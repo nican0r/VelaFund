@@ -4,7 +4,7 @@
 
 **Status**: Phase 1 (Foundation and Infrastructure) in progress. Monorepo scaffolded, backend and frontend foundations built. Phase 0 spec issues are applied in implementation code but **all 69 P0 issues remain unfixed in the spec files themselves**.
 
-**Last Updated**: 2026-02-23 (v12.0 - Fixed 13 of 15 auth bugs (BUG-2 through BUG-15, excluding BUG-1 which requires Redis). Implemented RolesGuard, registered ThrottlerGuard globally, fixed ValidationPipe error translation, added Apple OAuth support, fixed race condition in user creation, fixed 8 low/medium bugs. 67 tests passing (was 54). BUG-1 deferred until Redis infrastructure is set up.)
+**Last Updated**: 2026-02-23 (v12.1 - Fixed BUG-7: all 5 broken Prisma relations, 2 missing unique constraints, 8 missing indexes. 67 tests passing.)
 
 ---
 
@@ -28,10 +28,10 @@ A comprehensive spec audit (v8.0) uncovered systemic issues that affect nearly a
 | Aspect | Status | Notes |
 |--------|--------|-------|
 | `/frontend` directory | **SCAFFOLDED** | 14 source files, 0 tests. Layouts built. Privy SDK NOT installed. next-intl NOT installed. shadcn/ui CLI never run (no `components/ui/`, no `components.json`). **No auth protection on any route** — no `middleware.ts`, no protected route wrapper. Login page is static stub. Dashboard is visual prototype with hardcoded data. Missing CSP and HSTS security headers. Missing Brazilian formatting helpers. |
-| `/backend` directory | **SCAFFOLDED** | 36 source files, 67 tests. Auth module complete (13 of 15 bugs fixed — BUG-1 and BUG-7 remain). Common infrastructure solid. No domain feature modules yet. |
+| `/backend` directory | **SCAFFOLDED** | 36 source files, 67 tests. Auth module complete (14 of 15 bugs fixed — BUG-1 remains, requires Redis). Common infrastructure solid. No domain feature modules yet. |
 | `/contracts` directory | EXISTS (empty) | No Solidity files |
 | `package.json` | **CREATED** | pnpm workspaces + Turborepo configured |
-| Prisma schema | **NEAR-COMPLETE** | 1183 lines, 32 models, 35 enums. Missing: DataroomFolder, DataroomDocument, ExitScenario, WaterfallResult, ExportJob, LitigationVerification (inlined into CompanyProfile). 5 broken relations. Missing indexes on 5+ models. Missing `@@unique([documentId, email])` on DocumentSigner. |
+| Prisma schema | **NEAR-COMPLETE** | 32 models, 35 enums. All relations, unique constraints, and indexes complete. Missing entities: DataroomFolder, DataroomDocument, ExitScenario, WaterfallResult, ExportJob, LitigationVerification (inlined into CompanyProfile). Migration pending. |
 | Specification files | **26 files** in `/specs/` | **ALL 69 P0 issues still unfixed in specs** (code has correct patterns, specs are stale). 5 spec compliance gaps identified in v11.0. |
 | Cross-cutting specs | **9 files** in `.claude/rules/` | +user-flow-documentation.md |
 | Design system | `.claude/rules/design-system.md` | Complete (891 lines), tokens in tailwind.config.ts + globals.css. **Border radius scale systematically wrong** — entire scale shifted (lg=8px should be 12px, md=6px should be 8px, sm=4px should be 6px, xl=16px undefined). |
@@ -52,7 +52,7 @@ A comprehensive spec audit (v8.0) uncovered systemic issues that affect nearly a
 | BUG-4 | **ValidationPipe errors not structured** | **HIGH** | **FIXED v0.0.3** | `GlobalExceptionFilter` now detects `BadRequestException` from `ValidationPipe` and translates to `VAL_INVALID_INPUT` with `validationErrors` array per api-standards.md. |
 | BUG-5 | **Accept-Language not normalized** | **LOW** | **FIXED v0.0.3** | Added `normalizeLanguage()` in `GlobalExceptionFilter` that handles `en-US` → `en`, `pt` → `pt-BR`. |
 | BUG-6 | **Apple OAuth not handled** | **MEDIUM** | **FIXED v0.0.3** | Added `apple_oauth` account type to `extractEmail()` and `extractName()`. |
-| BUG-7 | **Prisma broken relations (5 total)** | **MEDIUM** | **OPEN** | `UserNotificationPreferences` has no `@relation` to User. `FundingRound` has no `@relation` to ShareClass. `OptionGrant` has no relation to Shareholder. `OptionPlan.shareClassId` has no `@relation` to ShareClass. `ConvertibleInstrument.targetShareClassId` has no `@relation` to ShareClass. |
+| BUG-7 | **Prisma broken relations (5 total)** | **MEDIUM** | **FIXED v0.0.4** | Fixed all 5 broken relations: UserNotificationPreferences→User, FundingRound→ShareClass, OptionGrant→Shareholder, OptionPlan→ShareClass, ConvertibleInstrument.targetShareClassId→ShareClass. Also added missing unique constraints (RoundCommitment[roundId,shareholderId], DocumentSigner[documentId,email]) and 8 missing indexes. |
 | BUG-8 | **Race condition in user creation** | **MEDIUM** | **FIXED v0.0.3** | Wrapped user find-or-create in `prisma.$transaction()` to prevent concurrent first-login race conditions. |
 | BUG-9 | **`@RequireAuth()` causes double guard execution** | **MEDIUM** | **FIXED v0.0.3** | Changed `@RequireAuth()` from `UseGuards(AuthGuard)` to `SetMetadata(REQUIRE_AUTH_KEY, true)` — now a no-op marker since AuthGuard is global. |
 | BUG-10 | **Email sync conflict on existing user** | **LOW** | **FIXED v0.0.3** | Added email conflict check before updating existing user's email on login. |
@@ -1061,13 +1061,13 @@ FINAL REVIEW:
   - Set up Prisma ORM with complete schema (ALL entities from 26 specs)
   - Environment validation via @nestjs/config
 
-- [x] Create base database schema (Prisma) (**NEAR-COMPLETE** - v0.0.1, 1183 lines, 32 models, 35 enums)
+- [x] Create base database schema (Prisma) (**COMPLETE** - v0.0.1 initial, v0.0.4 relations/indexes fixed. 32 models, 35 enums)
   - ALL main entities defined: User, Company, CompanyMember, Shareholder, ShareClass, Shareholding, Transaction, BlockchainTransaction, FundingRound, RoundCommitment, RoundClose, ConvertibleInstrument, OptionPlan, OptionGrant, OptionExerciseRequest, Document, DocumentSigner, DocumentTemplate, Notification, UserNotificationPreferences, AuditLog, AuditHashChain, ConsentRecord, KycVerification, CompanyProfile + 5 profile sub-entities, InvitationToken, BeneficialOwner
   - Correct patterns applied: @map for snake_case DB columns, Decimal for all financial fields, cpfEncrypted/cpfBlindIndex, Shareholding (not CapTableEntry), 1:many BlockchainTransaction→Transaction, PARTIALLY_SIGNED in DocumentStatus, channel on Notification
   - **MISSING ENTITIES**: DataroomFolder, DataroomDocument (company-dataroom.md), ExitScenario, WaterfallResult (exit-waterfall.md), ExportJob (reports-analytics.md — async export tracking), LitigationVerification (inlined into CompanyProfile — may need separate entity for multiple checks over time)
-  - **BROKEN RELATIONS** (BUG-7, 5 total): UserNotificationPreferences has no @relation to User, FundingRound has no @relation to ShareClass, OptionGrant has no @relation to Shareholder, OptionPlan.shareClassId has no @relation to ShareClass, ConvertibleInstrument.targetShareClassId has no @relation to ShareClass
-  - **MISSING CONSTRAINTS**: RoundCommitment needs `@@unique([roundId, shareholderId])` if one commitment per shareholder per round. DocumentSigner needs `@@unique([documentId, email])` to prevent duplicate signers.
-  - **MISSING INDEXES**: ProfileMetric, ProfileTeamMember, ProfileDocument (need `profileId` index), BeneficialOwner (needs `shareholderId`), RoundClose (needs `roundId`), DocumentSigner (needs `[userId, status]`), Shareholding (needs `shareClassId`)
+  - All relations complete (BUG-7 fixed in v0.0.4): UserNotificationPreferences→User, FundingRound→ShareClass, OptionGrant→Shareholder, OptionPlan→ShareClass, ConvertibleInstrument.targetShareClassId→ShareClass
+  - Unique constraints added: RoundCommitment `@@unique([roundId, shareholderId])`, DocumentSigner `@@unique([documentId, email])`
+  - All indexes added: ProfileMetric/ProfileTeamMember/ProfileDocument (profileId), BeneficialOwner (shareholderId), RoundClose (roundId), DocumentSigner ([userId, status]), Shareholding (shareClassId), plus CompanyProfile (companyId)
   - AuditLog entity defined (immutability trigger to be added in migration)
   - ConsentRecord entity (LGPD compliance)
   - Migration pending (needs running database)
@@ -1134,14 +1134,14 @@ FINAL REVIEW:
   - **MISSING**: Privy API retry/exponential backoff (single try/catch, no retry on transient failures)
   - **MISSING**: Email notification on lockout (spec BR-4)
 
-- [x] Fix critical auth bugs (**DONE v0.0.3** — 13 of 15 bugs fixed, BUG-1 + BUG-7 remain open)
+- [x] Fix critical auth bugs (**DONE v0.0.3** — 13 of 15 bugs fixed, BUG-1 remains open. BUG-7 fixed separately in v0.0.4.)
   - ~~BUG-1: Implement server-side session management~~ — **DEFERRED** (requires Redis infrastructure)
   - BUG-2: ✅ Implemented `RolesGuard` (reads ROLES_KEY, looks up CompanyMember, returns 404 for non-members)
   - BUG-3: ✅ Registered ThrottlerGuard as APP_GUARD in app.module.ts
   - BUG-4: ✅ GlobalExceptionFilter detects BadRequestException → structured VAL_INVALID_INPUT
   - BUG-5: ✅ normalizeLanguage() handles en-US → en, pt → pt-BR
   - BUG-6: ✅ Added apple_oauth to extractEmail() and extractName()
-  - ~~BUG-7: Fix Prisma broken relations~~ — **DEFERRED** (schema-level fix, not auth-specific)
+  - BUG-7: ✅ Fixed all 5 broken Prisma relations + 2 unique constraints + 8 indexes (v0.0.4)
   - BUG-8: ✅ Wrapped user find-or-create in `$transaction`
   - BUG-9: ✅ Changed @RequireAuth() to SetMetadata (no-op marker)
   - BUG-10: ✅ Email conflict check before updating existing user's email
@@ -1752,12 +1752,13 @@ HIGH:
     - File: backend/src/common/filters/global-exception.filter.ts
 
 MEDIUM:
-[ ] BUG-7: Fix Prisma broken relations (5 total)
-    - UserNotificationPreferences: add @relation to User, add reverse relation on User model
-    - FundingRound: add @relation to ShareClass
-    - OptionGrant: add nullable @relation to Shareholder
-    - OptionPlan.shareClassId: add @relation to ShareClass (NEW in v11.0)
-    - ConvertibleInstrument.targetShareClassId: add @relation to ShareClass (NEW in v11.0)
+[x] BUG-7: Fix Prisma broken relations (5 total) — **FIXED v0.0.4**
+    - ✅ UserNotificationPreferences: added @relation to User + reverse relation
+    - ✅ FundingRound: added @relation to ShareClass
+    - ✅ OptionGrant: added nullable @relation to Shareholder
+    - ✅ OptionPlan.shareClassId: added @relation to ShareClass
+    - ✅ ConvertibleInstrument.targetShareClassId: added @relation to ShareClass
+    - Also added 2 unique constraints and 8 missing indexes
     - File: backend/prisma/schema.prisma
 
 [ ] BUG-8: Fix race condition in user creation
@@ -1960,23 +1961,24 @@ Missing Models:
 [ ] Add ExportJob model (reports-analytics.md) — fields: id, companyId, format, status (QUEUED|PROCESSING|COMPLETED|FAILED), s3Key, downloadUrl, expiresAt, errorCode
 [ ] Consider extracting LitigationVerification from CompanyProfile to separate model
 
-Broken Relations (BUG-7, 5 total):
-[ ] Add @relation to UserNotificationPreferences.userId → User
-[ ] Add @relation to FundingRound.shareClassId → ShareClass
-[ ] Add nullable @relation to OptionGrant.shareholderId → Shareholder
-[ ] Add @relation to OptionPlan.shareClassId → ShareClass (v11.0)
-[ ] Add @relation to ConvertibleInstrument.targetShareClassId → ShareClass (v11.0)
+Broken Relations (BUG-7, 5 total) — **ALL FIXED v0.0.4**:
+[x] Add @relation to UserNotificationPreferences.userId → User
+[x] Add @relation to FundingRound.shareClassId → ShareClass
+[x] Add nullable @relation to OptionGrant.shareholderId → Shareholder
+[x] Add @relation to OptionPlan.shareClassId → ShareClass (v11.0)
+[x] Add @relation to ConvertibleInstrument.targetShareClassId → ShareClass (v11.0)
 
-Missing Constraints:
-[ ] Add @@unique([roundId, shareholderId]) to RoundCommitment if needed
-[ ] Add @@unique([documentId, email]) to DocumentSigner to prevent duplicate signers (v11.0)
+Missing Constraints — **ALL FIXED v0.0.4**:
+[x] Add @@unique([roundId, shareholderId]) to RoundCommitment
+[x] Add @@unique([documentId, email]) to DocumentSigner
 
-Missing Indexes (v11.0):
-[ ] ProfileMetric, ProfileTeamMember, ProfileDocument — add @@index([profileId])
-[ ] BeneficialOwner — add @@index([shareholderId])
-[ ] RoundClose — add @@index([roundId])
-[ ] DocumentSigner — add @@index([userId, status])
-[ ] Shareholding — add @@index([shareClassId])
+Missing Indexes (v11.0) — **ALL FIXED v0.0.4**:
+[x] ProfileMetric, ProfileTeamMember, ProfileDocument — added @@index([profileId])
+[x] BeneficialOwner — added @@index([shareholderId])
+[x] RoundClose — added @@index([roundId])
+[x] DocumentSigner — added @@index([userId, status])
+[x] Shareholding — added @@index([shareClassId])
+[x] CompanyProfile — added @@index([companyId])
 ```
 
 ### PREVIOUSLY COMPLETED (no action needed)

@@ -31,12 +31,13 @@ model User {
   cpfBlindIndex   String?   @map("cpf_blind_index")
 
   // Relations
-  kycVerification   KycVerification?
-  companyMembers    CompanyMember[]
-  createdCompanies  Company[]          @relation("CompanyCreator")
-  auditLogs         AuditLog[]
-  consentRecords    ConsentRecord[]
-  notifications     Notification[]
+  kycVerification           KycVerification?
+  companyMembers            CompanyMember[]
+  createdCompanies          Company[]          @relation("CompanyCreator")
+  auditLogs                 AuditLog[]
+  consentRecords            ConsentRecord[]
+  notifications             Notification[]
+  notificationPreferences   UserNotificationPreferences?
 
   @@index([cpfBlindIndex])
   @@index([privyUserId])
@@ -322,6 +323,7 @@ model ProfileMetric {
 
   profile CompanyProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
+  @@index([profileId])
   @@map("profile_metrics")
 }
 
@@ -348,6 +350,7 @@ model ProfileTeamMember {
 
   profile CompanyProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
+  @@index([profileId])
   @@map("profile_team_members")
 }
 
@@ -367,6 +370,7 @@ model ProfileDocument {
 
   profile CompanyProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
 
+  @@index([profileId])
   @@map("profile_documents")
 }
 
@@ -421,9 +425,12 @@ model ShareClass {
   updatedAt                     DateTime  @updatedAt @map("updated_at")
 
   // Relations
-  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  shareholdings Shareholding[]
-  transactions  Transaction[]  @relation("TransactionShareClass")
+  company              Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  shareholdings        Shareholding[]
+  transactions         Transaction[]          @relation("TransactionShareClass")
+  fundingRounds        FundingRound[]         @relation("FundingRoundShareClass")
+  optionPlans          OptionPlan[]           @relation("OptionPlanShareClass")
+  targetedConvertibles ConvertibleInstrument[] @relation("ConvertibleTargetShareClass")
 
   @@unique([companyId, className])
   @@index([companyId])
@@ -471,6 +478,7 @@ model Shareholder {
   toTransactions       Transaction[]        @relation("TransactionToShareholder")
   roundCommitments     RoundCommitment[]
   convertibles         ConvertibleInstrument[]
+  optionGrants         OptionGrant[]
 
   @@unique([companyId, cpfCnpjBlindIndex])
   @@index([companyId, status])
@@ -507,6 +515,7 @@ model BeneficialOwner {
 
   shareholder Shareholder @relation(fields: [shareholderId], references: [id], onDelete: Cascade)
 
+  @@index([shareholderId])
   @@map("beneficial_owners")
 }
 
@@ -528,6 +537,7 @@ model Shareholding {
 
   @@unique([shareholderId, shareClassId])
   @@index([companyId])
+  @@index([shareClassId])
   @@map("shareholdings")
 }
 
@@ -664,6 +674,7 @@ model FundingRound {
 
   // Relations
   company     Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  shareClass  ShareClass        @relation("FundingRoundShareClass", fields: [shareClassId], references: [id])
   commitments RoundCommitment[]
   closes      RoundClose[]
 
@@ -697,6 +708,7 @@ model RoundCommitment {
   round       FundingRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
   shareholder Shareholder  @relation(fields: [shareholderId], references: [id])
 
+  @@unique([roundId, shareholderId])
   @@index([roundId])
   @@map("round_commitments")
 }
@@ -721,6 +733,7 @@ model RoundClose {
 
   round FundingRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
 
+  @@index([roundId])
   @@map("round_closes")
 }
 
@@ -757,8 +770,9 @@ model ConvertibleInstrument {
   updatedAt                   DateTime              @updatedAt @map("updated_at")
 
   // Relations
-  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  shareholder Shareholder @relation(fields: [shareholderId], references: [id])
+  company          Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  shareholder      Shareholder @relation(fields: [shareholderId], references: [id])
+  targetShareClass ShareClass? @relation("ConvertibleTargetShareClass", fields: [targetShareClassId], references: [id])
 
   @@index([companyId, status])
   @@map("convertible_instruments")
@@ -822,8 +836,9 @@ model OptionPlan {
   updatedAt         DateTime        @updatedAt @map("updated_at")
 
   // Relations
-  company Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  grants  OptionGrant[]
+  company    Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  shareClass ShareClass    @relation("OptionPlanShareClass", fields: [shareClassId], references: [id])
+  grants     OptionGrant[]
 
   @@index([companyId, status])
   @@map("option_plans")
@@ -869,9 +884,10 @@ model OptionGrant {
   updatedAt          DateTime          @updatedAt @map("updated_at")
 
   // Relations
-  company   Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  plan      OptionPlan             @relation(fields: [planId], references: [id])
-  exercises OptionExerciseRequest[]
+  company     Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  plan        OptionPlan             @relation(fields: [planId], references: [id])
+  shareholder Shareholder?           @relation(fields: [shareholderId], references: [id])
+  exercises   OptionExerciseRequest[]
 
   @@index([companyId])
   @@index([planId])
@@ -1019,7 +1035,9 @@ model DocumentSigner {
   // Relations
   document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
+  @@unique([documentId, email])
   @@index([documentId])
+  @@index([userId, status])
   @@map("document_signers")
 }
 
@@ -1092,6 +1110,9 @@ model UserNotificationPreferences {
   security      Boolean @default(true)
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_notification_preferences")
 }
