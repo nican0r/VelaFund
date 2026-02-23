@@ -46,6 +46,18 @@ const MESSAGES: Record<string, Record<string, string>> = {
     'pt-BR': 'Não autorizado',
     en: 'Unauthorized',
   },
+  'errors.auth.accountLocked': {
+    'pt-BR': 'Conta temporariamente bloqueada. Tente novamente em 15 minutos.',
+    en: 'Account temporarily locked. Try again in 15 minutes.',
+  },
+  'errors.auth.privyUnavailable': {
+    'pt-BR': 'Serviço de autenticação indisponível',
+    en: 'Authentication service unavailable',
+  },
+  'errors.auth.duplicateEmail': {
+    'pt-BR': 'E-mail já registrado',
+    en: 'Email already registered',
+  },
   'errors.company.cnpjDuplicate': {
     'pt-BR': 'CNPJ já cadastrado',
     en: 'CNPJ already registered',

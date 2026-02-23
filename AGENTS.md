@@ -72,6 +72,9 @@ pnpm --filter @navia/backend prisma:generate
 |------|---------|
 | `backend/prisma/schema.prisma` | Database schema (all entities) |
 | `backend/src/main.ts` | NestJS bootstrap (middleware, pipes, filters) |
+| `backend/src/auth/auth.service.ts` | Privy auth: token verify, login, user find/create |
+| `backend/src/auth/auth.controller.ts` | Auth endpoints: login, logout, me |
+| `backend/src/auth/guards/auth.guard.ts` | Global auth guard (JWT + cookie extraction) |
 | `backend/src/common/filters/global-exception.filter.ts` | Error response formatting |
 | `backend/src/common/interceptors/response.interceptor.ts` | Success response envelope |
 | `frontend/src/app/globals.css` | shadcn/ui CSS variables (Navia theme) |

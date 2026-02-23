@@ -7,7 +7,7 @@ Each document follows the template defined in `.claude/rules/user-flow-documenta
 
 | Flow | Actors | Status |
 |------|--------|--------|
-| *No flows documented yet* | — | — |
+| [Authentication](./authentication.md) | Unauthenticated user, Authenticated user | Backend complete |
 
 ## Cross-References
 

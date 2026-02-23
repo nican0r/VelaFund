@@ -4,7 +4,7 @@
 
 **Status**: Phase 1 (Foundation and Infrastructure) in progress. Monorepo scaffolded, backend and frontend foundations built. Phase 0 spec issues are being resolved inline during implementation (camelCase TypeScript, UPPER_SNAKE_CASE enums, response envelopes, etc.).
 
-**Last Updated**: 2026-02-23 (v9.0 - Phase 1.1, 1.2, 1.3 scaffolding complete. All P0.CRITICAL items resolved in code. Backend: 22 tests passing, NestJS builds clean. Frontend: Next.js builds clean, design system tokens applied.)
+**Last Updated**: 2026-02-23 (v9.1 - Phase 1.4 backend auth complete. Privy integration with @privy-io/node, global AuthGuard, @Public/@RequireAuth/@CurrentUser/@Roles decorators, login/logout/me endpoints, cookie-based sessions, failed attempt lockout. Backend: 54 tests passing, NestJS builds clean. Frontend: Next.js builds clean, design system tokens applied.)
 
 ---
 
@@ -26,14 +26,14 @@ A comprehensive spec audit (v8.0) uncovered systemic issues that affect nearly a
 | Aspect | Status | Notes |
 |--------|--------|-------|
 | `/frontend` directory | **SCAFFOLDED** | Next.js 14 + Tailwind + shadcn/ui theme + i18n messages + API client + Jest |
-| `/backend` directory | **SCAFFOLDED** | NestJS 10 + Prisma schema (all entities) + API infrastructure + 22 passing tests |
+| `/backend` directory | **SCAFFOLDED** | NestJS 10 + Prisma schema (all entities) + API infrastructure + Auth module (Privy) + 54 passing tests |
 | `/contracts` directory | EXISTS (empty) | Foundry scaffold pending |
 | `package.json` | **CREATED** | pnpm workspaces + Turborepo configured |
 | Prisma schema | **COMPLETE** | All entities from 26 specs, ~550 lines, all P0.CRITICAL fixes applied |
 | Specification files | **26 files** in `/specs/` | 9 new specs added since v6.0, ~17,300 total lines |
 | Cross-cutting specs | **9 files** in `.claude/rules/` | +user-flow-documentation.md |
 | Design system | `.claude/rules/design-system.md` | Complete (891 lines), tokens in tailwind.config.ts + globals.css |
-| Git tag | `v0.0.1` | Foundation scaffold |
+| Git tag | `v0.0.2` | Backend Privy auth module |
 
 ### Phase 0 Progress Summary
 
@@ -1029,13 +1029,19 @@ FINAL REVIEW:
 
 ### 1.4 Authentication (Privy Integration)
 
-- [ ] Backend Privy integration
-  - JWT verification middleware
-  - AuthService (verify token, get/create user)
-  - Auth guards (`@Public`, `@RequireAuth`)
-  - `@CurrentUser` decorator
-  - Session management (2hr inactivity, 7d absolute)
-  - Failed login attempt tracking (5 failures -> 15min lock)
+- [x] Backend Privy integration (**DONE** - v0.0.2)
+  - @privy-io/node SDK (v0.9.0) — verifyAccessToken + users()._get()
+  - AuthService: verify token, get/create user, login flow, profile retrieval
+  - Global AuthGuard (via APP_GUARD) — all routes protected by default
+  - `@Public()` decorator to opt out of auth
+  - `@RequireAuth()` decorator for explicit auth
+  - `@CurrentUser()` param decorator (extracts AuthenticatedUser from request)
+  - `@Roles()` decorator for role-based access (guard implementation pending)
+  - AuthController: POST /api/v1/auth/login, POST /logout, GET /me
+  - HTTP-only cookie sessions (7d absolute, SameSite=Strict)
+  - Failed login attempt tracking (5 failures -> 15min lock per IP, in-memory Map for MVP)
+  - cookie-parser middleware added to main.ts
+  - 32 tests (auth.service: 16, auth.guard: 10, auth.controller: 6)
 
 - [ ] Frontend Privy integration
   - Privy React SDK configuration

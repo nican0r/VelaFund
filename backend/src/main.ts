@@ -3,6 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
+import * as cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
@@ -45,6 +46,9 @@ async function bootstrap() {
     credentials: true,
     maxAge: 3600,
   });
+
+  // Cookie parser (needed for HTTP-only auth cookies)
+  app.use(cookieParser());
 
   // Global middleware
   app.use(new RequestIdMiddleware().use.bind(new RequestIdMiddleware()));
