@@ -8,9 +8,9 @@
 
 ## Overview
 
-When employees want to exercise vested options, they submit an exercise request specifying quantity. The system calculates the amount due (quantity × strike price), provides bank transfer instructions, and creates a pending request. After the employee transfers money to the company bank account, an admin confirms payment receipt. Upon confirmation, the backend submits a blockchain transaction to issue shares, converting options to actual equity.
+When employees want to exercise vested options, they submit an exercise request specifying quantity. The system calculates the amount due (quantity x strike price), provides bank transfer instructions, and creates a pending request. After the employee transfers money to the company bank account, an admin confirms payment receipt. Upon confirmation, the backend submits a blockchain transaction to issue shares, converting options to actual equity.
 
-**Flow**: Employee requests → System calculates cost → Employee pays via bank → Admin confirms → Shares issued on-chain
+**Flow**: Employee requests -> System calculates cost -> Employee pays via bank -> Admin confirms -> Shares issued on-chain
 
 ---
 
@@ -42,8 +42,8 @@ When employees want to exercise vested options, they submit an exercise request 
 
 ### FR-1: Exercise Request Creation
 - Employee submits request for specific quantity
-- System validates: quantity ≤ vested options
-- System calculates amount due: quantity × strike price
+- System validates: quantity <= vested options
+- System calculates amount due: quantity x strike price
 - System creates pending request with payment instructions
 
 ### FR-2: Payment Method
@@ -67,7 +67,7 @@ When employees want to exercise vested options, they submit an exercise request 
 - Sends confirmation email to employee
 
 ### FR-5: Exercise Request Lifecycle
-- Status: PENDING_PAYMENT → PAYMENT_CONFIRMED → SHARES_ISSUED → COMPLETED
+- Status: PENDING_PAYMENT -> PAYMENT_CONFIRMED -> SHARES_ISSUED -> COMPLETED
 
 ---
 
@@ -82,7 +82,7 @@ interface OptionExerciseRequest {
   // Request Details
   quantity_requested: number;
   strike_price: number;              // From grant
-  amount_due: number;                // Quantity × strike price
+  amount_due: number;                // Quantity x strike price
 
   // Payment
   payment_status: 'PENDING' | 'CONFIRMED';
@@ -111,76 +111,179 @@ interface OptionExerciseRequest {
 
 ## API Endpoints
 
-### POST /api/v1/option-grants/:grantId/request-exercise
-Employee creates exercise request
+### POST /api/v1/companies/:companyId/option-grants/:grantId/exercise
+
+Employee creates an exercise request.
 
 **Request**:
 ```json
 {
-  "quantity": 5000
+  "quantity": 5000,
+  "paymentMethod": "PIX"
 }
 ```
 
 **Response** (201 Created):
 ```json
 {
-  "request_id": "uuid",
-  "quantity": 5000,
-  "strike_price": 5.00,
-  "amount_due": 25000.00,
-  "payment_reference": "EX-2024-001-ABC123",
-  "bank_details": {
-    "bank_name": "Banco do Brasil",
-    "account_holder": "Startup XYZ Ltda.",
-    "account_number": "12345-6",
-    "pix_key": "12.345.678/0001-90"
-  },
-  "instructions": "Transfer R$ 25,000.00 and include reference code EX-2024-001-ABC123"
+  "success": true,
+  "data": {
+    "id": "d4e5f6a7-b8c9-0123-def4-567890abcdef",
+    "optionGrantId": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+    "quantity": 5000,
+    "strikePrice": "5.00",
+    "amountDue": "25000.00",
+    "paymentReference": "EX-2026-001-ABC123",
+    "paymentMethod": "PIX",
+    "bankDetails": {
+      "bankName": "Banco do Brasil",
+      "accountHolder": "Startup XYZ Ltda.",
+      "accountNumber": "12345-6",
+      "pixKey": "12.345.678/0001-90"
+    },
+    "instructions": "Transfira R$ 25.000,00 e inclua o código de referência EX-2026-001-ABC123",
+    "status": "PENDING_PAYMENT",
+    "requestedAt": "2026-02-23T10:00:00.000Z",
+    "createdAt": "2026-02-23T10:00:00.000Z"
+  }
+}
+```
+
+### GET /api/v1/companies/:companyId/option-grants/:grantId/exercise
+
+Get the exercise request status for a specific grant.
+
+**Response** (200 OK):
+```json
+{
+  "success": true,
+  "data": {
+    "id": "d4e5f6a7-b8c9-0123-def4-567890abcdef",
+    "optionGrantId": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+    "quantity": 5000,
+    "strikePrice": "5.00",
+    "amountDue": "25000.00",
+    "paymentReference": "EX-2026-001-ABC123",
+    "paymentStatus": "PENDING",
+    "status": "PENDING_PAYMENT",
+    "blockchainTxHash": null,
+    "requestedAt": "2026-02-23T10:00:00.000Z",
+    "createdAt": "2026-02-23T10:00:00.000Z"
+  }
 }
 ```
 
 ### GET /api/v1/companies/:companyId/option-exercises
-Admin views all pending exercise requests
 
-**Response**:
+Admin views all exercise requests for the company with pagination.
+
+**Query Parameters**:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `page` | integer | 1 | Page number |
+| `limit` | integer | 20 | Items per page (max 100) |
+| `status` | string | — | Filter: `PENDING_PAYMENT`, `PAYMENT_CONFIRMED`, `SHARES_ISSUED`, `COMPLETED`, `CANCELLED` |
+| `sort` | string | `-requestedAt` | Sort field |
+
+**Response** (200 OK):
 ```json
 {
-  "pending_requests": [
+  "success": true,
+  "data": [
     {
-      "id": "uuid",
-      "employee_name": "Maria Silva",
+      "id": "d4e5f6a7-b8c9-0123-def4-567890abcdef",
+      "optionGrantId": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+      "shareholderName": "Maria Silva",
       "quantity": 5000,
-      "amount_due": 25000.00,
-      "payment_reference": "EX-2024-001-ABC123",
-      "requested_at": "2024-01-20T10:00:00Z",
+      "amountDue": "25000.00",
+      "paymentReference": "EX-2026-001-ABC123",
+      "requestedAt": "2026-02-23T10:00:00.000Z",
       "status": "PENDING_PAYMENT"
     }
-  ]
+  ],
+  "meta": {
+    "total": 3,
+    "page": 1,
+    "limit": 20,
+    "totalPages": 1
+  }
 }
 ```
 
-### POST /api/v1/option-exercises/:requestId/confirm-payment
-Admin confirms payment received
+### POST /api/v1/companies/:companyId/option-grants/:grantId/exercise/:exerciseId/confirm
+
+Admin confirms payment received and triggers share issuance.
 
 **Request**:
 ```json
 {
-  "payment_date": "2024-01-22",
-  "payment_notes": "PIX received, reference matched"
+  "paymentDate": "2026-02-25",
+  "paymentNotes": "PIX received, reference matched"
 }
 ```
 
 **Response** (200 OK):
 ```json
 {
-  "status": "PAYMENT_CONFIRMED",
-  "message": "Share issuance initiated",
-  "blockchain_tx_hash": "0x..."
+  "success": true,
+  "data": {
+    "id": "d4e5f6a7-b8c9-0123-def4-567890abcdef",
+    "status": "PAYMENT_CONFIRMED",
+    "paymentConfirmedAt": "2026-02-25T14:30:00.000Z",
+    "blockchainTxHash": "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+    "message": "Share issuance initiated"
+  }
 }
 ```
 
-### POST /api/v1/option-exercises/:requestId/cancel
-Employee or admin cancels request
+### POST /api/v1/companies/:companyId/option-grants/:grantId/exercise/:exerciseId/cancel
+
+Employee or admin cancels an exercise request. Only allowed while status is `PENDING_PAYMENT`.
+
+**Response** (200 OK):
+```json
+{
+  "success": true,
+  "data": {
+    "id": "d4e5f6a7-b8c9-0123-def4-567890abcdef",
+    "status": "CANCELLED",
+    "cancelledAt": "2026-02-24T09:00:00.000Z"
+  }
+}
+```
+
+---
+
+## Error Codes
+
+| Code | HTTP Status | Description | messageKey |
+|------|-------------|-------------|------------|
+| `OPT_EXERCISE_PENDING` | 422 | An exercise request is already pending for this grant | `errors.opt.exercisePending` |
+| `OPT_EXERCISE_NOT_FOUND` | 404 | Exercise request does not exist | `errors.opt.exerciseNotFound` |
+| `OPT_EXERCISE_WINDOW_CLOSED` | 422 | Post-termination exercise window has expired | `errors.opt.exerciseWindowClosed` |
+| `OPT_INSUFFICIENT_VESTED` | 422 | Not enough vested options to exercise the requested quantity | `errors.opt.insufficientVested` |
+| `OPT_GRANT_NOT_FOUND` | 404 | Option grant does not exist or is not accessible | `errors.opt.grantNotFound` |
+| `OPT_GRANT_TERMINATED` | 422 | Option grant has been terminated | `errors.opt.grantTerminated` |
+| `CHAIN_TX_FAILED` | 422 | On-chain share issuance transaction failed | `errors.chain.txFailed` |
+| `CHAIN_CONTRACT_NOT_DEPLOYED` | 422 | Company smart contract not yet deployed | `errors.chain.contractNotDeployed` |
+| `VAL_INVALID_INPUT` | 400 | One or more request fields failed validation | `errors.val.invalidInput` |
+
+**Error Response Example**:
+```json
+{
+  "success": false,
+  "error": {
+    "code": "OPT_INSUFFICIENT_VESTED",
+    "message": "Opções vested insuficientes para exercício",
+    "messageKey": "errors.opt.insufficientVested",
+    "details": {
+      "vestedOptions": 5000,
+      "requestedQuantity": 10000
+    }
+  }
+}
+```
 
 ---
 
@@ -188,7 +291,7 @@ Employee or admin cancels request
 
 ### BR-1: Vesting Validation
 - Employee can only exercise vested options
-- quantity_requested ≤ (vested_options - already_exercised)
+- quantity_requested <= (vested_options - already_exercised)
 
 ### BR-2: Payment Reference Uniqueness
 - Each exercise request gets unique payment reference
@@ -224,8 +327,8 @@ Employee or admin cancels request
 3. Employee clicks "Exercise Options"
 4. System displays form: "How many options to exercise?"
 5. Employee enters: 5,000
-6. System validates: 5,000 ≤ 5,000 vested ✓
-7. System calculates: 5,000 × R$ 5.00 = R$ 25,000.00
+6. System validates: 5,000 <= 5,000 vested
+7. System calculates: 5,000 x R$ 5.00 = R$ 25,000.00
 8. System shows payment summary:
    - Quantity: 5,000 options
    - Strike Price: R$ 5.00
@@ -236,7 +339,7 @@ Employee or admin cancels request
     - Bank: Banco do Brasil
     - Account: 12345-6
     - PIX: 12.345.678/0001-90
-    - Reference: EX-2024-001-ABC123
+    - Reference: EX-2026-001-ABC123
     - Amount: R$ 25,000.00
 12. Employee copies bank details
 13. Employee makes bank transfer via PIX
@@ -252,14 +355,14 @@ PRECONDITION: Employee transferred R$ 25,000 via PIX
 
 1. Admin navigates to "Option Exercises" admin panel
 2. System displays list of pending exercise requests
-3. Admin sees: Maria Silva - 5,000 options - R$ 25,000 - Ref: EX-2024-001-ABC123
+3. Admin sees: Maria Silva - 5,000 options - R$ 25,000 - Ref: EX-2026-001-ABC123
 4. Admin checks company bank account
-5. Admin finds PIX transfer: R$ 25,000.00, Description: "EX-2024-001-ABC123"
+5. Admin finds PIX transfer: R$ 25,000.00, Description: "EX-2026-001-ABC123"
 6. Admin clicks "Confirm Payment" on Maria's request
 7. System displays confirmation modal:
    - Employee: Maria Silva
    - Amount: R$ 25,000.00
-   - Reference: EX-2024-001-ABC123
+   - Reference: EX-2026-001-ABC123
    - "Once confirmed, 5,000 shares will be issued. Continue?"
 8. Admin enters payment date and optional notes
 9. Admin clicks "Confirm"
@@ -275,7 +378,7 @@ PRECONDITION: Employee transferred R$ 25,000 via PIX
 16. System updates OptionGrant: exercised += 5,000
 17. System updates CapTable: Maria now has 5,000 shares
 18. System sends email to Maria: "Your shares have been issued! View on Basescan"
-19. Admin sees: Request status "Completed ✓"
+19. Admin sees: Request status "Completed"
 
 POSTCONDITION: Shares issued on-chain, cap table updated, employee notified
 ```
@@ -286,15 +389,15 @@ POSTCONDITION: Shares issued on-chain, cap table updated, employee notified
 
 ### EC-1: Insufficient Vested Options
 **Scenario**: Employee requests 10,000 but only 5,000 vested
-**Handling**: Return error: "You only have 5,000 vested options available to exercise"
+**Handling**: Return `OPT_INSUFFICIENT_VESTED` (422) with `vestedOptions` and `requestedQuantity` in error details.
 
 ### EC-2: Payment Amount Mismatch
 **Scenario**: Employee transfers R$ 20,000 instead of R$ 25,000
-**Handling**: Admin sees warning in confirmation, can add notes, may reject and ask employee to complete payment
+**Handling**: Admin sees warning in confirmation, can add notes, may reject and ask employee to complete payment.
 
 ### EC-3: Blockchain Transaction Fails
 **Scenario**: Share issuance transaction fails on blockchain
-**Handling**: 
+**Handling**:
 - Retry automatically up to 3 times
 - If all fail, alert admin
 - Do NOT mark as completed until on-chain confirmation
@@ -302,7 +405,31 @@ POSTCONDITION: Shares issued on-chain, cap table updated, employee notified
 
 ### EC-4: Employee Cancels After Payment
 **Scenario**: Employee wants to cancel after transferring money
-**Handling**: Admin must refund payment manually, then cancel request in system
+**Handling**: Admin must refund payment manually, then cancel request in system.
+
+### EC-5: Duplicate Exercise Request
+**Scenario**: Employee submits a second exercise request while one is already pending.
+**Handling**: Return `OPT_EXERCISE_PENDING` (422). Only one pending exercise request is allowed per grant at a time.
+
+### EC-6: Exercise After Termination Window
+**Scenario**: A terminated employee attempts to exercise options after the 90-day post-termination window has closed.
+**Handling**: Return `OPT_EXERCISE_WINDOW_CLOSED` (422). The employee can no longer exercise. Unvested options are already forfeited; vested but unexercised options are also forfeited.
+
+---
+
+## Related Specifications
+
+| Specification | Relationship |
+|---------------|-------------|
+| [option-plans.md](./option-plans.md) | Exercise requests reference option grants defined in option plans |
+| [transactions.md](./transactions.md) | Each exercise creates a share issuance transaction |
+| [cap-table-management.md](./cap-table-management.md) | Exercised options create new shareholdings that affect the cap table |
+| [blockchain-integration.md](./blockchain-integration.md) | On-chain share issuance via the OCP smart contract |
+| [shareholder-registry.md](./shareholder-registry.md) | Employee becomes a shareholder upon exercise completion |
+| [notifications.md](./notifications.md) | Email notifications for exercise request submitted, payment confirmed, shares issued |
+| [api-standards.md](../.claude/rules/api-standards.md) | API response envelope, pagination, and URL conventions for exercise endpoints |
+| [error-handling.md](../.claude/rules/error-handling.md) | Error codes: OPT_INSUFFICIENT_VESTED, OPT_EXERCISE_PENDING, OPT_EXERCISE_NOT_FOUND, OPT_EXERCISE_WINDOW_CLOSED |
+| [audit-logging.md](../.claude/rules/audit-logging.md) | Audit events: OPTION_EXERCISE_REQUESTED, OPTION_EXERCISE_CONFIRMED, OPTION_EXERCISE_REJECTED |
 
 ---
 
@@ -318,7 +445,7 @@ POSTCONDITION: Shares issued on-chain, cap table updated, employee notified
 ## Success Criteria
 
 - Exercise request creation: < 2 seconds
-- Payment confirmation → share issuance: < 30 seconds
+- Payment confirmation -> share issuance: < 30 seconds
 - 99% successful share issuance rate
 - Zero lost payments (all payments tracked)
 - 100% cap table accuracy after exercises

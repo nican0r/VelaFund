@@ -8,7 +8,7 @@
 
 ## Overview
 
-The cap table is the central record of equity ownership in a company, showing who owns what percentage of the company across different share classes. VelaFund's cap table mirrors on-chain state from OCP smart contracts deployed on Base Network, with automatic real-time synchronization. The system calculates ownership percentages, voting power, and fully-diluted positions (including unvested options) automatically after each transaction. The cap table supports both Brazilian corporate structures (Ltda. quotas and S.A. shares) and maintains OCT (Open Cap Table) standard compliance for interoperability.
+The cap table is the central record of equity ownership in a company, showing who owns what percentage of the company across different share classes. Navia's cap table mirrors on-chain state from OCP smart contracts deployed on Base Network, with automatic real-time synchronization. The system calculates ownership percentages, voting power, and fully-diluted positions (including unvested options) automatically after each transaction. The cap table supports both Brazilian corporate structures (Ltda. quotas and S.A. shares) and maintains OCT (Open Cap Table) standard compliance for interoperability.
 
 ---
 
@@ -958,3 +958,22 @@ export class CapTableRecalculationProcessor {
 - 99.9% uptime for cap table views
 - Automatic recovery from blockchain sync failures
 - Zero data loss during blockchain reorgs
+
+---
+
+## Related Specifications
+
+| Specification | Relationship |
+|---------------|-------------|
+| [shareholder-registry.md](./shareholder-registry.md) | Shareholders are the rows in the cap table; shareholdings represent ownership positions |
+| [share-classes.md](./share-classes.md) | Share classes define the columns in the cap table; authorized vs issued tracking |
+| [transactions.md](./transactions.md) | Transactions trigger cap table recalculation; issuances, transfers, and cancellations change ownership |
+| [blockchain-integration.md](./blockchain-integration.md) | On-chain reconciliation verifies cap table accuracy against smart contract state |
+| [funding-rounds.md](./funding-rounds.md) | Round closes create issuance transactions affecting cap table; pro-forma modeling |
+| [convertible-conversion.md](./convertible-conversion.md) | Conversions create new shareholdings and update cap table |
+| [option-plans.md](./option-plans.md) | Option pools included in fully-diluted cap table view |
+| [reports-analytics.md](./reports-analytics.md) | Reports read cap table data for ownership breakdowns, waterfall analysis, and exports |
+| [company-management.md](./company-management.md) | Cap table is scoped to a company; company status affects cap table operations |
+| [api-standards.md](../.claude/rules/api-standards.md) | API endpoints follow `/api/v1/companies/:companyId/cap-table` pattern with envelope responses |
+| [error-handling.md](../.claude/rules/error-handling.md) | Error codes: `CAP_INSUFFICIENT_SHARES`, `CAP_NEGATIVE_BALANCE`, `CAP_RECONCILIATION_FAILED`, `CAP_SNAPSHOT_NOT_FOUND`, `CAP_SHARE_CLASS_NOT_FOUND`, `CAP_SHARE_CLASS_IN_USE` |
+| [audit-logging.md](../.claude/rules/audit-logging.md) | Audit events: `CAP_TABLE_SNAPSHOT_CREATED`, `CAP_TABLE_RECONCILIATION_RUN`, `CAP_TABLE_DISCREPANCY_FOUND`, `CAP_TABLE_EXPORTED` |

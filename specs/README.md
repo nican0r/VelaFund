@@ -22,75 +22,102 @@ This directory contains detailed specification documents for each topic of conce
    - AML screening and compliance
    - KYC gating by user type (admin, investor, employee)
 
-### Company Management (1 spec)
+### Company Management (5 specs)
 
-3. **[company-management.md](./company-management.md)** - Company creation, membership, and lifecycle management
+3. **[company-management.md](./company-management.md)** - Company creation, lifecycle management, and multi-company support
    - Brazilian entity types (Ltda. and S.A.)
-   - CNPJ validation via Verifik (async with Bull job)
-   - CompanyMember: merged role, permissions, and invitation entity
-   - Multi-company support with X-Company-Id header
    - Company lifecycle: DRAFT → ACTIVE → INACTIVE → DISSOLVED
-   - Creator's embedded wallet as smart contract admin
+   - Multi-company support with company context switching
+   - Company CRUD operations and dissolution flow
+
+4. **[company-membership.md](./company-membership.md)** - Member invitation, roles, and access management
+   - CompanyMember entity with merged role, permissions, and invitation status
+   - Member invitation and acceptance workflow
+   - InvitationToken entity and validation
+   - Role management business rules (last admin protection)
+
+5. **[company-cnpj-validation.md](./company-cnpj-validation.md)** - Async CNPJ validation via Verifik
+   - Bull background job for CNPJ validation against Receita Federal
+   - Setup status tracking and retry logic
+   - CNPJ-specific edge cases and error handling
+
+6. **[company-blockchain-admin.md](./company-blockchain-admin.md)** - Creator wallet as smart contract admin
+   - OCP smart contract deployment per company
+   - Creator's embedded wallet as on-chain admin
+   - Admin transfer logic and resolved design decisions
+
+7. **[company-profile.md](./company-profile.md)** - Public company profile and document dataroom
+   - Shareable company profile page (description, sector, founding year)
+   - Key metrics cards (employees, ARR, MRR, etc.)
+   - Founding team members with photos
+   - Dataroom document uploads (pitch deck, financials, legal)
+   - Share link with access controls (public, password, email-gated)
+   - View analytics and document download tracking
 
 ### Core Cap Table (4 specs)
 
-4. **[shareholder-registry.md](./shareholder-registry.md)** - Shareholder management and equity tracking
+8. **[shareholder-registry.md](./shareholder-registry.md)** - Shareholder management and equity tracking
    - Individual and corporate shareholders
    - Foreign shareholder tracking
    - Beneficial ownership (UBO)
    - Shareholder access control
 
-5. **[cap-table-management.md](./cap-table-management.md)** - Cap table operations and ownership tracking
+9. **[cap-table-management.md](./cap-table-management.md)** - Cap table operations and ownership tracking
    - Real-time automatic recalculation
    - Fully-diluted views
    - Historical snapshots
    - OCT format export
    - Blockchain reconciliation
 
-6. **[share-classes.md](./share-classes.md)** - Brazilian share class structures
-   - Ltda. quotas support
-   - S.A. common and preferred shares
-   - Voting rights and liquidation preferences
-   - Brazilian corporate law compliance
+10. **[share-classes.md](./share-classes.md)** - Brazilian share class structures
+    - Ltda. quotas support
+    - S.A. common and preferred shares
+    - Voting rights and liquidation preferences
+    - Brazilian corporate law compliance
 
-7. **[transactions.md](./transactions.md)** - Share issuances, transfers, conversions
-   - Share issuance with dilution impact
-   - Transfer validation (lock-ups, right of first refusal)
-   - Admin-initiated transfers per Brazilian law
-   - Automatic cap table updates
+11. **[transactions.md](./transactions.md)** - Share issuances, transfers, conversions
+    - Share issuance with dilution impact
+    - Transfer validation (lock-ups, right of first refusal)
+    - Admin-initiated transfers per Brazilian law
+    - Automatic cap table updates
 
 ### Blockchain Infrastructure (1 spec)
 
-8. **[blockchain-integration.md](./blockchain-integration.md)** - On-chain recording using OCP smart contracts
-   - Base Network (L2) deployment
-   - Creator's embedded wallet as smart contract admin (no separate AdminWallet entity)
-   - Privy gas sponsorship (gasless transactions)
-   - Real-time event monitoring and sync
-   - Transaction confirmation tracking
+12. **[blockchain-integration.md](./blockchain-integration.md)** - On-chain recording using OCP smart contracts
+    - Base Network (L2) deployment
+    - Creator's embedded wallet as smart contract admin
+    - Privy gas sponsorship (gasless transactions)
+    - Real-time event monitoring and sync
+    - Transaction confirmation tracking
 
-### Investment Features (2 specs)
+### Investment Features (3 specs)
 
-9. **[funding-rounds.md](./funding-rounds.md)** - Investment round management
-   - Round creation (Seed, Series A, B, C)
-   - Pro-forma cap table modeling
-   - Investor commitment tracking
-   - Round closing mechanics
+13. **[funding-rounds.md](./funding-rounds.md)** - Investment round management
+    - Round creation (Seed, Series A, B, C)
+    - Pro-forma cap table modeling
+    - Investor commitment tracking
+    - Round closing mechanics
 
-10. **[convertible-instruments.md](./convertible-instruments.md)** - Mútuo Conversível, Investimento-Anjo, MISTO/MAIS
-    - Brazilian convertible instruments
-    - Conversion scenario modeling
-    - Valuation cap and discount rate application
-    - Automatic conversion execution
+14. **[convertible-instruments.md](./convertible-instruments.md)** - Mútuo Conversível, Investimento-Anjo, MISTO/MAIS
+    - Brazilian convertible instrument creation and tracking
+    - Interest accrual and status management
+    - Daily interest calculation job
+
+15. **[convertible-conversion.md](./convertible-conversion.md)** - Convertible instrument conversion logic
+    - Conversion calculation engine (valuation cap, discount, MFN)
+    - Scenario modeling and simulation
+    - Qualified financing triggers
+    - Conversion execution flow
 
 ### Employee Equity (2 specs)
 
-11. **[option-plans.md](./option-plans.md)** - Employee stock option plan management
+16. **[option-plans.md](./option-plans.md)** - Employee stock option plan management
     - Option pool creation and tracking
     - Option grants with vesting schedules
     - Cliff and linear vesting calculations
     - Termination policy configuration
 
-12. **[option-exercises.md](./option-exercises.md)** - Option exercise requests and payment confirmation
+17. **[option-exercises.md](./option-exercises.md)** - Option exercise requests and payment confirmation
     - Employee exercise requests
     - Strike price payment via bank transfer
     - Admin payment confirmation
@@ -98,14 +125,14 @@ This directory contains detailed specification documents for each topic of conce
 
 ### Document Management (2 specs)
 
-13. **[document-generation.md](./document-generation.md)** - Template-based legal document creation
+18. **[document-generation.md](./document-generation.md)** - Template-based legal document creation
     - Database-stored templates (editable without deployment)
     - Structured form generation from schema
     - Real-time HTML preview
     - PDF generation via Puppeteer
     - Brazilian corporate document support
 
-14. **[document-signatures.md](./document-signatures.md)** - Ethereum wallet signatures (EIP-712)
+19. **[document-signatures.md](./document-signatures.md)** - Ethereum wallet signatures (EIP-712)
     - Signature request workflow
     - EIP-712 typed data signatures via Privy
     - Cryptographic signature verification
@@ -113,24 +140,24 @@ This directory contains detailed specification documents for each topic of conce
 
 ### Reporting & Communication (3 specs)
 
-15. **[reports-analytics.md](./reports-analytics.md)** - Cap table reports and exports
+20. **[reports-analytics.md](./reports-analytics.md)** - Cap table reports, analytics, and exports
     - Current and fully-diluted cap tables
     - Ownership and dilution analysis
     - Exit waterfall modeling (M&A scenarios)
     - Due diligence packages
-    - OCT JSON export
+    - PDF, Excel, CSV, and OCT JSON export
 
-16. **[notifications.md](./notifications.md)** - Email notification system
+21. **[notifications.md](./notifications.md)** - Email notification system
     - Event-triggered notifications (signatures, transactions, vesting)
     - AWS SES integration
     - User notification preferences
     - Background job processing (Bull queue)
 
-17. **[user-permissions.md](./user-permissions.md)** - Role-based access control (RBAC)
+22. **[user-permissions.md](./user-permissions.md)** - Role-based access control (RBAC)
     - Roles: Admin, Finance, Legal, Investor, Employee
     - Company-specific role assignment
+    - Fine-grained permission overrides
     - Permission matrix and enforcement
-    - Role audit logging
 
 ---
 
@@ -143,14 +170,15 @@ Each specification file follows this structure:
 - **User Stories**: As a [role], I want to [action] so that [benefit]
 - **Functional Requirements**: What the system must do
 - **Data Models**: TypeScript entity definitions
-- **API Endpoints**: REST endpoints with request/response examples
+- **API Endpoints**: REST endpoints with request/response examples in envelope format
 - **Business Rules**: Validation and constraints
 - **User Flows**: Step-by-step interaction flows
-- **Edge Cases & Error Handling**: Exception scenarios
+- **Edge Cases & Error Handling**: Exception scenarios with error codes
 - **Dependencies**: Internal and external dependencies
 - **Technical Implementation**: Code examples
 - **Security Considerations**: Security requirements
 - **Success Criteria**: Performance and accuracy metrics
+- **Related Specifications**: Cross-references to related specs
 
 ---
 
@@ -200,6 +228,7 @@ Based on user answers during spec creation:
 
 - **[requirements.md](../requirements.md)**: High-level product requirements
 - **[ARCHITECTURE.md](../ARCHITECTURE.md)**: System architecture and technical design
+- **[.claude/rules/](../.claude/rules/)**: API standards, error handling, security, audit logging, i18n, design system, testing rules
 - **[specs/](.)**: This directory - detailed specifications per topic
 
 ---
@@ -212,8 +241,14 @@ Canonical entity names used across all specifications. Always use these names in
 |--------|-------------|----------------|
 | User | Platform user account | authentication.md |
 | Company | Brazilian company (Ltda. or S.A.) with CNPJ, lifecycle status, and embedded settings | company-management.md |
-| CompanyMember | User's role, permissions, and invitation status within a company (merged entity) | company-management.md |
-| InvitationToken | Cryptographic token for company membership invitation acceptance | company-management.md |
+| CompanyMember | User's role, permissions, and invitation status within a company (merged entity) | company-membership.md |
+| InvitationToken | Cryptographic token for company membership invitation acceptance | company-membership.md |
+| CompanyProfile | Public-facing company profile with shareable link | company-profile.md |
+| ProfileMetric | Key metric displayed on company profile (ARR, employees, etc.) | company-profile.md |
+| ProfileTeamMember | Founding team member displayed on company profile | company-profile.md |
+| ProfileDocument | Document uploaded to company dataroom | company-profile.md |
+| ProfileView | View tracking record for shared profile | company-profile.md |
+| ProfileDocumentDownload | Download tracking record for dataroom documents | company-profile.md |
 | Shareholder | Equity holder in a company | shareholder-registry.md |
 | ShareClass | Type of shares (quotas, ON, PN) | share-classes.md |
 | Shareholding | A shareholder's position in a share class | cap-table-management.md |
@@ -222,7 +257,8 @@ Canonical entity names used across all specifications. Always use these names in
 | FundingRound | Investment round | funding-rounds.md |
 | RoundCommitment | Investor commitment to a round | funding-rounds.md |
 | RoundClose | A close event within a round | funding-rounds.md |
-| ConvertibleInstrument | Mutuo conversivel, Investimento-Anjo, etc. | convertible-instruments.md |
+| ConvertibleInstrument | Mútuo conversível, Investimento-Anjo, etc. | convertible-instruments.md |
+| ConvertibleConversion | Conversion calculation and execution record | convertible-conversion.md |
 | OptionPlan | Employee stock option pool | option-plans.md |
 | OptionGrant | Individual option grant to an employee | option-plans.md |
 | VestingSchedule | Vesting terms for a grant | option-plans.md |
@@ -231,7 +267,7 @@ Canonical entity names used across all specifications. Always use these names in
 | DocumentTemplate | Template for document generation | document-generation.md |
 | DocumentSigner | Signature record for a document | document-signatures.md |
 | Notification | User notification (email or in-app) | notifications.md |
-| AuditLog | Immutable audit trail record | audit-logging.md |
+| AuditLog | Immutable audit trail record | audit-logging.md (rules) |
 | KYCVerification | KYC verification record and audit trail | kyc-verification.md |
 | CapTableSnapshot | Point-in-time cap table snapshot | cap-table-management.md |
 
@@ -239,4 +275,4 @@ Canonical entity names used across all specifications. Always use these names in
 
 ## Total Specification Count
 
-**18 specification files** covering all aspects of the Navia MVP platform.
+**22 specification files** covering all aspects of the Navia MVP platform.

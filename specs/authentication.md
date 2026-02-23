@@ -8,7 +8,7 @@
 
 ## Overview
 
-VelaFund uses Privy as the authentication provider to enable seamless user login with automatic embedded wallet creation. Users can authenticate via email, Google OAuth, or Apple OAuth without needing crypto knowledge. Each user receives a non-custodial embedded wallet managed by Privy for blockchain identity and document signing.
+Navia uses Privy as the authentication provider to enable seamless user login with automatic embedded wallet creation. Users can authenticate via email, Google OAuth, or Apple OAuth without needing crypto knowledge. Each user receives a non-custodial embedded wallet managed by Privy for blockchain identity and document signing.
 
 ---
 
@@ -236,7 +236,7 @@ interface AuthSession {
 ### Flow 1: First-Time User Signup
 
 ```
-1. User visits VelaFund landing page
+1. User visits Navia landing page
 2. User clicks "Sign Up"
 3. Privy modal appears with authentication options
 4. User selects authentication method:
@@ -257,7 +257,7 @@ interface AuthSession {
 ### Flow 2: Returning User Login
 
 ```
-1. User visits VelaFund and clicks "Login"
+1. User visits Navia and clicks "Login"
 2. Privy modal appears
 3. User authenticates (email/Google/Apple)
 4. Privy returns Access Token
@@ -504,3 +504,21 @@ export class AuthService {
 - **Hardware Wallet Support**: Allow users to connect MetaMask/Ledger
 - **Passkey Support**: WebAuthn integration for passwordless auth
 - **Session Management UI**: Dashboard showing active sessions with revoke capability
+
+---
+
+## Related Specifications
+
+| Specification | Relationship |
+|---------------|-------------|
+| [kyc-verification.md](./kyc-verification.md) | KYC verification requires authenticated user; KYC status stored on User entity |
+| [company-management.md](./company-management.md) | Authenticated users create and join companies |
+| [company-membership.md](./company-membership.md) | Members must be authenticated to accept invitations and access company resources |
+| [company-blockchain-admin.md](./company-blockchain-admin.md) | Creator's Privy embedded wallet becomes the on-chain admin |
+| [user-permissions.md](./user-permissions.md) | Authorization (roles/permissions) applied after authentication |
+| [document-signatures.md](./document-signatures.md) | EIP-712 signatures use Privy embedded wallets created during auth |
+| [notifications.md](./notifications.md) | Login and session events trigger notifications |
+| [api-standards.md](../.claude/rules/api-standards.md) | Auth endpoints follow `/api/v1/auth/*` URL pattern, Bearer token in Authorization header |
+| [error-handling.md](../.claude/rules/error-handling.md) | Error codes: `AUTH_INVALID_TOKEN`, `AUTH_TOKEN_EXPIRED`, `AUTH_SESSION_NOT_FOUND`, `AUTH_DUPLICATE_EMAIL`, `AUTH_NO_WALLET`, `AUTH_ACCOUNT_LOCKED`, `AUTH_PRIVY_UNAVAILABLE` |
+| [security.md](../.claude/rules/security.md) | Token storage (HTTP-only cookies), session timeouts, Privy token verification, CSRF protection |
+| [audit-logging.md](../.claude/rules/audit-logging.md) | Audit events: `AUTH_LOGIN_SUCCESS`, `AUTH_LOGIN_FAILED`, `AUTH_LOGOUT`, `AUTH_TOKEN_REFRESHED`, `AUTH_ACCOUNT_LOCKED` |

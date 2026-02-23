@@ -8,7 +8,7 @@
 
 ## Overview
 
-VelaFund uses the Open Cap Table Protocol (OCP) smart contracts deployed on Base Network (Ethereum L2) to create an immutable, cryptographically verifiable record of all equity transactions. Each company has a dedicated admin wallet (Privy embedded wallet) that is the sole authority for minting/issuing shares on-chain. All blockchain operations are handled by the backend—users never interact directly with the blockchain. Privy gas sponsorship covers all transaction fees, eliminating gas cost concerns for users.
+Navia uses the Open Cap Table Protocol (OCP) smart contracts deployed on Base Network (Ethereum L2) to create an immutable, cryptographically verifiable record of all equity transactions. Each company has a dedicated admin wallet (Privy embedded wallet) that is the sole authority for minting/issuing shares on-chain. All blockchain operations are handled by the backend—users never interact directly with the blockchain. Privy gas sponsorship covers all transaction fees, eliminating gas cost concerns for users.
 
 **Key Principles**:
 - Backend-only blockchain interaction (users never sign blockchain transactions directly)
@@ -502,3 +502,20 @@ export class BlockchainService {
 - Zero gas fee charges to users
 - Real-time transaction status updates
 - Clear error messages for failures
+
+---
+
+## Related Specifications
+
+| Specification | Relationship |
+|---------------|-------------|
+| [company-blockchain-admin.md](./company-blockchain-admin.md) | Smart contract deployment and admin wallet management per company |
+| [transactions.md](./transactions.md) | On-chain recording of share issuance, transfer, and cancellation transactions |
+| [cap-table-management.md](./cap-table-management.md) | On-chain/off-chain reconciliation and cap table snapshot verification |
+| [document-signatures.md](./document-signatures.md) | Document hash anchoring on-chain after all signatures collected |
+| [company-management.md](./company-management.md) | Each company has an associated smart contract deployed on Base |
+| [option-exercises.md](./option-exercises.md) | Option exercise triggers on-chain share issuance |
+| [convertible-conversion.md](./convertible-conversion.md) | Convertible conversion triggers on-chain share issuance |
+| [api-standards.md](../.claude/rules/api-standards.md) | API response envelope, pagination, and URL conventions for blockchain endpoints |
+| [error-handling.md](../.claude/rules/error-handling.md) | Error codes: CHAIN_TX_FAILED, CHAIN_TX_TIMEOUT, CHAIN_GAS_ESTIMATION_FAILED, CHAIN_RPC_UNAVAILABLE, CHAIN_NONCE_CONFLICT, CHAIN_REORG_DETECTED |
+| [audit-logging.md](../.claude/rules/audit-logging.md) | Audit events: BLOCKCHAIN_TX_SUBMITTED, BLOCKCHAIN_TX_CONFIRMED, BLOCKCHAIN_TX_FAILED, BLOCKCHAIN_SYNC_STARTED, BLOCKCHAIN_SYNC_COMPLETED, BLOCKCHAIN_REORG_DETECTED |

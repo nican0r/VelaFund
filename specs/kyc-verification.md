@@ -8,7 +8,7 @@
 
 ## Overview
 
-VelaFund integrates with Verifik, an AI-powered identity verification platform specialized for Latin American markets, to comply with Brazilian KYC/AML regulations (BCB Circular 3.978/2020 and Resolução BCB 119/2021). The system performs multi-level verification including CPF/CNPJ validation against government databases, document authentication, facial biometric matching, liveness detection, and AML screening against PEP and sanctions lists.
+Navia integrates with Verifik, an AI-powered identity verification platform specialized for Latin American markets, to comply with Brazilian KYC/AML regulations (BCB Circular 3.978/2020 and Resolução BCB 119/2021). The system performs multi-level verification including CPF/CNPJ validation against government databases, document authentication, facial biometric matching, liveness detection, and AML screening against PEP and sanctions lists.
 
 **Regulatory Context**: Brazilian fintech platforms handling financial instruments must verify customer identities using CPF cross-checks with Receita Federal, facial recognition, and AML screening. Brazil has 5x higher deepfake fraud rates than the US, making liveness detection critical.
 
@@ -536,7 +536,7 @@ PRECONDITION: Investor just completed Privy authentication
 5. User clicks "Start Verification"
 6. [Steps 6-25 same as Admin Flow above]
 26. System updates KYC status = "approved"
-27. System displays "Verification Complete! Welcome to VelaFund"
+27. System displays "Verification Complete! Welcome to Navia"
 28. System redirects to investor dashboard
 29. User can now access platform features
 
@@ -1005,5 +1005,22 @@ export default function KYCVerificationPage() {
 - **Batch KYC**: Bulk shareholder verification for companies migrating cap tables
 - **Enhanced Due Diligence (EDD)**: Additional checks for high-risk users
 - **International KYC**: Support for non-Brazilian identity documents
-- **KYC API for Partners**: Allow partner platforms to leverage VelaFund KYC
+- **KYC API for Partners**: Allow partner platforms to leverage Navia KYC
 - **AI Fraud Detection**: Machine learning models to detect sophisticated fraud attempts
+
+---
+
+## Related Specifications
+
+| Specification | Relationship |
+|---------------|-------------|
+| [authentication.md](./authentication.md) | KYC requires authenticated user; user entity links to KYC verification records |
+| [shareholder-registry.md](./shareholder-registry.md) | Shareholders require KYC verification based on type (admin, investor, employee) |
+| [company-management.md](./company-management.md) | Company admins must complete KYC to activate company features |
+| [company-cnpj-validation.md](./company-cnpj-validation.md) | CNPJ validation uses the same Verifik service for Receita Federal lookups |
+| [option-exercises.md](./option-exercises.md) | Employees may need KYC before exercising options |
+| [funding-rounds.md](./funding-rounds.md) | Investors need KYC before committing to rounds |
+| [api-standards.md](../.claude/rules/api-standards.md) | KYC endpoints follow `/api/v1/kyc/*` global path pattern |
+| [error-handling.md](../.claude/rules/error-handling.md) | Error codes: `KYC_REQUIRED`, `KYC_CPF_INVALID`, `KYC_CPF_NOT_FOUND`, `KYC_CPF_DOB_MISMATCH`, `KYC_DOCUMENT_INVALID`, `KYC_DOCUMENT_EXPIRED`, `KYC_FACE_MATCH_FAILED`, `KYC_LIVENESS_CHECK_FAILED`, `KYC_AML_HIGH_RISK`, `KYC_PEP_DETECTED`, `KYC_SANCTIONS_MATCH`, `KYC_MAX_ATTEMPTS_EXCEEDED`, `KYC_VERIFIK_UNAVAILABLE` |
+| [security.md](../.claude/rules/security.md) | PII handling for CPF, biometric data; KYC document encryption via AWS KMS; LGPD consent for KYC data collection |
+| [audit-logging.md](../.claude/rules/audit-logging.md) | Audit events: `KYC_STARTED`, `KYC_CPF_VERIFIED`, `KYC_CPF_FAILED`, `KYC_DOCUMENT_UPLOADED`, `KYC_FACE_VERIFIED`, `KYC_FACE_FAILED`, `KYC_AML_SCREENED`, `KYC_APPROVED`, `KYC_REJECTED` |

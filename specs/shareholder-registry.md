@@ -1093,3 +1093,23 @@ function maskCPFCNPJ(value: string): string {
 - 100% of foreign shareholders flagged correctly
 - Corporate shareholders have UBO information (when required)
 - All shareholder changes logged in audit trail
+
+---
+
+## Related Specifications
+
+| Specification | Relationship |
+|---------------|-------------|
+| [cap-table-management.md](./cap-table-management.md) | Shareholdings link shareholders to the cap table; ownership percentages calculated here |
+| [share-classes.md](./share-classes.md) | Shareholders hold positions in specific share classes |
+| [transactions.md](./transactions.md) | Transactions create, transfer, or cancel shareholder positions |
+| [kyc-verification.md](./kyc-verification.md) | Shareholders require KYC verification based on their type and role |
+| [company-management.md](./company-management.md) | Shareholders are scoped to a company |
+| [funding-rounds.md](./funding-rounds.md) | Investors making commitments become shareholders at round close |
+| [convertible-conversion.md](./convertible-conversion.md) | Instrument conversion creates new shareholdings |
+| [option-exercises.md](./option-exercises.md) | Exercising options creates new shareholder positions |
+| [document-generation.md](./document-generation.md) | Documents reference shareholders (agreements, certificates) |
+| [notifications.md](./notifications.md) | Shareholders receive notifications for transactions, invitations |
+| [api-standards.md](../.claude/rules/api-standards.md) | API endpoints follow `/api/v1/companies/:companyId/shareholders` pattern with envelope responses |
+| [error-handling.md](../.claude/rules/error-handling.md) | Error codes: `SHAREHOLDER_NOT_FOUND` and related shareholder validation errors |
+| [audit-logging.md](../.claude/rules/audit-logging.md) | Audit events: `SHAREHOLDER_CREATED`, `SHAREHOLDER_UPDATED`, `SHAREHOLDER_DELETED`, `SHAREHOLDER_INVITED` |
