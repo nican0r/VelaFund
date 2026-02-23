@@ -1,0 +1,35 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "edit": "Edit",
+    "loading": "Loading...",
+    "save": "Save",
+    "search": "Search"
+  },
+  "dashboard": {
+    "title": "Dashboard"
+  },
+  "errors": {
+    "auth": {
+      "invalidToken": "Invalid authentication token",
+      "unauthorized": "Unauthorized"
+    },
+    "cap": {
+      "insufficientShares": "Insufficient shares to complete the operation"
+    },
+    "company": {
+      "cnpjDuplicate": "CNPJ already registered",
+      "notFound": "Company not found"
+    },
+    "sys": {
+      "httpError": "HTTP Error",
+      "internalError": "Internal server error",
+      "rateLimited": "Rate limit exceeded. Please try again in a few seconds."
+    },
+    "val": {
+      "invalidInput": "Invalid input data"
+    }
+  }
+}

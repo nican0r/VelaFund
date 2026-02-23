@@ -10,6 +10,8 @@
 
 The cap table is the central record of equity ownership in a company, showing who owns what percentage of the company across different share classes. Navia's cap table mirrors on-chain state from OCP smart contracts deployed on Base Network, with automatic real-time synchronization. The system calculates ownership percentages, voting power, and fully-diluted positions (including unvested options) automatically after each transaction. The cap table supports both Brazilian corporate structures (Ltda. quotas and S.A. shares) and maintains OCT (Open Cap Table) standard compliance for interoperability.
 
+For blockchain reconciliation (verifying off-chain cap table matches on-chain records), see [cap-table-reconciliation.md](./cap-table-reconciliation.md).
+
 ---
 
 ## User Stories
@@ -33,11 +35,6 @@ The cap table is the central record of equity ownership in a company, showing wh
 **As an** admin user
 **I want** ownership percentages to update automatically after transactions
 **So that** I always have accurate, current cap table data
-
-### US-5: Cap Table Reconciliation
-**As an** admin user
-**I want to** reconcile on-chain and off-chain cap table data
-**So that** I can verify data integrity and detect any discrepancies
 
 ### US-6: Export Cap Table
 **As an** admin user
@@ -67,9 +64,9 @@ The cap table is the central record of equity ownership in a company, showing wh
 - System MUST support sorting by ownership percentage, name, or date
 
 ### FR-3: Ownership Calculations
-- Ownership % = (Shareholder Total Shares / Company Total Shares) × 100
-- Voting % = (Shareholder Voting Power / Company Total Voting Power) × 100
-- Voting Power = Σ (Shares × Share Class Votes Per Share)
+- Ownership % = (Shareholder Total Shares / Company Total Shares) x 100
+- Voting % = (Shareholder Voting Power / Company Total Voting Power) x 100
+- Voting Power = Sum of (Shares x Share Class Votes Per Share)
 - Fully-Diluted % includes all outstanding options (vested + unvested)
 
 ### FR-4: Brazilian Structure Support
@@ -83,14 +80,6 @@ The cap table is the central record of equity ownership in a company, showing wh
 - System MUST map Brazilian structures to OCT schema
 - System MUST support OCT export for interoperability
 - System MUST maintain OCT versioning and schema validation
-
-### FR-6: On-Chain Synchronization
-- System MUST sync cap table state from Base Network smart contracts via event-driven listeners
-- System MUST detect on-chain state changes via event monitoring (primary sync mechanism)
-- System MUST handle blockchain reorgs gracefully
-- System MUST run a daily scheduled reconciliation job to cross-check on-chain vs off-chain state
-- System MUST support on-demand reconciliation triggered by admin
-- System MUST auto-trigger reconciliation if a discrepancy is detected during normal reads
 
 ### FR-7: Historical Snapshots
 - System MUST create automatic snapshots after each transaction
@@ -145,7 +134,7 @@ interface CapTableEntry {
   // Ownership
   shares: number;                      // Number of shares owned
   percentage: number;                  // Ownership percentage of company
-  voting_power: number;                // Total votes (shares × votes_per_share)
+  voting_power: number;                // Total votes (shares x votes_per_share)
 
   // Acquisition
   acquired_at: Date;                   // Date of acquisition
@@ -383,41 +372,9 @@ interface OCTStockIssuance {
     "entity_type": "LTDA",
     "jurisdiction": "BR"
   },
-  "stock_classes": [...],
-  "stockholders": [...],
-  "stock_issuances": [...]
-}
-```
-
----
-
-### POST /api/v1/companies/:companyId/cap-table/reconcile
-**Description**: Manually trigger cap table reconciliation with blockchain
-
-**Response** (200 OK):
-```json
-{
-  "status": "success",
-  "discrepancies": [],
-  "last_sync_at": "2024-01-20T10:10:00Z",
-  "blockchain_state_hash": "0x..."
-}
-```
-
-**Or if discrepancies found** (200 OK):
-```json
-{
-  "status": "discrepancies_found",
-  "discrepancies": [
-    {
-      "shareholder_name": "João Founder",
-      "share_class": "Quotas",
-      "on_chain_shares": 600000,
-      "off_chain_shares": 600000,
-      "difference": 0
-    }
-  ],
-  "resolution": "automatic_sync_completed"
+  "stock_classes": [],
+  "stockholders": [],
+  "stock_issuances": []
 }
 ```
 
@@ -458,15 +415,6 @@ interface OCTStockIssuance {
 - Sum of all ownership percentages MUST equal 100% (within 0.01% rounding tolerance)
 - If discrepancy detected, system MUST trigger recalculation
 - Persistent discrepancies MUST alert admin
-
-### BR-3: Blockchain as Source of Truth
-- On-chain data is authoritative for share ownership
-- Off-chain database mirrors on-chain state for performance
-- Primary sync is event-driven: blockchain event listeners update off-chain state in real-time after each confirmed transaction
-- A daily scheduled reconciliation job runs a full cross-check of on-chain vs off-chain state for all active companies
-- Admin can trigger on-demand reconciliation via the reconcile endpoint
-- If a discrepancy is detected during any read operation, the system MUST auto-trigger reconciliation for that company
-- Discrepancies trigger automatic sync from blockchain (source of truth) and alert admin via email
 
 ### BR-4: Snapshot Creation Triggers
 - Automatic snapshot after every transaction
@@ -515,7 +463,7 @@ PRECONDITION: Admin user logged in, company has shareholders
    - Total Shares: 1,000,000
    - Total Shareholders: 8
    - Last Updated: Jan 20, 2024 10:00 AM
-7. System shows sync status badge: "✓ Synced with blockchain"
+7. System shows sync status badge: "Synced with blockchain"
 8. Admin can toggle view: Current | Fully-Diluted | Authorized
 9. Admin can filter by share class dropdown
 10. Admin can export to PDF or OCT JSON
@@ -541,7 +489,7 @@ PRECONDITION: Admin viewing cap table, option grants exist
    - Fully-Diluted Total column
    - Fully-Diluted % column
 5. System highlights dilution in red:
-   - João Founder: 60.0% → 52.17% (-7.83%)
+   - João Founder: 60.0% -> 52.17% (-7.83%)
 6. System shows summary:
    - Outstanding Shares: 1,000,000
    - Outstanding Options: 150,000
@@ -567,7 +515,7 @@ PRECONDITION: Admin viewing cap table
    - João Founder: 600,000 shares (70.59%)
    - Maria Co-founder: 250,000 shares (29.41%)
    - Total: 850,000 shares
-7. System shows banner: "📅 Viewing cap table as of Dec 31, 2023"
+7. System shows banner: "Viewing cap table as of Dec 31, 2023"
 8. Admin can export this historical snapshot
 9. Admin clicks "Back to Current" to return
 
@@ -584,7 +532,7 @@ PRECONDITION: Admin just completed share issuance of 150K shares to new investor
 3. Backend event listener detects SharesIssued event
 4. Backend updates CapTableEntry:
    - Creates new entry for investor (150K shares)
-   - Updates company total_shares: 850K → 1,000K
+   - Updates company total_shares: 850K -> 1,000K
 5. Backend triggers recalculation job:
    - João Founder: 600K / 1M = 60.0% (was 70.59%)
    - Maria Co-founder: 250K / 1M = 25.0% (was 29.41%)
@@ -599,31 +547,6 @@ PRECONDITION: Admin just completed share issuance of 150K shares to new investor
 10. Frontend shows notification: "Cap table updated (Series A closing)"
 
 POSTCONDITION: Cap table automatically reflects new ownership, snapshot created
-```
-
-### Flow 5: Reconcile Cap Table with Blockchain
-
-```
-PRECONDITION: Admin suspects discrepancy between off-chain and on-chain data
-
-1. Admin clicks "Reconcile" button on cap table page
-2. System displays confirmation: "This will sync cap table with blockchain. Continue?"
-3. Admin clicks "Yes, Reconcile"
-4. System calls POST /api/v1/companies/:id/cap-table/reconcile
-5. Backend fetches on-chain state from Base Network smart contract
-6. Backend compares on-chain vs off-chain for each shareholder:
-   - João: On-chain 600K = Off-chain 600K ✓
-   - Maria: On-chain 250K = Off-chain 250K ✓
-   - Investor: On-chain 150K = Off-chain 150K ✓
-7. Backend validates blockchain_state_hash matches
-8. Backend updates last_sync_at timestamp
-9. System displays success message: "✓ Cap table in sync with blockchain"
-10. If discrepancies found:
-    - System logs discrepancies
-    - System automatically syncs from blockchain (source of truth)
-    - System alerts admin via email
-
-POSTCONDITION: Cap table verified against blockchain, discrepancies resolved
 ```
 
 ### Flow 6: Export Cap Table in OCT Format
@@ -654,39 +577,15 @@ POSTCONDITION: Cap table exported in OCT standard format
 ### EC-1: Ownership Percentages Don't Sum to 100%
 **Scenario**: After recalculation, ownership sums to 99.98% due to rounding
 **Handling**:
-- Allow tolerance of ±0.02%
+- Allow tolerance of +/-0.02%
 - If outside tolerance, trigger recalculation with higher precision
 - Log warning for admin review
-
-### EC-2: Blockchain Sync Failure
-**Scenario**: Unable to connect to Base Network RPC to fetch on-chain state
-**Handling**:
-- Display warning banner: "⚠️ Blockchain sync temporarily unavailable"
-- Continue using last synced state (show timestamp)
-- Retry sync every 5 minutes
-- Alert admin if sync fails for > 30 minutes
-
-### EC-3: Blockchain Reorg Detected
-**Scenario**: Blockchain reorganization invalidates recent transaction
-**Handling**:
-- Detect reorg via block number decrease
-- Roll back affected transactions in database
-- Re-sync from earlier confirmed block
-- Alert admin: "Blockchain reorganization detected. Cap table resynchronized."
 
 ### EC-4: Historical Snapshot Request for Future Date
 **Scenario**: User requests snapshot for date="2025-12-31" (future)
 **Handling**:
 - Return 400 Bad Request
 - Error message: "Cannot create snapshot for future date"
-
-### EC-5: Discrepancy Between On-Chain and Off-Chain
-**Scenario**: On-chain shows João has 600K shares, off-chain shows 650K
-**Handling**:
-- Prioritize on-chain data (source of truth)
-- Automatically update off-chain to match: 650K → 600K
-- Create audit log entry with discrepancy details
-- Email admin: "Cap table discrepancy detected and auto-resolved"
 
 ### EC-6: User Requests Very Old Snapshot (>5 years)
 **Scenario**: User requests cap table from 2015, but company only created account in 2023
@@ -934,11 +833,6 @@ export class CapTableRecalculationProcessor {
 - Log all export events (who, when, format)
 - Consider watermarking exported files
 
-### SEC-4: Blockchain State Verification
-- Verify blockchain_state_hash on every reconciliation
-- Detect tampering if hash doesn't match
-- Alert admin if verification fails
-
 ---
 
 ## Success Criteria
@@ -947,17 +841,13 @@ export class CapTableRecalculationProcessor {
 - Cap table loads in < 2 seconds for 500 shareholders
 - Ownership recalculation completes in < 5 seconds
 - Historical snapshot creation in < 3 seconds
-- Blockchain reconciliation in < 10 seconds
 
 ### Accuracy
 - 100% accuracy in ownership calculations (no rounding errors)
-- Zero discrepancies between on-chain and off-chain data
-- Ownership percentages sum to 100% (±0.01% tolerance)
+- Ownership percentages sum to 100% (+/-0.01% tolerance)
 
 ### Reliability
 - 99.9% uptime for cap table views
-- Automatic recovery from blockchain sync failures
-- Zero data loss during blockchain reorgs
 
 ---
 
@@ -965,6 +855,7 @@ export class CapTableRecalculationProcessor {
 
 | Specification | Relationship |
 |---------------|-------------|
+| [cap-table-reconciliation.md](./cap-table-reconciliation.md) | Blockchain reconciliation: verifying off-chain cap table matches on-chain records |
 | [shareholder-registry.md](./shareholder-registry.md) | Shareholders are the rows in the cap table; shareholdings represent ownership positions |
 | [share-classes.md](./share-classes.md) | Share classes define the columns in the cap table; authorized vs issued tracking |
 | [transactions.md](./transactions.md) | Transactions trigger cap table recalculation; issuances, transfers, and cancellations change ownership |
@@ -975,5 +866,5 @@ export class CapTableRecalculationProcessor {
 | [reports-analytics.md](./reports-analytics.md) | Reports read cap table data for ownership breakdowns, waterfall analysis, and exports |
 | [company-management.md](./company-management.md) | Cap table is scoped to a company; company status affects cap table operations |
 | [api-standards.md](../.claude/rules/api-standards.md) | API endpoints follow `/api/v1/companies/:companyId/cap-table` pattern with envelope responses |
-| [error-handling.md](../.claude/rules/error-handling.md) | Error codes: `CAP_INSUFFICIENT_SHARES`, `CAP_NEGATIVE_BALANCE`, `CAP_RECONCILIATION_FAILED`, `CAP_SNAPSHOT_NOT_FOUND`, `CAP_SHARE_CLASS_NOT_FOUND`, `CAP_SHARE_CLASS_IN_USE` |
-| [audit-logging.md](../.claude/rules/audit-logging.md) | Audit events: `CAP_TABLE_SNAPSHOT_CREATED`, `CAP_TABLE_RECONCILIATION_RUN`, `CAP_TABLE_DISCREPANCY_FOUND`, `CAP_TABLE_EXPORTED` |
+| [error-handling.md](../.claude/rules/error-handling.md) | Error codes: `CAP_INSUFFICIENT_SHARES`, `CAP_NEGATIVE_BALANCE`, `CAP_SNAPSHOT_NOT_FOUND`, `CAP_SHARE_CLASS_NOT_FOUND`, `CAP_SHARE_CLASS_IN_USE` |
+| [audit-logging.md](../.claude/rules/audit-logging.md) | Audit events: `CAP_TABLE_SNAPSHOT_CREATED`, `CAP_TABLE_EXPORTED` |

@@ -1,0 +1,15 @@
+# User Flow Documentation Index
+
+This directory contains user flow documentation for every feature in the Navia platform.
+Each document follows the template defined in `.claude/rules/user-flow-documentation.md`.
+
+## Flows
+
+| Flow | Actors | Status |
+|------|--------|--------|
+| *No flows documented yet* | — | — |
+
+## Cross-References
+
+Flow documents link to each other via **Feeds into**, **Depends on**, and **Triggers** sections.
+When adding a new flow, check existing flows for necessary cross-reference updates.

@@ -1,8 +1,8 @@
-# Company Profile & Dataroom Specification
+# Company Profile Specification
 
-**Topic of Concern**: Public-facing company profile and document dataroom for fundraising and investor relations
+**Topic of Concern**: Public-facing company profile for fundraising and investor relations — profile CRUD, key metrics, founding team, sharing/access controls, publishing lifecycle, and view analytics
 
-**One-Sentence Description**: The system provides a shareable company profile page where founders curate key startup information — description, metrics, founding team, and uploaded documents — that can be shared with investors and stakeholders via a unique link with optional access controls.
+**One-Sentence Description**: The system provides a shareable company profile page where founders curate key startup information — description, metrics, and founding team — that can be shared with investors and stakeholders via a unique link with optional access controls and view analytics.
 
 ---
 
@@ -14,15 +14,17 @@ The profile page includes:
 - **Company overview**: name, sector, founding year, and a rich-text description
 - **Key metrics**: employee count, ARR, MRR, or other financial metrics the founder chooses to display
 - **Founding team**: team member cards with name, role/title, and photo
-- **Dataroom documents**: uploaded files organized by category (pitch deck, financials, legal, etc.)
 - **Share functionality**: unique shareable link with optional password protection and access tracking
+- **Dataroom documents**: uploaded files organized by category — see [company-dataroom.md](./company-dataroom.md)
+- **Litigation verification**: automatic BigDataCorp litigation check — see [company-litigation-verification.md](./company-litigation-verification.md)
 
 The profile is **opt-in** — companies start with no profile. An ADMIN explicitly creates and publishes it. Data entered on the profile is separate from internal company data (e.g., the `description` on the profile may differ from `Company.description`).
 
 ### Relationship to Existing Features
 
 - **company-management.md**: The profile reads the company's `name`, `logoUrl`, `foundedDate`, and `entityType` from the Company entity as defaults, but all profile fields are independently editable.
-- **document-generation.md / document-signatures.md**: Dataroom documents are uploaded files (PDFs, images), not generated legal documents. They are stored in a separate S3 prefix.
+- **company-dataroom.md**: Dataroom document management is specified separately. Documents are uploaded files (PDFs, images) stored in a separate S3 prefix.
+- **company-litigation-verification.md**: Automatic litigation check via BigDataCorp is specified separately. Litigation fields on CompanyProfile are system-managed and immutable.
 - **reports-analytics.md**: The due diligence package export is an auto-generated ZIP of cap table data. The dataroom is a manually curated set of documents chosen by the founder.
 - **user-permissions.md**: Only ADMIN and FINANCE roles can edit the profile. The shared link provides read-only access to external viewers without a Navia account.
 
@@ -35,32 +37,27 @@ The profile is **opt-in** — companies start with no profile. An ADMIN explicit
 **I want to** create a public profile for my company with a description, metrics, and team information
 **So that** I can showcase my startup to prospective investors in a professional format
 
-### US-2: Upload Dataroom Documents
-**As an** admin user
-**I want to** upload documents (pitch deck, financials, term sheet, etc.) to the company profile
-**So that** investors can review key materials without needing separate file-sharing tools
-
-### US-3: Manage Founding Team
+### US-2: Manage Founding Team
 **As an** admin user
 **I want to** add, edit, and reorder founding team members on the profile
 **So that** investors can see who leads the company
 
-### US-4: Share Profile with Investors
+### US-3: Share Profile with Investors
 **As an** admin user
 **I want to** share a link to my company profile with prospective investors
 **So that** they can view the profile and dataroom without needing a Navia account
 
-### US-5: Protect Shared Profile
+### US-4: Protect Shared Profile
 **As an** admin user
 **I want to** optionally protect the shared profile link with a password or email-gated access
 **So that** only intended recipients can view sensitive company information
 
-### US-6: Track Profile Views
+### US-5: Track Profile Views
 **As an** admin user
 **I want to** see who viewed my company profile and when
 **So that** I can gauge investor interest and follow up accordingly
 
-### US-7: Preview and Publish Profile
+### US-6: Preview and Publish Profile
 **As an** admin user
 **I want to** preview the profile before publishing and toggle its visibility
 **So that** I control when the profile becomes accessible via the shared link
@@ -109,32 +106,6 @@ The profile is **opt-in** — companies start with no profile. An ADMIN explicit
 - ADMIN can add, edit, reorder, and remove team members
 - Team members on the profile are independent from CompanyMember records — they may include people who are not Navia users
 
-### FR-4: Dataroom Document Upload
-- System MUST allow uploading documents organized by category
-- Document categories:
-  - `PITCH_DECK` — Pitch deck presentations
-  - `FINANCIALS` — Financial statements, projections, unit economics
-  - `LEGAL` — Articles of incorporation, shareholder agreements, term sheets
-  - `PRODUCT` — Product documentation, demos, technical architecture
-  - `TEAM` — Team bios, org charts, advisory board
-  - `OTHER` — Miscellaneous documents
-- Each document has:
-  - `name`: display name (auto-populated from filename, editable)
-  - `category`: one of the predefined categories
-  - `fileKey`: S3 object key
-  - `fileSize`: file size in bytes
-  - `mimeType`: file MIME type
-  - `pageCount`: page count for PDFs (extracted server-side, null for non-PDFs)
-  - `order`: display order within category (0-indexed)
-  - `uploadedAt`: timestamp
-  - `uploadedById`: user who uploaded the file
-- Allowed file types: PDF, PNG, JPG, JPEG, XLSX, PPTX, DOCX
-- Maximum file size: 25 MB per file
-- Maximum total storage per company profile: 500 MB
-- System MUST generate a thumbnail preview for PDF first pages
-- System MUST extract page count from uploaded PDFs
-- Documents are served via pre-signed S3 URLs (15-minute expiry) — never directly public
-
 ### FR-5: Profile Sharing
 - System MUST generate a unique shareable URL for each published profile
 - URL format: `https://app.navia.com.br/p/{slug}` where `slug` is a URL-safe identifier
@@ -174,15 +145,6 @@ The profile is **opt-in** — companies start with no profile. An ADMIN explicit
 - Visiting a shared link for a DRAFT or ARCHIVED profile returns a "Profile not available" page
 - System MUST provide a preview mode that renders the profile as external viewers would see it, without publishing
 
-### FR-8: Automatic Litigation Check (BigDataCorp)
-- System MUST dispatch a background Bull job to fetch litigation data from BigDataCorp when a company profile is created (`POST /api/v1/companies/:companyId/profile`)
-- The job uses the company's already-validated CNPJ (from `company-cnpj-validation.md`)
-- System MUST store the litigation data as immutable fields on the CompanyProfile entity
-- No user (including ADMIN) can edit, hide, or delete the litigation data
-- If the BigDataCorp API fails after retries, the profile is still usable — the litigation section shows a "Verification pending" status
-- Litigation data is displayed on both the internal authenticated view and the public shareable profile
-- Litigation data includes: active/historical lawsuits, administrative proceedings, notary protest records, and a computed risk level
-
 ---
 
 ## Data Models
@@ -209,6 +171,7 @@ interface CompanyProfile {
   accessPassword: string | null;       // bcrypt hash (only for PASSWORD type)
 
   // Litigation verification (BigDataCorp) — immutable, system-populated
+  // See company-litigation-verification.md for full details
   litigationStatus: VerificationStatus; // PENDING | COMPLETED | FAILED
   litigationData: LitigationData | null; // Full BigDataCorp response (JSONB)
   litigationFetchedAt: Date | null;     // When data was last fetched
@@ -219,45 +182,6 @@ interface CompanyProfile {
   archivedAt: Date | null;             // When archived
   createdAt: Date;
   updatedAt: Date;
-}
-
-enum VerificationStatus {
-  PENDING = 'PENDING',
-  COMPLETED = 'COMPLETED',
-  FAILED = 'FAILED',
-}
-
-interface LitigationData {
-  summary: {
-    activeLawsuits: number;           // Count of active judicial processes
-    historicalLawsuits: number;       // Count of resolved/archived processes
-    activeAdministrative: number;     // Active administrative proceedings
-    protests: number;                 // Notary protest records
-    totalValueInDispute: string;      // Sum of all active dispute amounts (Decimal as string)
-    riskLevel: 'LOW' | 'MEDIUM' | 'HIGH';  // Computed from lawsuit count + amounts
-  };
-  lawsuits: Array<{
-    processId: string;                // Court case number (e.g., "0000123-45.2024.8.26.0100")
-    court: string;                    // Court name
-    caseType: 'CIVIL' | 'LABOR' | 'CRIMINAL' | 'TAX' | 'ADMINISTRATIVE';
-    status: string;                   // ATIVO, ARQUIVADO, EXTINTO, etc.
-    filingDate: string;               // ISO 8601 date
-    lastUpdate: string;               // ISO 8601 date
-    valueInDispute: string | null;    // Decimal as string, BRL
-    plaintiffName: string;            // Masked if individual (PII)
-    defendantRole: string;            // REU, AUTOR, etc.
-    subject: string;                  // Brief description of lawsuit type
-  }>;
-  protestData: {
-    totalProtests: number;
-    protests: Array<{
-      date: string;
-      amount: string;
-      notaryOffice: string;
-      status: string;                 // ATIVO, PAGO, CANCELADO
-    }>;
-  };
-  queryDate: string;                  // ISO 8601 — when BigDataCorp was queried
 }
 
 enum ProfileStatus {
@@ -342,36 +266,6 @@ interface ProfileTeamMember {
 }
 ```
 
-### ProfileDocument Entity
-
-```typescript
-interface ProfileDocument {
-  id: string;                          // UUID, primary key
-  profileId: string;                   // Foreign key to CompanyProfile
-  name: string;                        // Display name
-  category: DocumentCategory;          // PITCH_DECK | FINANCIALS | LEGAL | PRODUCT | TEAM | OTHER
-  fileKey: string;                     // S3 object key
-  fileSize: number;                    // File size in bytes
-  mimeType: string;                    // MIME type
-  pageCount: number | null;            // Page count (PDFs only)
-  thumbnailKey: string | null;         // S3 key for PDF first-page thumbnail
-  order: number;                       // Display order within category
-  uploadedById: string;                // Foreign key to User
-  uploadedAt: Date;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-enum DocumentCategory {
-  PITCH_DECK = 'PITCH_DECK',
-  FINANCIALS = 'FINANCIALS',
-  LEGAL = 'LEGAL',
-  PRODUCT = 'PRODUCT',
-  TEAM = 'TEAM',
-  OTHER = 'OTHER',
-}
-```
-
 ### ProfileView Entity
 
 ```typescript
@@ -383,19 +277,6 @@ interface ProfileView {
   userAgent: string;                   // Browser user agent
   referrer: string | null;             // HTTP referrer
   viewedAt: Date;
-}
-```
-
-### ProfileDocumentDownload Entity
-
-```typescript
-interface ProfileDocumentDownload {
-  id: string;                          // UUID, primary key
-  documentId: string;                  // Foreign key to ProfileDocument
-  profileId: string;                   // Foreign key to CompanyProfile
-  viewerEmail: string | null;          // Email (if available)
-  viewerIp: string;                    // Redacted to /24 subnet
-  downloadedAt: Date;
 }
 ```
 
@@ -419,6 +300,7 @@ model CompanyProfile {
   accessPassword String?             @map("access_password")
 
   // Litigation verification (BigDataCorp) — immutable
+  // See company-litigation-verification.md for full details
   litigationStatus    VerificationStatus @default(PENDING) @map("litigation_status")
   litigationData      Json?              @map("litigation_data")
   litigationFetchedAt DateTime?          @map("litigation_fetched_at")
@@ -475,30 +357,6 @@ model ProfileTeamMember {
   @@map("profile_team_members")
 }
 
-model ProfileDocument {
-  id           String           @id @default(uuid())
-  profileId    String           @map("profile_id")
-  name         String
-  category     DocumentCategory
-  fileKey      String           @map("file_key")
-  fileSize     Int              @map("file_size")
-  mimeType     String           @map("mime_type")
-  pageCount    Int?             @map("page_count")
-  thumbnailKey String?          @map("thumbnail_key")
-  order        Int              @default(0)
-  uploadedById String           @map("uploaded_by_id")
-  uploadedAt   DateTime         @map("uploaded_at")
-  createdAt    DateTime         @default(now()) @map("created_at")
-  updatedAt    DateTime         @updatedAt @map("updated_at")
-
-  profile      CompanyProfile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  uploadedBy   User             @relation(fields: [uploadedById], references: [id])
-  downloads    ProfileDocumentDownload[]
-
-  @@index([profileId, category, order])
-  @@map("profile_documents")
-}
-
 model ProfileView {
   id          String   @id @default(uuid())
   profileId   String   @map("profile_id")
@@ -513,27 +371,6 @@ model ProfileView {
   @@index([profileId, viewedAt])
   @@index([profileId, viewerEmail])
   @@map("profile_views")
-}
-
-model ProfileDocumentDownload {
-  id           String   @id @default(uuid())
-  documentId   String   @map("document_id")
-  profileId    String   @map("profile_id")
-  viewerEmail  String?  @map("viewer_email")
-  viewerIp     String   @map("viewer_ip")
-  downloadedAt DateTime @default(now()) @map("downloaded_at")
-
-  document     ProfileDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
-
-  @@index([documentId])
-  @@index([profileId, downloadedAt])
-  @@map("profile_document_downloads")
-}
-
-enum VerificationStatus {
-  PENDING
-  COMPLETED
-  FAILED
 }
 
 enum ProfileStatus {
@@ -583,15 +420,6 @@ enum MetricFormat {
   CURRENCY_USD
   PERCENTAGE
   TEXT
-}
-
-enum DocumentCategory {
-  PITCH_DECK
-  FINANCIALS
-  LEGAL
-  PRODUCT
-  TEAM
-  OTHER
 }
 ```
 
@@ -834,7 +662,7 @@ enum DocumentCategory {
 - `403 Forbidden` — User is not ADMIN or FINANCE
 - `404 Not Found` — Profile not found
 
-**Note**: Any litigation-related fields (`litigationStatus`, `litigationData`, `litigationFetchedAt`, `litigationError`) in the request body are silently ignored. These fields are system-managed and immutable (see BR-11).
+**Note**: Any litigation-related fields (`litigationStatus`, `litigationData`, `litigationFetchedAt`, `litigationError`) in the request body are silently ignored. These fields are system-managed and immutable (see [company-litigation-verification.md](./company-litigation-verification.md) BR-11).
 
 ---
 
@@ -1063,89 +891,6 @@ enum DocumentCategory {
 
 ---
 
-### Dataroom Documents
-
-#### POST /api/v1/companies/:companyId/profile/documents
-**Description**: Upload a document to the dataroom.
-
-**Auth**: Required. User must be ADMIN or FINANCE.
-
-**Request**: `multipart/form-data`
-- `file`: the document file
-- `category`: document category enum value
-- `name`: optional display name (defaults to filename)
-
-**Response** (201 Created):
-```json
-{
-  "success": true,
-  "data": {
-    "id": "doc_001",
-    "name": "LuminaTech_PitchDeck_2024.pdf",
-    "category": "PITCH_DECK",
-    "fileSize": 2456789,
-    "mimeType": "application/pdf",
-    "pageCount": 12,
-    "thumbnailUrl": "https://s3.amazonaws.com/navia/thumbnails/doc_001.png",
-    "order": 0,
-    "uploadedAt": "2026-02-20T15:00:00Z"
-  }
-}
-```
-
-**Error Responses**:
-- `400 Bad Request` — Invalid file type or missing category
-- `413 Payload Too Large` — File exceeds 25 MB
-- `422 Unprocessable Entity` — Total storage for profile exceeds 500 MB
-
----
-
-#### DELETE /api/v1/companies/:companyId/profile/documents/:documentId
-**Description**: Remove a document from the dataroom. Deletes the file from S3.
-
-**Auth**: Required. User must be ADMIN or FINANCE.
-
-**Response**: `204 No Content`
-
----
-
-#### PUT /api/v1/companies/:companyId/profile/documents/order
-**Description**: Reorder documents within their categories.
-
-**Auth**: Required. User must be ADMIN or FINANCE.
-
-**Request**:
-```json
-{
-  "documents": [
-    { "id": "doc_001", "order": 0 },
-    { "id": "doc_002", "order": 1 }
-  ]
-}
-```
-
-**Response** (200 OK): Returns updated documents with new order.
-
----
-
-#### GET /api/v1/companies/:companyId/profile/documents/:documentId/download
-**Description**: Generate a pre-signed S3 URL for downloading a document. For authenticated company members.
-
-**Auth**: Required. User must be a member of the company.
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "downloadUrl": "https://s3.amazonaws.com/navia/documents/...?X-Amz-Signature=...",
-    "expiresIn": 900
-  }
-}
-```
-
----
-
 ### Public Profile (No Auth Required)
 
 #### GET /api/v1/profiles/:slug
@@ -1277,33 +1022,9 @@ When `FAILED` (BigDataCorp fetch failed after all retries):
 
 **Notes**:
 - This endpoint records a ProfileView entry on each access
-- Documents only include metadata — actual file download requires a separate call
+- Documents only include metadata — actual file download requires a separate call (see [company-dataroom.md](./company-dataroom.md))
 - The `formattedValue` field provides the display-ready string using Brazilian formatting
-- The `litigation` section is read-only and system-populated — no additional access control beyond existing profile access controls (public/password/email-gated)
-
----
-
-#### GET /api/v1/profiles/:slug/documents/:documentId/download
-**Description**: Generate a pre-signed download URL for a public profile document. Records a download event.
-
-**Auth**: None required (but respects profile access controls — password/email).
-
-**Headers**:
-- `X-Profile-Password`: password (if password-protected)
-
-**Query Parameters**:
-- `email`: viewer email (if email-gated)
-
-**Response** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "downloadUrl": "https://s3.amazonaws.com/navia/documents/...?X-Amz-Signature=...",
-    "expiresIn": 900
-  }
-}
-```
+- The `litigation` section is read-only and system-populated — no additional access control beyond existing profile access controls (public/password/email-gated). See [company-litigation-verification.md](./company-litigation-verification.md) for full details.
 
 ---
 
@@ -1364,11 +1085,6 @@ When `FAILED` (BigDataCorp fetch failed after all retries):
 - A profile can have at most 10 team members
 - Attempting to save more than 10 returns `422 Unprocessable Entity`
 
-### BR-5: Document Storage Limit
-- Total storage for all documents in a profile is capped at 500 MB
-- Individual files are capped at 25 MB
-- Exceeding either limit returns `413 Payload Too Large` or `422 Unprocessable Entity`
-
 ### BR-6: Slug Uniqueness and Format
 - Slug must be unique across all profiles on the platform
 - Slug format: lowercase letters, numbers, and hyphens only, 3–50 characters
@@ -1385,21 +1101,9 @@ When `FAILED` (BigDataCorp fetch failed after all retries):
 - Email format is validated before granting access
 - The same email can view the profile multiple times (each view is recorded)
 
-### BR-9: Document File Validation
-- Files are validated by both MIME type and magic bytes (not just file extension)
-- PDF page count is extracted server-side using a PDF parsing library
-- Thumbnails are generated asynchronously via Bull job after upload
-
 ### BR-10: Profile Publishing Prerequisites
 - Publishing requires at least one of: description, metrics, team members, or documents
 - A completely empty profile cannot be published
-
-### BR-11: Litigation Data Immutability
-- Litigation verification fields (`litigationStatus`, `litigationData`, `litigationFetchedAt`, `litigationError`) are system-managed
-- No API endpoint allows direct modification of these fields
-- The `PUT /api/v1/companies/:companyId/profile` endpoint MUST silently ignore any litigation fields in the request body
-- Only the background Bull job processor (`profile-litigation` queue) can write to these fields
-- Litigation data cannot be hidden, deleted, or overridden by any user role (including ADMIN)
 
 ---
 
@@ -1505,21 +1209,9 @@ POSTCONDITION: Profile viewed, analytics recorded
 **Scenario**: An ADMIN deactivates the company while the profile is published.
 **Handling**: Profile is automatically set to DRAFT. Shared link returns "Profile not available."
 
-### EC-2: Document Upload During Publish
-**Scenario**: User uploads a document while the profile is published.
-**Handling**: Document is added immediately and visible to external viewers. No republish needed.
-
 ### EC-3: Slug Collision
 **Scenario**: Two companies with similar names generate the same slug.
 **Handling**: Auto-generated slugs include a 4-character random suffix. Custom slug changes return `409 Conflict` if taken.
-
-### EC-4: Large File Upload Timeout
-**Scenario**: User uploads a 25 MB file on a slow connection.
-**Handling**: Frontend shows upload progress bar. Backend accepts with a 60-second timeout for the upload endpoint. If timeout occurs, partial S3 upload is cleaned up via S3 lifecycle rule.
-
-### EC-5: PDF Thumbnail Generation Fails
-**Scenario**: Uploaded PDF is corrupt or password-protected, thumbnail generation fails.
-**Handling**: Document is stored successfully. Thumbnail is null. Frontend shows a generic PDF icon instead.
 
 ### EC-6: Profile Viewed After Archival
 **Scenario**: Investor bookmarked the link and visits after profile is archived.
@@ -1529,45 +1221,18 @@ POSTCONDITION: Profile viewed, analytics recorded
 **Scenario**: Two ADMINs edit the profile simultaneously.
 **Handling**: Last write wins (standard optimistic concurrency). No locking in MVP. The PUT endpoints replace full sections (metrics, team) to avoid partial merge conflicts.
 
-### EC-8: BigDataCorp API Failure During Profile Creation
-**Scenario**: The BigDataCorp API is unreachable or returns errors when the litigation check Bull job runs.
-**Handling**: Bull job retries 3 times with exponential backoff (30s, 60s, 120s). If all retries fail, `litigationStatus` is set to `FAILED` and `litigationError` stores a user-friendly message. The profile remains fully usable — the litigation section displays "Verification pending" or "Verification unavailable." An admin alert is sent via Slack. The job can be manually re-triggered by an admin.
-
-### EC-9: CNPJ Not Found in BigDataCorp
-**Scenario**: The company's CNPJ returns no results from BigDataCorp (e.g., very new company).
-**Handling**: `litigationStatus` is set to `COMPLETED` with `litigationData.summary` showing all zero counts and `riskLevel: 'LOW'`. This is a valid result — no litigation history is a positive signal.
-
-### EC-10: BigDataCorp Returns Stale Data
-**Scenario**: Litigation data changes after the initial fetch.
-**Handling**: Litigation data is fetched once at profile creation and stored as a point-in-time snapshot. The `litigationFetchedAt` timestamp is displayed to viewers so they can judge data freshness. Future enhancement: periodic re-fetch job (out of scope for MVP).
-
 ---
 
 ## Dependencies
 
 ### Internal Dependencies
 - **company-management.md**: Company entity (name, logoUrl, foundedDate, status)
+- **company-dataroom.md**: Document management — upload, download, storage (see separate spec)
+- **company-litigation-verification.md**: Litigation check via BigDataCorp (see separate spec)
 - **user-permissions.md**: ADMIN and FINANCE role checks for profile editing
 - **authentication.md**: Public profile endpoints skip auth; admin endpoints require Privy JWT
-- **audit-logging.md**: Profile create, update, publish, archive, and document upload events
+- **audit-logging.md**: Profile create, update, publish, archive events
 - **security.md**: File upload validation (MIME + magic bytes), EXIF stripping, S3 pre-signed URLs
-
-### External Dependencies
-- **AWS S3**: Document storage (`navia-profile-documents` bucket), photo storage (`navia-profile-photos` bucket), thumbnail storage
-  - SSE-S3 encryption (not KMS — profile documents are not high-sensitivity PII)
-  - Pre-signed URLs with 15-minute expiry for downloads
-  - Lifecycle rule: delete incomplete multipart uploads after 24 hours
-- **BigDataCorp**: Litigation and legal proceedings data via CNPJ lookup
-  - Endpoint: POST with CNPJ to `/empresas/owners_lawsuits` and related datasets
-  - Authentication: API Key in Authorization header
-  - Returns: Active/historical lawsuits, administrative proceedings, protest records
-  - Rate limit: Per API key (check contract)
-  - Environment variable: `BIGDATACORP_API_KEY` (rotated annually)
-- **Bull (Redis-backed)**: PDF thumbnail generation queue and litigation check queue
-  - Queue: `profile-thumbnails` — Retry: 2 attempts, 5-second backoff
-  - Queue: `profile-litigation` — Retry: 3 attempts, exponential backoff (30s, 60s, 120s)
-- **sharp**: Image processing for team member photo resizing and EXIF stripping
-- **pdf-lib or pdf-parse**: PDF page count extraction and thumbnail generation
 
 ---
 
@@ -1588,7 +1253,6 @@ import { randomBytes } from 'crypto';
 export class ProfileService {
   constructor(
     private prisma: PrismaService,
-    @InjectQueue('profile-thumbnails') private thumbnailQueue: Queue,
     @InjectQueue('profile-litigation') private litigationCheckQueue: Queue,
   ) {}
 
@@ -1634,6 +1298,7 @@ export class ProfileService {
     });
 
     // Dispatch BigDataCorp litigation check (non-blocking)
+    // See company-litigation-verification.md for full implementation
     await this.litigationCheckQueue.add('fetch-litigation', {
       profileId: profile.id,
       companyId: companyId,
@@ -1743,360 +1408,14 @@ export class ProfileService {
 }
 ```
 
-### Document Upload Handler
-
-```typescript
-// /backend/src/profile/profile-document.service.ts
-import { Injectable } from '@nestjs/common';
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
-import { PrismaService } from '../prisma/prisma.service';
-import * as pdfParse from 'pdf-parse';
-
-@Injectable()
-export class ProfileDocumentService {
-  private s3: S3Client;
-  private bucket = 'navia-profile-documents';
-
-  constructor(
-    private prisma: PrismaService,
-    @InjectQueue('profile-thumbnails') private thumbnailQueue: Queue,
-  ) {
-    this.s3 = new S3Client({ region: 'sa-east-1' });
-  }
-
-  async upload(
-    profileId: string,
-    userId: string,
-    file: Express.Multer.File,
-    category: string,
-    name?: string,
-  ) {
-    // Validate total storage
-    const currentStorage = await this.prisma.profileDocument.aggregate({
-      where: { profileId },
-      _sum: { fileSize: true },
-    });
-    const totalAfterUpload = (currentStorage._sum.fileSize || 0) + file.size;
-    if (totalAfterUpload > 500 * 1024 * 1024) {
-      throw new BusinessRuleException(
-        'PROFILE_STORAGE_LIMIT',
-        'errors.profile.storageLimit',
-      );
-    }
-
-    // Upload to S3
-    const fileKey = `profiles/${profileId}/${randomUUID()}-${sanitizeFilename(file.originalname)}`;
-    await this.s3.send(new PutObjectCommand({
-      Bucket: this.bucket,
-      Key: fileKey,
-      Body: file.buffer,
-      ContentType: file.mimetype,
-    }));
-
-    // Extract PDF page count
-    let pageCount: number | null = null;
-    if (file.mimetype === 'application/pdf') {
-      try {
-        const pdfData = await pdfParse(file.buffer);
-        pageCount = pdfData.numpages;
-      } catch {
-        pageCount = null;
-      }
-    }
-
-    // Get next order value
-    const maxOrder = await this.prisma.profileDocument.aggregate({
-      where: { profileId, category: category as any },
-      _max: { order: true },
-    });
-
-    const document = await this.prisma.profileDocument.create({
-      data: {
-        profileId,
-        name: name || file.originalname,
-        category: category as any,
-        fileKey,
-        fileSize: file.size,
-        mimeType: file.mimetype,
-        pageCount,
-        order: (maxOrder._max.order ?? -1) + 1,
-        uploadedById: userId,
-        uploadedAt: new Date(),
-      },
-    });
-
-    // Queue thumbnail generation for PDFs
-    if (file.mimetype === 'application/pdf') {
-      await this.thumbnailQueue.add('generate', {
-        documentId: document.id,
-        fileKey,
-      });
-    }
-
-    return document;
-  }
-
-  async getDownloadUrl(documentId: string): Promise<string> {
-    const document = await this.prisma.profileDocument.findUniqueOrThrow({
-      where: { id: documentId },
-    });
-
-    const command = new GetObjectCommand({
-      Bucket: this.bucket,
-      Key: document.fileKey,
-    });
-
-    return getSignedUrl(this.s3, command, { expiresIn: 900 }); // 15 minutes
-  }
-}
-```
-
-### BigDataCorpService — Litigation Data Fetching
-
-```typescript
-// /backend/src/profile/bigdatacorp.service.ts
-import { Injectable, Logger } from '@nestjs/common';
-import { CircuitBreakerService } from '../common/circuit-breaker.service';
-
-interface BigDataCorpLitigationResponse {
-  lawsuits: Array<{
-    processId: string;
-    court: string;
-    caseType: string;
-    status: string;
-    filingDate: string;
-    lastUpdate: string;
-    valueInDispute: string | null;
-    plaintiffName: string;
-    defendantRole: string;
-    subject: string;
-  }>;
-  administrativeProceedings: Array<{
-    processId: string;
-    agency: string;
-    status: string;
-    filingDate: string;
-  }>;
-  protests: Array<{
-    date: string;
-    amount: string;
-    notaryOffice: string;
-    status: string;
-  }>;
-}
-
-@Injectable()
-export class BigDataCorpService {
-  private readonly logger = new Logger(BigDataCorpService.name);
-  private readonly apiUrl = 'https://api.bigdatacorp.com.br';
-  private readonly timeout = 30000; // 30 seconds
-
-  constructor(private circuitBreaker: CircuitBreakerService) {
-    this.circuitBreaker.register('bigdatacorp', {
-      failureThreshold: 5,
-      resetTimeout: 60000, // 60s half-open
-    });
-  }
-
-  async fetchLitigationData(cnpj: string): Promise<BigDataCorpLitigationResponse> {
-    return this.circuitBreaker.execute('bigdatacorp', async () => {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), this.timeout);
-
-      try {
-        const response = await fetch(`${this.apiUrl}/empresas/owners_lawsuits`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${process.env.BIGDATACORP_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ cnpj: cnpj.replace(/\D/g, '') }),
-          signal: controller.signal,
-        });
-
-        if (!response.ok) {
-          if (response.status === 400 || response.status === 404) {
-            // Definitive result — CNPJ not found, do not retry
-            throw new BigDataCorpNotFoundError(`CNPJ ${cnpj} not found in BigDataCorp`);
-          }
-          throw new Error(`BigDataCorp API error: ${response.status}`);
-        }
-
-        return await response.json();
-      } finally {
-        clearTimeout(timeoutId);
-      }
-    });
-  }
-}
-
-class BigDataCorpNotFoundError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'BigDataCorpNotFoundError';
-  }
-}
-```
-
-### LitigationCheckProcessor — Bull Job
-
-```typescript
-// /backend/src/profile/profile-litigation.processor.ts
-import { Processor, Process } from '@nestjs/bull';
-import { Job } from 'bull';
-import { Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { BigDataCorpService } from './bigdatacorp.service';
-import { AuditService } from '../audit/audit.service';
-import { redactPii } from '../common/redact-pii';
-import { LitigationData } from './types';
-
-@Processor('profile-litigation')
-export class LitigationCheckProcessor {
-  private readonly logger = new Logger(LitigationCheckProcessor.name);
-
-  constructor(
-    private prisma: PrismaService,
-    private bigDataCorp: BigDataCorpService,
-    private auditService: AuditService,
-  ) {}
-
-  @Process('fetch-litigation')
-  async handleFetchLitigation(job: Job<{
-    profileId: string;
-    companyId: string;
-    cnpj: string;
-  }>) {
-    const { profileId, companyId, cnpj } = job.data;
-
-    try {
-      const response = await this.bigDataCorp.fetchLitigationData(cnpj);
-
-      // Mask individual plaintiff names (PII)
-      const maskedLawsuits = response.lawsuits.map((lawsuit) => ({
-        ...lawsuit,
-        plaintiffName: this.maskIndividualName(lawsuit.plaintiffName),
-      }));
-
-      // Compute summary
-      const activeLawsuits = maskedLawsuits.filter((l) => l.status === 'ATIVO');
-      const historicalLawsuits = maskedLawsuits.filter((l) => l.status !== 'ATIVO');
-      const totalValueInDispute = activeLawsuits
-        .reduce((sum, l) => sum + (parseFloat(l.valueInDispute || '0') || 0), 0)
-        .toFixed(2);
-
-      const litigationData: LitigationData = {
-        summary: {
-          activeLawsuits: activeLawsuits.length,
-          historicalLawsuits: historicalLawsuits.length,
-          activeAdministrative: response.administrativeProceedings.filter(
-            (a) => a.status === 'ATIVO',
-          ).length,
-          protests: response.protests.filter((p) => p.status === 'ATIVO').length,
-          totalValueInDispute,
-          riskLevel: this.computeRiskLevel(
-            activeLawsuits.length,
-            parseFloat(totalValueInDispute),
-          ),
-        },
-        lawsuits: maskedLawsuits,
-        protestData: {
-          totalProtests: response.protests.length,
-          protests: response.protests,
-        },
-        queryDate: new Date().toISOString(),
-      };
-
-      await this.prisma.companyProfile.update({
-        where: { id: profileId },
-        data: {
-          litigationStatus: 'COMPLETED',
-          litigationData: litigationData as any,
-          litigationFetchedAt: new Date(),
-          litigationError: null,
-        },
-      });
-
-      await this.auditService.log({
-        actorType: 'SYSTEM',
-        action: 'PROFILE_LITIGATION_FETCHED',
-        resourceType: 'CompanyProfile',
-        resourceId: profileId,
-        companyId,
-        changes: {
-          before: { litigationStatus: 'PENDING' },
-          after: {
-            litigationStatus: 'COMPLETED',
-            activeLawsuits: litigationData.summary.activeLawsuits,
-            riskLevel: litigationData.summary.riskLevel,
-          },
-        },
-      });
-
-      this.logger.log(`Litigation data fetched for profile ${profileId}`);
-    } catch (error) {
-      // If this is the last attempt, mark as FAILED
-      if (job.attemptsMade >= (job.opts.attempts || 3) - 1) {
-        await this.prisma.companyProfile.update({
-          where: { id: profileId },
-          data: {
-            litigationStatus: 'FAILED',
-            litigationError: 'Verification service temporarily unavailable',
-          },
-        });
-
-        await this.auditService.log({
-          actorType: 'SYSTEM',
-          action: 'PROFILE_LITIGATION_FAILED',
-          resourceType: 'CompanyProfile',
-          resourceId: profileId,
-          companyId,
-          metadata: { error: error.message },
-        });
-
-        this.logger.error(`Litigation fetch failed for profile ${profileId}`, error.stack);
-      }
-
-      throw error; // Let Bull handle retry
-    }
-  }
-
-  private computeRiskLevel(
-    activeLawsuits: number,
-    totalValue: number,
-  ): 'LOW' | 'MEDIUM' | 'HIGH' {
-    if (activeLawsuits === 0) return 'LOW';
-    if (activeLawsuits <= 2 && totalValue < 100000) return 'LOW';
-    if (activeLawsuits <= 5 && totalValue < 500000) return 'MEDIUM';
-    return 'HIGH';
-  }
-
-  private maskIndividualName(name: string): string {
-    // Company names (containing LTDA, S.A., EIRELI, MEI, etc.) are not masked
-    if (/\b(LTDA|S\.?A\.?|EIRELI|MEI|CNPJ|EMPRESA|CIA|COMPANHIA)\b/i.test(name)) {
-      return name;
-    }
-    // Individual names: mask with first initial + *** for each part
-    return name
-      .split(' ')
-      .map((part) => (part.length > 0 ? `${part[0]}***` : part))
-      .join(' ');
-  }
-}
-```
-
 ### Profile Controller
 
 ```typescript
 // /backend/src/profile/profile.controller.ts
 import {
-  Controller, Get, Post, Put, Delete, Body, Param, Query,
-  Headers, UseInterceptors, UploadedFile, HttpCode, HttpStatus,
+  Controller, Get, Post, Put, Body, Param, Query,
+  Headers, HttpCode, HttpStatus,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
 import { RequireAuth } from '../auth/decorators/require-auth.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -2106,7 +1425,6 @@ import { Auditable } from '../audit/auditable.decorator';
 export class ProfileController {
   constructor(
     private profileService: ProfileService,
-    private documentService: ProfileDocumentService,
   ) {}
 
   // --- Authenticated endpoints (company-scoped) ---
@@ -2156,32 +1474,42 @@ export class ProfileController {
     return this.profileService.unpublish(companyId);
   }
 
-  @Post('companies/:companyId/profile/documents')
+  @Post('companies/:companyId/profile/archive')
   @RequireAuth()
-  @Roles('ADMIN', 'FINANCE')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 25 * 1024 * 1024 } }))
-  @HttpCode(HttpStatus.CREATED)
-  @Auditable({ action: 'PROFILE_DOCUMENT_UPLOADED', resourceType: 'ProfileDocument', captureAfterState: true })
-  async uploadDocument(
-    @Param('companyId') companyId: string,
-    @UploadedFile() file: Express.Multer.File,
-    @Body('category') category: string,
-    @Body('name') name?: string,
-  ) {
-    const profile = await this.profileService.getByCompanyId(companyId);
-    return this.documentService.upload(profile.id, /* userId */, file, category, name);
+  @Roles('ADMIN')
+  @Auditable({ action: 'PROFILE_ARCHIVED', resourceType: 'CompanyProfile' })
+  async archive(@Param('companyId') companyId: string) {
+    return this.profileService.archive(companyId);
   }
 
-  @Delete('companies/:companyId/profile/documents/:documentId')
+  @Put('companies/:companyId/profile/metrics')
   @RequireAuth()
   @Roles('ADMIN', 'FINANCE')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @Auditable({ action: 'PROFILE_DOCUMENT_DELETED', resourceType: 'ProfileDocument', captureBeforeState: true })
-  async deleteDocument(
+  async updateMetrics(
     @Param('companyId') companyId: string,
-    @Param('documentId') documentId: string,
+    @Body() dto: UpdateMetricsDto,
   ) {
-    return this.documentService.delete(documentId);
+    return this.profileService.updateMetrics(companyId, dto);
+  }
+
+  @Put('companies/:companyId/profile/team')
+  @RequireAuth()
+  @Roles('ADMIN', 'FINANCE')
+  async updateTeam(
+    @Param('companyId') companyId: string,
+    @Body() dto: UpdateTeamDto,
+  ) {
+    return this.profileService.updateTeam(companyId, dto);
+  }
+
+  @Put('companies/:companyId/profile/slug')
+  @RequireAuth()
+  @Roles('ADMIN')
+  async updateSlug(
+    @Param('companyId') companyId: string,
+    @Body() dto: UpdateSlugDto,
+  ) {
+    return this.profileService.updateSlug(companyId, dto);
   }
 
   @Get('companies/:companyId/profile/analytics')
@@ -2205,26 +1533,12 @@ export class ProfileController {
   ) {
     return this.profileService.getPublicProfile(slug, password, email);
   }
-
-  @Get('profiles/:slug/documents/:documentId/download')
-  @Public()
-  async downloadPublicDocument(
-    @Param('slug') slug: string,
-    @Param('documentId') documentId: string,
-    @Headers('x-profile-password') password?: string,
-    @Query('email') email?: string,
-  ) {
-    await this.profileService.validatePublicAccess(slug, password, email);
-    return this.documentService.getPublicDownloadUrl(documentId, slug, email);
-  }
 }
 ```
 
 ---
 
 ## Error Codes
-
-Error codes specific to the profile and litigation features. These follow the patterns defined in `error-handling.md`.
 
 ### PROFILE — Profile Management
 
@@ -2235,9 +1549,6 @@ Error codes specific to the profile and litigation features. These follow the pa
 | `PROFILE_COMPANY_NOT_ACTIVE` | `errors.profile.companyNotActive` | 422 | Empresa não está ativa para criação de perfil | Company is not active for profile creation |
 | `PROFILE_EMPTY` | `errors.profile.empty` | 422 | Perfil não pode ser publicado sem conteúdo | Profile cannot be published without content |
 | `PROFILE_EMAIL_REQUIRED` | `errors.profile.emailRequired` | 422 | Email é obrigatório para acessar este perfil | Email is required to access this profile |
-| `PROFILE_STORAGE_LIMIT` | `errors.profile.storageLimit` | 422 | Limite de armazenamento de 500 MB excedido | 500 MB storage limit exceeded |
-| `PROFILE_LITIGATION_UNAVAILABLE` | `errors.profile.litigationUnavailable` | 502 | Serviço de verificação judicial temporariamente indisponível | Litigation verification service temporarily unavailable |
-| `PROFILE_LITIGATION_CNPJ_NOT_FOUND` | `errors.profile.litigationCnpjNotFound` | 422 | CNPJ não encontrado na base de dados judicial | CNPJ not found in litigation database |
 
 ### Audit Events
 
@@ -2248,10 +1559,6 @@ Error codes specific to the profile and litigation features. These follow the pa
 | `PROFILE_PUBLISHED` | CompanyProfile | USER | Profile published |
 | `PROFILE_UNPUBLISHED` | CompanyProfile | USER | Profile unpublished |
 | `PROFILE_ARCHIVED` | CompanyProfile | USER | Profile archived |
-| `PROFILE_DOCUMENT_UPLOADED` | ProfileDocument | USER | Document uploaded to dataroom |
-| `PROFILE_DOCUMENT_DELETED` | ProfileDocument | USER | Document removed from dataroom |
-| `PROFILE_LITIGATION_FETCHED` | CompanyProfile | SYSTEM | BigDataCorp litigation data successfully retrieved |
-| `PROFILE_LITIGATION_FAILED` | CompanyProfile | SYSTEM | BigDataCorp litigation fetch failed after all retries |
 
 ---
 
@@ -2267,13 +1574,6 @@ Error codes specific to the profile and litigation features. These follow the pa
 - Rate limit password attempts: 5 attempts per IP per 15 minutes to prevent brute-force
 - Email-gated profiles validate email format but do not verify email ownership (not a security gate, just an analytics tool)
 
-### SEC-3: Document Security
-- Documents are stored in a separate S3 bucket from internal company documents (`navia-profile-documents`)
-- S3 bucket has BlockPublicAccess enabled
-- All downloads go through pre-signed URLs generated by the backend
-- File uploads validated by MIME type + magic bytes (not just extension)
-- EXIF metadata stripped from image uploads
-
 ### SEC-4: View Analytics Privacy
 - Viewer IP addresses are stored redacted to /24 subnet
 - User agent strings are stored for analytics but not displayed in the admin UI (only used for bot filtering)
@@ -2285,17 +1585,8 @@ Error codes specific to the profile and litigation features. These follow the pa
 
 ### SEC-6: Audit Logging
 - Profile CRUD operations are audit-logged (see audit-logging.md)
-- Document uploads and deletions are audit-logged
 - Profile publish/unpublish state changes are audit-logged
 - Public view analytics are NOT audit-logged (they are tracked in ProfileView, not AuditLog)
-- Litigation fetch success (`PROFILE_LITIGATION_FETCHED`) and failure (`PROFILE_LITIGATION_FAILED`) are audit-logged as SYSTEM events
-
-### SEC-7: Litigation Data PII Handling
-- Individual plaintiff names (CPFs) from BigDataCorp are stored masked (`J*** S***`) — follows existing PII rules from `security.md`
-- Company names (CNPJs) in lawsuit data are stored in full (public information)
-- Litigation data is NOT encrypted at application level (not high-sensitivity PII, follows same pattern as `cnpjData` on Company entity — DB-at-rest encryption only)
-- Lawsuit amounts and court case numbers are public information and stored in full
-- The `litigationData` JSONB field never contains raw CPF numbers or personal addresses
 
 ---
 
@@ -2303,29 +1594,14 @@ Error codes specific to the profile and litigation features. These follow the pa
 
 ### Performance
 - Profile page load (public): < 1 second (including all metrics, team, and document metadata)
-- Document upload (25 MB): < 30 seconds
-- Pre-signed URL generation: < 200ms
 - Analytics dashboard load: < 2 seconds
-- Thumbnail generation: < 10 seconds after upload
 
 ### Accuracy
-- PDF page count extraction: 99%+ accuracy for valid PDFs
 - Brazilian number formatting: matches i18n.md rules exactly
 - View tracking: 100% of views recorded (including bots — filtered in analytics display)
 
-### Litigation Verification
-- BigDataCorp litigation fetch completes within 60 seconds of profile creation (average)
-- Litigation data displayed on both internal and public profile views
-- `PUT /api/v1/companies/:companyId/profile` silently ignores litigation fields in request body
-- Bull job retries 3 times with exponential backoff on BigDataCorp failure
-- Circuit breaker opens after 5 consecutive BigDataCorp failures, half-open after 60s
-- Failed litigation fetch does not block profile creation, editing, or publishing
-- Individual plaintiff names are masked in stored litigation data
-- `PROFILE_LITIGATION_FETCHED` and `PROFILE_LITIGATION_FAILED` audit events are recorded
-
 ### User Experience
 - Profile creation to first publish: < 10 minutes
-- Document upload: drag-and-drop with progress indicator
 - Share modal: 1 click to copy link
 - Preview mode: instant, no publish required
 - Team member reordering: drag-and-drop
@@ -2336,6 +1612,8 @@ Error codes specific to the profile and litigation features. These follow the pa
 
 | Specification | Relationship |
 |---------------|-------------|
+| [company-dataroom.md](./company-dataroom.md) | Dataroom document management — upload, download, storage, thumbnails |
+| [company-litigation-verification.md](./company-litigation-verification.md) | Automatic litigation check via BigDataCorp — immutable litigation data on profile |
 | [company-management.md](./company-management.md) | Profile reads company name, logo, founding date, entity type as defaults |
 | [company-cnpj-validation.md](./company-cnpj-validation.md) | Profile uses the already-validated CNPJ for BigDataCorp litigation lookup |
 | [document-generation.md](./document-generation.md) | Dataroom documents are separate from generated legal documents; different storage prefix |
@@ -2344,8 +1622,8 @@ Error codes specific to the profile and litigation features. These follow the pa
 | [shareholder-registry.md](./shareholder-registry.md) | Profile can display founding team members who may also be shareholders |
 | [funding-rounds.md](./funding-rounds.md) | Profile shared with prospective investors during fundraising process |
 | [api-standards.md](../.claude/rules/api-standards.md) | API endpoints follow `/api/v1/companies/:companyId/profile` pattern with envelope responses |
-| [error-handling.md](../.claude/rules/error-handling.md) | Error codes for profile not found, invalid share link, access denied; BigDataCorp retry/circuit breaker follows existing patterns |
-| [security.md](../.claude/rules/security.md) | Access controls on shared links; S3 storage for dataroom documents; PII masking for litigation data |
-| [audit-logging.md](../.claude/rules/audit-logging.md) | Profile publish/unpublish, document upload, and litigation fetch events logged |
+| [error-handling.md](../.claude/rules/error-handling.md) | Error codes for profile not found, invalid share link, access denied |
+| [security.md](../.claude/rules/security.md) | Access controls on shared links; S3 storage for dataroom documents |
+| [audit-logging.md](../.claude/rules/audit-logging.md) | Profile publish/unpublish events logged |
 | [i18n.md](../.claude/rules/i18n.md) | Profile content is user-authored and not translated; UI chrome follows i18n rules |
 | [design-system.md](../.claude/rules/design-system.md) | Profile page follows Navia design system for public-facing pages |

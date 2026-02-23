@@ -8,9 +8,11 @@
 
 ## Overview
 
-Navia integrates with Verifik, an AI-powered identity verification platform specialized for Latin American markets, to comply with Brazilian KYC/AML regulations (BCB Circular 3.978/2020 and Resolução BCB 119/2021). The system performs multi-level verification including CPF/CNPJ validation against government databases, document authentication, facial biometric matching, liveness detection, and AML screening against PEP and sanctions lists.
+Navia integrates with Verifik, an AI-powered identity verification platform specialized for Latin American markets, to comply with Brazilian KYC/AML regulations (BCB Circular 3.978/2020 and Resolução BCB 119/2021). The system performs multi-level verification including CPF validation against government databases, document authentication, facial biometric matching, liveness detection, and AML screening against PEP and sanctions lists.
 
 **Regulatory Context**: Brazilian fintech platforms handling financial instruments must verify customer identities using CPF cross-checks with Receita Federal, facial recognition, and AML screening. Brazil has 5x higher deepfake fraud rates than the US, making liveness detection critical.
+
+> **Note**: Company-level CNPJ validation is covered in [company-cnpj-validation.md](./company-cnpj-validation.md). This spec focuses on personal identity verification (CPF, documents, facial recognition, AML).
 
 ---
 
@@ -25,7 +27,7 @@ Navia integrates with Verifik, an AI-powered identity verification platform spec
 
 ### US-2: Admin KYC Before Cap Table Creation
 **As an** admin user ready to create my first cap table
-**I want to** complete CPF verification, document upload, facial recognition, and CNPJ verification
+**I want to** complete CPF verification, document upload, and facial recognition
 **So that** I can create a compliant cap table for my company
 
 ### US-3: Investor/Employee Immediate KYC
@@ -48,12 +50,7 @@ Navia integrates with Verifik, an AI-powered identity verification platform spec
 **I want to** take a selfie for facial recognition
 **So that** the system can verify I am the person in the identity document
 
-### US-7: Company Verification
-**As an** admin user creating a cap table
-**I want to** verify my company's CNPJ
-**So that** the system can confirm my company's legitimacy and legal status
-
-### US-8: KYC Status Visibility
+### US-7: KYC Status Visibility
 **As a** user who submitted KYC
 **I want to** see the verification status and any rejection reasons
 **So that** I can take corrective action if needed
@@ -81,21 +78,14 @@ Navia integrates with Verifik, an AI-powered identity verification platform spec
 - System MUST validate date of birth matches CPF registry
 - System MUST store certified CPF data returned by Verifik
 
-### FR-4: CNPJ Verification (Company)
-- Admin users MUST verify company CNPJ before creating cap table
-- System MUST validate CNPJ format (XX.XXX.XXX/XXXX-XX)
-- System MUST verify CNPJ against Receita Federal via Verifik API
-- System MUST confirm company is active and in good standing
-- System MUST store company legal data (name, address, activities)
-
-### FR-5: Document Verification
+### FR-4: Document Verification
 - System MUST accept: RG (Registro Geral), CNH (Driver's License), RNE (Foreign ID)
 - System MUST perform OCR extraction of document data
 - System MUST validate document authenticity (detect tampering)
 - System MUST compare extracted data with CPF validation results
 - System MUST store encrypted document images in S3
 
-### FR-6: Facial Recognition & Liveness
+### FR-5: Facial Recognition & Liveness
 - System MUST capture single-image selfie from user
 - System MUST perform 3D liveness detection (passive)
 - System MUST detect spoofing attempts (photos of photos, masks, deepfakes)
@@ -103,20 +93,20 @@ Navia integrates with Verifik, an AI-powered identity verification platform spec
 - System MUST require minimum match score of 85%
 - System MUST store encrypted selfie in S3
 
-### FR-7: AML Screening
+### FR-6: AML Screening
 - System MUST screen users against PEP (Politically Exposed Persons) databases
 - System MUST check OFAC, Interpol, DEA sanctions lists
 - System MUST check Brazilian SIMIT (fines and sanctions system)
 - System MUST calculate risk score (LOW, MEDIUM, HIGH)
 - System MUST flag high-risk users for manual review
 
-### FR-8: KYC Status Management
+### FR-7: KYC Status Management
 - System MUST track KYC status: not_started, in_progress, pending_review, approved, rejected, resubmission_required
 - System MUST allow maximum 3 resubmission attempts
 - System MUST provide rejection reasons for failed verifications
 - System MUST notify users via email of status changes
 
-### FR-9: Webhook Integration
+### FR-8: Webhook Integration
 - System MUST accept webhook callbacks from Verifik
 - System MUST verify webhook signatures
 - System MUST update KYC status based on async verification results
@@ -186,53 +176,6 @@ interface KYCVerification {
   attempt_count: number;            // Max 3 attempts
 
   // Metadata
-  created_at: Date;
-  updated_at: Date;
-}
-```
-
-### CompanyKYC Entity
-
-```typescript
-interface CompanyKYC {
-  id: string;
-  company_id: string;               // Foreign key to Company
-
-  // CNPJ Verification
-  cnpj: string;                     // XX.XXX.XXX/XXXX-XX
-  cnpj_verified: boolean;
-  cnpj_verified_at: Date | null;
-  legal_name: string;
-  trade_name: string;
-  company_status: 'ATIVA' | 'INATIVA' | 'SUSPENSA';
-  legal_nature: string;
-  opening_date: Date;
-  main_activity_code: string;
-  main_activity_desc: string;
-  address: {
-    street: string;
-    city: string;
-    state: string;
-    zip_code: string;
-  };
-  cnpj_data: object;                // Full certified data
-
-  // UBO (Ultimate Beneficial Owner)
-  ubo_identified: boolean;
-  ubo_data: {
-    name: string;
-    cpf: string;
-    ownership_percentage: number;
-  }[];
-
-  // Verifik Integration
-  verifik_signature: string;
-
-  // Status
-  status: KYCStatus;
-  approved_at: Date | null;
-  rejected_at: Date | null;
-
   created_at: Date;
   updated_at: Date;
 }
@@ -377,45 +320,6 @@ selfie: <image file>
 
 ---
 
-### POST /api/v1/kyc/verify-cnpj
-**Description**: Verify company CNPJ (admin only)
-
-**Request**:
-```json
-{
-  "cnpj": "09.159.197/0001-80"
-}
-```
-
-**Response** (200 OK):
-```json
-{
-  "verified": true,
-  "company_data": {
-    "legal_name": "VERIFIK LTDA",
-    "trade_name": "Verifik",
-    "cnpj": "09.159.197/0001-80",
-    "company_status": "ATIVA",
-    "legal_nature": "Sociedade Limitada",
-    "opening_date": "2019-05-10",
-    "main_activity": "Desenvolvimento de software",
-    "address": {
-      "street": "Rua Exemplo, 123",
-      "city": "São Paulo",
-      "state": "SP",
-      "zip_code": "01000-000"
-    }
-  }
-}
-```
-
-**Error Responses**:
-- `400 Bad Request` - Invalid CNPJ format
-- `404 Not Found` - CNPJ not found in Receita Federal
-- `422 Unprocessable Entity` - Company is inactive or suspended
-
----
-
 ### POST /api/v1/kyc/webhook/verifik
 **Description**: Webhook endpoint for Verifik async verification results
 
@@ -463,9 +367,8 @@ selfie: <image file>
 - Face match score MUST be ≥ 85%
 - Liveness score MUST be ≥ 80%
 
-### BR-5: Company-Admin Linkage
-- Admin user's personal CPF must be verified before CNPJ verification
-- CNPJ verification is only required when admin creates first cap table
+### BR-5: Admin CPF Prerequisite
+- Admin user's personal CPF must be verified before company creation
 - One company can have multiple verified admins
 
 ### BR-6: High-Risk Handling
@@ -513,15 +416,12 @@ PRECONDITION: Admin user is logged in, has not completed KYC
 24. System automatically triggers AML screening (background)
 25. System shows "Verification Complete" message
 26. System updates KYC status = "approved"
-27. System displays CNPJ verification prompt
-28. Admin enters company CNPJ
-29. System calls POST /api/v1/kyc/verify-cnpj
-30. Verifik validates CNPJ (< 3 seconds)
-31. System displays company verified ✓
-32. System redirects to cap table creation form
-33. Admin can now create cap table
+27. System redirects to cap table creation form
+28. Admin can now create cap table
 
-POSTCONDITION: Admin KYC approved, company CNPJ verified, cap table creation enabled
+For CNPJ validation flow, see [company-cnpj-validation.md](./company-cnpj-validation.md)
+
+POSTCONDITION: Admin KYC approved, cap table creation enabled
 ```
 
 ### Flow 2: Investor User KYC (Immediate After Signup)
@@ -648,7 +548,7 @@ POSTCONDITION: High-risk user manually approved by compliance team
 ### Internal Dependencies
 - **Authentication**: KYC flow requires authenticated user session
 - **Cap Table Management**: Cap table creation is gated by KYC approval
-- **Shareholder Registry**: Shareholder records inherit verified CPF/CNPJ data
+- **Shareholder Registry**: Shareholder records inherit verified CPF data
 - **Notifications**: KYC status changes trigger email notifications
 
 ### External Dependencies
@@ -657,7 +557,7 @@ POSTCONDITION: High-risk user manually approved by compliance team
   - Sandbox: https://api-sandbox.verifik.co/v2/
   - SLA: 99.5% uptime
   - Performance: < 5 seconds per verification step
-- **Receita Federal Database**: CPF/CNPJ validation (via Verifik)
+- **Receita Federal Database**: CPF validation (via Verifik)
 - **AWS S3**: Encrypted storage for KYC documents
 - **AWS KMS**: Encryption key management
 
@@ -714,27 +614,6 @@ export class VerifIkService {
       }
       throw new BadRequestException('CPF verification failed');
     }
-  }
-
-  async verifyCNPJ(cnpj: string) {
-    const response = await this.httpService
-      .get(`${this.apiUrl}/br/company`, {
-        params: {
-          documentType: 'CNPJ',
-          documentNumber: cnpj.replace(/\D/g, ''),
-        },
-        headers: {
-          Authorization: `Bearer ${this.apiToken}`,
-          Accept: 'application/json',
-        },
-      })
-      .toPromise();
-
-    return {
-      verified: true,
-      companyData: response.data,
-      signature: response.data.signature,
-    };
   }
 
   async verifyDocument(file: Buffer, documentType: string) {
@@ -1017,7 +896,7 @@ export default function KYCVerificationPage() {
 | [authentication.md](./authentication.md) | KYC requires authenticated user; user entity links to KYC verification records |
 | [shareholder-registry.md](./shareholder-registry.md) | Shareholders require KYC verification based on type (admin, investor, employee) |
 | [company-management.md](./company-management.md) | Company admins must complete KYC to activate company features |
-| [company-cnpj-validation.md](./company-cnpj-validation.md) | CNPJ validation uses the same Verifik service for Receita Federal lookups |
+| [company-cnpj-validation.md](./company-cnpj-validation.md) | Covers all CNPJ validation (company-level verification via Verifik); this spec defers to it for CNPJ flows |
 | [option-exercises.md](./option-exercises.md) | Employees may need KYC before exercising options |
 | [funding-rounds.md](./funding-rounds.md) | Investors need KYC before committing to rounds |
 | [api-standards.md](../.claude/rules/api-standards.md) | KYC endpoints follow `/api/v1/kyc/*` global path pattern |

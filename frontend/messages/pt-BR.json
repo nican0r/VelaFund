@@ -1,0 +1,35 @@
+{
+  "common": {
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "delete": "Excluir",
+    "edit": "Editar",
+    "loading": "Carregando...",
+    "save": "Salvar",
+    "search": "Buscar"
+  },
+  "dashboard": {
+    "title": "Painel"
+  },
+  "errors": {
+    "auth": {
+      "invalidToken": "Token de autenticação inválido",
+      "unauthorized": "Não autorizado"
+    },
+    "cap": {
+      "insufficientShares": "Ações insuficientes para completar a operação"
+    },
+    "company": {
+      "cnpjDuplicate": "CNPJ já cadastrado",
+      "notFound": "Empresa não encontrada"
+    },
+    "sys": {
+      "httpError": "Erro HTTP",
+      "internalError": "Erro interno do servidor",
+      "rateLimited": "Limite de requisições excedido. Tente novamente em alguns segundos."
+    },
+    "val": {
+      "invalidInput": "Dados de entrada inválidos"
+    }
+  }
+}

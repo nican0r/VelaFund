@@ -55,10 +55,11 @@ while true; do
     # --verbose: Detailed execution logging
     # Output format: Uses default 'text' format for human-readable terminal output
     docker sandbox run claude -p \
-        --dangerously-skip-permissions \
         --model opus \
+        --output-format=stream-json \
         --verbose \
-        "$(cat "$PROMPT_FILE")"
+        "$(cat "$PROMPT_FILE")" 
+        
 
     # Push changes after each iteration
     git push origin "$CURRENT_BRANCH" || {

@@ -1,8 +1,10 @@
 # Reports & Analytics Specification
 
-**Topic of Concern**: Cap table reports, investor reporting, exit waterfall analysis, and due diligence packages
+**Topic of Concern**: Cap table reports, investor reporting, dilution analysis, and due diligence packages
 
-**One-Sentence Description**: The system generates comprehensive reports including ownership breakdowns, dilution analysis, exit waterfalls, and exports in PDF, Excel, CSV, and OCT JSON formats.
+**One-Sentence Description**: The system generates comprehensive reports including ownership breakdowns, dilution analysis, investor portfolio views, and exports in PDF, Excel, CSV, and OCT JSON formats.
+
+**Note**: Exit waterfall modeling has been moved to [exit-waterfall.md](./exit-waterfall.md).
 
 **Complements**:
 - `api-standards.md` — response envelope, pagination, export content types
@@ -19,15 +21,14 @@
 2. [User Stories](#user-stories)
 3. [Report Types](#report-types)
 4. [API Endpoints](#api-endpoints)
-5. [Waterfall Calculation Algorithm](#waterfall-calculation-algorithm)
-6. [Data Models](#data-models)
-7. [Per-Role Access Matrix](#per-role-access-matrix)
-8. [Edge Cases](#edge-cases)
-9. [Dependencies](#dependencies)
-10. [Technical Implementation](#technical-implementation)
-11. [Security Considerations](#security-considerations)
-12. [Success Criteria](#success-criteria)
-13. [Related Specifications](#related-specifications)
+5. [Data Models](#data-models)
+6. [Per-Role Access Matrix](#per-role-access-matrix)
+7. [Edge Cases](#edge-cases)
+8. [Dependencies](#dependencies)
+9. [Technical Implementation](#technical-implementation)
+10. [Security Considerations](#security-considerations)
+11. [Success Criteria](#success-criteria)
+12. [Related Specifications](#related-specifications)
 
 ---
 
@@ -51,17 +52,7 @@ Reports are generated from current database state (no stale caches). For large e
 - Support filtering by share class.
 - Data reflects the current cap table state (no caching delay).
 
-### US-2: Exit Waterfall Scenarios
-
-**As an** admin, **I want to** run exit waterfall scenarios at various exit valuations, **so that** I can model how proceeds would be distributed among shareholders based on liquidation preferences.
-
-**Acceptance Criteria**:
-- Accept an exit amount and optional share class preference order.
-- Calculate per-class and per-shareholder proceeds considering liquidation preferences, participation rights, and caps.
-- Show breakeven analysis: the exit value at which common shareholders surpass preferred shareholders on a per-share basis.
-- Support both participating and non-participating preferred scenarios.
-
-### US-3: Investor Portfolio View
+### US-2: Investor Portfolio View
 
 **As an** investor, **I want to** see my portfolio summary across all companies I hold shares in, **so that** I can track my total investment value and ownership percentages.
 
@@ -70,7 +61,7 @@ Reports are generated from current database state (no stale caches). For large e
 - Accessible via the user-scoped endpoint (not company-scoped).
 - Only display the investor's own holdings; never expose other shareholders' data.
 
-### US-4: Due Diligence Package
+### US-3: Due Diligence Package
 
 **As a** legal user, **I want to** generate a due diligence package for the company, **so that** potential investors and auditors can review the company's equity history.
 
@@ -79,7 +70,7 @@ Reports are generated from current database state (no stale caches). For large e
 - Include blockchain verification hashes for all on-chain transactions.
 - Large packages are generated asynchronously; the user receives an email with a download link.
 
-### US-5: Cap Table Export
+### US-4: Cap Table Export
 
 **As a** finance user, **I want to** export the current cap table in standard formats (PDF, Excel, CSV, OCT JSON), **so that** I can share it with accountants, lawyers, and other stakeholders.
 
@@ -107,7 +98,7 @@ Reports are generated from current database state (no stale caches). For large e
 - Ownership certificates
 - Investment summary (amount invested, current value, ROI multiple)
 - Transaction history for the specific investor
-- Exit proceeds projections at various valuations
+- Exit proceeds projections at various valuations (see [exit-waterfall.md](./exit-waterfall.md))
 
 ### Due Diligence Packages
 - Complete cap table history
@@ -123,7 +114,7 @@ Reports are generated from current database state (no stale caches). For large e
 - Ownership concentration (Gini coefficient)
 - Foreign ownership percentage
 - Upcoming vesting events calendar
-- Exit waterfall analysis (M&A scenarios)
+- Exit waterfall analysis (see [exit-waterfall.md](./exit-waterfall.md))
 
 ---
 
@@ -182,79 +173,6 @@ Returns the current ownership breakdown for the company.
   }
 }
 ```
-
-### POST /api/v1/companies/:companyId/reports/waterfall
-
-Runs an exit waterfall scenario. Uses POST because the request includes a complex calculation body.
-
-**Request Body**:
-
-```json
-{
-  "exitAmount": "10000000.00",
-  "shareClassOrder": ["uuid-class-preferred-a", "uuid-class-preferred-b", "uuid-class-common"],
-  "includeOptions": true,
-  "includeConvertibles": true
-}
-```
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `exitAmount` | string (decimal) | Yes | Total exit proceeds in BRL |
-| `shareClassOrder` | UUID[] | No | Liquidation preference stacking order. Defaults to class seniority. |
-| `includeOptions` | boolean | No | Include vested unexercised options (default: `true`) |
-| `includeConvertibles` | boolean | No | Include converted convertible instruments (default: `true`) |
-
-**Response** (`200 OK`):
-
-```json
-{
-  "success": true,
-  "data": {
-    "exitAmount": "10000000.00",
-    "generatedAt": "2026-02-23T14:35:00.000Z",
-    "shareClassResults": [
-      {
-        "shareClassId": "uuid-class-preferred-a",
-        "shareClassName": "PN-A",
-        "totalShares": "30000",
-        "liquidationPreference": "3000000.00",
-        "participationProceeds": "700000.00",
-        "totalProceeds": "3700000.00",
-        "perShareValue": "123.33",
-        "roiMultiple": "2.47",
-        "isParticipating": true,
-        "participationCapped": false
-      },
-      {
-        "shareClassId": "uuid-class-common",
-        "shareClassName": "ON",
-        "totalShares": "40000",
-        "liquidationPreference": "0.00",
-        "participationProceeds": "0.00",
-        "totalProceeds": "4200000.00",
-        "perShareValue": "105.00",
-        "roiMultiple": null,
-        "isParticipating": false,
-        "participationCapped": false
-      }
-    ],
-    "breakeven": {
-      "exitValue": "15000000.00",
-      "description": "Exit value at which common per-share proceeds exceed preferred per-share proceeds"
-    },
-    "unallocatedProceeds": "0.00"
-  }
-}
-```
-
-**Error Responses**:
-
-| Status | Code | When |
-|--------|------|------|
-| `400` | `VAL_INVALID_INPUT` | `exitAmount` is missing or not a valid decimal |
-| `404` | `COMPANY_NOT_FOUND` | Company does not exist or user has no access |
-| `422` | `CAP_SHARE_CLASS_NOT_FOUND` | A share class ID in `shareClassOrder` does not exist |
 
 ### GET /api/v1/companies/:companyId/reports/cap-table/export
 
@@ -425,89 +343,6 @@ Returns the authenticated investor's portfolio across all companies.
 
 ---
 
-## Waterfall Calculation Algorithm
-
-The exit waterfall calculates how exit proceeds are distributed among share classes based on their liquidation preferences and participation rights. The algorithm follows these steps:
-
-### Step 1: Apply Liquidation Preferences
-
-For each share class in seniority order (most senior first), allocate the liquidation preference amount:
-
-```
-For each shareClass in preferenceOrder:
-  preferenceAmount = shareClass.liquidationPreferenceMultiple * shareClass.originalInvestment
-  allocation = min(preferenceAmount, remainingProceeds)
-  shareClass.preferenceProceeds = allocation
-  remainingProceeds -= allocation
-```
-
-If remaining proceeds reach zero before all preferences are satisfied, junior classes receive nothing.
-
-### Step 2: Preference Stacking Order
-
-Liquidation preferences stack in the order defined by the share class seniority (configurable per company):
-
-1. **Standard seniority**: Later rounds are senior to earlier rounds (Series B > Series A > Seed).
-2. **Pari passu**: All preferred classes share pro-rata from the same pool.
-3. **Custom order**: Admin can define a custom stacking order via the `shareClassOrder` request parameter.
-
-### Step 3: Remaining Proceeds Distribution to Common
-
-After all liquidation preferences are satisfied, remaining proceeds are distributed to common shareholders on a pro-rata basis:
-
-```
-commonProRataShare = shareholderShares / totalCommonShares
-commonProceeds = remainingProceeds * commonProRataShare
-```
-
-### Step 4: Participating Preferred Additional Share
-
-For share classes with participation rights, after their liquidation preference is paid, they also participate in the remaining proceeds alongside common shareholders:
-
-```
-For each participatingClass:
-  participationShare = participatingClass.shares / totalParticipatingAndCommonShares
-  participatingClass.participationProceeds = remainingProceeds * participationShare
-```
-
-### Step 5: Cap on Participation
-
-If a participating preferred class has a participation cap (e.g., 3x), total proceeds (preference + participation) are capped:
-
-```
-For each participatingClass with cap:
-  maxTotal = participatingClass.cap * participatingClass.originalInvestment
-  if (preferenceProceeds + participationProceeds) > maxTotal:
-    participatingClass.totalProceeds = maxTotal
-    excessReturned = (preferenceProceeds + participationProceeds) - maxTotal
-    redistribute excessReturned to uncapped classes pro-rata
-```
-
-### Step 6: Non-Participating Preferred Conversion Analysis
-
-Non-participating preferred holders choose the better of:
-- (a) Taking their liquidation preference, OR
-- (b) Converting to common and receiving a pro-rata share of total proceeds.
-
-The algorithm computes both scenarios and selects the higher value for each non-participating class.
-
-### Step 7: Breakeven Analysis
-
-Calculate the exit value at which common shareholders' per-share proceeds equal or exceed preferred shareholders' per-share proceeds:
-
-```
-Iterate exit values from 0 to 10x last valuation:
-  For each exitValue:
-    Run waterfall
-    If commonPerShare >= preferredPerShare for all preferred classes:
-      breakeven = exitValue
-      break
-```
-
-The breakeven is computed via binary search for efficiency.
-
----
-
 ## Data Models
 
 ### TypeScript Interfaces
@@ -542,30 +377,6 @@ interface OwnershipReport {
   optionPoolSummary: OptionPoolSummary;
 }
 
-interface WaterfallShareClassResult {
-  shareClassId: string;
-  shareClassName: string;
-  totalShares: string;
-  liquidationPreference: string;
-  participationProceeds: string;
-  totalProceeds: string;
-  perShareValue: string;
-  roiMultiple: string | null; // null for common (no original investment basis)
-  isParticipating: boolean;
-  participationCapped: boolean;
-}
-
-interface WaterfallAnalysis {
-  exitAmount: string;
-  generatedAt: string;
-  shareClassResults: WaterfallShareClassResult[];
-  breakeven: {
-    exitValue: string;
-    description: string;
-  };
-  unallocatedProceeds: string;
-}
-
 interface ExportJob {
   id: string;
   companyId: string;
@@ -591,6 +402,8 @@ interface PortfolioHolding {
 }
 ```
 
+For waterfall-related data models (`WaterfallShareClassResult`, `WaterfallAnalysis`), see [exit-waterfall.md](./exit-waterfall.md).
+
 ---
 
 ## Per-Role Access Matrix
@@ -599,11 +412,12 @@ interface PortfolioHolding {
 |--------------------|-------|---------|-------|----------|----------|
 | Ownership breakdown (`GET .../reports/ownership`) | Full | Full | Full | No | No |
 | Dilution analysis (`GET .../reports/dilution`) | Full | Full | Read | No | No |
-| Waterfall analysis (`POST .../reports/waterfall`) | Full | No | No | No | No |
 | Cap table export (`GET .../reports/cap-table/export`) | Full | Full | Full | No | No |
 | Due diligence package (`GET .../reports/due-diligence`) | Full | No | Full | No | No |
 | Portfolio view (`GET /users/me/reports/portfolio`) | No | No | No | Own only | No |
 | Option grant report | Full | Full | Read | No | Own only |
+
+For waterfall analysis access, see [exit-waterfall.md](./exit-waterfall.md) (ADMIN only).
 
 **Notes**:
 - "Full" = can view and export.
@@ -618,17 +432,9 @@ interface PortfolioHolding {
 
 ### EC-1: Empty Cap Table
 
-When a company has no shareholders or share classes, the ownership report returns empty arrays with zero totals. Waterfall analysis returns `422` with code `CAP_SHARE_CLASS_NOT_FOUND` since there are no classes to distribute proceeds to.
+When a company has no shareholders or share classes, the ownership report returns empty arrays with zero totals.
 
-### EC-2: Zero Exit Amount in Waterfall
-
-If `exitAmount` is `"0.00"`, the waterfall returns all share classes with `totalProceeds: "0.00"` and `perShareValue: "0.00"`. The breakeven is `"0.00"`. This is a valid scenario (e.g., distressed liquidation).
-
-### EC-3: Convertible Instruments Not Yet Converted
-
-When `includeConvertibles` is `true` in the waterfall request, convertible instruments are modeled as-if converted at their most favorable conversion terms (conversion cap or discount, whichever yields more shares). If conversion terms are ambiguous (e.g., no cap and no discount), the convertible is excluded and noted in the response metadata.
-
-### EC-4: Concurrent Export Requests
+### EC-2: Concurrent Export Requests
 
 If a user requests an export while a previous export of the same format for the same company is still processing, the system returns the existing job ID rather than queuing a duplicate. The deduplication window is 5 minutes.
 
@@ -678,21 +484,8 @@ export class ReportService {
     // 6. Return structured OwnershipReport
   }
 
-  async runWaterfall(companyId: string, input: {
-    exitAmount: string;
-    shareClassOrder?: string[];
-    includeOptions?: boolean;
-    includeConvertibles?: boolean;
-  }): Promise<WaterfallAnalysis> {
-    // 1. Load share classes with liquidation preference terms
-    // 2. Determine stacking order (custom or default seniority)
-    // 3. Execute waterfall algorithm (Steps 1-7 from spec)
-    // 4. Compute breakeven via binary search
-    // 5. Return WaterfallAnalysis
-  }
-
   async exportCapTable(companyId: string, format: string, snapshotDate?: string): Promise<ExportJob> {
-    // 1. Check for duplicate in-progress export (EC-4 deduplication)
+    // 1. Check for duplicate in-progress export (EC-2 deduplication)
     // 2. Create ExportJob record with status QUEUED
     // 3. Add job to Bull queue
     // 4. Return job metadata
@@ -711,6 +504,9 @@ export class ReportService {
     // 4. Compute ROI multiple: estimatedValue / totalInvested
     // 5. Return holdings array
   }
+
+  // Waterfall analysis method — see exit-waterfall.md for specification
+  // async runWaterfall(companyId, input): Promise<WaterfallAnalysis>
 }
 ```
 
@@ -749,9 +545,8 @@ export class ReportExportProcessor {
 |----|-------------|--------|
 | FR-1 | Synchronous reports generate from current database state | < 3 seconds |
 | FR-2 | Async export jobs complete within reasonable time | < 60 seconds (cap table), < 5 minutes (due diligence) |
-| FR-3 | Waterfall calculations use `Decimal` precision | No floating-point errors |
-| FR-4 | Export files are stored temporarily in S3 | 1-hour pre-signed URL expiry, auto-deleted after 24 hours |
-| FR-5 | All numeric values in reports use Brazilian number format for display | `1.234,56` via `Intl.NumberFormat('pt-BR')` on frontend |
+| FR-3 | Export files are stored temporarily in S3 | 1-hour pre-signed URL expiry, auto-deleted after 24 hours |
+| FR-4 | All numeric values in reports use Brazilian number format for display | `1.234,56` via `Intl.NumberFormat('pt-BR')` on frontend |
 
 ---
 
@@ -770,8 +565,6 @@ export class ReportExportProcessor {
 ## Success Criteria
 
 - [ ] Ownership report generates in < 3 seconds for companies with up to 500 shareholders
-- [ ] Waterfall calculation produces results matching manual calculations to the cent (verified with test fixtures)
-- [ ] Breakeven analysis converges within 100 binary search iterations
 - [ ] PDF exports render with correct formatting, company header, and generation date
 - [ ] Excel exports include multiple tabs (summary, by share class, by shareholder) with correct formulas
 - [ ] CSV exports produce valid RFC 4180 CSV with UTF-8 BOM for Brazilian character support
@@ -785,18 +578,21 @@ export class ReportExportProcessor {
 - [ ] Decimal precision is maintained throughout calculations (no floating-point rounding)
 - [ ] Brazilian number formatting is used for all financial values in display contexts
 
+For waterfall-specific success criteria, see [exit-waterfall.md](./exit-waterfall.md).
+
 ---
 
 ## Related Specifications
 
 | Specification | Relationship |
 |---------------|-------------|
+| [exit-waterfall.md](./exit-waterfall.md) | Exit waterfall scenario modeling — extracted from this spec |
 | [cap-table-management.md](./cap-table-management.md) | Source data for ownership reports, shareholding breakdowns, and snapshots |
 | [shareholder-registry.md](./shareholder-registry.md) | Shareholder data for ownership reports and due diligence packages |
 | [share-classes.md](./share-classes.md) | Per-class breakdowns in cap table reports |
 | [transactions.md](./transactions.md) | Transaction history reports and activity timelines |
 | [funding-rounds.md](./funding-rounds.md) | Funding round summary reports and round history |
-| [convertible-instruments.md](./convertible-instruments.md) | Convertible tracking and waterfall modeling data |
+| [convertible-instruments.md](./convertible-instruments.md) | Convertible tracking data for due diligence packages |
 | [option-plans.md](./option-plans.md) | Option pool reports and fully-diluted calculations |
 | [user-permissions.md](./user-permissions.md) | Role-based report access: ADMIN, FINANCE, LEGAL, INVESTOR, EMPLOYEE |
 | [api-standards.md](../.claude/rules/api-standards.md) | Response envelope format, pagination, export content types, HTTP status codes |

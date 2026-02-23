@@ -1,0 +1,1182 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// AUTHENTICATION & IDENTITY
+// =============================================================================
+
+model User {
+  id              String    @id @default(uuid())
+  privyUserId     String    @unique @map("privy_user_id")
+  email           String    @unique
+  firstName       String?   @map("first_name")
+  lastName        String?   @map("last_name")
+  walletAddress   String?   @unique @map("wallet_address")
+  profilePictureUrl String? @map("profile_picture_url")
+  kycStatus       KycStatus @default(NOT_STARTED) @map("kyc_status")
+  locale          String    @default("pt-BR")
+  lastLoginAt     DateTime? @map("last_login_at")
+  deletedAt       DateTime? @map("deleted_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Encrypted fields
+  cpfEncrypted    Bytes?    @map("cpf_encrypted")
+  cpfBlindIndex   String?   @map("cpf_blind_index")
+
+  // Relations
+  kycVerification   KycVerification?
+  companyMembers    CompanyMember[]
+  createdCompanies  Company[]          @relation("CompanyCreator")
+  auditLogs         AuditLog[]
+  consentRecords    ConsentRecord[]
+  notifications     Notification[]
+
+  @@index([cpfBlindIndex])
+  @@index([privyUserId])
+  @@map("users")
+}
+
+enum KycStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  RESUBMISSION_REQUIRED
+
+  @@map("kyc_status")
+}
+
+model KycVerification {
+  id                String            @id @default(uuid())
+  userId            String            @unique @map("user_id")
+  cpfVerified       Boolean           @default(false) @map("cpf_verified")
+  documentType      DocumentType?     @map("document_type")
+  documentS3Key     String?           @map("document_s3_key")
+  faceVerified      Boolean           @default(false) @map("face_verified")
+  faceMatchScore    Decimal?          @map("face_match_score") @db.Decimal(5, 2)
+  livenessScore     Decimal?          @map("liveness_score") @db.Decimal(5, 2)
+  selfieS3Key       String?           @map("selfie_s3_key")
+  amlScreeningDone  Boolean           @default(false) @map("aml_screening_done")
+  amlRiskScore      Decimal?          @map("aml_risk_score") @db.Decimal(5, 2)
+  isPep             Boolean           @default(false) @map("is_pep")
+  sanctionsMatch    Boolean           @default(false) @map("sanctions_match")
+  status            KycStatus         @default(NOT_STARTED)
+  attemptCount      Int               @default(0) @map("attempt_count")
+  verifikSessionId  String?           @map("verifik_session_id")
+  submittedAt       DateTime?         @map("submitted_at")
+  verifiedAt        DateTime?         @map("verified_at")
+  rejectedAt        DateTime?         @map("rejected_at")
+  rejectionReason   String?           @map("rejection_reason")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("kyc_verifications")
+}
+
+enum DocumentType {
+  RG
+  CNH
+  RNE
+
+  @@map("document_type")
+}
+
+// =============================================================================
+// COMPANY MANAGEMENT
+// =============================================================================
+
+model Company {
+  id                String          @id @default(uuid())
+  name              String
+  entityType        CompanyEntityType @map("entity_type")
+  cnpj              String          @unique
+  description       String?
+  logoUrl           String?         @map("logo_url")
+  foundedDate       DateTime?       @map("founded_date") @db.Date
+  status            CompanyStatus   @default(DRAFT)
+  cnpjValidatedAt   DateTime?       @map("cnpj_validated_at")
+  cnpjData          Json?           @map("cnpj_data")
+  contractAddress   String?         @map("contract_address")
+  adminWalletAddress String?        @map("admin_wallet_address")
+  defaultCurrency   String          @default("BRL") @map("default_currency")
+  fiscalYearEnd     String          @default("12-31") @map("fiscal_year_end")
+  timezone          String          @default("America/Sao_Paulo")
+  locale            String          @default("pt-BR")
+  createdById       String          @map("created_by_id")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  createdBy         User            @relation("CompanyCreator", fields: [createdById], references: [id])
+  members           CompanyMember[]
+  shareholders      Shareholder[]
+  shareClasses      ShareClass[]
+  shareholdings     Shareholding[]
+  transactions      Transaction[]
+  fundingRounds     FundingRound[]
+  convertibles      ConvertibleInstrument[]
+  optionPlans       OptionPlan[]
+  optionGrants      OptionGrant[]
+  documents         Document[]
+  documentTemplates DocumentTemplate[]
+  auditLogs         AuditLog[]
+  capTableSnapshots CapTableSnapshot[]
+  profile           CompanyProfile?
+
+  @@index([cnpj])
+  @@index([status])
+  @@index([createdById])
+  @@map("companies")
+}
+
+enum CompanyEntityType {
+  LTDA
+  SA_CAPITAL_FECHADO
+  SA_CAPITAL_ABERTO
+
+  @@map("company_entity_type")
+}
+
+enum CompanyStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+  DISSOLVED
+
+  @@map("company_status")
+}
+
+model CompanyMember {
+  id          String              @id @default(uuid())
+  companyId   String              @map("company_id")
+  userId      String?             @map("user_id")
+  email       String
+  role        CompanyMemberRole
+  status      CompanyMemberStatus @default(PENDING)
+  permissions Json?
+  invitedBy   String?             @map("invited_by")
+  invitedAt   DateTime            @default(now()) @map("invited_at")
+  acceptedAt  DateTime?           @map("accepted_at")
+  removedAt   DateTime?           @map("removed_at")
+  removedBy   String?             @map("removed_by")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+
+  // Relations
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user            User?            @relation(fields: [userId], references: [id])
+  invitationToken InvitationToken?
+
+  @@unique([companyId, email])
+  @@index([companyId, status])
+  @@index([userId])
+  @@map("company_members")
+}
+
+enum CompanyMemberRole {
+  ADMIN
+  FINANCE
+  LEGAL
+  INVESTOR
+  EMPLOYEE
+
+  @@map("company_member_role")
+}
+
+enum CompanyMemberStatus {
+  PENDING
+  ACTIVE
+  REMOVED
+
+  @@map("company_member_status")
+}
+
+model InvitationToken {
+  id              String        @id @default(uuid())
+  companyMemberId String        @unique @map("company_member_id")
+  token           String        @unique
+  expiresAt       DateTime      @map("expires_at")
+  usedAt          DateTime?     @map("used_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  // Relations
+  companyMember CompanyMember @relation(fields: [companyMemberId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@map("invitation_tokens")
+}
+
+// =============================================================================
+// COMPANY PROFILE & DATAROOM
+// =============================================================================
+
+model CompanyProfile {
+  id                String          @id @default(uuid())
+  companyId         String          @unique @map("company_id")
+  slug              String          @unique
+  status            ProfileStatus   @default(DRAFT)
+  headline          String?
+  description       String?
+  sector            CompanySector?
+  foundedYear       Int?            @map("founded_year")
+  website           String?
+  location          String?
+  accessType        ProfileAccessType @default(PUBLIC) @map("access_type")
+  accessPasswordHash String?        @map("access_password_hash")
+  litigationStatus  VerificationStatus? @map("litigation_status")
+  litigationData    Json?           @map("litigation_data")
+  litigationFetchedAt DateTime?     @map("litigation_fetched_at")
+  litigationError   String?         @map("litigation_error")
+  publishedAt       DateTime?       @map("published_at")
+  archivedAt        DateTime?       @map("archived_at")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  company    Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  metrics    ProfileMetric[]
+  team       ProfileTeamMember[]
+  documents  ProfileDocument[]
+  views      ProfileView[]
+
+  @@index([slug])
+  @@map("company_profiles")
+}
+
+enum ProfileStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+
+  @@map("profile_status")
+}
+
+enum ProfileAccessType {
+  PUBLIC
+  PASSWORD
+  EMAIL_GATED
+
+  @@map("profile_access_type")
+}
+
+enum CompanySector {
+  FINTECH
+  SAAS
+  BLOCKCHAIN_WEB3
+  HEALTHTECH
+  EDTECH
+  AGRITECH
+  LOGISTICS
+  ECOMMERCE
+  MARKETPLACE
+  PROPTECH
+  INSURTECH
+  LEGALTECH
+  HRTECH
+  CLEANTECH
+  BIOTECH
+  GAMING
+  MEDIA_ENTERTAINMENT
+  FOOD_BEVERAGE
+  FASHION
+  TRAVEL
+  SOCIAL_IMPACT
+  CYBERSECURITY
+  AI_ML
+  IOT
+  HARDWARE
+  OTHER
+
+  @@map("company_sector")
+}
+
+enum VerificationStatus {
+  PENDING
+  COMPLETED
+  FAILED
+
+  @@map("verification_status")
+}
+
+model ProfileMetric {
+  id        String       @id @default(uuid())
+  profileId String       @map("profile_id")
+  label     String
+  value     String
+  format    MetricFormat
+  icon      String?
+  order     Int          @default(0)
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  profile CompanyProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@map("profile_metrics")
+}
+
+enum MetricFormat {
+  NUMBER
+  CURRENCY_BRL
+  CURRENCY_USD
+  PERCENTAGE
+  TEXT
+
+  @@map("metric_format")
+}
+
+model ProfileTeamMember {
+  id          String   @id @default(uuid())
+  profileId   String   @map("profile_id")
+  name        String
+  title       String?
+  photoUrl    String?  @map("photo_url")
+  linkedinUrl String?  @map("linkedin_url")
+  order       Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  profile CompanyProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@map("profile_team_members")
+}
+
+model ProfileDocument {
+  id           String   @id @default(uuid())
+  profileId    String   @map("profile_id")
+  name         String
+  category     DocumentCategory
+  fileKey      String   @map("file_key")
+  fileSize     Int      @map("file_size")
+  mimeType     String   @map("mime_type")
+  pageCount    Int?     @map("page_count")
+  thumbnailKey String?  @map("thumbnail_key")
+  order        Int      @default(0)
+  uploadedById String   @map("uploaded_by_id")
+  uploadedAt   DateTime @default(now()) @map("uploaded_at")
+
+  profile CompanyProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@map("profile_documents")
+}
+
+enum DocumentCategory {
+  PITCH_DECK
+  FINANCIALS
+  LEGAL
+  PRODUCT
+  TEAM
+  OTHER
+
+  @@map("document_category")
+}
+
+model ProfileView {
+  id          String   @id @default(uuid())
+  profileId   String   @map("profile_id")
+  viewerEmail String?  @map("viewer_email")
+  viewerIp    String?  @map("viewer_ip")
+  userAgent   String?  @map("user_agent")
+  referrer    String?
+  viewedAt    DateTime @default(now()) @map("viewed_at")
+
+  profile CompanyProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId, viewedAt])
+  @@map("profile_views")
+}
+
+// =============================================================================
+// CAP TABLE CORE
+// =============================================================================
+
+model ShareClass {
+  id                            String    @id @default(uuid())
+  companyId                     String    @map("company_id")
+  className                     String    @map("class_name")
+  type                          ShareClassType
+  votesPerShare                 Int       @default(1) @map("votes_per_share")
+  totalAuthorized               Decimal   @map("total_authorized") @db.Decimal(30, 10)
+  totalIssued                   Decimal   @default(0) @map("total_issued") @db.Decimal(30, 10)
+  liquidationPreferenceMultiple Decimal?  @map("liquidation_preference_multiple") @db.Decimal(10, 4)
+  participatingRights           Boolean   @default(false) @map("participating_rights")
+  participationCap              Decimal?  @map("participation_cap") @db.Decimal(10, 4)
+  rightOfFirstRefusal           Boolean   @default(true) @map("right_of_first_refusal")
+  lockUpPeriodMonths            Int?      @map("lock_up_period_months")
+  tagAlongPercentage            Decimal?  @map("tag_along_percentage") @db.Decimal(5, 2)
+  conversionRatio               Decimal?  @map("conversion_ratio") @db.Decimal(10, 6)
+  antiDilutionType              AntiDilutionType? @map("anti_dilution_type")
+  seniority                     Int       @default(0)
+  createdAt                     DateTime  @default(now()) @map("created_at")
+  updatedAt                     DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  shareholdings Shareholding[]
+  transactions  Transaction[]  @relation("TransactionShareClass")
+
+  @@unique([companyId, className])
+  @@index([companyId])
+  @@map("share_classes")
+}
+
+enum ShareClassType {
+  QUOTA
+  COMMON_SHARES
+  PREFERRED_SHARES
+
+  @@map("share_class_type")
+}
+
+enum AntiDilutionType {
+  FULL_RATCHET
+  WEIGHTED_AVERAGE
+
+  @@map("anti_dilution_type")
+}
+
+model Shareholder {
+  id                String            @id @default(uuid())
+  companyId         String            @map("company_id")
+  userId            String?           @map("user_id")
+  name              String
+  email             String?
+  type              ShareholderType
+  status            ShareholderStatus @default(ACTIVE)
+  cpfCnpj           String?           @map("cpf_cnpj")
+  cpfCnpjEncrypted  Bytes?            @map("cpf_cnpj_encrypted")
+  cpfCnpjBlindIndex String?           @map("cpf_cnpj_blind_index")
+  walletAddress     String?           @map("wallet_address")
+  nationality       String            @default("BR")
+  taxResidency      String            @default("BR") @map("tax_residency")
+  isForeign         Boolean           @default(false) @map("is_foreign")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  company              Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  shareholdings        Shareholding[]
+  beneficialOwners     BeneficialOwner[]
+  fromTransactions     Transaction[]        @relation("TransactionFromShareholder")
+  toTransactions       Transaction[]        @relation("TransactionToShareholder")
+  roundCommitments     RoundCommitment[]
+  convertibles         ConvertibleInstrument[]
+
+  @@unique([companyId, cpfCnpjBlindIndex])
+  @@index([companyId, status])
+  @@index([companyId, type])
+  @@map("shareholders")
+}
+
+enum ShareholderType {
+  FOUNDER
+  INVESTOR
+  EMPLOYEE
+  ADVISOR
+  CORPORATE
+
+  @@map("shareholder_type")
+}
+
+enum ShareholderStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+
+  @@map("shareholder_status")
+}
+
+model BeneficialOwner {
+  id            String   @id @default(uuid())
+  shareholderId String   @map("shareholder_id")
+  name          String
+  cpf           String?
+  ownershipPct  Decimal  @map("ownership_pct") @db.Decimal(5, 2)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  shareholder Shareholder @relation(fields: [shareholderId], references: [id], onDelete: Cascade)
+
+  @@map("beneficial_owners")
+}
+
+model Shareholding {
+  id             String   @id @default(uuid())
+  companyId      String   @map("company_id")
+  shareholderId  String   @map("shareholder_id")
+  shareClassId   String   @map("share_class_id")
+  quantity       Decimal  @map("quantity") @db.Decimal(30, 10)
+  ownershipPct   Decimal  @map("ownership_pct") @db.Decimal(10, 6)
+  votingPowerPct Decimal  @map("voting_power_pct") @db.Decimal(10, 6)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  shareholder Shareholder @relation(fields: [shareholderId], references: [id])
+  shareClass  ShareClass  @relation(fields: [shareClassId], references: [id])
+
+  @@unique([shareholderId, shareClassId])
+  @@index([companyId])
+  @@map("shareholdings")
+}
+
+model CapTableSnapshot {
+  id          String   @id @default(uuid())
+  companyId   String   @map("company_id")
+  snapshotDate DateTime @map("snapshot_date") @db.Date
+  data        Json
+  notes       String?
+  stateHash   String?  @map("state_hash")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, snapshotDate])
+  @@map("cap_table_snapshots")
+}
+
+// =============================================================================
+// TRANSACTIONS
+// =============================================================================
+
+model Transaction {
+  id                   String            @id @default(uuid())
+  companyId            String            @map("company_id")
+  type                 TransactionType
+  status               TransactionStatus @default(DRAFT)
+  fromShareholderId    String?           @map("from_shareholder_id")
+  toShareholderId      String?           @map("to_shareholder_id")
+  shareClassId         String            @map("share_class_id")
+  quantity             Decimal           @db.Decimal(30, 10)
+  pricePerShare        Decimal?          @map("price_per_share") @db.Decimal(30, 10)
+  totalValue           Decimal?          @map("total_value") @db.Decimal(30, 10)
+  notes                String?
+  requiresBoardApproval Boolean          @default(false) @map("requires_board_approval")
+  approvedBy           String?           @map("approved_by")
+  approvedAt           DateTime?         @map("approved_at")
+  cancelledBy          String?           @map("cancelled_by")
+  cancelledAt          DateTime?         @map("cancelled_at")
+  confirmedAt          DateTime?         @map("confirmed_at")
+  createdBy            String            @map("created_by")
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  company          Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  fromShareholder  Shareholder?           @relation("TransactionFromShareholder", fields: [fromShareholderId], references: [id])
+  toShareholder    Shareholder?           @relation("TransactionToShareholder", fields: [toShareholderId], references: [id])
+  shareClass       ShareClass             @relation("TransactionShareClass", fields: [shareClassId], references: [id])
+  blockchainTransactions BlockchainTransaction[]
+
+  @@index([companyId, type])
+  @@index([companyId, status])
+  @@index([companyId, createdAt])
+  @@map("transactions")
+}
+
+enum TransactionType {
+  ISSUANCE
+  TRANSFER
+  CONVERSION
+  CANCELLATION
+  SPLIT
+
+  @@map("transaction_type")
+}
+
+enum TransactionStatus {
+  DRAFT
+  PENDING_APPROVAL
+  SUBMITTED
+  CONFIRMED
+  FAILED
+  CANCELLED
+
+  @@map("transaction_status")
+}
+
+model BlockchainTransaction {
+  id              String                    @id @default(uuid())
+  transactionId   String                    @map("transaction_id")
+  txHash          String?                   @map("tx_hash")
+  blockNumber     Int?                      @map("block_number")
+  blockHash       String?                   @map("block_hash")
+  gasUsed         String?                   @map("gas_used")
+  status          BlockchainTransactionStatus @default(PENDING)
+  errorMessage    String?                   @map("error_message")
+  attempts        Int                       @default(0)
+  submittedAt     DateTime?                 @map("submitted_at")
+  confirmedAt     DateTime?                 @map("confirmed_at")
+  createdAt       DateTime                  @default(now()) @map("created_at")
+  updatedAt       DateTime                  @updatedAt @map("updated_at")
+
+  // Relations (1:many with Transaction per H6)
+  transaction Transaction @relation(fields: [transactionId], references: [id])
+
+  @@index([transactionId])
+  @@index([txHash])
+  @@index([status])
+  @@map("blockchain_transactions")
+}
+
+enum BlockchainTransactionStatus {
+  PENDING
+  SUBMITTED
+  CONFIRMED
+  FAILED
+
+  @@map("blockchain_transaction_status")
+}
+
+// =============================================================================
+// FUNDING ROUNDS
+// =============================================================================
+
+model FundingRound {
+  id                    String           @id @default(uuid())
+  companyId             String           @map("company_id")
+  name                  String
+  shareClassId          String           @map("share_class_id")
+  targetAmount          Decimal          @map("target_amount") @db.Decimal(30, 10)
+  minimumCloseAmount    Decimal?         @map("minimum_close_amount") @db.Decimal(30, 10)
+  hardCap               Decimal?         @map("hard_cap") @db.Decimal(30, 10)
+  preMoneyValuation     Decimal          @map("pre_money_valuation") @db.Decimal(30, 10)
+  pricePerShare         Decimal          @map("price_per_share") @db.Decimal(30, 10)
+  status                FundingRoundStatus @default(DRAFT)
+  notes                 String?
+  openedAt              DateTime?        @map("opened_at")
+  closedAt              DateTime?        @map("closed_at")
+  cancelledAt           DateTime?        @map("cancelled_at")
+  createdBy             String           @map("created_by")
+  createdAt             DateTime         @default(now()) @map("created_at")
+  updatedAt             DateTime         @updatedAt @map("updated_at")
+
+  // Relations
+  company     Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  commitments RoundCommitment[]
+  closes      RoundClose[]
+
+  @@index([companyId, status])
+  @@map("funding_rounds")
+}
+
+enum FundingRoundStatus {
+  DRAFT
+  OPEN
+  CLOSING
+  CLOSED
+  CANCELLED
+
+  @@map("funding_round_status")
+}
+
+model RoundCommitment {
+  id              String                  @id @default(uuid())
+  roundId         String                  @map("round_id")
+  shareholderId   String                  @map("shareholder_id")
+  amount          Decimal                 @db.Decimal(30, 10)
+  sharesAllocated Decimal?                @map("shares_allocated") @db.Decimal(30, 10)
+  paymentStatus   CommitmentPaymentStatus @default(PENDING) @map("payment_status")
+  paymentConfirmedAt DateTime?            @map("payment_confirmed_at")
+  notes           String?
+  createdAt       DateTime                @default(now()) @map("created_at")
+  updatedAt       DateTime                @updatedAt @map("updated_at")
+
+  // Relations
+  round       FundingRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+  shareholder Shareholder  @relation(fields: [shareholderId], references: [id])
+
+  @@index([roundId])
+  @@map("round_commitments")
+}
+
+enum CommitmentPaymentStatus {
+  PENDING
+  RECEIVED
+  CONFIRMED
+  CANCELLED
+
+  @@map("commitment_payment_status")
+}
+
+model RoundClose {
+  id         String   @id @default(uuid())
+  roundId    String   @map("round_id")
+  closeDate  DateTime @map("close_date") @db.Date
+  amount     Decimal  @db.Decimal(30, 10)
+  shares     Decimal  @db.Decimal(30, 10)
+  notes      String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  round FundingRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  @@map("round_closes")
+}
+
+// =============================================================================
+// CONVERTIBLE INSTRUMENTS
+// =============================================================================
+
+model ConvertibleInstrument {
+  id                          String                @id @default(uuid())
+  companyId                   String                @map("company_id")
+  shareholderId               String                @map("shareholder_id")
+  instrumentType              InstrumentType        @map("instrument_type")
+  status                      ConvertibleStatus     @default(OUTSTANDING)
+  principalAmount             Decimal               @map("principal_amount") @db.Decimal(30, 10)
+  interestRate                Decimal               @map("interest_rate") @db.Decimal(10, 6)
+  interestType                InterestType          @default(SIMPLE) @map("interest_type")
+  accruedInterest             Decimal               @default(0) @map("accrued_interest") @db.Decimal(30, 10)
+  valuationCap                Decimal?              @map("valuation_cap") @db.Decimal(30, 10)
+  discountRate                Decimal?              @map("discount_rate") @db.Decimal(10, 6)
+  qualifiedFinancingThreshold Decimal?              @map("qualified_financing_threshold") @db.Decimal(30, 10)
+  conversionTrigger           ConversionTrigger?    @map("conversion_trigger")
+  targetShareClassId          String?               @map("target_share_class_id")
+  autoConvert                 Boolean               @default(false) @map("auto_convert")
+  mfnClause                   Boolean              @default(false) @map("mfn_clause")
+  issueDate                   DateTime              @map("issue_date") @db.Date
+  maturityDate                DateTime              @map("maturity_date") @db.Date
+  convertedAt                 DateTime?             @map("converted_at")
+  redeemedAt                  DateTime?             @map("redeemed_at")
+  cancelledAt                 DateTime?             @map("cancelled_at")
+  conversionData              Json?                 @map("conversion_data")
+  notes                       String?
+  createdBy                   String                @map("created_by")
+  createdAt                   DateTime              @default(now()) @map("created_at")
+  updatedAt                   DateTime              @updatedAt @map("updated_at")
+
+  // Relations
+  company     Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  shareholder Shareholder @relation(fields: [shareholderId], references: [id])
+
+  @@index([companyId, status])
+  @@map("convertible_instruments")
+}
+
+enum InstrumentType {
+  MUTUO_CONVERSIVEL
+  INVESTIMENTO_ANJO
+  MISTO
+  MAIS
+
+  @@map("instrument_type")
+}
+
+enum ConvertibleStatus {
+  OUTSTANDING
+  CONVERTED
+  REDEEMED
+  MATURED
+  CANCELLED
+
+  @@map("convertible_status")
+}
+
+enum InterestType {
+  SIMPLE
+  COMPOUND
+
+  @@map("interest_type")
+}
+
+enum ConversionTrigger {
+  QUALIFIED_FINANCING
+  MATURITY
+  CHANGE_OF_CONTROL
+  INVESTOR_OPTION
+
+  @@map("conversion_trigger")
+}
+
+// =============================================================================
+// OPTION PLANS & GRANTS
+// =============================================================================
+
+model OptionPlan {
+  id               String           @id @default(uuid())
+  companyId        String           @map("company_id")
+  name             String
+  shareClassId     String           @map("share_class_id")
+  totalPoolSize    Decimal          @map("total_pool_size") @db.Decimal(30, 10)
+  totalGranted     Decimal          @default(0) @map("total_granted") @db.Decimal(30, 10)
+  totalExercised   Decimal          @default(0) @map("total_exercised") @db.Decimal(30, 10)
+  status           OptionPlanStatus @default(ACTIVE)
+  boardApprovalDate DateTime?       @map("board_approval_date") @db.Date
+  terminationPolicy TerminationPolicy @default(FORFEITURE) @map("termination_policy")
+  exerciseWindowDays Int            @default(90) @map("exercise_window_days")
+  notes             String?
+  closedAt          DateTime?       @map("closed_at")
+  createdBy         String          @map("created_by")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  company Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  grants  OptionGrant[]
+
+  @@index([companyId, status])
+  @@map("option_plans")
+}
+
+enum OptionPlanStatus {
+  ACTIVE
+  CLOSED
+
+  @@map("option_plan_status")
+}
+
+enum TerminationPolicy {
+  FORFEITURE
+  ACCELERATION
+  PRO_RATA
+
+  @@map("termination_policy")
+}
+
+model OptionGrant {
+  id                 String            @id @default(uuid())
+  companyId          String            @map("company_id")
+  planId             String            @map("plan_id")
+  shareholderId      String?           @map("shareholder_id")
+  employeeName       String            @map("employee_name")
+  employeeEmail      String            @map("employee_email")
+  quantity           Decimal           @db.Decimal(30, 10)
+  strikePrice        Decimal           @map("strike_price") @db.Decimal(30, 10)
+  exercised          Decimal           @default(0) @db.Decimal(30, 10)
+  status             OptionGrantStatus @default(ACTIVE)
+  grantDate          DateTime          @map("grant_date") @db.Date
+  expirationDate     DateTime          @map("expiration_date") @db.Date
+  cliffMonths        Int               @map("cliff_months")
+  vestingDurationMonths Int            @map("vesting_duration_months")
+  vestingFrequency   VestingFrequency  @default(MONTHLY) @map("vesting_frequency")
+  cliffPercentage    Decimal           @default(0) @map("cliff_percentage") @db.Decimal(5, 2)
+  accelerationOnCoc  Boolean           @default(false) @map("acceleration_on_coc")
+  terminatedAt       DateTime?         @map("terminated_at")
+  notes              String?
+  createdBy          String            @map("created_by")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  company   Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  plan      OptionPlan             @relation(fields: [planId], references: [id])
+  exercises OptionExerciseRequest[]
+
+  @@index([companyId])
+  @@index([planId])
+  @@map("option_grants")
+}
+
+enum OptionGrantStatus {
+  ACTIVE
+  EXERCISED
+  CANCELLED
+  EXPIRED
+
+  @@map("option_grant_status")
+}
+
+enum VestingFrequency {
+  MONTHLY
+  QUARTERLY
+  ANNUALLY
+
+  @@map("vesting_frequency")
+}
+
+model OptionExerciseRequest {
+  id                String                @id @default(uuid())
+  grantId           String                @map("grant_id")
+  quantity          Decimal               @db.Decimal(30, 10)
+  totalCost         Decimal               @map("total_cost") @db.Decimal(30, 10)
+  paymentReference  String                @unique @map("payment_reference")
+  status            ExerciseRequestStatus @default(PENDING_PAYMENT)
+  confirmedBy       String?               @map("confirmed_by")
+  confirmedAt       DateTime?             @map("confirmed_at")
+  cancelledAt       DateTime?             @map("cancelled_at")
+  blockchainTxHash  String?               @map("blockchain_tx_hash")
+  createdBy         String                @map("created_by")
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
+
+  // Relations
+  grant OptionGrant @relation(fields: [grantId], references: [id])
+
+  @@index([grantId])
+  @@map("option_exercise_requests")
+}
+
+enum ExerciseRequestStatus {
+  PENDING_PAYMENT
+  PAYMENT_CONFIRMED
+  SHARES_ISSUED
+  COMPLETED
+  CANCELLED
+
+  @@map("exercise_request_status")
+}
+
+// =============================================================================
+// DOCUMENTS & SIGNATURES
+// =============================================================================
+
+model DocumentTemplate {
+  id             String              @id @default(uuid())
+  companyId      String              @map("company_id")
+  name           String
+  documentType   DocumentTemplateType @map("document_type")
+  content        String
+  formSchema     Json?               @map("form_schema")
+  version        Int                 @default(1)
+  isActive       Boolean             @default(true) @map("is_active")
+  createdBy      String              @map("created_by")
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+
+  // Relations
+  company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  documents Document[]
+
+  @@index([companyId, documentType])
+  @@map("document_templates")
+}
+
+enum DocumentTemplateType {
+  SHAREHOLDER_AGREEMENT
+  MEETING_MINUTES
+  SHARE_CERTIFICATE
+  OPTION_LETTER
+  INVESTMENT_AGREEMENT
+
+  @@map("document_template_type")
+}
+
+model Document {
+  id            String         @id @default(uuid())
+  companyId     String         @map("company_id")
+  templateId    String?        @map("template_id")
+  title         String
+  status        DocumentStatus @default(DRAFT)
+  formData      Json?          @map("form_data")
+  s3Key         String?        @map("s3_key")
+  contentHash   String?        @map("content_hash")
+  blockchainTxHash String?     @map("blockchain_tx_hash")
+  locale        String         @default("pt-BR")
+  generatedAt   DateTime?      @map("generated_at")
+  anchoredAt    DateTime?      @map("anchored_at")
+  createdBy     String         @map("created_by")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  company  Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  template DocumentTemplate? @relation(fields: [templateId], references: [id])
+  signers  DocumentSigner[]
+
+  @@index([companyId, status])
+  @@map("documents")
+}
+
+enum DocumentStatus {
+  DRAFT
+  GENERATED
+  PENDING_SIGNATURES
+  PARTIALLY_SIGNED
+  FULLY_SIGNED
+
+  @@map("document_status")
+}
+
+model DocumentSigner {
+  id              String             @id @default(uuid())
+  documentId      String             @map("document_id")
+  userId          String?            @map("user_id")
+  name            String
+  email           String
+  walletAddress   String?            @map("wallet_address")
+  signerRole      SignerRole         @map("signer_role")
+  status          DocumentSignerStatus @default(PENDING)
+  signature       String?
+  signatureType   String?            @map("signature_type")
+  signedAt        DateTime?          @map("signed_at")
+  declinedAt      DateTime?          @map("declined_at")
+  declineReason   String?            @map("decline_reason")
+  expiresAt       DateTime           @map("expires_at")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+
+  // Relations
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@map("document_signers")
+}
+
+enum SignerRole {
+  SHAREHOLDER
+  DIRECTOR
+  EMPLOYEE
+  WITNESS
+
+  @@map("signer_role")
+}
+
+enum DocumentSignerStatus {
+  PENDING
+  SIGNED
+  DECLINED
+
+  @@map("document_signer_status")
+}
+
+// =============================================================================
+// NOTIFICATIONS
+// =============================================================================
+
+model Notification {
+  id               String             @id @default(uuid())
+  userId           String             @map("user_id")
+  channel          NotificationChannel
+  notificationType String             @map("notification_type")
+  subject          String
+  body             String
+  metadata         Json?
+  status           NotificationStatus @default(PENDING)
+  readAt           DateTime?          @map("read_at")
+  sentAt           DateTime?          @map("sent_at")
+  failedAt         DateTime?          @map("failed_at")
+  failureReason    String?            @map("failure_reason")
+  createdAt        DateTime           @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+enum NotificationChannel {
+  EMAIL
+  IN_APP
+
+  @@map("notification_channel")
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  BOUNCED
+
+  @@map("notification_status")
+}
+
+model UserNotificationPreferences {
+  id            String  @id @default(uuid())
+  userId        String  @unique @map("user_id")
+  transactions  Boolean @default(true)
+  documents     Boolean @default(true)
+  options       Boolean @default(true)
+  security      Boolean @default(true)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("user_notification_preferences")
+}
+
+// =============================================================================
+// AUDIT LOGGING
+// =============================================================================
+
+model AuditLog {
+  id           String    @id @default(uuid())
+  timestamp    DateTime  @default(now())
+  actorId      String?   @map("actor_id")
+  actorType    ActorType @map("actor_type")
+  action       String
+  resourceType String    @map("resource_type")
+  resourceId   String?   @map("resource_id")
+  companyId    String?   @map("company_id")
+  changes      Json?
+  metadata     Json?
+
+  // Relations
+  actor   User?    @relation(fields: [actorId], references: [id])
+  company Company? @relation(fields: [companyId], references: [id])
+
+  @@index([timestamp])
+  @@index([actorId])
+  @@index([companyId, timestamp])
+  @@index([resourceType, resourceId])
+  @@index([action])
+  @@index([companyId, action, timestamp])
+  @@map("audit_logs")
+}
+
+enum ActorType {
+  USER
+  SYSTEM
+  ADMIN
+
+  @@map("actor_type")
+}
+
+// =============================================================================
+// CONSENT (LGPD COMPLIANCE)
+// =============================================================================
+
+model ConsentRecord {
+  id          String      @id @default(uuid())
+  userId      String      @map("user_id")
+  consentType ConsentType @map("consent_type")
+  granted     Boolean
+  grantedAt   DateTime    @map("granted_at")
+  revokedAt   DateTime?   @map("revoked_at")
+  ipAddress   String      @map("ip_address")
+  userAgent   String      @map("user_agent")
+  version     String
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, consentType])
+  @@map("consent_records")
+}
+
+enum ConsentType {
+  TERMS_OF_SERVICE
+  PRIVACY_POLICY
+  KYC_DATA_COLLECTION
+  EMAIL_NOTIFICATIONS
+  MARKETING_COMMUNICATIONS
+
+  @@map("consent_type")
+}
+
+// =============================================================================
+// HASH CHAIN (AUDIT TAMPER DETECTION)
+// =============================================================================
+
+model AuditHashChain {
+  id           String   @id @default(uuid())
+  date         String   @unique
+  logCount     Int      @map("log_count")
+  hash         String
+  previousHash String   @map("previous_hash")
+  computedAt   DateTime @map("computed_at")
+
+  @@map("audit_hash_chain")
+}
