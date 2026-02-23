@@ -47,7 +47,7 @@ User opens Navia
 
 User clicks "Logout"
   │
-  └─ POST /api/v1/auth/logout ─→ Cookie cleared ─→ Redirect to login
+  └─ POST /api/v1/auth/logout (@Public) ─→ Cookie cleared ─→ Redirect to login
 
 User visits GET /api/v1/auth/me
   │
@@ -79,15 +79,17 @@ TRIGGER: User navigates to login page and clicks login button
    → IF invalid: record failed attempt, return 401 AUTH_INVALID_TOKEN
 10. [Backend] Fetches Privy user profile via privyClient.users()._get(userId)
     → IF Privy unavailable: return 502 AUTH_PRIVY_UNAVAILABLE
-11. [Backend] Extracts email from linked_accounts (email type, then google_oauth fallback)
+11. [Backend] Extracts email from linked_accounts (email type, then google_oauth, then apple_oauth fallback)
     → IF no email: return 401 AUTH_INVALID_TOKEN
-12. [Backend] Finds user by privyUserId in database
-13. [Backend] Updates lastLoginAt, syncs wallet/email if changed in Privy
-14. [Backend] Clears any failed login attempts for this IP
-15. [Backend] Sets HTTP-only cookie: navia-auth-token (7d, SameSite=Strict)
-16. [Backend] Returns 200 with { user, isNewUser: false }
-17. [UI] Stores user data in state
-18. [UI] Redirects to /dashboard
+12. [Backend] Begins database transaction
+13. [Backend] Finds user by privyUserId in database
+14. [Backend] Updates lastLoginAt, syncs wallet if changed; checks email conflict before syncing email
+15. [Backend] Commits transaction
+16. [Backend] Clears any failed login attempts for this IP
+17. [Backend] Sets HTTP-only cookie: navia-auth-token (7d, SameSite=Strict)
+18. [Backend] Returns 200 with { user, isNewUser: false }
+19. [UI] Stores user data in state
+20. [UI] Redirects to /dashboard
 
 POSTCONDITION: User is authenticated, session cookie is set
 SIDE EFFECTS: User.lastLoginAt updated, failed attempts cleared for IP
@@ -100,12 +102,12 @@ PRECONDITION: User authenticated via Privy but no Navia account exists
 ACTOR: New user
 TRIGGER: First login after Privy authentication
 
-Steps 1-11: Same as existing user login
-12. [Backend] No user found by privyUserId
-13. [Backend] Checks if email exists with different Privy ID
+Steps 1-12: Same as existing user login (through transaction begin)
+13. [Backend] No user found by privyUserId
+14. [Backend] Checks if email exists with different Privy ID
     → IF exists: return 409 AUTH_DUPLICATE_EMAIL
-14. [Backend] Creates new user in database with Privy data (email, wallet, name from Google OAuth if available)
-15-18: Same as existing user login, with isNewUser: true
+15. [Backend] Creates new user in database with Privy data (email, wallet, name from Google/Apple OAuth or email local part)
+16-20: Same as existing user login, with isNewUser: true
 
 POSTCONDITION: New user created in database, session cookie set
 SIDE EFFECTS: New User record created with kycStatus=NOT_STARTED, locale=pt-BR
@@ -114,16 +116,17 @@ SIDE EFFECTS: New User record created with kycStatus=NOT_STARTED, locale=pt-BR
 ### Happy Path: Logout
 
 ```
-PRECONDITION: User is authenticated
-ACTOR: Authenticated user
+PRECONDITION: User has a session cookie (valid or expired)
+ACTOR: User (authenticated or with expired cookie)
 TRIGGER: User clicks logout button
 
 1. [UI] User clicks "Logout" in navigation
 2. [Frontend] Sends POST /api/v1/auth/logout
-3. [Backend] Clears navia-auth-token cookie
-4. [Backend] Returns 200 with { message: "Logged out successfully" }
-5. [Frontend] Clears local user state
-6. [UI] Redirects to /login
+3. [Backend] Endpoint is @Public() — no auth check needed (allows expired-cookie users to clear cookies)
+4. [Backend] Clears navia-auth-token cookie
+5. [Backend] Returns 200 with { messageKey: "errors.auth.loggedOut" }
+6. [Frontend] Clears local user state
+7. [UI] Redirects to /login
 
 POSTCONDITION: Session cookie cleared, user redirected to login
 ```
@@ -183,10 +186,11 @@ POSTCONDITION: Login not completed, no state changed
 | 8 | IP lockout check | IP has >= 5 failures and lock not expired | Error | 429 AUTH_ACCOUNT_LOCKED |
 | 9 | Token verification | Invalid or expired Privy token | Error | 401 AUTH_INVALID_TOKEN, failed attempt recorded |
 | 10 | Privy user fetch | Privy API unavailable | Error | 502 AUTH_PRIVY_UNAVAILABLE |
-| 11 | Email extraction | No email in linked_accounts | Error | 401 AUTH_INVALID_TOKEN |
-| 12 | User lookup | No user with this privyUserId | Happy | Create new user (step 13-14) |
-| 12 | User lookup | User exists with this privyUserId | Happy | Update existing user |
-| 13 | Email uniqueness | Email exists with different privyUserId | Error | 409 AUTH_DUPLICATE_EMAIL |
+| 11 | Email extraction | No email in linked_accounts (email, google_oauth, apple_oauth) | Error | 401 AUTH_INVALID_TOKEN |
+| 13 | User lookup | No user with this privyUserId | Happy | Create new user (step 14-15) |
+| 13 | User lookup | User exists with this privyUserId | Happy | Update existing user |
+| 14 | Email uniqueness | Email exists with different privyUserId | Error | 409 AUTH_DUPLICATE_EMAIL |
+| 14 | Email sync (existing user) | New email conflicts with another user | Skip | Email not synced, warning logged |
 
 ---
 
@@ -203,12 +207,17 @@ POSTCONDITION: Login not completed, no state changed
 
 ## Auth Token Flow (Request Lifecycle)
 
-Every authenticated request goes through this flow:
+Every request goes through three global guards in order: ThrottlerGuard → AuthGuard → RolesGuard.
 
 ```
 HTTP Request arrives
   │
-  ├─ [route has @Public()] ─→ Skip auth, proceed to handler
+  ├─ ThrottlerGuard checks rate limit
+  │     │
+  │     ├─ [within limit] ─→ Continue
+  │     └─ [exceeded] ─→ 429 Too Many Requests
+  │
+  ├─ [route has @Public()] ─→ Skip auth, proceed to RolesGuard
   │
   └─ [no @Public()] ─→ AuthGuard activates
         │
@@ -220,8 +229,22 @@ HTTP Request arrives
                     │
                     └─ AuthService.verifyTokenAndGetUser(token)
                           │
-                          ├─ [valid + user exists + not deleted] ─→ Attach user to request, proceed
+                          ├─ [valid + user exists + not deleted] ─→ Attach user to request
                           └─ [any failure] ─→ 401 Unauthorized
+                                │
+                                └─ RolesGuard activates
+                                      │
+                                      ├─ [no @Roles() decorator] ─→ Proceed to handler
+                                      │
+                                      └─ [@Roles() present] ─→ Check company membership
+                                            │
+                                            ├─ [no :companyId param] ─→ 403 Forbidden
+                                            │
+                                            ├─ [not ACTIVE member] ─→ 404 Not Found (prevents enumeration)
+                                            │
+                                            ├─ [role not in required list] ─→ 403 Forbidden
+                                            │
+                                            └─ [role matches] ─→ Attach companyMember to request, proceed
 ```
 
 ---
@@ -233,6 +256,14 @@ All authentication endpoints are role-agnostic — they operate on the authentic
 | Endpoint | Unauthenticated | Any Authenticated User |
 |----------|----------------|----------------------|
 | POST /api/v1/auth/login | Allowed (@Public) | Allowed (re-login) |
-| POST /api/v1/auth/logout | 401 | Allowed |
+| POST /api/v1/auth/logout | Allowed (@Public) | Allowed |
 | GET /api/v1/auth/me | 401 | Allowed |
 | GET /api/v1/health | Allowed (@Public) | Allowed |
+
+Company-scoped endpoints use `@Roles()` to enforce role-based access:
+
+| Endpoint Pattern | Required Roles | Non-member |
+|-----------------|---------------|------------|
+| GET /api/v1/companies/:companyId/* | Per @Roles() on endpoint | 404 Not Found |
+| POST /api/v1/companies/:companyId/* | Per @Roles() on endpoint | 404 Not Found |
+| Endpoints without @Roles() | Any authenticated user | N/A |

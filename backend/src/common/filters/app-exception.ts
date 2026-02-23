@@ -66,6 +66,14 @@ const MESSAGES: Record<string, Record<string, string>> = {
     'pt-BR': 'Ações insuficientes para completar a operação',
     en: 'Insufficient shares to complete the operation',
   },
+  'errors.auth.forbidden': {
+    'pt-BR': 'Permissão insuficiente para esta operação',
+    en: 'Insufficient permission for this operation',
+  },
+  'errors.auth.loggedOut': {
+    'pt-BR': 'Sessão encerrada com sucesso',
+    en: 'Session ended successfully',
+  },
 };
 
 export class AppException extends Error {

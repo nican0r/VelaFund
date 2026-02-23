@@ -61,8 +61,11 @@ export class AuthController {
     };
   }
 
+  // BUG-14 fix: Make logout @Public() so users with expired cookies can still
+  // clear them. The endpoint only clears a cookie — no security risk.
+  // BUG-15 fix: Return messageKey instead of hardcoded English string.
   @Post('logout')
-  @RequireAuth()
+  @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Logout and invalidate session' })
   @ApiResponse({ status: 200, description: 'Logout successful' })
@@ -74,7 +77,7 @@ export class AuthController {
       path: '/',
     });
 
-    return { message: 'Logged out successfully' };
+    return { messageKey: 'errors.auth.loggedOut' };
   }
 
   @Get('me')

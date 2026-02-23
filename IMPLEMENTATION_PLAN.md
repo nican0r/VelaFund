@@ -2,9 +2,9 @@
 
 **Job to be Done**: Help Brazilian companies manage their cap table with on-chain record-keeping and regulatory compliance.
 
-**Status**: Phase 1 (Foundation and Infrastructure) in progress. Monorepo scaffolded, backend and frontend foundations built. Phase 0 spec issues are being resolved inline during implementation (camelCase TypeScript, UPPER_SNAKE_CASE enums, response envelopes, etc.).
+**Status**: Phase 1 (Foundation and Infrastructure) in progress. Monorepo scaffolded, backend and frontend foundations built. Phase 0 spec issues are applied in implementation code but **all 69 P0 issues remain unfixed in the spec files themselves**.
 
-**Last Updated**: 2026-02-23 (v9.1 - Phase 1.4 backend auth complete. Privy integration with @privy-io/node, global AuthGuard, @Public/@RequireAuth/@CurrentUser/@Roles decorators, login/logout/me endpoints, cookie-based sessions, failed attempt lockout. Backend: 54 tests passing, NestJS builds clean. Frontend: Next.js builds clean, design system tokens applied.)
+**Last Updated**: 2026-02-23 (v12.0 - Fixed 13 of 15 auth bugs (BUG-2 through BUG-15, excluding BUG-1 which requires Redis). Implemented RolesGuard, registered ThrottlerGuard globally, fixed ValidationPipe error translation, added Apple OAuth support, fixed race condition in user creation, fixed 8 low/medium bugs. 67 tests passing (was 54). BUG-1 deferred until Redis infrastructure is set up.)
 
 ---
 
@@ -12,7 +12,7 @@
 
 This implementation plan provides the validated roadmap for the Navia MVP. Phase 1 (Foundation and Infrastructure) is in progress — monorepo, backend scaffold (NestJS + Prisma), and frontend scaffold (Next.js + Tailwind) are complete. Phase 0 spec issues are being resolved inline during implementation.
 
-A comprehensive spec audit (v8.0) uncovered systemic issues that affect nearly all 26 spec files. The most impactful findings are:
+A comprehensive spec audit (v8.0) uncovered systemic issues that affect nearly all 26 spec files. A deep audit (v11.0) with 12 parallel subagents uncovered 8 additional auth bugs, Prisma schema gaps, frontend security gaps, and spec compliance issues. The most impactful findings are:
 
 1. **snake_case in TypeScript interfaces** — 13 specs define entity interfaces using `snake_case` field names, violating the `api-standards.md` mandate for camelCase.
 2. **Response envelope non-compliance** — Multiple specs show API responses outside the standard `{ "success": true, "data": ... }` envelope.
@@ -20,20 +20,47 @@ A comprehensive spec audit (v8.0) uncovered systemic issues that affect nearly a
 4. **KYCStatus enum mismatch** — `authentication.md` (4 values, lowercase) vs `kyc-verification.md` (6 values, UPPER_SNAKE_CASE).
 5. **Missing API endpoints** — At least 10 endpoints referenced in specs or required by the UI but never defined.
 6. **Company scoping conflict** — `company-management.md` uses `X-Company-Id` header; `api-standards.md` uses `:companyId` path parameter.
+7. **Auth race condition + double guard execution** — (v11.0) Non-atomic user creation allows duplicate 500s; `@RequireAuth()` causes double Privy API calls.
+8. **Frontend completely unprotected** — (v11.0) No route protection, no middleware.ts, no CSP header, missing Brazilian formatting helpers.
 
-### Current Project State
+### Current Project State (v11.0 Audit)
 
 | Aspect | Status | Notes |
 |--------|--------|-------|
-| `/frontend` directory | **SCAFFOLDED** | Next.js 14 + Tailwind + shadcn/ui theme + i18n messages + API client + Jest |
-| `/backend` directory | **SCAFFOLDED** | NestJS 10 + Prisma schema (all entities) + API infrastructure + Auth module (Privy) + 54 passing tests |
-| `/contracts` directory | EXISTS (empty) | Foundry scaffold pending |
+| `/frontend` directory | **SCAFFOLDED** | 14 source files, 0 tests. Layouts built. Privy SDK NOT installed. next-intl NOT installed. shadcn/ui CLI never run (no `components/ui/`, no `components.json`). **No auth protection on any route** — no `middleware.ts`, no protected route wrapper. Login page is static stub. Dashboard is visual prototype with hardcoded data. Missing CSP and HSTS security headers. Missing Brazilian formatting helpers. |
+| `/backend` directory | **SCAFFOLDED** | 36 source files, 67 tests. Auth module complete (13 of 15 bugs fixed — BUG-1 and BUG-7 remain). Common infrastructure solid. No domain feature modules yet. |
+| `/contracts` directory | EXISTS (empty) | No Solidity files |
 | `package.json` | **CREATED** | pnpm workspaces + Turborepo configured |
-| Prisma schema | **COMPLETE** | All entities from 26 specs, ~550 lines, all P0.CRITICAL fixes applied |
-| Specification files | **26 files** in `/specs/` | 9 new specs added since v6.0, ~17,300 total lines |
+| Prisma schema | **NEAR-COMPLETE** | 1183 lines, 32 models, 35 enums. Missing: DataroomFolder, DataroomDocument, ExitScenario, WaterfallResult, ExportJob, LitigationVerification (inlined into CompanyProfile). 5 broken relations. Missing indexes on 5+ models. Missing `@@unique([documentId, email])` on DocumentSigner. |
+| Specification files | **26 files** in `/specs/` | **ALL 69 P0 issues still unfixed in specs** (code has correct patterns, specs are stale). 5 spec compliance gaps identified in v11.0. |
 | Cross-cutting specs | **9 files** in `.claude/rules/` | +user-flow-documentation.md |
-| Design system | `.claude/rules/design-system.md` | Complete (891 lines), tokens in tailwind.config.ts + globals.css |
-| Git tag | `v0.0.2` | Backend Privy auth module |
+| Design system | `.claude/rules/design-system.md` | Complete (891 lines), tokens in tailwind.config.ts + globals.css. **Border radius scale systematically wrong** — entire scale shifted (lg=8px should be 12px, md=6px should be 8px, sm=4px should be 6px, xl=16px undefined). |
+| CI/CD | **MISSING** | No `.github/workflows/` directory |
+| `.env.example` files | **MISSING** | Neither backend nor frontend has one |
+| README.md | **STALE** | Contains only "# VelaFund" |
+| ARCHITECTURE.md | **STALE** | "VelaFund" branding, references removed entities (AdminWallet, CapTableEntry) |
+| User flow docs | **1 of ~15** | Only `docs/user-flows/authentication.md` exists |
+| Git tag | `v0.0.3` | Auth bug fixes (13 of 15 fixed) |
+
+### Critical Bugs Found (v10.0 + v11.0 Audit)
+
+| # | Bug | Severity | Status | Description |
+|---|-----|----------|--------|-------------|
+| BUG-1 | **Privy token stored as 7-day cookie** | **CRITICAL** | **OPEN** | Raw Privy access token (expires in 1-6 hours) is stored in a 7-day HTTP-only cookie. After Privy token expiry, `verifyAccessToken()` throws on every request → all authenticated requests return 401. Need either: (a) token refresh endpoint + shorter cookie, or (b) server-side session store (Redis). **Deferred until Redis infrastructure is set up.** |
+| BUG-2 | **RolesGuard not implemented** | **CRITICAL** | **FIXED v0.0.3** | Implemented `RolesGuard` that reads `ROLES_KEY` metadata, looks up `CompanyMember` with ACTIVE status, returns 404 for non-members (prevents enumeration). Registered as `APP_GUARD` in `auth.module.ts`. 12 tests. |
+| BUG-3 | **ThrottlerGuard not global** | **HIGH** | **FIXED v0.0.3** | Registered `ThrottlerGuard` as `APP_GUARD` in `app.module.ts`. All routes now rate-limited by default. |
+| BUG-4 | **ValidationPipe errors not structured** | **HIGH** | **FIXED v0.0.3** | `GlobalExceptionFilter` now detects `BadRequestException` from `ValidationPipe` and translates to `VAL_INVALID_INPUT` with `validationErrors` array per api-standards.md. |
+| BUG-5 | **Accept-Language not normalized** | **LOW** | **FIXED v0.0.3** | Added `normalizeLanguage()` in `GlobalExceptionFilter` that handles `en-US` → `en`, `pt` → `pt-BR`. |
+| BUG-6 | **Apple OAuth not handled** | **MEDIUM** | **FIXED v0.0.3** | Added `apple_oauth` account type to `extractEmail()` and `extractName()`. |
+| BUG-7 | **Prisma broken relations (5 total)** | **MEDIUM** | **OPEN** | `UserNotificationPreferences` has no `@relation` to User. `FundingRound` has no `@relation` to ShareClass. `OptionGrant` has no relation to Shareholder. `OptionPlan.shareClassId` has no `@relation` to ShareClass. `ConvertibleInstrument.targetShareClassId` has no `@relation` to ShareClass. |
+| BUG-8 | **Race condition in user creation** | **MEDIUM** | **FIXED v0.0.3** | Wrapped user find-or-create in `prisma.$transaction()` to prevent concurrent first-login race conditions. |
+| BUG-9 | **`@RequireAuth()` causes double guard execution** | **MEDIUM** | **FIXED v0.0.3** | Changed `@RequireAuth()` from `UseGuards(AuthGuard)` to `SetMetadata(REQUIRE_AUTH_KEY, true)` — now a no-op marker since AuthGuard is global. |
+| BUG-10 | **Email sync conflict on existing user** | **LOW** | **FIXED v0.0.3** | Added email conflict check before updating existing user's email on login. |
+| BUG-11 | **`extractName()` returns null for email-only users** | **LOW** | **FIXED v0.0.3** | Added Apple OAuth name extraction and email local part fallback. |
+| BUG-12 | **`redactEmail()` crashes on malformed emails** | **LOW** | **FIXED v0.0.3** | Added guard against missing `@` character. |
+| BUG-13 | **Unbounded in-memory lockout Map** | **LOW** | **FIXED v0.0.3** | Added `MAX_TRACKED_IPS = 10000` cap with eviction of expired entries. |
+| BUG-14 | **Logout unreachable when cookie expired** | **LOW** | **FIXED v0.0.3** | Changed logout endpoint from `@RequireAuth()` to `@Public()`. |
+| BUG-15 | **Logout message hardcoded English** | **LOW** | **FIXED v0.0.3** | Returns `{ messageKey: 'errors.auth.loggedOut' }` instead of hardcoded English string. |
 
 ### Phase 0 Progress Summary
 
@@ -46,6 +73,8 @@ A comprehensive spec audit (v8.0) uncovered systemic issues that affect nearly a
 | Previously completed (v7.x) | 18 | **18** | 0 |
 | **Total Phase 0 Tasks** | **87** | **18** | **69** |
 
+> **v10.0 finding**: All 69 remaining items are **spec file documentation debt**, not implementation blockers. The actual code (Prisma schema, backend modules, API responses) already uses the correct patterns (camelCase fields, response envelope, Shareholding entity name, UPPER_SNAKE_CASE enums, :companyId path params). The spec `.md` files have not been updated to reflect what was built. See [Priority 3](#priority-3-phase-0-spec-fixes-69-items--specs-are-stale-code-has-correct-patterns) for the full list.
+
 ### Specification Completeness Analysis
 
 | Spec File | Lines | Status | Issues Found |
@@ -54,23 +83,23 @@ A comprehensive spec audit (v8.0) uncovered systemic issues that affect nearly a
 | shareholder-registry.md | 1,115 | HAS ISSUES | snake_case interfaces, uses `{ "shareholders": [] }` instead of envelope, enum casing inconsistency |
 | convertible-conversion.md | 1,046 | HAS ISSUES | snake_case interfaces, raw `fetch()` in frontend code |
 | convertible-instruments.md | 904 | HAS ISSUES | snake_case interfaces, lowercase enum values (`mutuo_conversivel`, `outstanding`), 5 open questions |
-| kyc-verification.md | 905 | HAS ISSUES | snake_case interfaces, envelope non-compliance, `alert()` in frontend code, 5-min pre-signed URL (security.md says 15-min), 5 open questions |
+| kyc-verification.md | 905 | HAS ISSUES | snake_case interfaces, envelope non-compliance, `alert()` in frontend code, 5-min pre-signed URL (security.md says 15-min), 5 open questions, CAPTCHA requirement after 2 failed attempts mentioned but not reflected in any endpoint |
 | cap-table-management.md | 870 | HAS ISSUES | `CapTableEntry` (should be `Shareholding`), snake_case interfaces |
 | company-management.md | 761 | HAS ISSUES | Uses `X-Company-Id` header (api-standards uses `:companyId` path), returns 403 (should be 404 per security.md) |
 | company-membership.md | 747 | HAS ISSUES | Returns 200 for DELETE (should be 204), uses `X-Company-Id` header |
-| user-permissions.md | 739 | HAS ISSUES | Uses `AUTH_FORBIDDEN` error code (not in error-handling.md), conflicts with reports-analytics.md and audit-logging.md |
+| user-permissions.md | 739 | HAS ISSUES | Uses `AUTH_FORBIDDEN` error code (not in error-handling.md), conflicts with reports-analytics.md and audit-logging.md, CompanyScopeGuard referenced with no implementation spec, ROLE_DEFAULTS incomplete, investor conditional access footnotes have no enforcement mechanism |
 | company-dataroom.md | 661 | COMPLETE | Minor snake_case in some areas |
 | document-generation.md | 652 | HAS ISSUES | `document_hash` (should be `contentHash`), snake_case in Document interface, missing `PARTIALLY_SIGNED` status |
-| reports-analytics.md | 602 | HAS ISSUES | Grants LEGAL "Full" export access (denied in user-permissions.md) |
+| reports-analytics.md | 602 | HAS ISSUES | Grants LEGAL "Full" export access (denied in user-permissions.md), missing ExportJob Prisma model, no formal error code catalog for reports |
 | transactions.md | 591 | HAS ISSUES | References stale `cap-table.md` and `blockchain.md`, DRAFT status defined but no creation API, missing CONVERSION request body |
-| company-litigation-verification.md | 589 | MINOR ISSUES | `PROFILE_LITIGATION_CNPJ_NOT_FOUND` appears orphaned |
+| company-litigation-verification.md | 589 | HAS ISSUES | `PROFILE_LITIGATION_CNPJ_NOT_FOUND` contradicts EC-9 behavior, risk level computation has overlapping rules (ambiguous for 2 active lawsuits at R$80k) |
 | option-plans.md | 552 | HAS ISSUES | snake_case interfaces, no plan close endpoint, no grant termination endpoint |
 | authentication.md | 524 | HAS ISSUES | snake_case interfaces, login response not in envelope, KYCStatus 4-value lowercase mismatch, 4 open questions |
 | blockchain-integration.md | 521 | HAS ISSUES | 2 API paths not company-scoped, `AdminWallet` entity contradicts company-blockchain-admin.md, `BlockchainTransaction` 1:1 prevents re-submission |
 | document-signatures.md | 506 | HAS ISSUES | `document_hash` in FR text (entity already uses camelCase), `PARTIALLY_SIGNED` referenced but not in document-generation.md status enum |
 | funding-rounds.md | 467 | NEEDS EXPANSION | Wrong status enum, snake_case interfaces, no cancellation endpoint, no payment status endpoint, needs +33 lines |
 | option-exercises.md | 451 | HAS ISSUES | snake_case interfaces |
-| notifications.md | 420 | NEEDS EXPANSION | Missing `channel` enum, snake_case interfaces, needs +180 lines, no unread count endpoint, no bulk mark-as-read |
+| notifications.md | 420 | NEEDS EXPANSION | Missing `channel` enum, snake_case interfaces, needs +180 lines, no unread count endpoint, no bulk mark-as-read, missing WebSocket/SSE for real-time, notification type enum not formally cataloged |
 | exit-waterfall.md | 413 | HAS ISSUES | `runWaterfall` method is a comment-only stub |
 | share-classes.md | 403 | NEEDS EXPANSION | Needs +97 lines |
 | company-cnpj-validation.md | 402 | MINOR ISSUES | No explicit CNPJ retry endpoint for EC-3 |
@@ -112,7 +141,7 @@ A comprehensive spec audit (v8.0) uncovered systemic issues that affect nearly a
 10. [Phase 9: Production Readiness](#phase-9-production-readiness)
 11. [Dependency Graph](#dependency-graph)
 12. [Technology Stack Reference](#technology-stack-reference)
-13. [Quick Reference Checklists](#quick-reference-checklists)
+13. [Quick Reference: Prioritized Work Remaining](#quick-reference-prioritized-work-remaining)
 
 ---
 
@@ -667,8 +696,8 @@ These items affect implementation quality but would not cause contradictions. Th
 | # | Entity | Referenced In | Issue |
 |---|--------|---------------|-------|
 | M4.1 | `RoundClose` | `funding-rounds.md` | Mentioned but not fully defined as an entity |
-| M4.2 | `ExportJob` | `reports-analytics.md` | No persistence model for async export jobs |
-| M4.3 | `CompanyScopeGuard` | `user-permissions.md` | Referenced but implementation spec not defined |
+| M4.2 | `ExportJob` | `reports-analytics.md` | No persistence model for async export jobs. Needs: id, companyId, format, status (QUEUED/PROCESSING/COMPLETED/FAILED), s3Key, downloadUrl, expiresAt, errorCode. Also missing from Prisma schema. |
+| M4.3 | `CompanyScopeGuard` | `user-permissions.md` | Referenced but implementation spec not defined. Both `RolesGuard` and `PermissionGuard` depend on it. |
 | M4.4 | Company bank account | `option-exercises.md` (bank transfer payment) | No entity for storing company bank details for payment |
 
 **Resolution**: Define each missing entity with all required fields. `RoundClose` and `ExportJob` should be full entity definitions. `CompanyScopeGuard` is an implementation detail that can be deferred to Phase 1 code. Company bank account needs a decision: is it part of Company settings or a separate entity?
@@ -955,11 +984,11 @@ FINAL REVIEW:
   - Configured pnpm workspaces + Turborepo
   - Created root `package.json` with workspace config
 
-- [x] Configure development tooling (**DONE** - v0.0.1)
+- [x] Configure development tooling (**PARTIAL** - v0.0.1)
   - Set up Git hooks (Husky) — installed, pre-commit hooks pending
   - Created shared TypeScript configurations (tsconfig.base.json)
   - Set up ESLint + Prettier with consistent rules
-  - Created `.env.example` files for backend and frontend
+  - **MISSING**: `.env.example` files for backend and frontend (neither exists)
 
 - [ ] Set up CI/CD pipeline
   - Configure GitHub Actions (lint, test, build, secret scan)
@@ -971,22 +1000,59 @@ FINAL REVIEW:
 
 - [x] Initialize Next.js 14+ with App Router (**DONE** - v0.0.1)
   - Configured TypeScript strict mode
-  - shadcn/ui CSS variables configured in globals.css (component library init pending)
-  - TanStack Query dependency installed (provider pending)
-  - i18n message files created (pt-BR.json, en.json), next-intl integration pending
+  - shadcn/ui CSS variables configured in globals.css
+  - TanStack Query provider configured in providers.tsx (staleTime: 60s, smart retry)
+  - i18n message files created (pt-BR.json, en.json) — minimal skeleton, ~9 error keys
   - Sentry integration pending
 
-- [ ] Create base layouts per design-system.md
-  - Dashboard layout with sidebar navigation (navy-900 bg, 240px width)
-  - Auth layout (centered card, gray-50 background)
-  - Top bar with search, notifications, user menu
-  - Responsive sidebar (collapsible at md, hidden at sm)
+- [x] Create base layouts per design-system.md (**DONE** - visual structure complete)
+  - Dashboard layout with sidebar navigation (**DONE** — high-fidelity to spec: navy-900 bg, 240px/64px, active states, overline labels, dividers, user section)
+  - Auth layout (**DONE** — centered card, gray-50 background)
+  - Top bar (**DONE** — search bar, notification bell with badge, user avatar; missing: company switcher, notification dropdown, real user data)
+  - Responsive sidebar (**DONE** — collapsible at md, mobile drawer at sm via mobile-sidebar.tsx)
+  - **GAPS**: User data hardcoded ("Nelson Pereira"), no company switcher in topbar, notification bell is placeholder, nav items duplicated between sidebar.tsx and mobile-sidebar.tsx (should be shared constant), keyboard shortcut shows "Ctrl K" not "⌘ K", missing `aria-current="page"` on active nav links (accessibility)
 
 - [x] Set up form handling and validation (**PARTIAL** - v0.0.1)
   - React Hook Form + Zod dependencies installed
   - Created typed API client with error interceptor (per api-standards.md envelope)
+  - **MISSING**: CSRF token injection in API client (`X-CSRF-Token` header)
+  - **MISSING**: 401 auto-redirect to `/login?expired=true`
+  - **MISSING**: Dynamic `Accept-Language` from user locale (hardcoded to `pt-BR`)
+  - **MISSING**: `useErrorToast()` hook for consuming ApiError objects
   - Loading skeletons and error boundaries pending
-  - Toast notifications via sonner (dependency installed, integration pending)
+  - Toast notifications via sonner (**DONE** — Toaster configured with correct colors/positions)
+
+- [ ] Install and configure shadcn/ui component library
+  - Run `npx shadcn-ui@latest init` (Radix UI primitives are installed, but CLI never run — no `components/ui/` directory, no `components.json`)
+  - Generate core components: Button, Input, Card, Table, Dialog, Select, Badge, Tabs, Tooltip, Avatar, DropdownMenu, Label
+
+- [ ] Integrate next-intl for i18n
+  - Install `next-intl` package (NOT currently installed)
+  - Create root middleware.ts for locale routing
+  - Replace all hardcoded English strings with `useTranslations()` calls
+  - Expand message files: add auth.*, shareholders.*, capTable.*, transactions.*, settings.* namespaces
+
+- [ ] Fix tailwind.config.ts / globals.css border radius systematic error
+  - `globals.css` sets `--radius: 0.5rem` (8px) but design-system.md requires `radius-lg = 12px`
+  - Entire scale is shifted: lg=8px (should be 12px), md=6px (should be 8px), sm=4px (should be 6px)
+  - `borderRadius.xl` (16px) is undefined entirely
+  - Fix: set `--radius: 0.75rem` (12px) and add explicit xl=16px
+
+- [ ] Add security headers to next.config.js
+  - **MISSING**: `Content-Security-Policy` header (required by security.md) — must allow Privy iframe, S3 images, Base RPC
+  - **MISSING**: `Strict-Transport-Security` header
+  - Add via `next.config.js` `headers()` function
+
+- [ ] Create Brazilian formatting helpers in `lib/`
+  - `formatNumber()` — `Intl.NumberFormat('pt-BR')` for all numbers regardless of locale
+  - `formatCurrency()` — `Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })` for R$ values
+  - `formatDate()` — `Intl.DateTimeFormat('pt-BR')` for dd/MM/yyyy dates
+  - `formatPercentage()` — Brazilian format with comma decimal separator
+  - Required by i18n.md "Formatting — Always Brazilian" section
+
+- [ ] Add route protection
+  - Create `middleware.ts` to redirect unauthenticated users from protected routes
+  - Currently: unauthenticated users can visit `/dashboard` and see full UI with hardcoded data
 
 ### 1.3 Backend Foundation (NestJS)
 
@@ -995,8 +1061,13 @@ FINAL REVIEW:
   - Set up Prisma ORM with complete schema (ALL entities from 26 specs)
   - Environment validation via @nestjs/config
 
-- [x] Create base database schema (Prisma) (**DONE** - v0.0.1)
-  - ALL entities defined: User, Company, CompanyMember, Shareholder, ShareClass, Shareholding, Transaction, BlockchainTransaction, FundingRound, ConvertibleInstrument, OptionPlan, OptionGrant, Document, Notification, AuditLog, ConsentRecord, etc.
+- [x] Create base database schema (Prisma) (**NEAR-COMPLETE** - v0.0.1, 1183 lines, 32 models, 35 enums)
+  - ALL main entities defined: User, Company, CompanyMember, Shareholder, ShareClass, Shareholding, Transaction, BlockchainTransaction, FundingRound, RoundCommitment, RoundClose, ConvertibleInstrument, OptionPlan, OptionGrant, OptionExerciseRequest, Document, DocumentSigner, DocumentTemplate, Notification, UserNotificationPreferences, AuditLog, AuditHashChain, ConsentRecord, KycVerification, CompanyProfile + 5 profile sub-entities, InvitationToken, BeneficialOwner
+  - Correct patterns applied: @map for snake_case DB columns, Decimal for all financial fields, cpfEncrypted/cpfBlindIndex, Shareholding (not CapTableEntry), 1:many BlockchainTransaction→Transaction, PARTIALLY_SIGNED in DocumentStatus, channel on Notification
+  - **MISSING ENTITIES**: DataroomFolder, DataroomDocument (company-dataroom.md), ExitScenario, WaterfallResult (exit-waterfall.md), ExportJob (reports-analytics.md — async export tracking), LitigationVerification (inlined into CompanyProfile — may need separate entity for multiple checks over time)
+  - **BROKEN RELATIONS** (BUG-7, 5 total): UserNotificationPreferences has no @relation to User, FundingRound has no @relation to ShareClass, OptionGrant has no @relation to Shareholder, OptionPlan.shareClassId has no @relation to ShareClass, ConvertibleInstrument.targetShareClassId has no @relation to ShareClass
+  - **MISSING CONSTRAINTS**: RoundCommitment needs `@@unique([roundId, shareholderId])` if one commitment per shareholder per round. DocumentSigner needs `@@unique([documentId, email])` to prevent duplicate signers.
+  - **MISSING INDEXES**: ProfileMetric, ProfileTeamMember, ProfileDocument (need `profileId` index), BeneficialOwner (needs `shareholderId`), RoundClose (needs `roundId`), DocumentSigner (needs `[userId, status]`), Shareholding (needs `shareClassId`)
   - AuditLog entity defined (immutability trigger to be added in migration)
   - ConsentRecord entity (LGPD compliance)
   - Migration pending (needs running database)
@@ -1006,20 +1077,28 @@ FINAL REVIEW:
   - AWS SDK configuration (S3, SES, KMS)
   - Health check module (**DONE** - GET /api/v1/health with DB check)
 
-- [x] Set up API infrastructure (per api-standards.md) (**DONE** - v0.0.1)
+- [x] Set up API infrastructure (per api-standards.md) (**DONE with gaps** - v0.0.1)
   - Global exception filter with i18n (PT-BR/EN) — 5 tests passing
+    - **GAP** (BUG-4): ValidationPipe 400 errors emitted as `SYS_HTTP_ERROR`, not structured `VAL_INVALID_INPUT` with `validationErrors` array
+    - **GAP**: Only 14 of ~50+ error codes have translations in backend `MESSAGES` map
+    - **GAP** (BUG-5): `Accept-Language: en-US` not normalized to `en` (falls back to `pt-BR`)
+    - **GAP**: `NotFoundException` resource name is case-sensitive with no guard (`shareClass` → wrong key lookup)
   - Response interceptor (standard envelope) — 3 tests passing
-  - Request ID middleware (X-Request-Id)
+  - Request ID middleware (X-Request-Id) — working but instantiated outside DI container
   - Rate limiting via @nestjs/throttler (5 tiers configured)
-  - Swagger/OpenAPI documentation (non-production only)
-  - CORS configuration (per security.md)
+    - **GAP** (BUG-3): `ThrottlerGuard` NOT registered as `APP_GUARD` — only works on endpoints with explicit `@Throttle()` decorator
+    - No `X-RateLimit-*` response headers on unthrottled endpoints
+  - Swagger/OpenAPI documentation (non-production only) — working at `/api/docs`
+  - CORS configuration (per security.md) — correct, missing `X-CSRF-Token` in `allowedHeaders`
 
 - [x] Set up security infrastructure (**PARTIAL** - v0.0.1)
-  - Helmet integration (security headers) — configured in main.ts
-  - CSRF double-submit cookie middleware — pending
-  - Encryption service (AWS KMS) — pending
+  - Helmet integration (security headers) — configured in main.ts (missing `permittedCrossDomainPolicies: false`)
+  - **MISSING**: Request body size limits (`json({ limit: '1mb' })`) per security.md
+  - CSRF double-submit cookie middleware — **NOT IMPLEMENTED** (SameSite=Strict provides partial protection)
+  - Encryption service (AWS KMS) — pending (aws-sdk not installed)
   - Blind index service (HMAC-SHA256) — pending
-  - PII redaction utility — pending
+  - PII redaction utility — **NOT IMPLEMENTED** (auth module has private `redactIp`/`redactEmail` but no shared `redactPii()` utility)
+  - Sentry integration — **NOT INSTALLED** (`@sentry/nestjs` not in package.json)
 
 - [ ] Set up audit logging infrastructure (per audit-logging.md)
   - AuditInterceptor with @Auditable() decorator
@@ -1029,27 +1108,58 @@ FINAL REVIEW:
 
 ### 1.4 Authentication (Privy Integration)
 
-- [x] Backend Privy integration (**DONE** - v0.0.2)
+- [x] Backend Privy integration (**DONE** - v0.0.2, bugs fixed in v0.0.3)
   - @privy-io/node SDK (v0.9.0) — verifyAccessToken + users()._get()
   - AuthService: verify token, get/create user, login flow, profile retrieval
   - Global AuthGuard (via APP_GUARD) — all routes protected by default
+  - Global RolesGuard (via APP_GUARD) — reads `@Roles()` metadata, checks CompanyMember role (**fixed v0.0.3**)
+  - Global ThrottlerGuard (via APP_GUARD) — rate limits all routes by default (**fixed v0.0.3**)
   - `@Public()` decorator to opt out of auth
-  - `@RequireAuth()` decorator for explicit auth
+  - `@RequireAuth()` decorator — metadata marker (no-op since AuthGuard is global) (**fixed v0.0.3**)
   - `@CurrentUser()` param decorator (extracts AuthenticatedUser from request)
-  - `@Roles()` decorator for role-based access (guard implementation pending)
-  - AuthController: POST /api/v1/auth/login, POST /logout, GET /me
-  - HTTP-only cookie sessions (7d absolute, SameSite=Strict)
-  - Failed login attempt tracking (5 failures -> 15min lock per IP, in-memory Map for MVP)
+  - `@Roles()` decorator for role-based access with company-scoped CompanyMember lookup
+  - AuthController: POST /api/v1/auth/login, POST /logout (@Public), GET /me
+  - HTTP-only cookie sessions (**BUG-1 OPEN**: stores raw Privy token in 7-day cookie; token expires in hours)
+  - Failed login attempt tracking (5 failures -> 15min lock per IP, in-memory Map with 10K cap — not shared across instances)
+  - Atomic user find-or-create via `$transaction` (**fixed v0.0.3**)
+  - Apple OAuth + Google OAuth + email account support (**fixed v0.0.3**)
+  - ValidationPipe errors translated to structured VAL_INVALID_INPUT (**fixed v0.0.3**)
+  - Accept-Language normalization (en-US → en, pt → pt-BR) (**fixed v0.0.3**)
   - cookie-parser middleware added to main.ts
-  - 32 tests (auth.service: 16, auth.guard: 10, auth.controller: 6)
+  - 67 tests total (auth.service: 16, auth.guard: 10, auth.controller: 6, roles.guard: 13, + common module tests)
+  - **MISSING**: `/api/v1/auth/refresh` endpoint (spec FR-3)
+  - **MISSING**: 2-hour inactivity timeout (spec FR-5, BR-3)
+  - **MISSING**: Audit logging events (AUTH_LOGIN_SUCCESS, AUTH_LOGOUT, AUTH_ACCOUNT_LOCKED)
+  - **MISSING**: `profile_picture_url` sync from Privy (spec FR-4)
+  - **MISSING**: Privy API retry/exponential backoff (single try/catch, no retry on transient failures)
+  - **MISSING**: Email notification on lockout (spec BR-4)
+
+- [x] Fix critical auth bugs (**DONE v0.0.3** — 13 of 15 bugs fixed, BUG-1 + BUG-7 remain open)
+  - ~~BUG-1: Implement server-side session management~~ — **DEFERRED** (requires Redis infrastructure)
+  - BUG-2: ✅ Implemented `RolesGuard` (reads ROLES_KEY, looks up CompanyMember, returns 404 for non-members)
+  - BUG-3: ✅ Registered ThrottlerGuard as APP_GUARD in app.module.ts
+  - BUG-4: ✅ GlobalExceptionFilter detects BadRequestException → structured VAL_INVALID_INPUT
+  - BUG-5: ✅ normalizeLanguage() handles en-US → en, pt → pt-BR
+  - BUG-6: ✅ Added apple_oauth to extractEmail() and extractName()
+  - ~~BUG-7: Fix Prisma broken relations~~ — **DEFERRED** (schema-level fix, not auth-specific)
+  - BUG-8: ✅ Wrapped user find-or-create in `$transaction`
+  - BUG-9: ✅ Changed @RequireAuth() to SetMetadata (no-op marker)
+  - BUG-10: ✅ Email conflict check before updating existing user's email
+  - BUG-11: ✅ Email local part fallback + Apple OAuth name extraction
+  - BUG-12: ✅ Guard against missing `@` in redactEmail()
+  - BUG-13: ✅ MAX_TRACKED_IPS = 10000 cap with eviction
+  - BUG-14: ✅ Logout endpoint changed to @Public()
+  - BUG-15: ✅ Returns messageKey instead of hardcoded English string
 
 - [ ] Frontend Privy integration
-  - Privy React SDK configuration
-  - AuthContext provider
-  - Protected route wrapper
-  - Login page with Privy modal
-  - User menu with logout
-  - CSRF token handling in API client
+  - Install `@privy-io/react-auth` package (NOT currently installed)
+  - Add `PrivyProvider` to providers.tsx
+  - Create `AuthContext` provider with `useAuth()` hook
+  - Create protected route wrapper component
+  - Wire login page to Privy modal (replace static HTML stub)
+  - Wire sidebar/topbar user data from auth context (replace hardcoded "Nelson Pereira")
+  - Add user menu with logout
+  - Add CSRF token handling in API client (`X-CSRF-Token` header from `navia-csrf` cookie)
 
 ### 1.5 KYC Verification (Verifik Integration)
 
@@ -1613,16 +1723,169 @@ PHASE 5: INVESTMENTS              PHASE 6: EMPLOYEE EQUITY
 
 ---
 
-## Quick Reference Checklists
+## Quick Reference: Prioritized Work Remaining
 
-### Phase 0 Remaining Work (57 items)
+### PRIORITY 1: Critical & High Bugs (must fix before any new feature work)
 
 ```
-P0.CRITICAL — MUST DO BEFORE ANY CODE (18 items, ~8 hours):
+CRITICAL:
+[ ] BUG-1: Fix Privy token / session management
+    - Raw Privy access token (expires in hours) stored in 7-day cookie → all requests fail after expiry
+    - Options: (a) Redis-backed server session, (b) implement /auth/refresh endpoint, (c) shorter cookie + silent refresh
+    - Files: backend/src/auth/auth.controller.ts (line 50), auth.service.ts
+
+[ ] BUG-2: Implement RolesGuard
+    - @Roles('ADMIN') decorator sets metadata but nothing reads it
+    - Create guards/roles.guard.ts that reads ROLES_KEY, checks user's role against required roles
+    - Register as APP_GUARD or apply per-module
+    - Files: new backend/src/auth/guards/roles.guard.ts + spec
+
+HIGH:
+[ ] BUG-3: Register ThrottlerGuard globally
+    - ThrottlerModule configured with 5 tiers but guard not registered as APP_GUARD
+    - All non-auth endpoints are currently unthrottled
+    - File: backend/src/app.module.ts (add APP_GUARD provider)
+
+[ ] BUG-4: Fix ValidationPipe error translation
+    - NestJS BadRequestException with message array caught as SYS_HTTP_ERROR
+    - Should detect class-validator errors and translate to VAL_INVALID_INPUT with validationErrors array
+    - File: backend/src/common/filters/global-exception.filter.ts
+
+MEDIUM:
+[ ] BUG-7: Fix Prisma broken relations (5 total)
+    - UserNotificationPreferences: add @relation to User, add reverse relation on User model
+    - FundingRound: add @relation to ShareClass
+    - OptionGrant: add nullable @relation to Shareholder
+    - OptionPlan.shareClassId: add @relation to ShareClass (NEW in v11.0)
+    - ConvertibleInstrument.targetShareClassId: add @relation to ShareClass (NEW in v11.0)
+    - File: backend/prisma/schema.prisma
+
+[ ] BUG-8: Fix race condition in user creation
+    - login() does non-atomic find-or-create with 3 separate queries
+    - Two concurrent first-logins for same Privy user → unique-constraint 500
+    - Fix: wrap in $transaction or use upsert
+    - File: backend/src/auth/auth.service.ts
+
+[ ] BUG-9: Fix @RequireAuth() double guard execution
+    - AuthGuard is already global APP_GUARD; @RequireAuth() adds UseGuards(AuthGuard) again
+    - Result: 2x Privy API calls + 2x DB lookups per request
+    - Fix: make @RequireAuth() a no-op metadata decorator or remove UseGuards
+    - File: backend/src/auth/decorators/require-auth.decorator.ts
+
+[ ] BUG-6: Handle Apple OAuth email extraction
+    - extractEmail() only handles 'email' and 'google_oauth' linked accounts
+    - Apple OAuth users get 401 on login
+    - File: backend/src/auth/auth.service.ts
+```
+
+### PRIORITY 1b: Non-Critical Bugs (fix during Phase 1, before Phase 2)
+
+```
+[ ] BUG-5: Normalize Accept-Language header
+    - 'en-US' does not resolve to 'en' (falls back to pt-BR)
+    - File: backend/src/common/filters/global-exception.filter.ts
+
+[ ] BUG-10: Guard against email sync conflict
+    - login() syncs email from Privy without checking if new email belongs to another user
+    - Could cause unique-constraint 500
+    - Fix: catch Prisma unique error or check before update
+    - File: backend/src/auth/auth.service.ts
+
+[ ] BUG-11: Fix extractName() for email-only users
+    - Only extracts from google_oauth → email-only users always have null name
+    - Fix: fallback to email local part (before @)
+    - File: backend/src/auth/auth.service.ts
+
+[ ] BUG-12: Fix redactEmail() crash on malformed emails
+    - If email has no '@', domain is undefined → produces 'X***@undefined'
+    - Fix: guard against missing '@'
+    - File: backend/src/auth/auth.service.ts
+
+[ ] BUG-13: Bound the in-memory lockout Map
+    - DDoS with many unique IPs → unbounded memory growth
+    - Fix: add max size (e.g., LRU cache) or switch to Redis
+    - File: backend/src/auth/auth.service.ts
+
+[ ] BUG-14: Make logout endpoint @Public()
+    - Current: @RequireAuth() blocks expired-token users from reaching logout
+    - Result: users with expired cookies cannot clear them
+    - Fix: change to @Public() (endpoint only clears cookie, no security risk)
+    - File: backend/src/auth/auth.controller.ts
+
+[ ] BUG-15: Remove hardcoded English logout message
+    - 'Logged out successfully' violates i18n.md rules
+    - Fix: return messageKey and let frontend translate
+    - File: backend/src/auth/auth.controller.ts
+```
+
+### PRIORITY 2: Phase 1 Remaining Implementation (foundation work)
+
+```
+BACKEND — Security & Infrastructure:
+[ ] Implement CSRF double-submit cookie middleware (security.md)
+[ ] Add request body size limits (json({ limit: '1mb' })) to main.ts
+[ ] Add X-CSRF-Token to CORS allowedHeaders
+[ ] Implement shared redactPii() utility (common/utils/redact-pii.ts)
+    - CPF: ***.***.***-XX, Email: m***@domain.com, Wallet: 0x1234...abcd, IP: /24, tokens: [REDACTED]
+[ ] Install and configure Redis + Bull (@nestjs/bull, ioredis)
+[ ] Install AWS SDK v3 (@aws-sdk/client-s3, client-ses, client-kms)
+[ ] Implement EncryptionService (AWS KMS)
+[ ] Implement BlindIndexService (HMAC-SHA256)
+[ ] Install and configure Sentry (@sentry/nestjs)
+[ ] Set up audit logging infrastructure (@Auditable decorator, AuditService, Bull processor)
+[ ] Create .env.example files for backend and frontend
+[ ] Set up CI/CD pipeline (GitHub Actions: lint, test, build, secret scan)
+[ ] Add jest.config.ts coverage thresholds (85% general, 95% critical)
+
+BACKEND — Auth Fixes:
+[ ] Handle Apple OAuth email extraction (extractEmail → apple_oauth type)
+[ ] Implement /api/v1/auth/refresh endpoint (spec FR-3)
+[ ] Add 2-hour inactivity timeout tracking
+[ ] Move failed attempt lockout from in-memory Map to Redis
+[ ] Add Privy API retry with exponential backoff (3 attempts)
+[ ] Add audit logging events to auth flows (AUTH_LOGIN_SUCCESS, etc.)
+[ ] Write tests for untested paths: @CurrentUser, @Roles, lockout expiry, Apple OAuth
+
+FRONTEND — Security (v11.0 findings):
+[ ] Add route protection via middleware.ts — currently any unauthenticated user can visit /dashboard
+[ ] Add Content-Security-Policy header in next.config.js (allow Privy iframe, S3 images, Base RPC)
+[ ] Add Strict-Transport-Security header in next.config.js
+
+FRONTEND — Core Integration:
+[ ] Install @privy-io/react-auth and add PrivyProvider
+[ ] Create AuthContext / useAuth hook
+[ ] Wire login page to Privy modal (replace static HTML stub)
+[ ] Create protected route wrapper
+[ ] Wire sidebar/topbar user data from auth context
+[ ] Install next-intl and set up locale routing middleware
+[ ] Replace all hardcoded English strings with useTranslations()
+[ ] Run npx shadcn-ui@latest init and generate core components (Button, Input, Card, Table, Dialog, etc.)
+[ ] Add CSRF token injection to API client
+[ ] Add 401 auto-redirect to /login?expired=true in API client
+[ ] Dynamic Accept-Language from user locale in API client
+[ ] Create useErrorToast() hook for consuming ApiError objects
+[ ] Fix border radius systematic error in globals.css + tailwind.config.ts
+    - Set --radius: 0.75rem (12px), add xl=16px, fix entire scale (lg=12px, md=8px, sm=6px)
+[ ] Create Brazilian formatting helpers (lib/format.ts)
+    - formatNumber(), formatCurrency(), formatDate(), formatPercentage()
+    - Always use pt-BR Intl formatters regardless of locale (per i18n.md)
+[ ] Extract shared nav items constant (currently duplicated in sidebar.tsx and mobile-sidebar.tsx)
+[ ] Add aria-current="page" to active nav links (accessibility)
+[ ] Wire dashboard ownership chart with Recharts (replace placeholder)
+[ ] Write component tests (0 frontend tests currently exist)
+[ ] Add company switcher to topbar
+```
+
+### PRIORITY 3: Phase 0 Spec Fixes (69 items — specs are stale, code has correct patterns)
+
+**NOTE**: The implementation code (Prisma schema, backend modules) already uses the correct patterns. These 69 items are **spec file documentation updates** to align the spec text with what was actually built. They should be done to prevent confusion but are not blocking implementation.
+
+```
+P0.CRITICAL — Spec file updates (18 items, ~8 hours):
 
   Systemic fixes (2 items, ~4 hours):
-  [ ] C1: snake_case → camelCase in TypeScript interfaces (13 files)
-  [ ] C2: Response envelope compliance (6+ files)
+  [ ] C1: snake_case → camelCase in TypeScript interfaces (13 spec files)
+  [ ] C2: Response envelope compliance (6+ spec files)
 
   Scoping/behavior (3 items, ~1.5 hours):
   [ ] C3: X-Company-Id → :companyId path parameter (2 files)
@@ -1636,7 +1899,7 @@ P0.CRITICAL — MUST DO BEFORE ANY CODE (18 items, ~8 hours):
 
   Enum standardization (4 items, ~1.5 hours):
   [ ] C6: KYCStatus → 6 values, UPPER_SNAKE_CASE (2 files)
-  [ ] C7: FundingRound status enum (1 file)
+  [ ] C7: FundingRound status enum DRAFT|OPEN|CLOSING|CLOSED|CANCELLED (1 file)
   [ ] C8: ConvertibleInstrument enum casing (1 file)
   [ ] C12: Add channel enum to Notification entity (1 file)
 
@@ -1644,71 +1907,109 @@ P0.CRITICAL — MUST DO BEFORE ANY CODE (18 items, ~8 hours):
   [ ] C9.1: blockchain admin-wallet → company-scoped
   [ ] C9.2: blockchain transaction → company-scoped
 
-  Status enum (1 item, ~10 min):
+  Status enum + security (3 items):
   [ ] C13: Add PARTIALLY_SIGNED to Document status
+  [ ] C14: Remove accessPassword from company-profile.md API responses
+  [ ] C15: Change financial `number` types to `string` (Decimal) in 16 files
 
----
+P0.HIGH — Spec file updates (18 items, ~8 hours):
+  [ ] H1.1: Resolve LEGAL export access (reports-analytics.md vs user-permissions.md)
+  [ ] H1.2: Resolve FINANCE audit access (audit-logging.md vs user-permissions.md)
+  [ ] H2.1-H2.10: Define 10 missing API endpoints in respective spec files
+  [ ] H3: Add AUTH_FORBIDDEN, NOTIFICATION_NOT_FOUND, NOTIFICATION_PREFERENCES_INVALID to error-handling.md
+  [ ] H4: Add SHARE_CLASS_CREATED/UPDATED/DELETED audit events
+  [ ] H5: Remove AdminWallet entity from blockchain-integration.md
+  [ ] H6: Change BlockchainTransaction to 1:many in blockchain-integration.md
+  [ ] H7: Clarify pre-signed URL expiry policy in security.md
+  [ ] H8+H9: Fill transaction spec gaps + fix stale cross-references
 
-P0.HIGH — MUST DO BEFORE ANY CODE (18 items, ~8 hours):
-
-  Permission conflicts (2 items):
-  [ ] H1.1: LEGAL export access decision
-  [ ] H1.2: FINANCE audit access decision
-
-  Missing endpoints (10 items):
-  [ ] H2.1: CNPJ retry endpoint
-  [ ] H2.2: Funding round cancellation
-  [ ] H2.3: Commitment payment status update
-  [ ] H2.4: Document signature decline
-  [ ] H2.5: Notification unread count
-  [ ] H2.6: Notification bulk mark-as-read
-  [ ] H2.7: Option plan close
-  [ ] H2.8: Option grant termination/forfeiture
-  [ ] H2.9: Blockchain admin ownership transfer
-  [ ] H2.10: Shareholder enum casing fix
-
-  Missing definitions (6 items):
-  [ ] H3: Add 3 error codes to error-handling.md + verify orphaned code
-  [ ] H4: Add share class audit events
-  [ ] H5: Remove AdminWallet entity
-  [ ] H6: BlockchainTransaction 1:many relationship
-  [ ] H7: Pre-signed URL expiry clarification
-  [ ] H8+H9: Transaction spec gaps + stale references
-
----
-
-P0.MEDIUM — RECOMMENDED BEFORE PHASE 1 (13 items, ~12 hours):
-
-  [ ] M1: Prisma schema approach (decision + implementation)
-  [ ] M2: Frontend code fixes (3 files)
-  [ ] M3: Open questions resolved (14 questions across 3 files)
-  [ ] M4: Missing entities (4 items)
-  [ ] M5.1: share-classes.md expansion (403 → 500+)
-  [ ] M5.2: funding-rounds.md expansion (467 → 500+)
-  [ ] M5.3: notifications.md expansion (420 → 600+)
+P0.MEDIUM — Spec file updates (13 items, ~12 hours):
+  [ ] M1: Prisma schema approach (decision — already have schema, need docs)
+  [ ] M2: Frontend code fixes in 3 spec files (alert→toast, fetch→API client)
+  [ ] M3: Resolve 14 open questions across 3 spec files
+  [ ] M4: Define missing entities (RoundClose, ExportJob, CompanyScopeGuard, bank account)
+  [ ] M5.1-M5.3: Spec expansions (share-classes, funding-rounds, notifications)
   [ ] M6: exit-waterfall.md stub resolution
 
----
-
-P0.LOW — CAN DO DURING PHASE 1 (8 items, ~2 hours):
-
+P0.LOW — Documentation updates (8 items, ~2 hours):
   [ ] L1: Complete cross-references (4 company specs)
-  [ ] L2: Fix company-profile.md numbering gaps
-  [ ] L3: VelaFund → Navia rename (3 files)
-  [ ] L4: ARCHITECTURE.md ERD update (8+ entities)
+  [ ] L2: company-profile.md numbering gaps
+  [ ] L3: VelaFund → Navia rename (README.md, ARCHITECTURE.md)
+  [ ] L4: ARCHITECTURE.md ERD update (8+ missing entities)
 
----
+Spec Compliance Gaps (v11.0 findings — address during spec updates):
+  [ ] user-permissions.md: CompanyScopeGuard referenced but has no implementation spec and no code
+  [ ] user-permissions.md: ROLE_DEFAULTS map is incomplete (uses /* ... */ comments)
+  [ ] user-permissions.md: Investor conditional access footnotes (*, **, ****) have no enforcement mechanism
+  [ ] notifications.md: Missing WebSocket/SSE for real-time in-app notifications
+  [ ] notifications.md: Notification type enum not formally defined as a catalog
+  [ ] reports-analytics.md: Missing ExportJob Prisma model, no formal error code catalog for reports
+  [ ] kyc-verification.md: CAPTCHA requirement after 2 failed attempts mentioned but not in any endpoint
+  [ ] company-litigation-verification.md: Risk level computation has overlapping rules (ambiguous for 2 active lawsuits, R$80k)
+  [ ] company-litigation-verification.md: PROFILE_LITIGATION_CNPJ_NOT_FOUND error code contradicts EC-9 (treats not-found as COMPLETED)
+```
 
-ALREADY DONE (18 items — no action needed):
-[x] Django → NestJS references updated
-[x] API paths have /api/v1/ prefix
+### PRIORITY 4: Prisma Schema Gaps
+
+```
+Missing Models:
+[ ] Add DataroomFolder model (company-dataroom.md)
+[ ] Add DataroomDocument model (company-dataroom.md)
+[ ] Add ExitScenario model (exit-waterfall.md)
+[ ] Add WaterfallResult model (exit-waterfall.md)
+[ ] Add ExportJob model (reports-analytics.md) — fields: id, companyId, format, status (QUEUED|PROCESSING|COMPLETED|FAILED), s3Key, downloadUrl, expiresAt, errorCode
+[ ] Consider extracting LitigationVerification from CompanyProfile to separate model
+
+Broken Relations (BUG-7, 5 total):
+[ ] Add @relation to UserNotificationPreferences.userId → User
+[ ] Add @relation to FundingRound.shareClassId → ShareClass
+[ ] Add nullable @relation to OptionGrant.shareholderId → Shareholder
+[ ] Add @relation to OptionPlan.shareClassId → ShareClass (v11.0)
+[ ] Add @relation to ConvertibleInstrument.targetShareClassId → ShareClass (v11.0)
+
+Missing Constraints:
+[ ] Add @@unique([roundId, shareholderId]) to RoundCommitment if needed
+[ ] Add @@unique([documentId, email]) to DocumentSigner to prevent duplicate signers (v11.0)
+
+Missing Indexes (v11.0):
+[ ] ProfileMetric, ProfileTeamMember, ProfileDocument — add @@index([profileId])
+[ ] BeneficialOwner — add @@index([shareholderId])
+[ ] RoundClose — add @@index([roundId])
+[ ] DocumentSigner — add @@index([userId, status])
+[ ] Shareholding — add @@index([shareClassId])
+```
+
+### PREVIOUSLY COMPLETED (no action needed)
+
+```
+[x] Monorepo: pnpm workspaces + Turborepo configured
+[x] Backend NestJS scaffold: AppModule, ConfigModule, PrismaModule, HealthModule
+[x] Backend auth module: AuthService, AuthController, AuthGuard, 4 decorators
+[x] Backend common: GlobalExceptionFilter, ResponseInterceptor, RequestIdMiddleware, PaginationQueryDto, paginate, sort-parser, AppException hierarchy
+[x] Backend health: HealthController with DB check
+[x] Backend Prisma schema: 32 models, 35 enums, 1183 lines
+[x] Frontend Next.js scaffold: App Router, TypeScript strict
+[x] Frontend layouts: sidebar (high-fidelity), topbar, auth layout, dashboard layout, mobile sidebar
+[x] Frontend providers: QueryClientProvider (TanStack Query), Toaster (sonner)
+[x] Frontend API client: typed with error parsing, credentials: include
+[x] Frontend tailwind.config.ts: design system color tokens, fonts, spacing
+[x] Frontend globals.css: shadcn/ui CSS variables
+[x] Frontend dashboard: visual prototype with stat cards (hardcoded data)
+[x] User flow docs: authentication.md
+[x] Helmet, CORS, cookie-parser in main.ts
+[x] ThrottlerModule configured (5 tiers)
+[x] Swagger/OpenAPI at /api/docs
+[x] 54 backend tests passing
+[x] ESLint + Prettier configured
+[x] Husky installed
+[x] Django → NestJS references updated in specs
+[x] API paths have /api/v1/ prefix in specs
 [x] Transaction vs ShareTransaction resolved
 [x] Signature → DocumentSigner renamed
 [x] OptionGrant vs Option resolved
 [x] specs/README.md entity glossary added
 [x] 5 API path scoping issues fixed
 [x] Blockchain /status endpoint scoped
-[x] KYC hybrid approach documented
 [x] reports-analytics.md expanded (602 lines)
 [x] user-permissions.md expanded (739 lines)
 [x] option-plans.md expanded (552 lines)
@@ -1761,6 +2062,8 @@ Before moving to next phase:
 
 | Date | Version | Author | Changes |
 |------|---------|--------|---------|
+| 2026-02-23 | 11.0 | Claude | **Deep audit with 12 parallel subagents**. Found 8 new auth bugs: BUG-8 (race condition in user creation), BUG-9 (@RequireAuth double guard), BUG-10 (email sync conflict), BUG-11 (extractName null for email users), BUG-12 (redactEmail crash), BUG-13 (unbounded lockout Map), BUG-14 (logout unreachable when expired), BUG-15 (hardcoded English logout). Expanded BUG-7 from 3 to 5 broken Prisma relations (+OptionPlan.shareClassId, +ConvertibleInstrument.targetShareClassId). Found missing ExportJob model, missing indexes on 5+ models, missing DocumentSigner unique constraint. Frontend: no auth protection on any route (no middleware.ts), border radius scale systematically wrong, missing CSP/HSTS headers, missing Brazilian formatting helpers, shadcn/ui CLI never run, nav items duplicated, missing aria-current on active links. Added 9 spec compliance gaps (user-permissions CompanyScopeGuard undefined, notifications missing real-time mechanism, reports missing ExportJob/error codes, kyc CAPTCHA not in endpoints, litigation risk rules ambiguous). Added Priority 1b section for non-critical bugs. |
+| 2026-02-23 | 10.0 | Claude | **Comprehensive code-vs-spec audit** with 8 parallel subagents. Audited all 34 backend source files, 14 frontend source files, 1183-line Prisma schema, and all 26 spec files. Key findings: 7 critical/high bugs in existing code (BUG-1: Privy token in 7-day cookie, BUG-2: no RolesGuard, BUG-3: ThrottlerGuard not global, BUG-4: ValidationPipe errors unstructured, BUG-5: Accept-Language not normalized, BUG-6: Apple OAuth not handled, BUG-7: Prisma broken relations). All 69 P0 spec issues confirmed still pending in spec files but code has correct patterns. Frontend: Privy SDK not installed, next-intl not installed, shadcn/ui not initialized, 0 tests, login is static stub. Restructured Quick Reference into 4 priority tiers. Updated all phase sections with accurate status annotations. |
 | 2026-02-23 | 8.0 | Claude | **Comprehensive spec audit**. Found 55+ new issues beyond the original 8. Restructured Phase 0 into priority tiers (CRITICAL/HIGH/MEDIUM/LOW). Key systemic findings: snake_case in 13 TypeScript interfaces, response envelope non-compliance in 6+ files, X-Company-Id vs :companyId conflict, KYCStatus 4-vs-6-value mismatch, convertible-instruments lowercase enums, 10 missing API endpoints, 3 permission matrix conflicts, AdminWallet entity contradiction, BlockchainTransaction 1:1 constraint, PARTIALLY_SIGNED missing from Document enum, 3 missing error codes, 3 missing audit events, 14 unresolved open questions. Total P0 remaining: 57 items (was 14). Updated all phase descriptions to reference spec fixes. |
 | 2026-02-23 | 7.1 | Claude | Integrated 9 new specs into implementation phases (2.5 Company Profile, 2.6 Dataroom, 3.4 Reconciliation, 5.3 Exit Waterfall, 8.3 Litigation). Found 2 blockchain API paths still unscoped (lines 150, 190). Added P0.5 Documentation Fixes (VelaFund to Navia rename in 3 files, ARCHITECTURE.md ERD missing 8+ entities). Added security/audit infrastructure to Phase 1.3. Updated technology stack with 8 missing tools. Updated dependency graph. Total P0 remaining: 14 items. |
 | 2026-02-23 | 7.0 | Claude | Full re-audit: verified all 26 specs against actual files. Found API paths ALL fixed (6/6), DocumentSigner rename done, 3 of 6 expansions met targets. Updated spec count from 18 to 26. Updated line counts. Reduced remaining P0 work from 12 to 8 items. |

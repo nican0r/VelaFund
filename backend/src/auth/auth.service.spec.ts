@@ -30,6 +30,7 @@ describe('AuthService', () => {
       create: jest.Mock;
       update: jest.Mock;
     };
+    $transaction: jest.Mock;
   };
 
   const mockDbUser = {
@@ -68,7 +69,11 @@ describe('AuthService', () => {
         create: jest.fn(),
         update: jest.fn(),
       },
+      $transaction: jest.fn(),
     };
+
+    // $transaction calls the callback with the prisma mock itself as the tx client
+    prisma.$transaction.mockImplementation((fn: (tx: typeof prisma) => Promise<unknown>) => fn(prisma));
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [

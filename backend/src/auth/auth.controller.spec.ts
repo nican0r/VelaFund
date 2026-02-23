@@ -143,7 +143,7 @@ describe('AuthController', () => {
 
       const result = await controller.logout(mockRes as any);
 
-      expect(result).toEqual({ message: 'Logged out successfully' });
+      expect(result).toEqual({ messageKey: 'errors.auth.loggedOut' });
       expect(mockRes.clearCookie).toHaveBeenCalledWith(
         'navia-auth-token',
         expect.objectContaining({
