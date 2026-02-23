@@ -50,13 +50,12 @@ while true; do
     # docker sandbox run: Execute Claude in an isolated Docker container
     # claude -p: Headless mode (non-interactive, uses prompt from argument)
     # --dangerously-skip-permissions: Auto-approve all tool calls (YOLO mode)
-    # --output-format=stream-json: Structured output for logging/monitoring
     # --model opus: Primary agent uses Opus for complex reasoning (task selection, prioritization)
     #               Can use 'sonnet' in build mode for speed if plan is clear and tasks well-defined
     # --verbose: Detailed execution logging
+    # Output format: Uses default 'text' format for human-readable terminal output
     docker sandbox run claude -p \
         --dangerously-skip-permissions \
-        --output-format=stream-json \
         --model opus \
         --verbose \
         "$(cat "$PROMPT_FILE")"

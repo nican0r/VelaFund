@@ -65,10 +65,11 @@ The shareholder registry is the central database of all equity holders in a comp
 - System MUST track shareholder type: FOUNDER, INVESTOR, EMPLOYEE, ADVISOR, CORPORATE
 
 ### FR-2: Required Shareholder Information
-- System MUST require: legal name, CPF/CNPJ, wallet address
+- System MUST require: legal name, CPF/CNPJ, email
 - System MUST require: nationality, tax residency
-- System SHOULD collect: contact information (email, phone), physical address
+- System SHOULD collect: contact information (phone), physical address
 - System MUST link shareholder to verified KYC record (if available)
+- System MUST NOT require a wallet address on shareholder creation — the wallet address is derived from the shareholder's `User.walletAddress` once they sign up and receive a Privy embedded wallet
 
 ### FR-3: Ownership Tracking
 - System MUST calculate total shares owned across all share classes
@@ -117,8 +118,12 @@ interface Shareholder {
   // Identity Information
   legal_name: string;                  // Full legal name
   cpf_cnpj: string;                    // CPF (individuals) or CNPJ (companies)
-  wallet_address: string;              // Ethereum wallet address
   shareholder_type: ShareholderType;   // FOUNDER | INVESTOR | EMPLOYEE | ADVISOR | CORPORATE
+
+  // Wallet Address (derived, not manually set)
+  // Populated automatically from User.walletAddress when the shareholder signs up
+  // Null until the shareholder creates a platform account and receives a Privy embedded wallet
+  wallet_address: string | null;
 
   // Contact Information
   email: string | null;
@@ -206,14 +211,13 @@ interface ShareholderOwnership {
 ## API Endpoints
 
 ### POST /api/v1/companies/:companyId/shareholders
-**Description**: Add new shareholder to company
+**Description**: Add new shareholder to company. Wallet address is never provided manually — it is automatically populated from `User.walletAddress` when the shareholder signs up on the platform and receives a Privy embedded wallet.
 
 **Request**:
 ```json
 {
   "legal_name": "João da Silva",
   "cpf_cnpj": "012.345.678-01",
-  "wallet_address": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
   "shareholder_type": "investor",
   "email": "joao@example.com",
   "phone": "+55 11 98765-4321",
@@ -235,7 +239,7 @@ interface ShareholderOwnership {
   "id": "uuid",
   "legal_name": "João da Silva",
   "cpf_cnpj": "012.345.678-01",
-  "wallet_address": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+  "wallet_address": null,
   "shareholder_type": "investor",
   "is_foreign": false,
   "status": "active",
@@ -320,6 +324,7 @@ interface ShareholderOwnership {
   "nationality": "BR",
   "tax_residency": "BR",
   "is_foreign": false,
+  "has_platform_account": true,
   "status": "active",
   "ownership": {
     "total_shares": 155000,
@@ -378,7 +383,8 @@ interface ShareholderOwnership {
 ```
 
 **Business Rules**:
-- Cannot update: legal_name, cpf_cnpj, wallet_address (immutable after creation)
+- Cannot update: legal_name, cpf_cnpj (immutable after creation)
+- Cannot update: wallet_address (system-managed, derived from User.walletAddress)
 - Can update: contact information, address, tax residency, RDE-IED information
 
 ---
@@ -533,9 +539,12 @@ interface ShareholderOwnership {
 - Same CPF/CNPJ can be shareholder in multiple companies
 - Attempting to add duplicate CPF/CNPJ returns `409 Conflict`
 
-### BR-2: Wallet Address Uniqueness
-- Each wallet address must be unique across all shareholders globally
-- If shareholder has user account, wallet address must match user's wallet
+### BR-2: Wallet Address Derivation
+- Wallet address is NEVER manually provided — it is always derived from `User.walletAddress`
+- When a shareholder signs up on the platform (creating a User record with a Privy embedded wallet), the system links the User to the Shareholder record via matching email or CPF/CNPJ
+- On linkage, `Shareholder.wallet_address` is populated from `User.walletAddress` and `Shareholder.user_id` is set
+- Until the shareholder creates a platform account, `wallet_address` is null
+- On-chain transactions involving shareholders without a wallet address are deferred until the shareholder signs up
 
 ### BR-3: Shareholder Type Validation
 - FOUNDER: Can only be assigned during company creation or by admin
@@ -583,26 +592,29 @@ PRECONDITION: Admin user is logged in, viewing company cap table
    - Tax & Compliance
 3. Admin selects shareholder type: Individual or Corporate
 4. If Individual:
-   - Admin enters: legal_name, CPF, wallet_address
+   - Admin enters: legal_name, CPF, email
 5. If Corporate:
-   - Admin enters: legal_name, CNPJ, wallet_address
+   - Admin enters: legal_name, CNPJ, email
    - System prompts for beneficial owner information
 6. Admin enters nationality and tax residency
 7. System automatically sets is_foreign flag
 8. If is_foreign = true:
    - System displays RDE-IED fields
    - System shows compliance warning
-9. Admin enters contact information (email, phone, address)
+9. Admin enters additional contact information (phone, address)
 10. Admin clicks "Save Shareholder"
 11. System validates all required fields
 12. System checks for duplicate CPF/CNPJ in company
 13. System calls POST /api/v1/companies/:id/shareholders
-14. Backend creates shareholder record
-15. System displays success message
-16. System redirects to shareholder detail page
-17. Shareholder appears in shareholders list
+14. Backend creates shareholder record (wallet_address = null)
+15. Backend checks if a User with matching email exists:
+    - If yes: links User to Shareholder, populates wallet_address from User.walletAddress
+    - If no: shareholder remains unlinked until they sign up
+16. System displays success message
+17. System redirects to shareholder detail page
+18. Shareholder appears in shareholders list
 
-POSTCONDITION: New shareholder created with status = "active", zero shares
+POSTCONDITION: New shareholder created with status = "active", zero shares, wallet linked if user exists
 ```
 
 ### Flow 2: View Shareholder Details
@@ -728,12 +740,13 @@ POSTCONDITION: Admin has shareholder list for external use
 - Display error: "A shareholder with this CPF already exists. View existing shareholder?"
 - Provide link to existing shareholder record
 
-### EC-2: Invalid Wallet Address
-**Scenario**: Admin enters malformed Ethereum address
+### EC-2: Shareholder Signs Up — Auto-Links Wallet
+**Scenario**: A shareholder record exists with `wallet_address = null`, then the person signs up on the platform
 **Handling**:
-- Validate address format (0x followed by 40 hex characters)
-- Return 400 Bad Request: "Invalid wallet address format"
-- Provide example of correct format
+- On user creation (signup), the system checks if any Shareholder records match the new user's email
+- If a match is found, the system links the Shareholder to the User: sets `user_id` and populates `wallet_address` from `User.walletAddress`
+- Any deferred on-chain operations for this shareholder can now proceed
+- Admin is notified: "Shareholder João da Silva has joined the platform"
 
 ### EC-3: Foreign Shareholder Without RDE-IED
 **Scenario**: Foreign shareholder created without RDE-IED number
@@ -821,21 +834,22 @@ export class ShareholdersService {
       throw new ConflictException('Shareholder with this CPF/CNPJ already exists in company');
     }
 
-    // Validate wallet address format
-    if (!this.isValidWalletAddress(createDto.wallet_address)) {
-      throw new BadRequestException('Invalid Ethereum wallet address');
-    }
-
     // Set is_foreign flag
     const isForeign = createDto.tax_residency !== 'BR';
 
-    // Create shareholder
+    // Check if a User with matching email already exists on the platform
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: createDto.email },
+    });
+
+    // Create shareholder — wallet_address derived from User if they exist
     const shareholder = await this.prisma.shareholder.create({
       data: {
         company_id: companyId,
         legal_name: createDto.legal_name,
         cpf_cnpj: createDto.cpf_cnpj,
-        wallet_address: createDto.wallet_address,
+        wallet_address: existingUser?.walletAddress ?? null,
+        user_id: existingUser?.id ?? null,
         shareholder_type: createDto.shareholder_type,
         email: createDto.email,
         phone: createDto.phone,
@@ -848,6 +862,23 @@ export class ShareholdersService {
     });
 
     return shareholder;
+  }
+
+  /**
+   * Called during user signup to auto-link any existing Shareholder records
+   * to the newly created User (by matching email).
+   */
+  async linkUserToShareholders(userId: string, email: string, walletAddress: string) {
+    await this.prisma.shareholder.updateMany({
+      where: {
+        email,
+        user_id: null,
+      },
+      data: {
+        user_id: userId,
+        wallet_address: walletAddress,
+      },
+    });
   }
 
   async getShareholderWithOwnership(companyId: string, shareholderId: string) {
@@ -910,9 +941,6 @@ export class ShareholdersService {
     };
   }
 
-  private isValidWalletAddress(address: string): boolean {
-    return /^0x[a-fA-F0-9]{40}$/.test(address);
-  }
 }
 ```
 
@@ -1049,7 +1077,7 @@ function maskCPFCNPJ(value: string): string {
 ### Data Accuracy
 - 100% of shareholders have valid CPF/CNPJ
 - Zero duplicate CPF/CNPJ within a company
-- 100% of wallet addresses pass validation
+- 100% of wallet addresses derived from User records (never manually entered)
 
 ### Performance
 - Shareholder list loads in < 2 seconds for 500 shareholders

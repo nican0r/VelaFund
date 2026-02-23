@@ -85,10 +85,12 @@ The cap table is the central record of equity ownership in a company, showing wh
 - System MUST maintain OCT versioning and schema validation
 
 ### FR-6: On-Chain Synchronization
-- System MUST sync cap table state from Base Network smart contracts
-- System MUST detect on-chain state changes via event monitoring
+- System MUST sync cap table state from Base Network smart contracts via event-driven listeners
+- System MUST detect on-chain state changes via event monitoring (primary sync mechanism)
 - System MUST handle blockchain reorgs gracefully
-- System MUST reconcile discrepancies between on-chain and off-chain data
+- System MUST run a daily scheduled reconciliation job to cross-check on-chain vs off-chain state
+- System MUST support on-demand reconciliation triggered by admin
+- System MUST auto-trigger reconciliation if a discrepancy is detected during normal reads
 
 ### FR-7: Historical Snapshots
 - System MUST create automatic snapshots after each transaction
@@ -460,8 +462,11 @@ interface OCTStockIssuance {
 ### BR-3: Blockchain as Source of Truth
 - On-chain data is authoritative for share ownership
 - Off-chain database mirrors on-chain state for performance
-- Reconciliation checks run every 10 minutes
-- Discrepancies trigger automatic sync from blockchain
+- Primary sync is event-driven: blockchain event listeners update off-chain state in real-time after each confirmed transaction
+- A daily scheduled reconciliation job runs a full cross-check of on-chain vs off-chain state for all active companies
+- Admin can trigger on-demand reconciliation via the reconcile endpoint
+- If a discrepancy is detected during any read operation, the system MUST auto-trigger reconciliation for that company
+- Discrepancies trigger automatic sync from blockchain (source of truth) and alert admin via email
 
 ### BR-4: Snapshot Creation Triggers
 - Automatic snapshot after every transaction

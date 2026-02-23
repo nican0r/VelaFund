@@ -67,24 +67,36 @@ VelaFund uses role-based access control (RBAC) to manage user permissions. Each 
 
 ## Data Models
 
+> **Note**: The role and permissions entity is the **CompanyMember** table defined in `company-management.md`. CompanyMember is a merged entity that combines role, permissions, and invitation workflow in one table. The old `CompanyRole` entity has been superseded.
+
 ```typescript
-interface CompanyRole {
+// See company-management.md for the full CompanyMember entity definition.
+// Key fields relevant to permissions:
+interface CompanyMember {
   id: string;
-  user_id: string;
-  company_id: string;
+  companyId: string;
+  userId: string | null;               // null for pending invitations
+  email: string;
   role: 'ADMIN' | 'FINANCE' | 'LEGAL' | 'INVESTOR' | 'EMPLOYEE';
-  
+
   // Optional: Fine-grained permissions override
   permissions: {
-    cap_table_read: boolean;
-    cap_table_write: boolean;
-    transactions_create: boolean;
-    documents_create: boolean;
-    users_manage: boolean;
+    capTableRead?: boolean;
+    capTableWrite?: boolean;
+    transactionsCreate?: boolean;
+    transactionsApprove?: boolean;
+    documentsCreate?: boolean;
+    documentsSign?: boolean;
+    usersManage?: boolean;
+    reportsView?: boolean;
+    reportsExport?: boolean;
+    auditView?: boolean;
   } | null;
 
-  assigned_by: string;               // User ID who assigned this role
-  assigned_at: Date;
+  status: 'PENDING' | 'ACTIVE' | 'REMOVED';
+  invitedBy: string;                   // User ID who assigned this role
+  invitedAt: Date;
+  acceptedAt: Date | null;
 }
 ```
 
@@ -110,14 +122,19 @@ interface CompanyRole {
 
 ## API Endpoints
 
-### POST /api/v1/companies/:companyId/roles
-Assign role to user
+> **Note**: Role management is handled through the CompanyMember endpoints defined in `company-management.md`. The primary endpoints are:
 
-### DELETE /api/v1/companies/:companyId/roles/:roleId
-Remove user's role
+### POST /api/v1/companies/:companyId/members/invite
+Invite a user and assign a role (creates a PENDING CompanyMember)
 
-### GET /api/v1/companies/:companyId/roles
-List all users and their roles in company
+### PUT /api/v1/companies/:companyId/members/:memberId
+Update a member's role or permissions
+
+### DELETE /api/v1/companies/:companyId/members/:memberId
+Remove a member (sets status to REMOVED)
+
+### GET /api/v1/companies/:companyId/members
+List all members and their roles in the company
 
 ---
 
