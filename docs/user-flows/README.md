@@ -8,6 +8,7 @@ Each document follows the template defined in `.claude/rules/user-flow-documenta
 | Flow | Actors | Status |
 |------|--------|--------|
 | [Authentication](./authentication.md) | Unauthenticated user, Authenticated user | Backend complete |
+| [Company Management](./company-management.md) | Authenticated user, ADMIN member | Backend complete |
 
 ## Cross-References
 

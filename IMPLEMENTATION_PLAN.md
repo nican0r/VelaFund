@@ -4,7 +4,7 @@
 
 **Status**: Phase 1 (Foundation and Infrastructure) in progress. Monorepo scaffolded, backend and frontend foundations built. Phase 0 spec issues are applied in implementation code but **all 69 P0 issues remain unfixed in the spec files themselves**.
 
-**Last Updated**: 2026-02-23 (v12.1 - Fixed BUG-7: all 5 broken Prisma relations, 2 missing unique constraints, 8 missing indexes. 67 tests passing.)
+**Last Updated**: 2026-02-23 (v12.2 - Company Management backend module: CRUD endpoints, service with CNPJ Módulo 11 validation, DTOs, 42 tests. 109 tests passing total.)
 
 ---
 
@@ -28,7 +28,7 @@ A comprehensive spec audit (v8.0) uncovered systemic issues that affect nearly a
 | Aspect | Status | Notes |
 |--------|--------|-------|
 | `/frontend` directory | **SCAFFOLDED** | 14 source files, 0 tests. Layouts built. Privy SDK NOT installed. next-intl NOT installed. shadcn/ui CLI never run (no `components/ui/`, no `components.json`). **No auth protection on any route** — no `middleware.ts`, no protected route wrapper. Login page is static stub. Dashboard is visual prototype with hardcoded data. Missing CSP and HSTS security headers. Missing Brazilian formatting helpers. |
-| `/backend` directory | **SCAFFOLDED** | 36 source files, 67 tests. Auth module complete (14 of 15 bugs fixed — BUG-1 remains, requires Redis). Common infrastructure solid. No domain feature modules yet. |
+| `/backend` directory | **SCAFFOLDED** | 42 source files, 109 tests. Auth module complete (14 of 15 bugs fixed — BUG-1 remains, requires Redis). Common infrastructure solid. **Company Management module complete** (CRUD endpoints, CNPJ Módulo 11 validation, company status state machine, 42 tests). |
 | `/contracts` directory | EXISTS (empty) | No Solidity files |
 | `package.json` | **CREATED** | pnpm workspaces + Turborepo configured |
 | Prisma schema | **NEAR-COMPLETE** | 32 models, 35 enums. All relations, unique constraints, and indexes complete. Missing entities: DataroomFolder, DataroomDocument, ExitScenario, WaterfallResult, ExportJob, LitigationVerification (inlined into CompanyProfile). Migration pending. |
@@ -39,8 +39,8 @@ A comprehensive spec audit (v8.0) uncovered systemic issues that affect nearly a
 | `.env.example` files | **MISSING** | Neither backend nor frontend has one |
 | README.md | **STALE** | Contains only "# VelaFund" |
 | ARCHITECTURE.md | **STALE** | "VelaFund" branding, references removed entities (AdminWallet, CapTableEntry) |
-| User flow docs | **1 of ~15** | Only `docs/user-flows/authentication.md` exists |
-| Git tag | `v0.0.3` | Auth bug fixes (13 of 15 fixed) |
+| User flow docs | **2 of ~15** | `docs/user-flows/authentication.md`, `docs/user-flows/company-management.md` |
+| Git tag | `v0.0.5` | Company Management backend module |
 
 ### Critical Bugs Found (v10.0 + v11.0 Audit)
 
@@ -1161,9 +1161,31 @@ FINAL REVIEW:
   - Add user menu with logout
   - Add CSRF token handling in API client (`X-CSRF-Token` header from `navia-csrf` cookie)
 
-### 1.5 KYC Verification (Verifik Integration)
+### 1.5 Company Management
+
+- [x] Backend Company module (**DONE** - v0.0.5)
+  - CompanyController: 6 endpoints (POST, GET list, GET :companyId, PUT, PATCH status, DELETE)
+  - CompanyService: full business logic
+    - CNPJ Módulo 11 checksum validation (format + mathematical verification)
+    - Atomic company + ADMIN member creation via `$transaction` (BR-4)
+    - Membership limit check (max 20 companies per user, BR-6)
+    - Duplicate CNPJ detection (P2002 → 409 Conflict)
+    - Company status state machine: DRAFT → ACTIVE ↔ INACTIVE → DISSOLVED
+    - Dissolve prerequisites: no active shareholders, no active funding rounds
+    - Immutable fields: entityType and CNPJ not updateable (BR-5)
+    - DISSOLVED companies fully read-only (BR-2)
+  - CreateCompanyDto: name, entityType (LTDA/SA_CAPITAL_FECHADO/SA_CAPITAL_ABERTO), cnpj, optional description/foundedDate/defaultCurrency/fiscalYearEnd/timezone/locale
+  - UpdateCompanyDto: partial update of mutable fields only
+  - Pagination, sorting, status filtering for company list
+  - 10 new error message translations (PT-BR + EN) in GlobalExceptionFilter
+  - 42 tests (24 service + 18 controller) — all passing
+  - Routes: `POST /api/v1/companies`, `GET /api/v1/companies`, `GET /api/v1/companies/:companyId`, `PUT /api/v1/companies/:companyId`, `PATCH /api/v1/companies/:companyId/status`, `DELETE /api/v1/companies/:companyId`
+  - **NOT YET**: Company CNPJ async validation via Verifik (DRAFT → ACTIVE transition), company membership CRUD (separate module)
+
+### 1.6 KYC Verification (Verifik Integration)
 
 - [ ] Backend Verifik integration
+
   - Verifik service (API client with circuit breaker)
   - CPF validation endpoint
   - CNPJ validation endpoint
@@ -1734,22 +1756,12 @@ CRITICAL:
     - Options: (a) Redis-backed server session, (b) implement /auth/refresh endpoint, (c) shorter cookie + silent refresh
     - Files: backend/src/auth/auth.controller.ts (line 50), auth.service.ts
 
-[ ] BUG-2: Implement RolesGuard
-    - @Roles('ADMIN') decorator sets metadata but nothing reads it
-    - Create guards/roles.guard.ts that reads ROLES_KEY, checks user's role against required roles
-    - Register as APP_GUARD or apply per-module
-    - Files: new backend/src/auth/guards/roles.guard.ts + spec
+[x] BUG-2: Implement RolesGuard — **FIXED v0.0.3**
 
 HIGH:
-[ ] BUG-3: Register ThrottlerGuard globally
-    - ThrottlerModule configured with 5 tiers but guard not registered as APP_GUARD
-    - All non-auth endpoints are currently unthrottled
-    - File: backend/src/app.module.ts (add APP_GUARD provider)
+[x] BUG-3: Register ThrottlerGuard globally — **FIXED v0.0.3**
 
-[ ] BUG-4: Fix ValidationPipe error translation
-    - NestJS BadRequestException with message array caught as SYS_HTTP_ERROR
-    - Should detect class-validator errors and translate to VAL_INVALID_INPUT with validationErrors array
-    - File: backend/src/common/filters/global-exception.filter.ts
+[x] BUG-4: Fix ValidationPipe error translation — **FIXED v0.0.3**
 
 MEDIUM:
 [x] BUG-7: Fix Prisma broken relations (5 total) — **FIXED v0.0.4**
@@ -1761,62 +1773,29 @@ MEDIUM:
     - Also added 2 unique constraints and 8 missing indexes
     - File: backend/prisma/schema.prisma
 
-[ ] BUG-8: Fix race condition in user creation
-    - login() does non-atomic find-or-create with 3 separate queries
-    - Two concurrent first-logins for same Privy user → unique-constraint 500
-    - Fix: wrap in $transaction or use upsert
-    - File: backend/src/auth/auth.service.ts
+[x] BUG-8: Fix race condition in user creation — **FIXED v0.0.3**
 
-[ ] BUG-9: Fix @RequireAuth() double guard execution
-    - AuthGuard is already global APP_GUARD; @RequireAuth() adds UseGuards(AuthGuard) again
-    - Result: 2x Privy API calls + 2x DB lookups per request
-    - Fix: make @RequireAuth() a no-op metadata decorator or remove UseGuards
-    - File: backend/src/auth/decorators/require-auth.decorator.ts
+[x] BUG-9: Fix @RequireAuth() double guard execution — **FIXED v0.0.3**
 
-[ ] BUG-6: Handle Apple OAuth email extraction
-    - extractEmail() only handles 'email' and 'google_oauth' linked accounts
-    - Apple OAuth users get 401 on login
-    - File: backend/src/auth/auth.service.ts
+[x] BUG-6: Handle Apple OAuth email extraction — **FIXED v0.0.3**
 ```
 
 ### PRIORITY 1b: Non-Critical Bugs (fix during Phase 1, before Phase 2)
 
 ```
-[ ] BUG-5: Normalize Accept-Language header
-    - 'en-US' does not resolve to 'en' (falls back to pt-BR)
-    - File: backend/src/common/filters/global-exception.filter.ts
+[x] BUG-5: Normalize Accept-Language header — **FIXED v0.0.3**
 
-[ ] BUG-10: Guard against email sync conflict
-    - login() syncs email from Privy without checking if new email belongs to another user
-    - Could cause unique-constraint 500
-    - Fix: catch Prisma unique error or check before update
-    - File: backend/src/auth/auth.service.ts
+[x] BUG-10: Guard against email sync conflict — **FIXED v0.0.3**
 
-[ ] BUG-11: Fix extractName() for email-only users
-    - Only extracts from google_oauth → email-only users always have null name
-    - Fix: fallback to email local part (before @)
-    - File: backend/src/auth/auth.service.ts
+[x] BUG-11: Fix extractName() for email-only users — **FIXED v0.0.3**
 
-[ ] BUG-12: Fix redactEmail() crash on malformed emails
-    - If email has no '@', domain is undefined → produces 'X***@undefined'
-    - Fix: guard against missing '@'
-    - File: backend/src/auth/auth.service.ts
+[x] BUG-12: Fix redactEmail() crash on malformed emails — **FIXED v0.0.3**
 
-[ ] BUG-13: Bound the in-memory lockout Map
-    - DDoS with many unique IPs → unbounded memory growth
-    - Fix: add max size (e.g., LRU cache) or switch to Redis
-    - File: backend/src/auth/auth.service.ts
+[x] BUG-13: Bound the in-memory lockout Map — **FIXED v0.0.3**
 
-[ ] BUG-14: Make logout endpoint @Public()
-    - Current: @RequireAuth() blocks expired-token users from reaching logout
-    - Result: users with expired cookies cannot clear them
-    - Fix: change to @Public() (endpoint only clears cookie, no security risk)
-    - File: backend/src/auth/auth.controller.ts
+[x] BUG-14: Make logout endpoint @Public() — **FIXED v0.0.3**
 
-[ ] BUG-15: Remove hardcoded English logout message
-    - 'Logged out successfully' violates i18n.md rules
-    - Fix: return messageKey and let frontend translate
-    - File: backend/src/auth/auth.controller.ts
+[x] BUG-15: Remove hardcoded English logout message — **FIXED v0.0.3**
 ```
 
 ### PRIORITY 2: Phase 1 Remaining Implementation (foundation work)
@@ -1839,13 +1818,17 @@ BACKEND — Security & Infrastructure:
 [ ] Add jest.config.ts coverage thresholds (85% general, 95% critical)
 
 BACKEND — Auth Fixes:
-[ ] Handle Apple OAuth email extraction (extractEmail → apple_oauth type)
+[x] Handle Apple OAuth email extraction — **FIXED v0.0.3**
 [ ] Implement /api/v1/auth/refresh endpoint (spec FR-3)
 [ ] Add 2-hour inactivity timeout tracking
 [ ] Move failed attempt lockout from in-memory Map to Redis
 [ ] Add Privy API retry with exponential backoff (3 attempts)
 [ ] Add audit logging events to auth flows (AUTH_LOGIN_SUCCESS, etc.)
 [ ] Write tests for untested paths: @CurrentUser, @Roles, lockout expiry, Apple OAuth
+
+BACKEND — Company Management (next steps):
+[ ] Company membership CRUD module (invite, accept, remove, role change)
+[ ] Async CNPJ validation via Verifik (triggers DRAFT → ACTIVE transition)
 
 FRONTEND — Security (v11.0 findings):
 [ ] Add route protection via middleware.ts — currently any unauthenticated user can visit /dashboard
@@ -1990,6 +1973,7 @@ Missing Indexes (v11.0) — **ALL FIXED v0.0.4**:
 [x] Backend common: GlobalExceptionFilter, ResponseInterceptor, RequestIdMiddleware, PaginationQueryDto, paginate, sort-parser, AppException hierarchy
 [x] Backend health: HealthController with DB check
 [x] Backend Prisma schema: 32 models, 35 enums, 1183 lines
+[x] Backend Company module: CompanyController (6 endpoints), CompanyService (CNPJ Módulo 11, $transaction, status state machine), DTOs, 42 tests
 [x] Frontend Next.js scaffold: App Router, TypeScript strict
 [x] Frontend layouts: sidebar (high-fidelity), topbar, auth layout, dashboard layout, mobile sidebar
 [x] Frontend providers: QueryClientProvider (TanStack Query), Toaster (sonner)

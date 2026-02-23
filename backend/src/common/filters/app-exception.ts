@@ -62,6 +62,42 @@ const MESSAGES: Record<string, Record<string, string>> = {
     'pt-BR': 'CNPJ já cadastrado',
     en: 'CNPJ already registered',
   },
+  'errors.company.invalidCnpj': {
+    'pt-BR': 'CNPJ inválido — dígitos verificadores incorretos',
+    en: 'Invalid CNPJ — incorrect check digits',
+  },
+  'errors.company.invalidFoundedDate': {
+    'pt-BR': 'Data de fundação inválida',
+    en: 'Invalid founding date',
+  },
+  'errors.company.futureFoundedDate': {
+    'pt-BR': 'Data de fundação não pode ser no futuro',
+    en: 'Founding date cannot be in the future',
+  },
+  'errors.company.membershipLimit': {
+    'pt-BR': 'Limite de empresas atingido (máximo 20)',
+    en: 'Company membership limit reached (maximum 20)',
+  },
+  'errors.company.cannotUpdateDissolved': {
+    'pt-BR': 'Empresa dissolvida não pode ser atualizada',
+    en: 'Dissolved company cannot be updated',
+  },
+  'errors.company.alreadyDissolved': {
+    'pt-BR': 'Empresa já está dissolvida',
+    en: 'Company is already dissolved',
+  },
+  'errors.company.hasActiveShareholders': {
+    'pt-BR': 'Empresa possui acionistas ativos — remova-os antes de dissolver',
+    en: 'Company has active shareholders — remove them before dissolving',
+  },
+  'errors.company.hasActiveRounds': {
+    'pt-BR': 'Empresa possui rodadas de investimento ativas — encerre-as antes de dissolver',
+    en: 'Company has active funding rounds — close them before dissolving',
+  },
+  'errors.company.invalidStatusTransition': {
+    'pt-BR': 'Transição de status inválida',
+    en: 'Invalid status transition',
+  },
   'errors.cap.insufficientShares': {
     'pt-BR': 'Ações insuficientes para completar a operação',
     en: 'Insufficient shares to complete the operation',

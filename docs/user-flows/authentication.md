@@ -3,7 +3,7 @@
 **Feature**: User authentication via Privy SDK with JWT verification and cookie-based sessions
 **Actors**: Unauthenticated user, Authenticated user
 **Preconditions**: Privy app configured (PRIVY_APP_ID, PRIVY_APP_SECRET)
-**Related Flows**: [Company Creation](./company-creation.md) (requires auth), [KYC Verification](./kyc-verification.md) (requires auth)
+**Related Flows**: [Company Management](./company-management.md) (requires auth), [KYC Verification](./kyc-verification.md) (requires auth)
 
 ---
 
