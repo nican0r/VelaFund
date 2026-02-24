@@ -458,6 +458,7 @@ model Shareholder {
   userId            String?           @map("user_id")
   name              String
   email             String?
+  phone             String?
   type              ShareholderType
   status            ShareholderStatus @default(ACTIVE)
   cpfCnpj           String?           @map("cpf_cnpj")
@@ -467,6 +468,9 @@ model Shareholder {
   nationality       String            @default("BR")
   taxResidency      String            @default("BR") @map("tax_residency")
   isForeign         Boolean           @default(false) @map("is_foreign")
+  address           Json?
+  rdeIedNumber      String?           @map("rde_ied_number")
+  rdeIedDate        DateTime?         @map("rde_ied_date")
   createdAt         DateTime          @default(now()) @map("created_at")
   updatedAt         DateTime          @updatedAt @map("updated_at")
 

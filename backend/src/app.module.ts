@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { CompanyModule } from './company/company.module';
 import { MemberModule } from './member/member.module';
 import { ShareClassModule } from './share-class/share-class.module';
+import { ShareholderModule } from './shareholder/shareholder.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { ShareClassModule } from './share-class/share-class.module';
     CompanyModule,
     MemberModule,
     ShareClassModule,
+    ShareholderModule,
   ],
   providers: [
     // BUG-3 fix: Register ThrottlerGuard globally — rate limits apply to all endpoints.

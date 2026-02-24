@@ -26,6 +26,54 @@ const MESSAGES: Record<string, Record<string, string>> = {
     'pt-BR': 'Acionista não encontrado',
     en: 'Shareholder not found',
   },
+  'errors.shareholder.companyNotActive': {
+    'pt-BR': 'A empresa deve estar ativa para gerenciar acionistas',
+    en: 'Company must be active to manage shareholders',
+  },
+  'errors.shareholder.invalidDocument': {
+    'pt-BR': 'CPF/CNPJ inválido — formato não reconhecido',
+    en: 'Invalid CPF/CNPJ — unrecognized format',
+  },
+  'errors.shareholder.corporateNeedsCnpj': {
+    'pt-BR': 'Acionista do tipo CORPORATE deve informar CNPJ',
+    en: 'CORPORATE shareholder must provide a CNPJ',
+  },
+  'errors.shareholder.individualNeedsCpf': {
+    'pt-BR': 'Acionista pessoa física deve informar CPF',
+    en: 'Individual shareholder must provide a CPF',
+  },
+  'errors.shareholder.invalidCpf': {
+    'pt-BR': 'CPF inválido — dígitos verificadores incorretos',
+    en: 'Invalid CPF — incorrect check digits',
+  },
+  'errors.shareholder.invalidCnpj': {
+    'pt-BR': 'CNPJ inválido — dígitos verificadores incorretos',
+    en: 'Invalid CNPJ — incorrect check digits',
+  },
+  'errors.shareholder.cpfCnpjDuplicate': {
+    'pt-BR': 'CPF/CNPJ já cadastrado nesta empresa',
+    en: 'CPF/CNPJ already registered in this company',
+  },
+  'errors.shareholder.invalidRdeDate': {
+    'pt-BR': 'Data do RDE-IED inválida',
+    en: 'Invalid RDE-IED date',
+  },
+  'errors.shareholder.alreadyInactive': {
+    'pt-BR': 'Acionista já está inativo',
+    en: 'Shareholder is already inactive',
+  },
+  'errors.shareholder.notCorporate': {
+    'pt-BR': 'Apenas acionistas do tipo CORPORATE podem ter beneficiários finais',
+    en: 'Only CORPORATE shareholders can have beneficial owners',
+  },
+  'errors.shareholder.uboPercentagesExceed': {
+    'pt-BR': 'A soma das participações dos beneficiários finais não pode exceder 100%',
+    en: 'Beneficial owners ownership percentages cannot exceed 100%',
+  },
+  'errors.shareholder.uboNoQualifiedOwner': {
+    'pt-BR': 'Pelo menos um beneficiário final deve ter participação >= 25%',
+    en: 'At least one beneficial owner must have >= 25% ownership',
+  },
   'errors.shareClass.notFound': {
     'pt-BR': 'Classe de ações não encontrada',
     en: 'Share class not found',

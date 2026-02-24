@@ -2,9 +2,9 @@
 
 **Job to be Done**: Help Brazilian companies manage their cap table with on-chain record-keeping and regulatory compliance.
 
-**Status**: Phase 1 (Foundation and Infrastructure) in progress. Monorepo scaffolded, backend and frontend foundations built. Phase 0 spec issues are applied in implementation code but **all 69 P0 issues remain unfixed in the spec files themselves**.
+**Status**: Phase 2 (Core Cap Table) in progress. Monorepo scaffolded, backend and frontend foundations built. Phase 0 spec issues are applied in implementation code but **all 69 P0 issues remain unfixed in the spec files themselves**.
 
-**Last Updated**: 2026-02-24 (v12.4 - Share Class CRUD backend module: 5 endpoints, entity type compatibility, preferred share 2/3 limit, immutability after issuance. 34 new tests, 210 tests passing total.)
+**Last Updated**: 2026-02-24 (v12.5 - Shareholder Registry backend module: 7 endpoints, CPF/CNPJ Módulo 11 validation, blind index uniqueness, beneficial owners with AML rules, foreign shareholder tracking. 55 new tests, 265 tests passing total.)
 
 ---
 
@@ -28,7 +28,7 @@ A comprehensive spec audit (v8.0) uncovered systemic issues that affect nearly a
 | Aspect | Status | Notes |
 |--------|--------|-------|
 | `/frontend` directory | **SCAFFOLDED** | 14 source files, 0 tests. Layouts built. Privy SDK NOT installed. next-intl NOT installed. shadcn/ui CLI never run (no `components/ui/`, no `components.json`). **No auth protection on any route** — no `middleware.ts`, no protected route wrapper. Login page is static stub. Dashboard is visual prototype with hardcoded data. Missing CSP and HSTS security headers. Missing Brazilian formatting helpers. |
-| `/backend` directory | **SCAFFOLDED** | 62 source files, 210 tests. Auth module complete (14 of 15 bugs fixed — BUG-1 remains, requires Redis). Common infrastructure solid. **Company Management module complete** (CRUD endpoints, CNPJ Módulo 11 validation, company status state machine, 42 tests). **Company Membership module complete** (invite, accept, remove, role change, resend invitation, permission overrides, invitation acceptance, 52 tests). **Share Class module complete** (5 CRUD endpoints, entity type compatibility Ltda→QUOTA / S.A.→COMMON/PREFERRED, preferred share 2/3 limit per Art. 15 §2, immutability after issuance, 34 tests). |
+| `/backend` directory | **SCAFFOLDED** | 72 source files, 265 tests. Auth module complete (14 of 15 bugs fixed — BUG-1 remains, requires Redis). Common infrastructure solid. **Company Management module complete** (CRUD endpoints, CNPJ Módulo 11 validation, company status state machine, 42 tests). **Company Membership module complete** (invite, accept, remove, role change, resend invitation, permission overrides, invitation acceptance, 52 tests). **Share Class module complete** (5 CRUD endpoints, entity type compatibility Ltda→QUOTA / S.A.→COMMON/PREFERRED, preferred share 2/3 limit per Art. 15 §2, immutability after issuance, 34 tests). **Shareholder module complete** (7 endpoints, CPF/CNPJ Módulo 11 validation, blind index uniqueness, beneficial owners with AML rules, foreign shareholder tracking, 55 tests). |
 | `/contracts` directory | EXISTS (empty) | No Solidity files |
 | `package.json` | **CREATED** | pnpm workspaces + Turborepo configured |
 | Prisma schema | **NEAR-COMPLETE** | 32 models, 35 enums. All relations, unique constraints, and indexes complete. Missing entities: DataroomFolder, DataroomDocument, ExitScenario, WaterfallResult, ExportJob, LitigationVerification (inlined into CompanyProfile). Migration pending. |
@@ -39,8 +39,8 @@ A comprehensive spec audit (v8.0) uncovered systemic issues that affect nearly a
 | `.env.example` files | **MISSING** | Neither backend nor frontend has one |
 | README.md | **STALE** | Contains only "# VelaFund" |
 | ARCHITECTURE.md | **STALE** | "VelaFund" branding, references removed entities (AdminWallet, CapTableEntry) |
-| User flow docs | **4 of ~15** | `docs/user-flows/authentication.md`, `docs/user-flows/company-management.md`, `docs/user-flows/member-invitation.md`, `docs/user-flows/share-class-management.md` |
-| Git tag | `v0.0.7` | Share Class CRUD backend module |
+| User flow docs | **5 of ~15** | `docs/user-flows/authentication.md`, `docs/user-flows/company-management.md`, `docs/user-flows/member-invitation.md`, `docs/user-flows/share-class-management.md`, `docs/user-flows/shareholder-management.md` |
+| Git tag | `v0.0.8` | Shareholder Registry backend module |
 
 ### Critical Bugs Found (v10.0 + v11.0 Audit)
 
@@ -1283,14 +1283,31 @@ FINAL REVIEW:
 
 ### 2.3 Shareholder Registry
 
-- [ ] Shareholder backend (per shareholder-registry.md)
-  - Shareholder entity + Prisma model
-  - BeneficialOwner entity (UBO tracking)
-  - Shareholder CRUD API endpoints
-  - CPF/CNPJ validation on creation (encrypted storage, blind index)
-  - Foreign shareholder support (RDE-IED fields)
-  - Shareholder invite service
-  - KYC status integration
+- [x] Shareholder backend (per shareholder-registry.md) — **v0.0.8**
+  - ShareholderController: 7 endpoints
+    - `POST /api/v1/companies/:companyId/shareholders` — create shareholder (@Roles ADMIN)
+    - `GET /api/v1/companies/:companyId/shareholders` — list with pagination, filtering (status/type/isForeign/search), sorting (@Roles ADMIN/FINANCE/LEGAL)
+    - `GET /api/v1/companies/:companyId/shareholders/foreign` — foreign shareholders with ownership summary (@Roles ADMIN/LEGAL)
+    - `GET /api/v1/companies/:companyId/shareholders/:shareholderId` — detail with shareholdings and beneficial owners (@Roles ADMIN/FINANCE/LEGAL)
+    - `PUT /api/v1/companies/:companyId/shareholders/:shareholderId` — update mutable fields only (@Roles ADMIN)
+    - `DELETE /api/v1/companies/:companyId/shareholders/:shareholderId` — smart delete: hard delete if no holdings, soft delete (INACTIVE) otherwise (@Roles ADMIN)
+    - `POST /api/v1/companies/:companyId/shareholders/:shareholderId/beneficial-owners` — set UBO list for CORPORATE shareholders (@Roles ADMIN)
+  - ShareholderService: full business logic
+    - CPF Módulo 11 checksum validation (Brazilian individual tax ID)
+    - CNPJ Módulo 11 checksum validation (Brazilian corporate tax ID)
+    - Type compatibility: CORPORATE → CNPJ required, others → CPF required
+    - SHA-256 blind index for CPF/CNPJ uniqueness per company (@@unique([companyId, cpfCnpjBlindIndex]))
+    - Auto-computed `isForeign` from taxResidency (non-BR = foreign)
+    - Beneficial owner AML rules: sum of percentages ≤ 100%, at least one ≥ 25%
+    - Atomic beneficial owner replacement via $transaction
+    - Smart delete: checks Shareholding and Transaction references before hard delete
+    - Immutable fields: name, cpfCnpj, type, walletAddress
+    - RDE-IED date validation for foreign shareholders
+  - 4 DTOs: CreateShareholderDto (with AddressDto nested, ShareholderTypeDto enum), UpdateShareholderDto (mutable fields only), ListShareholdersQueryDto (extends PaginationQueryDto), SetBeneficialOwnersDto
+  - 12 new i18n error messages (PT-BR + EN) in app-exception.ts MESSAGES map
+  - 55 tests (35 service + 20 controller) — all passing
+  - Prisma schema updated: added phone, address (Json), rdeIedNumber, rdeIedDate fields to Shareholder model
+  - **NOT YET**: Shareholder invite service (email notification), KYC status integration, application-level CPF/CNPJ encryption (using simple SHA-256 blind index; will upgrade to HMAC-SHA256 via AWS KMS when infrastructure is ready)
 
 - [ ] Shareholder frontend
   - Shareholder list with filters and search
