@@ -21,9 +21,14 @@ import { CreateOptionPlanDto } from './dto/create-option-plan.dto';
 import { UpdateOptionPlanDto } from './dto/update-option-plan.dto';
 import { CreateOptionGrantDto } from './dto/create-option-grant.dto';
 import {
+  CreateExerciseRequestDto,
+  ConfirmExercisePaymentDto,
+} from './dto/create-exercise-request.dto';
+import {
   ListOptionPlansQueryDto,
   ListOptionGrantsQueryDto,
 } from './dto/list-option-plans-query.dto';
+import { ListExerciseRequestsQueryDto } from './dto/list-exercise-requests-query.dto';
 import { paginate } from '../common/helpers/paginate';
 import { Roles } from '../auth/decorators/roles.decorator';
 import {
@@ -206,5 +211,94 @@ export class OptionPlanController {
     @Param('grantId') grantId: string,
   ) {
     return this.optionPlanService.cancelGrant(companyId, grantId);
+  }
+
+  // ========================
+  // Option Exercise Endpoints
+  // ========================
+
+  @Post('option-grants/:grantId/exercise')
+  @HttpCode(HttpStatus.CREATED)
+  @Roles('ADMIN')
+  @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @ApiOperation({ summary: 'Create an exercise request for a grant' })
+  @ApiParam({ name: 'companyId', description: 'Company UUID' })
+  @ApiParam({ name: 'grantId', description: 'Option grant UUID' })
+  @ApiResponse({ status: 201, description: 'Exercise request created' })
+  @ApiResponse({ status: 404, description: 'Grant not found' })
+  @ApiResponse({ status: 422, description: 'Insufficient vested options or pending request' })
+  async createExercise(
+    @Param('companyId') companyId: string,
+    @Param('grantId') grantId: string,
+    @Body() dto: CreateExerciseRequestDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.optionPlanService.createExerciseRequest(companyId, grantId, dto, user.id);
+  }
+
+  @Get('option-exercises')
+  @Roles('ADMIN', 'FINANCE', 'LEGAL')
+  @Throttle({ read: { ttl: 60000, limit: 100 } })
+  @ApiOperation({ summary: 'List all exercise requests for the company' })
+  @ApiParam({ name: 'companyId', description: 'Company UUID' })
+  @ApiResponse({ status: 200, description: 'Paginated list of exercise requests' })
+  async listExercises(
+    @Param('companyId') companyId: string,
+    @Query() query: ListExerciseRequestsQueryDto,
+  ) {
+    const { items, total } = await this.optionPlanService.findAllExercises(
+      companyId,
+      query,
+    );
+    return paginate(items, total, query.page, query.limit);
+  }
+
+  @Get('option-exercises/:exerciseId')
+  @Roles('ADMIN', 'FINANCE', 'LEGAL')
+  @Throttle({ read: { ttl: 60000, limit: 100 } })
+  @ApiOperation({ summary: 'Get exercise request detail' })
+  @ApiParam({ name: 'companyId', description: 'Company UUID' })
+  @ApiParam({ name: 'exerciseId', description: 'Exercise request UUID' })
+  @ApiResponse({ status: 200, description: 'Exercise request detail' })
+  @ApiResponse({ status: 404, description: 'Exercise request not found' })
+  async getExercise(
+    @Param('companyId') companyId: string,
+    @Param('exerciseId') exerciseId: string,
+  ) {
+    return this.optionPlanService.findExerciseById(companyId, exerciseId);
+  }
+
+  @Post('option-exercises/:exerciseId/confirm')
+  @Roles('ADMIN')
+  @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @ApiOperation({ summary: 'Confirm payment and issue shares for exercise' })
+  @ApiParam({ name: 'companyId', description: 'Company UUID' })
+  @ApiParam({ name: 'exerciseId', description: 'Exercise request UUID' })
+  @ApiResponse({ status: 200, description: 'Payment confirmed, shares issued' })
+  @ApiResponse({ status: 404, description: 'Exercise request not found' })
+  @ApiResponse({ status: 422, description: 'Already confirmed or not pending' })
+  async confirmExercise(
+    @Param('companyId') companyId: string,
+    @Param('exerciseId') exerciseId: string,
+    @Body() dto: ConfirmExercisePaymentDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.optionPlanService.confirmExercisePayment(companyId, exerciseId, dto, user.id);
+  }
+
+  @Post('option-exercises/:exerciseId/cancel')
+  @Roles('ADMIN')
+  @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @ApiOperation({ summary: 'Cancel a pending exercise request' })
+  @ApiParam({ name: 'companyId', description: 'Company UUID' })
+  @ApiParam({ name: 'exerciseId', description: 'Exercise request UUID' })
+  @ApiResponse({ status: 200, description: 'Exercise request cancelled' })
+  @ApiResponse({ status: 404, description: 'Exercise request not found' })
+  @ApiResponse({ status: 422, description: 'Already cancelled or not pending' })
+  async cancelExercise(
+    @Param('companyId') companyId: string,
+    @Param('exerciseId') exerciseId: string,
+  ) {
+    return this.optionPlanService.cancelExercise(companyId, exerciseId);
   }
 }

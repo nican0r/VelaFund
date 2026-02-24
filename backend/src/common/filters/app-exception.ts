@@ -432,6 +432,42 @@ const MESSAGES: Record<string, Record<string, string>> = {
     'pt-BR': 'Outorga de opções não encontrada',
     en: 'Option grant not found',
   },
+  'errors.optionExercise.notFound': {
+    'pt-BR': 'Solicitação de exercício não encontrada',
+    en: 'Exercise request not found',
+  },
+  'errors.opt.exercisePending': {
+    'pt-BR': 'Já existe uma solicitação de exercício pendente para esta outorga',
+    en: 'An exercise request is already pending for this grant',
+  },
+  'errors.opt.insufficientVested': {
+    'pt-BR': 'Opções vestidas insuficientes para o exercício solicitado',
+    en: 'Insufficient vested options for the requested exercise',
+  },
+  'errors.opt.exerciseWindowClosed': {
+    'pt-BR': 'O prazo para exercício pós-término expirou',
+    en: 'Post-termination exercise window has expired',
+  },
+  'errors.opt.grantNotActive': {
+    'pt-BR': 'A outorga de opções não está ativa',
+    en: 'Option grant is not active',
+  },
+  'errors.opt.exerciseNotPending': {
+    'pt-BR': 'A solicitação de exercício não está pendente de pagamento',
+    en: 'Exercise request is not pending payment',
+  },
+  'errors.opt.exerciseAlreadyCancelled': {
+    'pt-BR': 'A solicitação de exercício já foi cancelada',
+    en: 'Exercise request has already been cancelled',
+  },
+  'errors.opt.exerciseAlreadyConfirmed': {
+    'pt-BR': 'A solicitação de exercício já foi confirmada',
+    en: 'Exercise request has already been confirmed',
+  },
+  'errors.opt.noShareholderLinked': {
+    'pt-BR': 'A outorga precisa estar vinculada a um acionista para emitir ações',
+    en: 'Grant must be linked to a shareholder to issue shares',
+  },
 };
 
 export class AppException extends Error {

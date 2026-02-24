@@ -72,6 +72,29 @@ const mockGrant = {
   },
 };
 
+const mockExercise = {
+  id: 'exercise-1',
+  grantId: 'grant-1',
+  quantity: '2000',
+  totalCost: '10000',
+  paymentReference: 'EX-2026-A1B2C3',
+  status: 'PENDING_PAYMENT' as const,
+  confirmedBy: null,
+  confirmedAt: null,
+  cancelledAt: null,
+  blockchainTxHash: null,
+  createdBy: 'user-1',
+  createdAt: '2026-02-01T00:00:00.000Z',
+  updatedAt: '2026-02-01T00:00:00.000Z',
+  grant: {
+    id: 'grant-1',
+    employeeName: 'Maria Silva',
+    employeeEmail: 'maria@company.com',
+    strikePrice: '5.00',
+    plan: { id: 'plan-1', name: '2026 Employee Option Plan' },
+  },
+};
+
 const mockService = {
   createPlan: jest.fn(),
   findAllPlans: jest.fn(),
@@ -83,6 +106,11 @@ const mockService = {
   findGrantById: jest.fn(),
   getGrantVestingSchedule: jest.fn(),
   cancelGrant: jest.fn(),
+  createExerciseRequest: jest.fn(),
+  findAllExercises: jest.fn(),
+  findExerciseById: jest.fn(),
+  confirmExercisePayment: jest.fn(),
+  cancelExercise: jest.fn(),
 };
 
 describe('OptionPlanController', () => {
@@ -364,6 +392,191 @@ describe('OptionPlanController', () => {
 
       await expect(
         controller.cancelGrant('comp-1', 'grant-1'),
+      ).rejects.toThrow(BusinessRuleException);
+    });
+  });
+
+  // ========================
+  // Option Exercise Endpoints
+  // ========================
+
+  describe('createExercise', () => {
+    it('should create and return an exercise request', async () => {
+      mockService.createExerciseRequest.mockResolvedValue(mockExercise);
+
+      const result = await controller.createExercise(
+        'comp-1',
+        'grant-1',
+        { quantity: '2000' },
+        mockUser,
+      );
+
+      expect(result).toEqual(mockExercise);
+      expect(mockService.createExerciseRequest).toHaveBeenCalledWith(
+        'comp-1',
+        'grant-1',
+        { quantity: '2000' },
+        'user-1',
+      );
+    });
+
+    it('should propagate NotFoundException for missing grant', async () => {
+      mockService.createExerciseRequest.mockRejectedValue(
+        new NotFoundException('optionGrant', 'grant-1'),
+      );
+
+      await expect(
+        controller.createExercise('comp-1', 'grant-1', { quantity: '2000' }, mockUser),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should propagate BusinessRuleException for insufficient vested', async () => {
+      mockService.createExerciseRequest.mockRejectedValue(
+        new BusinessRuleException('OPT_INSUFFICIENT_VESTED', 'errors.opt.insufficientVested', {
+          exercisableOptions: '500',
+          requestedQuantity: '2000',
+        }),
+      );
+
+      await expect(
+        controller.createExercise('comp-1', 'grant-1', { quantity: '2000' }, mockUser),
+      ).rejects.toThrow(BusinessRuleException);
+    });
+  });
+
+  describe('listExercises', () => {
+    it('should return paginated exercise requests', async () => {
+      mockService.findAllExercises.mockResolvedValue({
+        items: [mockExercise],
+        total: 1,
+      });
+
+      const result = await controller.listExercises('comp-1', { page: 1, limit: 20 });
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          success: true,
+          data: [mockExercise],
+          meta: expect.objectContaining({ total: 1, page: 1 }),
+        }),
+      );
+    });
+
+    it('should pass filters to service', async () => {
+      mockService.findAllExercises.mockResolvedValue({
+        items: [],
+        total: 0,
+      });
+
+      await controller.listExercises('comp-1', {
+        page: 1,
+        limit: 20,
+        status: 'COMPLETED',
+        grantId: 'grant-1',
+      });
+
+      expect(mockService.findAllExercises).toHaveBeenCalledWith(
+        'comp-1',
+        expect.objectContaining({ status: 'COMPLETED', grantId: 'grant-1' }),
+      );
+    });
+  });
+
+  describe('getExercise', () => {
+    it('should return exercise detail', async () => {
+      mockService.findExerciseById.mockResolvedValue(mockExercise);
+
+      const result = await controller.getExercise('comp-1', 'exercise-1');
+
+      expect(result.id).toBe('exercise-1');
+      expect(result.grant.employeeName).toBe('Maria Silva');
+    });
+
+    it('should propagate NotFoundException', async () => {
+      mockService.findExerciseById.mockRejectedValue(
+        new NotFoundException('optionExercise', 'exercise-1'),
+      );
+
+      await expect(
+        controller.getExercise('comp-1', 'exercise-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('confirmExercise', () => {
+    it('should confirm payment and return updated exercise', async () => {
+      mockService.confirmExercisePayment.mockResolvedValue({
+        ...mockExercise,
+        status: 'COMPLETED',
+        confirmedBy: 'user-1',
+      });
+
+      const result = await controller.confirmExercise(
+        'comp-1',
+        'exercise-1',
+        {},
+        mockUser,
+      );
+
+      expect(result.status).toBe('COMPLETED');
+      expect(mockService.confirmExercisePayment).toHaveBeenCalledWith(
+        'comp-1',
+        'exercise-1',
+        {},
+        'user-1',
+      );
+    });
+
+    it('should propagate BusinessRuleException for already confirmed', async () => {
+      mockService.confirmExercisePayment.mockRejectedValue(
+        new BusinessRuleException('OPT_EXERCISE_ALREADY_CONFIRMED', 'errors.opt.exerciseAlreadyConfirmed'),
+      );
+
+      await expect(
+        controller.confirmExercise('comp-1', 'exercise-1', {}, mockUser),
+      ).rejects.toThrow(BusinessRuleException);
+    });
+
+    it('should propagate BusinessRuleException for no shareholder linked', async () => {
+      mockService.confirmExercisePayment.mockRejectedValue(
+        new BusinessRuleException('OPT_NO_SHAREHOLDER_LINKED', 'errors.opt.noShareholderLinked'),
+      );
+
+      await expect(
+        controller.confirmExercise('comp-1', 'exercise-1', {}, mockUser),
+      ).rejects.toThrow(BusinessRuleException);
+    });
+  });
+
+  describe('cancelExercise', () => {
+    it('should cancel and return exercise', async () => {
+      mockService.cancelExercise.mockResolvedValue({
+        ...mockExercise,
+        status: 'CANCELLED',
+      });
+
+      const result = await controller.cancelExercise('comp-1', 'exercise-1');
+
+      expect(result.status).toBe('CANCELLED');
+    });
+
+    it('should propagate BusinessRuleException for already cancelled', async () => {
+      mockService.cancelExercise.mockRejectedValue(
+        new BusinessRuleException('OPT_EXERCISE_ALREADY_CANCELLED', 'errors.opt.exerciseAlreadyCancelled'),
+      );
+
+      await expect(
+        controller.cancelExercise('comp-1', 'exercise-1'),
+      ).rejects.toThrow(BusinessRuleException);
+    });
+
+    it('should propagate BusinessRuleException for non-pending status', async () => {
+      mockService.cancelExercise.mockRejectedValue(
+        new BusinessRuleException('OPT_EXERCISE_NOT_PENDING', 'errors.opt.exerciseNotPending'),
+      );
+
+      await expect(
+        controller.cancelExercise('comp-1', 'exercise-1'),
       ).rejects.toThrow(BusinessRuleException);
     });
   });

@@ -73,6 +73,25 @@ function mockGrant(overrides: Record<string, unknown> = {}) {
   } as any;
 }
 
+function mockExercise(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'exercise-1',
+    grantId: 'grant-1',
+    quantity: new Prisma.Decimal('2000'),
+    totalCost: new Prisma.Decimal('10000'),
+    paymentReference: 'EX-2026-A1B2C3',
+    status: 'PENDING_PAYMENT',
+    confirmedBy: null,
+    confirmedAt: null,
+    cancelledAt: null,
+    blockchainTxHash: null,
+    createdBy: 'user-1',
+    createdAt: new Date('2026-02-01'),
+    updatedAt: new Date('2026-02-01'),
+    ...overrides,
+  } as any;
+}
+
 // ── Test Setup ──
 
 describe('OptionPlanService', () => {
@@ -82,7 +101,7 @@ describe('OptionPlanService', () => {
   beforeEach(async () => {
     prisma = {
       company: { findFirst: jest.fn() },
-      shareClass: { findFirst: jest.fn() },
+      shareClass: { findFirst: jest.fn(), update: jest.fn() },
       optionPlan: {
         create: jest.fn(),
         findMany: jest.fn(),
@@ -97,6 +116,18 @@ describe('OptionPlanService', () => {
         count: jest.fn(),
         update: jest.fn(),
         aggregate: jest.fn(),
+      },
+      optionExerciseRequest: {
+        create: jest.fn(),
+        findMany: jest.fn(),
+        findFirst: jest.fn(),
+        count: jest.fn(),
+        update: jest.fn(),
+      },
+      shareholding: {
+        findFirst: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
       },
       shareholder: { findFirst: jest.fn() },
       $transaction: jest.fn((fn: any) => fn(prisma)),
@@ -781,6 +812,442 @@ describe('OptionPlanService', () => {
       expect(schedule).toHaveLength(48);
       expect(schedule[0].type).toBe('MONTHLY');
       expect(schedule[schedule.length - 1].cumulative).toBe('48000');
+    });
+  });
+
+  // ========================
+  // Option Exercise Requests
+  // ========================
+
+  describe('createExerciseRequest', () => {
+    const dto = { quantity: '2000' };
+
+    function fullyVestedGrant(overrides: Record<string, unknown> = {}) {
+      return mockGrant({
+        grantDate: new Date('2020-01-15'), // fully vested (>48 months ago)
+        plan: {
+          id: 'plan-1',
+          exerciseWindowDays: 90,
+          terminationPolicy: 'FORFEITURE',
+          shareClassId: 'sc-1',
+        },
+        ...overrides,
+      });
+    }
+
+    it('should create an exercise request', async () => {
+      prisma.optionGrant.findFirst.mockResolvedValue(fullyVestedGrant());
+      prisma.optionExerciseRequest.findFirst.mockResolvedValue(null);
+      prisma.optionExerciseRequest.create.mockResolvedValue(mockExercise());
+
+      const result = await service.createExerciseRequest('company-1', 'grant-1', dto, 'user-1');
+
+      expect(result.id).toBe('exercise-1');
+      expect(prisma.optionExerciseRequest.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            grantId: 'grant-1',
+            quantity: new Prisma.Decimal('2000'),
+          }),
+        }),
+      );
+    });
+
+    it('should generate a payment reference with EX- prefix', async () => {
+      prisma.optionGrant.findFirst.mockResolvedValue(fullyVestedGrant());
+      prisma.optionExerciseRequest.findFirst.mockResolvedValue(null);
+      prisma.optionExerciseRequest.create.mockResolvedValue(mockExercise());
+
+      await service.createExerciseRequest('company-1', 'grant-1', dto, 'user-1');
+
+      const createCall = prisma.optionExerciseRequest.create.mock.calls[0][0];
+      expect(createCall.data.paymentReference).toMatch(/^EX-\d{4}-[A-F0-9]{6}$/);
+    });
+
+    it('should calculate totalCost as quantity × strikePrice', async () => {
+      prisma.optionGrant.findFirst.mockResolvedValue(fullyVestedGrant());
+      prisma.optionExerciseRequest.findFirst.mockResolvedValue(null);
+      prisma.optionExerciseRequest.create.mockResolvedValue(mockExercise());
+
+      await service.createExerciseRequest('company-1', 'grant-1', dto, 'user-1');
+
+      const createCall = prisma.optionExerciseRequest.create.mock.calls[0][0];
+      // 2000 * 5.00 = 10000
+      expect(createCall.data.totalCost.toString()).toBe('10000');
+    });
+
+    it('should throw NotFoundException if grant not found', async () => {
+      prisma.optionGrant.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.createExerciseRequest('company-1', 'grant-1', dto, 'user-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BusinessRuleException if grant not active', async () => {
+      prisma.optionGrant.findFirst.mockResolvedValue(
+        fullyVestedGrant({ status: 'CANCELLED' }),
+      );
+
+      await expect(
+        service.createExerciseRequest('company-1', 'grant-1', dto, 'user-1'),
+      ).rejects.toThrow(BusinessRuleException);
+    });
+
+    it('should throw BusinessRuleException if exercise window expired', async () => {
+      const terminatedLongAgo = new Date('2020-01-01');
+      prisma.optionGrant.findFirst.mockResolvedValue(
+        fullyVestedGrant({
+          terminatedAt: terminatedLongAgo,
+          plan: {
+            id: 'plan-1',
+            exerciseWindowDays: 90,
+            terminationPolicy: 'FORFEITURE',
+            shareClassId: 'sc-1',
+          },
+        }),
+      );
+
+      await expect(
+        service.createExerciseRequest('company-1', 'grant-1', dto, 'user-1'),
+      ).rejects.toThrow(BusinessRuleException);
+    });
+
+    it('should throw BusinessRuleException if quantity is zero', async () => {
+      prisma.optionGrant.findFirst.mockResolvedValue(fullyVestedGrant());
+
+      await expect(
+        service.createExerciseRequest('company-1', 'grant-1', { quantity: '0' }, 'user-1'),
+      ).rejects.toThrow(BusinessRuleException);
+    });
+
+    it('should throw BusinessRuleException if quantity exceeds exercisable', async () => {
+      prisma.optionGrant.findFirst.mockResolvedValue(
+        fullyVestedGrant({ exercised: new Prisma.Decimal('9500') }),
+      );
+
+      await expect(
+        service.createExerciseRequest('company-1', 'grant-1', { quantity: '1000' }, 'user-1'),
+      ).rejects.toThrow(BusinessRuleException);
+    });
+
+    it('should throw BusinessRuleException if pending exercise exists', async () => {
+      prisma.optionGrant.findFirst.mockResolvedValue(fullyVestedGrant());
+      prisma.optionExerciseRequest.findFirst.mockResolvedValue({ id: 'existing-exercise' });
+
+      await expect(
+        service.createExerciseRequest('company-1', 'grant-1', dto, 'user-1'),
+      ).rejects.toThrow(BusinessRuleException);
+    });
+  });
+
+  describe('findAllExercises', () => {
+    it('should return paginated exercises', async () => {
+      prisma.optionExerciseRequest.findMany.mockResolvedValue([mockExercise()]);
+      prisma.optionExerciseRequest.count.mockResolvedValue(1);
+
+      const result = await service.findAllExercises('company-1', { page: 1, limit: 20 });
+
+      expect(result.items).toHaveLength(1);
+      expect(result.total).toBe(1);
+      expect(prisma.optionExerciseRequest.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            grant: { companyId: 'company-1' },
+          }),
+        }),
+      );
+    });
+
+    it('should filter by status', async () => {
+      prisma.optionExerciseRequest.findMany.mockResolvedValue([]);
+      prisma.optionExerciseRequest.count.mockResolvedValue(0);
+
+      await service.findAllExercises('company-1', {
+        page: 1,
+        limit: 20,
+        status: 'COMPLETED',
+      });
+
+      expect(prisma.optionExerciseRequest.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            status: 'COMPLETED',
+          }),
+        }),
+      );
+    });
+
+    it('should filter by grantId', async () => {
+      prisma.optionExerciseRequest.findMany.mockResolvedValue([]);
+      prisma.optionExerciseRequest.count.mockResolvedValue(0);
+
+      await service.findAllExercises('company-1', {
+        page: 1,
+        limit: 20,
+        grantId: 'grant-1',
+      });
+
+      expect(prisma.optionExerciseRequest.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            grantId: 'grant-1',
+          }),
+        }),
+      );
+    });
+  });
+
+  describe('findExerciseById', () => {
+    it('should return exercise with grant details', async () => {
+      prisma.optionExerciseRequest.findFirst.mockResolvedValue(
+        mockExercise({
+          grant: {
+            id: 'grant-1',
+            employeeName: 'Maria Silva',
+            employeeEmail: 'maria@company.com',
+            strikePrice: new Prisma.Decimal('5.00'),
+            quantity: new Prisma.Decimal('10000'),
+            exercised: new Prisma.Decimal('0'),
+            status: 'ACTIVE',
+            plan: { id: 'plan-1', name: 'Plan 1', shareClassId: 'sc-1' },
+            shareholder: { id: 'sh-1', name: 'Maria Silva' },
+          },
+        }),
+      );
+
+      const result = await service.findExerciseById('company-1', 'exercise-1');
+
+      expect(result.id).toBe('exercise-1');
+      expect(result.grant.employeeName).toBe('Maria Silva');
+    });
+
+    it('should throw NotFoundException if exercise not found', async () => {
+      prisma.optionExerciseRequest.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.findExerciseById('company-1', 'exercise-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('confirmExercisePayment', () => {
+    function pendingExercise(overrides: Record<string, unknown> = {}) {
+      return mockExercise({
+        grant: {
+          id: 'grant-1',
+          planId: 'plan-1',
+          shareholderId: 'sh-1',
+          quantity: new Prisma.Decimal('10000'),
+          exercised: new Prisma.Decimal('0'),
+          plan: { shareClassId: 'sc-1' },
+        },
+        ...overrides,
+      });
+    }
+
+    it('should confirm payment and update all related records', async () => {
+      prisma.optionExerciseRequest.findFirst.mockResolvedValue(pendingExercise());
+      prisma.optionExerciseRequest.update.mockResolvedValue(
+        mockExercise({ status: 'COMPLETED', confirmedBy: 'user-1' }),
+      );
+      prisma.optionGrant.update.mockResolvedValue(mockGrant());
+      prisma.optionPlan.update.mockResolvedValue(mockPlan());
+      prisma.shareholding.findFirst.mockResolvedValue(null);
+      prisma.shareholding.create.mockResolvedValue({ id: 'holding-1' });
+      prisma.shareClass.update.mockResolvedValue(mockShareClass());
+
+      const result = await service.confirmExercisePayment(
+        'company-1',
+        'exercise-1',
+        {},
+        'user-1',
+      );
+
+      expect(result.status).toBe('COMPLETED');
+      // Exercise request updated
+      expect(prisma.optionExerciseRequest.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'COMPLETED', confirmedBy: 'user-1' }),
+        }),
+      );
+      // Grant exercised incremented
+      expect(prisma.optionGrant.update).toHaveBeenCalled();
+      // Plan totalExercised incremented
+      expect(prisma.optionPlan.update).toHaveBeenCalled();
+      // Shareholding created (new)
+      expect(prisma.shareholding.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            shareholderId: 'sh-1',
+            shareClassId: 'sc-1',
+            quantity: new Prisma.Decimal('2000'),
+          }),
+        }),
+      );
+      // ShareClass totalIssued incremented
+      expect(prisma.shareClass.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            totalIssued: { increment: new Prisma.Decimal('2000') },
+          }),
+        }),
+      );
+    });
+
+    it('should update existing shareholding instead of creating', async () => {
+      prisma.optionExerciseRequest.findFirst.mockResolvedValue(pendingExercise());
+      prisma.optionExerciseRequest.update.mockResolvedValue(
+        mockExercise({ status: 'COMPLETED' }),
+      );
+      prisma.optionGrant.update.mockResolvedValue(mockGrant());
+      prisma.optionPlan.update.mockResolvedValue(mockPlan());
+      prisma.shareholding.findFirst.mockResolvedValue({
+        id: 'holding-1',
+        quantity: new Prisma.Decimal('5000'),
+      });
+      prisma.shareholding.update.mockResolvedValue({ id: 'holding-1' });
+      prisma.shareClass.update.mockResolvedValue(mockShareClass());
+
+      await service.confirmExercisePayment('company-1', 'exercise-1', {}, 'user-1');
+
+      expect(prisma.shareholding.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'holding-1' },
+          data: expect.objectContaining({
+            quantity: new Prisma.Decimal('7000'), // 5000 + 2000
+          }),
+        }),
+      );
+      expect(prisma.shareholding.create).not.toHaveBeenCalled();
+    });
+
+    it('should mark grant as EXERCISED when fully exercised', async () => {
+      prisma.optionExerciseRequest.findFirst.mockResolvedValue(
+        pendingExercise({
+          quantity: new Prisma.Decimal('10000'),
+          totalCost: new Prisma.Decimal('50000'),
+          grant: {
+            id: 'grant-1',
+            planId: 'plan-1',
+            shareholderId: 'sh-1',
+            quantity: new Prisma.Decimal('10000'),
+            exercised: new Prisma.Decimal('0'),
+            plan: { shareClassId: 'sc-1' },
+          },
+        }),
+      );
+      prisma.optionExerciseRequest.update.mockResolvedValue(
+        mockExercise({ status: 'COMPLETED' }),
+      );
+      prisma.optionGrant.update.mockResolvedValue(mockGrant({ status: 'EXERCISED' }));
+      prisma.optionPlan.update.mockResolvedValue(mockPlan());
+      prisma.shareholding.findFirst.mockResolvedValue(null);
+      prisma.shareholding.create.mockResolvedValue({ id: 'holding-1' });
+      prisma.shareClass.update.mockResolvedValue(mockShareClass());
+
+      await service.confirmExercisePayment('company-1', 'exercise-1', {}, 'user-1');
+
+      expect(prisma.optionGrant.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: 'EXERCISED',
+          }),
+        }),
+      );
+    });
+
+    it('should throw NotFoundException if exercise not found', async () => {
+      prisma.optionExerciseRequest.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.confirmExercisePayment('company-1', 'exercise-1', {}, 'user-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BusinessRuleException if already confirmed', async () => {
+      prisma.optionExerciseRequest.findFirst.mockResolvedValue(
+        pendingExercise({ status: 'COMPLETED' }),
+      );
+
+      await expect(
+        service.confirmExercisePayment('company-1', 'exercise-1', {}, 'user-1'),
+      ).rejects.toThrow(BusinessRuleException);
+    });
+
+    it('should throw BusinessRuleException if already cancelled', async () => {
+      prisma.optionExerciseRequest.findFirst.mockResolvedValue(
+        pendingExercise({ status: 'CANCELLED' }),
+      );
+
+      await expect(
+        service.confirmExercisePayment('company-1', 'exercise-1', {}, 'user-1'),
+      ).rejects.toThrow(BusinessRuleException);
+    });
+
+    it('should throw BusinessRuleException if no shareholder linked', async () => {
+      prisma.optionExerciseRequest.findFirst.mockResolvedValue(
+        pendingExercise({
+          grant: {
+            id: 'grant-1',
+            planId: 'plan-1',
+            shareholderId: null,
+            quantity: new Prisma.Decimal('10000'),
+            exercised: new Prisma.Decimal('0'),
+            plan: { shareClassId: 'sc-1' },
+          },
+        }),
+      );
+
+      await expect(
+        service.confirmExercisePayment('company-1', 'exercise-1', {}, 'user-1'),
+      ).rejects.toThrow(BusinessRuleException);
+    });
+  });
+
+  describe('cancelExercise', () => {
+    it('should cancel a pending exercise request', async () => {
+      prisma.optionExerciseRequest.findFirst.mockResolvedValue(mockExercise());
+      prisma.optionExerciseRequest.update.mockResolvedValue(
+        mockExercise({ status: 'CANCELLED' }),
+      );
+
+      const result = await service.cancelExercise('company-1', 'exercise-1');
+
+      expect(result.status).toBe('CANCELLED');
+      expect(prisma.optionExerciseRequest.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'CANCELLED' }),
+        }),
+      );
+    });
+
+    it('should throw NotFoundException if exercise not found', async () => {
+      prisma.optionExerciseRequest.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.cancelExercise('company-1', 'exercise-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BusinessRuleException if already cancelled', async () => {
+      prisma.optionExerciseRequest.findFirst.mockResolvedValue(
+        mockExercise({ status: 'CANCELLED' }),
+      );
+
+      await expect(
+        service.cancelExercise('company-1', 'exercise-1'),
+      ).rejects.toThrow(BusinessRuleException);
+    });
+
+    it('should throw BusinessRuleException if not pending', async () => {
+      prisma.optionExerciseRequest.findFirst.mockResolvedValue(
+        mockExercise({ status: 'COMPLETED' }),
+      );
+
+      await expect(
+        service.cancelExercise('company-1', 'exercise-1'),
+      ).rejects.toThrow(BusinessRuleException);
     });
   });
 });

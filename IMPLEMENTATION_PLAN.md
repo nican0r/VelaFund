@@ -4,7 +4,7 @@
 
 **Status**: Phase 6 (Employee Equity) in progress. Monorepo scaffolded, backend and frontend foundations built. Phase 0 spec issues are applied in implementation code but **all 69 P0 issues remain unfixed in the spec files themselves**.
 
-**Last Updated**: 2026-02-24 (v16.0 - Option Plan backend module: 10 endpoints (plan CRUD + close + grant CRUD + vesting schedule + cancel grant), vesting calculation engine (cliff + post-cliff linear vesting with MONTHLY/QUARTERLY/ANNUALLY frequencies), pool size enforcement, grant lifecycle management (ACTIVE→EXERCISED/CANCELLED/EXPIRED), full vesting schedule generation, cliff percentage auto-calculation. 15 new i18n error messages (PT-BR + EN). 65 new tests, 518 tests passing total.)
+**Last Updated**: 2026-02-24 (v17.0 - Option Exercise backend module: 5 new endpoints (create exercise, list exercises, get exercise, confirm payment, cancel exercise), exercise request lifecycle (PENDING_PAYMENT→COMPLETED/CANCELLED), atomic payment confirmation with $transaction (updates exercise status, grant.exercised, plan.totalExercised, upserts Shareholding, increments ShareClass.totalIssued), vesting validation, exercise window enforcement for terminated grants, single pending exercise per grant, payment reference generation. 9 new i18n error messages (PT-BR + EN). 38 new tests, 556 tests passing total.)
 
 ---
 
@@ -1521,11 +1521,12 @@ FINAL REVIEW:
 
 ### 6.2 Option Exercises
 
-- [ ] OptionExerciseRequest entity + Prisma model (per option-exercises.md)
-- [ ] Exercise request flow (employee)
-- [ ] Payment confirmation flow (admin)
-- [ ] Share issuance on confirmation
-- [ ] Termination handling service
+- [x] OptionExerciseRequest entity + Prisma model (per option-exercises.md) — **v0.0.13**: Already defined in Prisma schema with status enum (PENDING_PAYMENT, PAYMENT_CONFIRMED, SHARES_ISSUED, COMPLETED, CANCELLED)
+- [x] Exercise request flow — **v0.0.13**: createExerciseRequest validates grant ACTIVE, exercise window, vesting, no pending exercise, generates payment reference (EX-YYYY-XXXXXX)
+- [x] Payment confirmation flow (admin) — **v0.0.13**: confirmExercisePayment atomic $transaction updates exercise→COMPLETED, grant.exercised, plan.totalExercised, upserts Shareholding, increments ShareClass.totalIssued
+- [x] Share issuance on confirmation — **v0.0.13**: Cap table mutation via Shareholding upsert + ShareClass.totalIssued increment (database-only, blockchain deferred to Phase 3)
+- [x] Cancel exercise — **v0.0.13**: cancelExercise from PENDING_PAYMENT only
+- [x] List/get exercise requests — **v0.0.13**: findAllExercises (company-scoped via grant relation, status/grantId filters), findExerciseById with full grant/plan/shareholder details
 - [ ] Frontend: Exercise request flow
 
 ---

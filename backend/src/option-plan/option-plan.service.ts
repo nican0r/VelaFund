@@ -10,12 +10,19 @@ import { CreateOptionPlanDto } from './dto/create-option-plan.dto';
 import { UpdateOptionPlanDto } from './dto/update-option-plan.dto';
 import { CreateOptionGrantDto } from './dto/create-option-grant.dto';
 import {
+  CreateExerciseRequestDto,
+  ConfirmExercisePaymentDto,
+} from './dto/create-exercise-request.dto';
+import {
   ListOptionPlansQueryDto,
   ListOptionGrantsQueryDto,
 } from './dto/list-option-plans-query.dto';
+import { ListExerciseRequestsQueryDto } from './dto/list-exercise-requests-query.dto';
+import { randomBytes } from 'crypto';
 
 const PLAN_SORTABLE_FIELDS = ['createdAt', 'name', 'totalPoolSize', 'status'];
 const GRANT_SORTABLE_FIELDS = ['grantDate', 'createdAt', 'quantity', 'status', 'employeeName'];
+const EXERCISE_SORTABLE_FIELDS = ['createdAt', 'status', 'quantity'];
 
 @Injectable()
 export class OptionPlanService {
@@ -457,6 +464,315 @@ export class OptionPlanService {
       });
 
       return cancelled;
+    });
+  }
+
+  // ========================
+  // Option Exercise Requests
+  // ========================
+
+  async createExerciseRequest(
+    companyId: string,
+    grantId: string,
+    dto: CreateExerciseRequestDto,
+    userId: string,
+  ) {
+    // Validate grant exists and belongs to company
+    const grant = await this.prisma.optionGrant.findFirst({
+      where: { id: grantId, companyId },
+      include: {
+        plan: { select: { id: true, exerciseWindowDays: true, terminationPolicy: true, shareClassId: true } },
+      },
+    });
+    if (!grant) throw new NotFoundException('optionGrant', grantId);
+
+    // Grant must be ACTIVE (CANCELLED/EXPIRED/EXERCISED cannot exercise)
+    if (grant.status !== 'ACTIVE') {
+      throw new BusinessRuleException(
+        'OPT_GRANT_NOT_ACTIVE',
+        'errors.opt.grantNotActive',
+      );
+    }
+
+    // Check exercise window for terminated grants
+    if (grant.terminatedAt) {
+      const windowEnd = new Date(grant.terminatedAt);
+      windowEnd.setDate(windowEnd.getDate() + grant.plan.exerciseWindowDays);
+      if (new Date() > windowEnd) {
+        throw new BusinessRuleException(
+          'OPT_EXERCISE_WINDOW_CLOSED',
+          'errors.opt.exerciseWindowClosed',
+          { exerciseWindowDays: grant.plan.exerciseWindowDays },
+        );
+      }
+    }
+
+    const quantity = new Prisma.Decimal(dto.quantity);
+    if (quantity.lte(0)) {
+      throw new BusinessRuleException(
+        'OPT_INVALID_QUANTITY',
+        'errors.opt.invalidQuantity',
+      );
+    }
+
+    // Validate quantity against vested options
+    const vesting = this.calculateVesting(grant);
+    const exercisable = new Prisma.Decimal(vesting.exercisableQuantity);
+    if (quantity.gt(exercisable)) {
+      throw new BusinessRuleException(
+        'OPT_INSUFFICIENT_VESTED',
+        'errors.opt.insufficientVested',
+        {
+          exercisableOptions: vesting.exercisableQuantity,
+          requestedQuantity: dto.quantity,
+        },
+      );
+    }
+
+    // Check no pending exercise request exists for this grant
+    const pendingExercise = await this.prisma.optionExerciseRequest.findFirst({
+      where: { grantId, status: 'PENDING_PAYMENT' },
+      select: { id: true },
+    });
+    if (pendingExercise) {
+      throw new BusinessRuleException(
+        'OPT_EXERCISE_PENDING',
+        'errors.opt.exercisePending',
+      );
+    }
+
+    // Calculate total cost
+    const totalCost = quantity.mul(grant.strikePrice);
+
+    // Generate unique payment reference: EX-YYYY-XXXXXX
+    const year = new Date().getFullYear();
+    const randomPart = randomBytes(3).toString('hex').toUpperCase();
+    const paymentReference = `EX-${year}-${randomPart}`;
+
+    return this.prisma.optionExerciseRequest.create({
+      data: {
+        grantId,
+        quantity,
+        totalCost,
+        paymentReference,
+        createdBy: userId,
+      },
+    });
+  }
+
+  async findAllExercises(companyId: string, query: ListExerciseRequestsQueryDto) {
+    // Exercise requests are scoped to company through grants
+    const where: Prisma.OptionExerciseRequestWhereInput = {
+      grant: { companyId },
+    };
+
+    if (query.status) {
+      where.status = query.status as any;
+    }
+    if (query.grantId) {
+      where.grantId = query.grantId;
+    }
+
+    const sortFields = parseSort(query.sort, EXERCISE_SORTABLE_FIELDS);
+    const orderBy = sortFields.map((sf) => ({ [sf.field]: sf.direction }));
+
+    const [items, total] = await Promise.all([
+      this.prisma.optionExerciseRequest.findMany({
+        where,
+        orderBy,
+        skip: ((query.page ?? 1) - 1) * (query.limit ?? 20),
+        take: query.limit ?? 20,
+        include: {
+          grant: {
+            select: {
+              id: true,
+              employeeName: true,
+              employeeEmail: true,
+              strikePrice: true,
+              plan: { select: { id: true, name: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.optionExerciseRequest.count({ where }),
+    ]);
+
+    return { items, total };
+  }
+
+  async findExerciseById(companyId: string, exerciseId: string) {
+    const exercise = await this.prisma.optionExerciseRequest.findFirst({
+      where: { id: exerciseId, grant: { companyId } },
+      include: {
+        grant: {
+          select: {
+            id: true,
+            employeeName: true,
+            employeeEmail: true,
+            strikePrice: true,
+            quantity: true,
+            exercised: true,
+            status: true,
+            plan: { select: { id: true, name: true, shareClassId: true } },
+            shareholder: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+    if (!exercise) throw new NotFoundException('optionExercise', exerciseId);
+    return exercise;
+  }
+
+  async confirmExercisePayment(
+    companyId: string,
+    exerciseId: string,
+    dto: ConfirmExercisePaymentDto,
+    userId: string,
+  ) {
+    const exercise = await this.prisma.optionExerciseRequest.findFirst({
+      where: { id: exerciseId, grant: { companyId } },
+      include: {
+        grant: {
+          select: {
+            id: true,
+            planId: true,
+            shareholderId: true,
+            quantity: true,
+            exercised: true,
+            plan: { select: { shareClassId: true } },
+          },
+        },
+      },
+    });
+    if (!exercise) throw new NotFoundException('optionExercise', exerciseId);
+
+    if (exercise.status === 'COMPLETED' || exercise.status === 'PAYMENT_CONFIRMED' || exercise.status === 'SHARES_ISSUED') {
+      throw new BusinessRuleException(
+        'OPT_EXERCISE_ALREADY_CONFIRMED',
+        'errors.opt.exerciseAlreadyConfirmed',
+      );
+    }
+
+    if (exercise.status === 'CANCELLED') {
+      throw new BusinessRuleException(
+        'OPT_EXERCISE_ALREADY_CANCELLED',
+        'errors.opt.exerciseAlreadyCancelled',
+      );
+    }
+
+    if (exercise.status !== 'PENDING_PAYMENT') {
+      throw new BusinessRuleException(
+        'OPT_EXERCISE_NOT_PENDING',
+        'errors.opt.exerciseNotPending',
+      );
+    }
+
+    // Require shareholder to be linked for share issuance
+    if (!exercise.grant.shareholderId) {
+      throw new BusinessRuleException(
+        'OPT_NO_SHAREHOLDER_LINKED',
+        'errors.opt.noShareholderLinked',
+      );
+    }
+
+    const exerciseQuantity = exercise.quantity;
+    const newExercised = exercise.grant.exercised.add(exerciseQuantity);
+    const fullyExercised = newExercised.gte(exercise.grant.quantity);
+    const shareClassId = exercise.grant.plan.shareClassId;
+    const shareholderId = exercise.grant.shareholderId;
+
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Update exercise request to COMPLETED (no blockchain, so skip SHARES_ISSUED)
+      const confirmed = await tx.optionExerciseRequest.update({
+        where: { id: exerciseId },
+        data: {
+          status: 'COMPLETED',
+          confirmedBy: userId,
+          confirmedAt: new Date(),
+        },
+      });
+
+      // 2. Update grant exercised count
+      await tx.optionGrant.update({
+        where: { id: exercise.grantId },
+        data: {
+          exercised: newExercised,
+          ...(fullyExercised ? { status: 'EXERCISED' } : {}),
+        },
+      });
+
+      // 3. Update plan totalExercised
+      await tx.optionPlan.update({
+        where: { id: exercise.grant.planId },
+        data: {
+          totalExercised: { increment: exerciseQuantity },
+        },
+      });
+
+      // 4. Cap table mutation: upsert Shareholding for the shareholder
+      const existingHolding = await tx.shareholding.findFirst({
+        where: { shareholderId, shareClassId },
+      });
+
+      if (existingHolding) {
+        await tx.shareholding.update({
+          where: { id: existingHolding.id },
+          data: {
+            quantity: existingHolding.quantity.add(exerciseQuantity),
+          },
+        });
+      } else {
+        await tx.shareholding.create({
+          data: {
+            companyId,
+            shareholderId,
+            shareClassId,
+            quantity: exerciseQuantity,
+            ownershipPct: new Prisma.Decimal(0),
+            votingPowerPct: new Prisma.Decimal(0),
+          },
+        });
+      }
+
+      // 5. Increment ShareClass.totalIssued
+      await tx.shareClass.update({
+        where: { id: shareClassId },
+        data: {
+          totalIssued: { increment: exerciseQuantity },
+        },
+      });
+
+      return confirmed;
+    });
+  }
+
+  async cancelExercise(companyId: string, exerciseId: string) {
+    const exercise = await this.prisma.optionExerciseRequest.findFirst({
+      where: { id: exerciseId, grant: { companyId } },
+      select: { id: true, status: true },
+    });
+    if (!exercise) throw new NotFoundException('optionExercise', exerciseId);
+
+    if (exercise.status === 'CANCELLED') {
+      throw new BusinessRuleException(
+        'OPT_EXERCISE_ALREADY_CANCELLED',
+        'errors.opt.exerciseAlreadyCancelled',
+      );
+    }
+
+    if (exercise.status !== 'PENDING_PAYMENT') {
+      throw new BusinessRuleException(
+        'OPT_EXERCISE_NOT_PENDING',
+        'errors.opt.exerciseNotPending',
+      );
+    }
+
+    return this.prisma.optionExerciseRequest.update({
+      where: { id: exerciseId },
+      data: {
+        status: 'CANCELLED',
+        cancelledAt: new Date(),
+      },
     });
   }
 
