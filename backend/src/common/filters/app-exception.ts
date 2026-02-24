@@ -468,6 +468,59 @@ const MESSAGES: Record<string, Record<string, string>> = {
     'pt-BR': 'A outorga precisa estar vinculada a um acionista para emitir ações',
     en: 'Grant must be linked to a shareholder to issue shares',
   },
+  // ─── CONVERTIBLE INSTRUMENT MESSAGES ──────────────────────────────
+  'errors.convertible.notFound': {
+    'pt-BR': 'Instrumento conversível não encontrado',
+    en: 'Convertible instrument not found',
+  },
+  'errors.conv.companyNotActive': {
+    'pt-BR': 'A empresa deve estar ativa para criar instrumentos conversíveis',
+    en: 'Company must be active to create convertible instruments',
+  },
+  'errors.conv.maturityBeforeIssue': {
+    'pt-BR': 'Data de vencimento deve ser posterior à data de emissão',
+    en: 'Maturity date must be after issue date',
+  },
+  'errors.conv.invalidPrincipal': {
+    'pt-BR': 'O valor principal deve ser maior que zero',
+    en: 'Principal amount must be greater than zero',
+  },
+  'errors.conv.highInterestRate': {
+    'pt-BR': 'Taxa de juros acima de 30% requer confirmação explícita',
+    en: 'Interest rate above 30% requires explicit confirmation',
+  },
+  'errors.conv.cannotUpdate': {
+    'pt-BR': 'Instrumento conversível não pode ser atualizado no status atual',
+    en: 'Convertible instrument cannot be updated in current status',
+  },
+  'errors.conv.invalidStatusTransition': {
+    'pt-BR': 'Transição de status inválida para este instrumento conversível',
+    en: 'Invalid status transition for this convertible instrument',
+  },
+  'errors.conv.alreadyConverted': {
+    'pt-BR': 'Instrumento conversível já foi convertido ou não está ativo',
+    en: 'Convertible instrument has already been converted or is not active',
+  },
+  'errors.conv.triggerNotMet': {
+    'pt-BR': 'Valor da rodada não atinge o limite mínimo de financiamento qualificado',
+    en: 'Funding round amount does not meet the qualified financing threshold',
+  },
+  'errors.conv.holdingPeriodNotMet': {
+    'pt-BR': 'Período mínimo de retenção do Investimento-Anjo não foi cumprido',
+    en: 'Investimento-Anjo minimum holding period has not been met',
+  },
+  'errors.conv.zeroPremoneeyShares': {
+    'pt-BR': 'Não existem ações pré-money emitidas — impossível calcular preço de conversão',
+    en: 'No pre-money shares issued — cannot calculate conversion price',
+  },
+  'errors.conv.invalidValuation': {
+    'pt-BR': 'O valor da avaliação deve ser maior que zero',
+    en: 'Valuation must be greater than zero',
+  },
+  'errors.conv.exceedsAuthorized': {
+    'pt-BR': 'Conversão excede o total autorizado da classe de ações',
+    en: 'Conversion would exceed the authorized total of the share class',
+  },
 };
 
 export class AppException extends Error {

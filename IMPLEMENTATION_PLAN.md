@@ -2,9 +2,9 @@
 
 **Job to be Done**: Help Brazilian companies manage their cap table with on-chain record-keeping and regulatory compliance.
 
-**Status**: Phase 6 (Employee Equity) in progress. Monorepo scaffolded, backend and frontend foundations built. Phase 0 spec issues are applied in implementation code but **all 69 P0 issues remain unfixed in the spec files themselves**.
+**Status**: Phase 5.2 (Convertible Instruments) complete. Phase 6 (Employee Equity) complete. Monorepo scaffolded, backend and frontend foundations built. Phase 0 spec issues are applied in implementation code but **all 69 P0 issues remain unfixed in the spec files themselves**.
 
-**Last Updated**: 2026-02-24 (v17.0 - Option Exercise backend module: 5 new endpoints (create exercise, list exercises, get exercise, confirm payment, cancel exercise), exercise request lifecycle (PENDING_PAYMENT→COMPLETED/CANCELLED), atomic payment confirmation with $transaction (updates exercise status, grant.exercised, plan.totalExercised, upserts Shareholding, increments ShareClass.totalIssued), vesting validation, exercise window enforcement for terminated grants, single pending exercise per grant, payment reference generation. 9 new i18n error messages (PT-BR + EN). 38 new tests, 556 tests passing total.)
+**Last Updated**: 2026-02-24 (v18.0 - Convertible Instruments backend module: 9 endpoints (create, list with summary aggregation, get detail, interest breakdown with monthly accrual, conversion scenario modeling with MFN/discount/cap methods, update, redeem, cancel, convert to equity). Status state machine OUTSTANDING→CONVERTED/REDEEMED/MATURED/CANCELLED. Simple and compound interest calculation (actual/365 day count). Conversion engine with discount method, cap method, round price method, MFN best-for-investor selection. capTriggersAbove formula. Atomic conversion execution via $transaction (creates ISSUANCE Transaction, upserts Shareholding, increments ShareClass.totalIssued). 13 new i18n error messages (PT-BR + EN). 71 new tests (44 service + 27 controller), 627 tests passing total.)
 
 ---
 
@@ -1479,12 +1479,14 @@ FINAL REVIEW:
 
 ### 5.2 Convertible Instruments
 
-- [ ] ConvertibleInstrument entity (per convertible-instruments.md, with UPPER_SNAKE_CASE enums)
-- [ ] Daily interest calculation job
-- [ ] Conversion calculation engine (per convertible-conversion.md)
-- [ ] Conversion scenario modeling API
-- [ ] Conversion trigger detection
-- [ ] Automatic conversion execution
+- [x] ConvertibleInstrument entity (per convertible-instruments.md, with UPPER_SNAKE_CASE enums) — **v0.0.14**: Already defined in Prisma schema (InstrumentType: MUTUO_CONVERSIVEL/INVESTIMENTO_ANJO/MISTO/MAIS, ConvertibleStatus: OUTSTANDING/CONVERTED/REDEEMED/MATURED/CANCELLED, InterestType: SIMPLE/COMPOUND, ConversionTrigger: QUALIFIED_FINANCING/MATURITY/CHANGE_OF_CONTROL/INVESTOR_OPTION). Full CRUD: create (validates company ACTIVE, shareholder exists, maturity > issue, principal > 0, interest ≤ 30%), list (paginated, status/shareholderId filters, summary aggregation), get detail, update (OUTSTANDING/MATURED only)
+- [x] Interest calculation engine — **v0.0.14**: Simple interest (P × r × days/365), compound interest (P × (1+r/365)^days - P), daily accrual with actual/365 day count, monthly breakdown generation, getInterestBreakdown endpoint
+- [x] Conversion calculation engine (per convertible-conversion.md) — **v0.0.14**: Three methods (discount, cap, round price), MFN clause picks best-for-investor (most shares / lowest price), capTriggersAbove = valuationCap / (1 - discountRate), pre-money shares from ShareClass.totalIssued aggregate
+- [x] Conversion scenario modeling API — **v0.0.14**: getConversionScenarios endpoint models conversion at multiple valuations (custom or default 2M/4M/6M/8M/10M), returns discount/cap/round-price per scenario with ownership % and dilution
+- [x] Conversion execution — **v0.0.14**: Atomic $transaction: validates convertible OUTSTANDING/MATURED, validates share class exists + authorized shares sufficient, creates ISSUANCE Transaction (CONFIRMED), upserts Shareholding, increments ShareClass.totalIssued, updates convertible to CONVERTED with conversionData JSON
+- [x] Redeem / Cancel endpoints — **v0.0.14**: redeem (OUTSTANDING/MATURED → REDEEMED with redemption data), cancel (OUTSTANDING/MATURED → CANCELLED with reason in notes), status state machine enforced
+- [ ] Daily interest calculation job (background, requires Bull/Redis infrastructure)
+- [ ] Automatic conversion trigger detection (background, requires event system)
 - [ ] Frontend: Instrument creation wizard
 - [ ] Frontend: Scenario modeling UI
 - [ ] Frontend: Instrument portfolio view

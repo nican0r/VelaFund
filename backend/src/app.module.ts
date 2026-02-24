@@ -13,6 +13,7 @@ import { CapTableModule } from './cap-table/cap-table.module';
 import { TransactionModule } from './transaction/transaction.module';
 import { FundingRoundModule } from './funding-round/funding-round.module';
 import { OptionPlanModule } from './option-plan/option-plan.module';
+import { ConvertibleModule } from './convertible/convertible.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { OptionPlanModule } from './option-plan/option-plan.module';
     TransactionModule,
     FundingRoundModule,
     OptionPlanModule,
+    ConvertibleModule,
   ],
   providers: [
     // BUG-3 fix: Register ThrottlerGuard globally — rate limits apply to all endpoints.

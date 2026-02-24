@@ -16,6 +16,7 @@ Each document follows the template defined in `.claude/rules/user-flow-documenta
 | [Transactions](./transactions.md) | ADMIN (full lifecycle + approve/confirm), FINANCE (create/submit/cancel), LEGAL (read-only) | Backend complete |
 | [Funding Rounds](./funding-rounds.md) | ADMIN (full lifecycle + commitments), FINANCE (read + payment updates), LEGAL (read-only) | Backend complete |
 | [Option Plans, Grants & Exercises](./option-plans.md) | ADMIN (full CRUD + close/cancel + exercise confirm/cancel), FINANCE/LEGAL (read-only) | Backend complete |
+| [Convertible Instruments](./convertible-instruments.md) | ADMIN (full CRUD + convert/redeem/cancel), FINANCE (read + scenarios), LEGAL (read-only) | Backend complete |
 
 ## Cross-References
 
