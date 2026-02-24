@@ -102,6 +102,36 @@ const MESSAGES: Record<string, Record<string, string>> = {
     'pt-BR': 'Ações insuficientes para completar a operação',
     en: 'Insufficient shares to complete the operation',
   },
+  'errors.cap.shareClassDuplicate': {
+    'pt-BR': 'Já existe uma classe de ações com este nome nesta empresa',
+    en: 'A share class with this name already exists in this company',
+  },
+  'errors.cap.shareClassInUse': {
+    'pt-BR':
+      'Classe de ações não pode ser removida — possui ações emitidas ou participações ativas',
+    en: 'Share class cannot be deleted — has issued shares or active shareholdings',
+  },
+  'errors.cap.companyNotActive': {
+    'pt-BR': 'A empresa deve estar ativa para gerenciar classes de ações',
+    en: 'Company must be active to manage share classes',
+  },
+  'errors.cap.invalidShareClassType': {
+    'pt-BR': 'Tipo de classe de ações inválido para este tipo de empresa',
+    en: 'Invalid share class type for this company entity type',
+  },
+  'errors.cap.totalAuthorizedCannotDecrease': {
+    'pt-BR': 'O total autorizado não pode ser diminuído',
+    en: 'Total authorized cannot be decreased',
+  },
+  'errors.cap.preferredShareLimitExceeded': {
+    'pt-BR':
+      'Ações preferenciais não podem exceder 2/3 do capital total autorizado (Lei 6.404/76 Art. 15 §2)',
+    en: 'Preferred shares cannot exceed 2/3 of total authorized capital (Brazilian Corp Law Art. 15 §2)',
+  },
+  'errors.cap.invalidTotalAuthorized': {
+    'pt-BR': 'O total autorizado deve ser um valor não-negativo',
+    en: 'Total authorized must be a non-negative value',
+  },
   'errors.auth.forbidden': {
     'pt-BR': 'Permissão insuficiente para esta operação',
     en: 'Insufficient permission for this operation',

@@ -4,7 +4,7 @@
 
 **Status**: Phase 1 (Foundation and Infrastructure) in progress. Monorepo scaffolded, backend and frontend foundations built. Phase 0 spec issues are applied in implementation code but **all 69 P0 issues remain unfixed in the spec files themselves**.
 
-**Last Updated**: 2026-02-23 (v12.3 - Company Membership CRUD module: invite, accept, remove, role change, resend invitation, permission overrides. 52 new tests, 161 tests passing total.)
+**Last Updated**: 2026-02-24 (v12.4 - Share Class CRUD backend module: 5 endpoints, entity type compatibility, preferred share 2/3 limit, immutability after issuance. 34 new tests, 210 tests passing total.)
 
 ---
 
@@ -28,7 +28,7 @@ A comprehensive spec audit (v8.0) uncovered systemic issues that affect nearly a
 | Aspect | Status | Notes |
 |--------|--------|-------|
 | `/frontend` directory | **SCAFFOLDED** | 14 source files, 0 tests. Layouts built. Privy SDK NOT installed. next-intl NOT installed. shadcn/ui CLI never run (no `components/ui/`, no `components.json`). **No auth protection on any route** — no `middleware.ts`, no protected route wrapper. Login page is static stub. Dashboard is visual prototype with hardcoded data. Missing CSP and HSTS security headers. Missing Brazilian formatting helpers. |
-| `/backend` directory | **SCAFFOLDED** | 52 source files, 161 tests. Auth module complete (14 of 15 bugs fixed — BUG-1 remains, requires Redis). Common infrastructure solid. **Company Management module complete** (CRUD endpoints, CNPJ Módulo 11 validation, company status state machine, 42 tests). **Company Membership module complete** (invite, accept, remove, role change, resend invitation, permission overrides, invitation acceptance, 52 tests). |
+| `/backend` directory | **SCAFFOLDED** | 62 source files, 210 tests. Auth module complete (14 of 15 bugs fixed — BUG-1 remains, requires Redis). Common infrastructure solid. **Company Management module complete** (CRUD endpoints, CNPJ Módulo 11 validation, company status state machine, 42 tests). **Company Membership module complete** (invite, accept, remove, role change, resend invitation, permission overrides, invitation acceptance, 52 tests). **Share Class module complete** (5 CRUD endpoints, entity type compatibility Ltda→QUOTA / S.A.→COMMON/PREFERRED, preferred share 2/3 limit per Art. 15 §2, immutability after issuance, 34 tests). |
 | `/contracts` directory | EXISTS (empty) | No Solidity files |
 | `package.json` | **CREATED** | pnpm workspaces + Turborepo configured |
 | Prisma schema | **NEAR-COMPLETE** | 32 models, 35 enums. All relations, unique constraints, and indexes complete. Missing entities: DataroomFolder, DataroomDocument, ExitScenario, WaterfallResult, ExportJob, LitigationVerification (inlined into CompanyProfile). Migration pending. |
@@ -39,8 +39,8 @@ A comprehensive spec audit (v8.0) uncovered systemic issues that affect nearly a
 | `.env.example` files | **MISSING** | Neither backend nor frontend has one |
 | README.md | **STALE** | Contains only "# VelaFund" |
 | ARCHITECTURE.md | **STALE** | "VelaFund" branding, references removed entities (AdminWallet, CapTableEntry) |
-| User flow docs | **2 of ~15** | `docs/user-flows/authentication.md`, `docs/user-flows/company-management.md` |
-| Git tag | `v0.0.6` | Company Membership CRUD backend module |
+| User flow docs | **4 of ~15** | `docs/user-flows/authentication.md`, `docs/user-flows/company-management.md`, `docs/user-flows/member-invitation.md`, `docs/user-flows/share-class-management.md` |
+| Git tag | `v0.0.7` | Share Class CRUD backend module |
 
 ### Critical Bugs Found (v10.0 + v11.0 Audit)
 
@@ -1268,12 +1268,13 @@ FINAL REVIEW:
 
 ### 2.2 Share Classes
 
-- [ ] Share class backend (per share-classes.md)
-  - ShareClass entity + Prisma model
-  - Share class CRUD API endpoints
-  - Ltda quota logic (single class, equal rights)
-  - S.A. ON/PN logic (voting, preferences)
-  - Share class validation rules
+- [x] Share class backend (per share-classes.md) — **v0.0.7**
+  - ShareClass entity (Prisma model already existed)
+  - Share class CRUD API endpoints (5 endpoints: create, list, get, update, delete)
+  - Ltda quota logic (type compatibility: Ltda → QUOTA only)
+  - S.A. ON/PN logic (type compatibility: S.A. → COMMON_SHARES/PREFERRED_SHARES only)
+  - Share class validation rules (preferred 2/3 limit per Art. 15 §2, totalAuthorized can only increase, delete only if totalIssued=0, unique className per company)
+  - 34 unit tests (21 service + 13 controller)
 
 - [ ] Share class frontend
   - Share class creation form
