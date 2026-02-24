@@ -32,11 +32,11 @@
 
 These are prerequisites for many downstream features.
 
-- [x] **Redis + Bull queue setup** — DONE (v0.0.16): Added `@nestjs/bull`, `bull`, `ioredis` dependencies. BullModule.forRootAsync configured in AppModule with REDIS_URL from ConfigService and default job options (3 retries, exponential backoff). Global `RedisModule` provides shared `REDIS_CLIENT` injection token with connection lifecycle management. Redis health check added to HealthController (reports `up`/`down`/`unconfigured`). 8 new tests (640 total passing).
-  - [x] Add `@nestjs/bull`, `bull`, `ioredis` dependencies
-  - [x] Configure BullModule.forRoot with Redis connection (Railway Redis URL)
-  - [x] REDIS_URL added to backend ConfigModule validation
-  - [x] Create Bull health check in HealthController
+- [x] **Redis + Bull queue setup** — DONE (v0.0.16): Added `@nestjs/bull`, `bull`, `ioredis` dependencies. BullModule.forRootAsync configured in AppModule with ConfigService, defaultJobOptions (3 attempts, exponential backoff). RedisModule created as a @Global module providing a shared ioredis client (`REDIS_CLIENT` injection token) with lazyConnect, retry strategy, and clean shutdown via OnModuleDestroy. Redis health check added to HealthController (reports `up`/`down`/`unconfigured`). 12 new tests (640 total passing).
+  - [x] Add `@nestjs/bull`, `bull`, `ioredis` dependencies — DONE (v0.0.16)
+  - [x] Configure BullModule.forRoot with Redis connection (Railway Redis URL) — DONE: BullModule.forRootAsync in AppModule with ConfigService, defaultJobOptions (3 attempts, exponential backoff)
+  - [x] REDIS_URL already in `.env.example` — add to backend ConfigModule validation — DONE: RedisModule reads REDIS_URL via ConfigService, defaults gracefully to null when unconfigured
+  - [x] Create Bull health check in HealthController — DONE: Health endpoint now reports database + Redis status (up/down/unconfigured)
   - _Unlocks_: audit logging, notifications, email sending, daily interest accrual, async CNPJ validation, export jobs, session store
 
 - [ ] **AWS SDK integration**
@@ -609,17 +609,17 @@ Models/enums that exist in specs but are missing from the schema:
 ## Dependency Graph (simplified)
 
 ```
-P1 Redis+Bull ──────────────┬──→ P3.1 Notifications
-                            ├──→ P3.2 Audit Logging (+ P1 redactPii)
-                            ├──→ P3.3 KYC (+ P1 AWS)
-                            ├──→ P3.7 Dataroom (+ P1 AWS)
-                            ├──→ P3.8 Blockchain
-                            ├──→ P3.10 Litigation (+ P3.6 Company Profile)
-                            ├──→ P3.11 Reconciliation (+ P3.8)
-                            ├──→ P3.13 Reports (+ P1 AWS)
-                            ├──→ P3.14 CNPJ Validation (+ P3.3)
-                            ├──→ P2 Convertible daily accrual job
-                            └──→ P0 BUG-1 session fix
+P1 Redis+Bull (DONE v0.0.16) ┬──→ P3.1 Notifications
+                              ├──→ P3.2 Audit Logging (+ P1 redactPii)
+                              ├──→ P3.3 KYC (+ P1 AWS)
+                              ├──→ P3.7 Dataroom (+ P1 AWS)
+                              ├──→ P3.8 Blockchain
+                              ├──→ P3.10 Litigation (+ P3.6 Company Profile)
+                              ├──→ P3.11 Reconciliation (+ P3.8)
+                              ├──→ P3.13 Reports (+ P1 AWS)
+                              ├──→ P3.14 CNPJ Validation (+ P3.3)
+                              ├──→ P2 Convertible daily accrual job
+                              └──→ P0 BUG-1 session fix
 
 P1 AWS SDK ─────────────────┬──→ P1 Email (SES)
                             ├──→ P1 EncryptionService (KMS)
