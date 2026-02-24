@@ -41,10 +41,11 @@ This specification covers instrument creation, configuration, interest accrual, 
 8. [Edge Cases & Error Handling](#edge-cases--error-handling)
 9. [Dependencies](#dependencies)
 10. [Security Considerations](#security-considerations)
-11. [Success Criteria](#success-criteria)
-12. [Open Questions](#open-questions)
-13. [Future Enhancements](#future-enhancements)
-14. [Related Specifications](#related-specifications)
+11. [Frontend Implementation](#frontend-implementation)
+12. [Success Criteria](#success-criteria)
+13. [Open Questions](#open-questions)
+14. [Future Enhancements](#future-enhancements)
+15. [Related Specifications](#related-specifications)
 
 ---
 
@@ -832,6 +833,355 @@ export class InterestCalculationProcessor {
 - Log all document access events
 
 **Note**: For conversion-specific security (conversion authorization, conversion data immutability, conversion rate limiting), see `convertible-conversion.md`.
+
+---
+
+## Frontend Implementation
+
+### FE-1: Pages & Routes
+
+| Route | Page | Description |
+|-------|------|-------------|
+| `/dashboard/investments` | InvestmentsPage | Shared tab container — "Convertibles" tab |
+| `/dashboard/investments/convertibles/new` | CreateConvertiblePage | Type-adaptive creation form |
+| `/dashboard/investments/convertibles/[convertibleId]` | ConvertibleDetailPage | Detail with interest, scenarios, actions |
+| `/dashboard/investments/convertibles/[convertibleId]/edit` | EditConvertiblePage | Edit convertible (OUTSTANDING status only) |
+
+**Navigation**: Shared with Funding Rounds under "Investments" sidebar item. Convertibles is the second tab.
+
+### FE-2: Page Layouts
+
+#### Convertibles List (within InvestmentsPage, "Convertibles" tab)
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  [Rounds] [Convertibles]  ← Tab bar (active)           │
+├─────────────────────────────────────────────────────────┤
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │
+│  │Outstanding│ │Total     │ │Total     │ │Total     │  │
+│  │Count     │ │Principal │ │Accrued   │ │Value     │  │
+│  │  5       │ │R$ 2.1M   │ │R$ 84K    │ │R$ 2.18M  │  │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘  │
+├─────────────────────────────────────────────────────────┤
+│  Filters: [Status ▼] [Type ▼] [Investor ▼]  🔍 Search  │
+├─────────────────────────────────────────────────────────┤
+│  Convertibles Table (paginated)                         │
+│  ...                                                    │
+│  ═══════════════════════════════════════════════════════ │
+│  TOTAL: R$ 2.1M principal | R$ 84K interest | R$ 2.18M │
+├─────────────────────────────────────────────────────────┤
+│  Showing 1-10 of 15                    < 1 2 >          │
+└─────────────────────────────────────────────────────────┘
+```
+
+#### Convertible Detail Page
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  ← Back    TypeBadge  StatusBadge    [Edit] [Actions ▼] │
+│  h1: Mutuo Conversivel — Fund ABC                       │
+│  body-sm: Created 10/01/2026 · Maturity 10/01/2028     │
+├─────────────────────────────────────────────────────────┤
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │
+│  │Principal │ │Accrued   │ │Total     │ │Days to   │  │
+│  │R$ 500K   │ │Interest  │ │Value     │ │Maturity  │  │
+│  │          │ │R$ 22.4K  │ │R$ 522.4K │ │  342     │  │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘  │
+├─────────────────────────────────────────────────────────┤
+│  ⚠️ MaturityWarning (if <=30 days to maturity)          │
+├─────────────────────────────────────────────────────────┤
+│  [Details/Terms] [Interest] [Scenarios] [Documents]     │
+│  ...tab content...                                      │
+└─────────────────────────────────────────────────────────┘
+```
+
+### FE-3: Components
+
+| Component | Description | Props |
+|-----------|-------------|-------|
+| `ConvertibleInstrumentTable` | Paginated table of convertible instruments with summary footer | `companyId: string`, `filters?: ConvertibleFilters` |
+| `ConvertibleSummaryCards` | 4 stat cards for convertible metrics | `companyId: string` |
+| `ConvertibleDetailHeader` | Header with type/status badges, back link, actions menu | `convertible: ConvertibleInstrument` |
+| `InterestBreakdownTable` | Period-by-period interest calculation display | `convertibleId: string` |
+| `InterestAccrualChart` | Line chart showing interest accrual over time (Recharts) | `interestHistory: InterestEntry[]` |
+| `ConvertibleTermsCard` | Card displaying conversion terms (cap, discount, trigger) | `convertible: ConvertibleInstrument` |
+| `InvestimentoAnjoWarning` | Compliance alert for Investimento-Anjo specific requirements | `holdingPeriodEnd: Date`, `isInHoldingPeriod: boolean` |
+| `MaturityWarning` | Yellow banner displayed when <= 30 days to maturity | `maturityDate: Date`, `daysRemaining: number` |
+| `InstrumentTypeBadge` | Badge showing instrument type with appropriate color | `type: InstrumentType` |
+| `ConvertibleStatusBadge` | Status pill badge for convertible status | `status: ConvertibleStatus` |
+| `RedeemModal` | Modal form for redeeming a convertible | `convertibleId: string`, `onSuccess: () => void` |
+| `CancelConvertibleModal` | Destructive confirmation modal for cancellation | `convertibleId: string`, `onSuccess: () => void` |
+
+### FE-4: Tables
+
+#### Convertibles Table
+
+| Column | Field | Type | Sortable | Alignment |
+|--------|-------|------|----------|-----------|
+| Investor | `investor.name` | text with avatar | Yes | Left |
+| Type | `instrumentType` | instrument type badge | Yes | Left |
+| Principal | `principalAmount` | currency (BRL) | Yes | Right |
+| Accrued Interest | `accruedInterest` | currency (BRL) | Yes | Right |
+| Total Value | computed (principal + interest) | currency (BRL) | Yes | Right |
+| Status | `status` | status badge | Yes | Center |
+| Maturity Date | `maturityDate` | date (dd/MM/yyyy) | Yes | Left |
+| Days Remaining | computed | number (red if <= 30) | Yes | Right |
+
+- Default sort: `-createdAt`
+- Summary footer row: Total principal, total accrued interest, total value (bold, `gray-800`)
+- Empty state: "Nenhum instrumento conversivel" + "Criar instrumento" CTA
+
+#### Interest Breakdown Table
+
+| Column | Field | Type | Alignment |
+|--------|-------|------|-----------|
+| Period | `periodLabel` | text (e.g., "Jan 2026") | Left |
+| Days | `daysInPeriod` | number | Right |
+| Interest Accrued | `interestAmount` | currency (BRL) | Right |
+
+- No pagination (all periods displayed)
+- Cumulative total row at bottom
+
+### FE-5: Forms
+
+#### Create/Edit Convertible Form
+
+The form adapts based on the selected instrument type, showing/hiding fields as appropriate.
+
+**Section 1: Instrument Type**
+
+| Field | Label | Type | Validation | Required |
+|-------|-------|------|------------|----------|
+| `instrumentType` | Tipo de Instrumento | radio group (MUTUO_CONVERSIVEL, INVESTIMENTO_ANJO, MISTO, MAIS) | must select one | Yes |
+
+**Section 2: Investor**
+
+| Field | Label | Type | Validation | Required |
+|-------|-------|------|------------|----------|
+| `shareholderId` | Investidor | searchable select (shareholders) | must exist | Yes |
+
+**Section 3: Financial Terms**
+
+| Field | Label | Type | Validation | Required |
+|-------|-------|------|------------|----------|
+| `principalAmount` | Valor Principal | currency input (BRL) | > 0 | Yes |
+| `interestRate` | Taxa de Juros (% a.a.) | percentage input | >= 0, <= 100 | Yes |
+| `interestType` | Tipo de Juros | select (SIMPLE, COMPOUND) | must select | Yes |
+| `dayCountConvention` | Convencao de Dias | select (ACTUAL_360, ACTUAL_365, BUSINESS_252) | must select | Yes |
+| `issueDate` | Data de Emissao | date picker | <= today | Yes |
+| `maturityDate` | Data de Vencimento | date picker | > issueDate | Yes |
+| `maturityMonths` | Prazo (meses) | number input | auto-calculated from dates | No |
+
+**Section 4: Conversion Terms**
+
+| Field | Label | Type | Validation | Required |
+|-------|-------|------|------------|----------|
+| `valuationCap` | Valuation Cap | currency input (BRL) | > 0 if provided | No |
+| `discountRate` | Taxa de Desconto (%) | percentage input | 0-100 | No |
+| `qualifiedFinancingThreshold` | Financiamento Qualificado Minimo | currency input (BRL) | > 0 if provided | No |
+| `hasMfnClause` | Clausula MFN (Nacao Mais Favorecida) | toggle | — | No |
+
+**Section 5: Investimento-Anjo Specific** (shown only when `instrumentType === 'INVESTIMENTO_ANJO'`)
+
+| Field | Label | Type | Validation | Required |
+|-------|-------|------|------------|----------|
+| `minimumHoldingPeriod` | Periodo Minimo de Retencao (meses) | number input | >= 24 (legal minimum) | Yes |
+| `maximumHoldingPeriod` | Periodo Maximo de Retencao (meses) | number input | >= minimumHoldingPeriod | Yes |
+| `remunerationRate` | Taxa de Remuneracao (% a.a.) | percentage input | >= 0 | No |
+| `participationInProfits` | Participacao nos Lucros | toggle | — | No |
+
+- **Live preview**: Maturity value calculated as: principal x (1 + rate)^years for compound, or principal x (1 + rate x years) for simple. Displayed in a side card.
+- **Layout**: Multi-section vertical form with collapsible sections. Submit: "Criar Instrumento" / "Salvar Alteracoes"
+
+### FE-6: Visualizations
+
+#### Interest Accrual Chart
+
+- **Type**: Area line chart (Recharts `AreaChart`)
+- **X-axis**: Months (from issue date to maturity)
+- **Y-axis**: Value in BRL
+- **Line 1**: Total value (principal + interest) — `ocean-600`, solid, filled area below
+- **Line 2**: Principal (constant) — `gray-300`, dashed
+- **Fill**: Gradient area between Line 1 and Line 2 in `ocean-100` opacity
+- **Today marker**: Vertical dashed line in `navy-900` with "Hoje" label
+- **Tooltip**: Shows date, principal, accrued interest, total value
+- **Container**: White card, title "Evolucao dos Juros"
+
+### FE-7: Modals & Dialogs
+
+| Modal | Size | Type | Key Elements |
+|-------|------|------|--------------|
+| RedeemModal | Medium (560px) | Form | 3 fields: redemption amount (pre-filled with total value), redemption date, notes. Summary card showing principal + interest breakdown. Submit: "Resgatar Instrumento" |
+| CancelConvertibleModal | Small (400px) | Destructive | Warning text, cancellation reason textarea (required), red "Cancelar Instrumento" button |
+
+### FE-8: Status Badges
+
+#### Convertible Status
+
+| Status | Background | Text Color | Label (PT-BR) | Label (EN) |
+|--------|-----------|------------|----------------|------------|
+| `OUTSTANDING` | `blue-50` | `blue-600` | Vigente | Outstanding |
+| `CONVERTED` | `green-100` | `green-700` | Convertido | Converted |
+| `REDEEMED` | `cream-100` | `cream-700` | Resgatado | Redeemed |
+| `MATURED` | `#FEE2E2` | `#991B1B` | Vencido | Matured |
+| `CANCELLED` | `gray-100` | `gray-600` | Cancelado | Cancelled |
+
+#### Instrument Type
+
+| Type | Background | Text Color | Label (PT-BR) | Label (EN) |
+|------|-----------|------------|----------------|------------|
+| `MUTUO_CONVERSIVEL` | `navy-100` | `navy-700` | Mutuo Conversivel | Convertible Loan |
+| `INVESTIMENTO_ANJO` | `cream-100` | `cream-700` | Investimento-Anjo | Angel Investment |
+| `MISTO` | `blue-50` | `blue-600` | MISTO | MISTO |
+| `MAIS` | `green-100` | `green-700` | MAIS | MAIS |
+
+### FE-9: Role-Based UI
+
+| Action | ADMIN | FINANCE | LEGAL | INVESTOR |
+|--------|-------|---------|-------|----------|
+| View convertibles list | All | All | All | Own instruments only |
+| View convertible detail | Full detail | Full detail | Full detail | Own instrument only |
+| Create convertible | Yes | No | No | No |
+| Edit convertible | Yes (OUTSTANDING) | No | No | No |
+| Convert to equity | Yes | Yes | No | No |
+| Redeem | Yes | No | No | No |
+| Cancel | Yes | No | No | No |
+| View interest breakdown | Yes | Yes | Yes | Own only |
+| View scenarios | Yes | Yes | Yes | No |
+
+- **INVESTOR view**: Filtered list showing only their instruments. Detail page shows terms and interest but not conversion scenarios.
+- **Hidden actions**: Buttons not shown for unauthorized roles.
+
+### FE-10: API Integration (TanStack Query)
+
+```typescript
+// Query key factory
+const convertibleKeys = {
+  all: (companyId: string) => ['convertibles', companyId] as const,
+  list: (companyId: string, filters?: ConvertibleFilters) => [...convertibleKeys.all(companyId), 'list', filters] as const,
+  detail: (companyId: string, convertibleId: string) => [...convertibleKeys.all(companyId), convertibleId] as const,
+  interest: (companyId: string, convertibleId: string) => [...convertibleKeys.detail(companyId, convertibleId), 'interest'] as const,
+  scenarios: (companyId: string, convertibleId: string) => [...convertibleKeys.detail(companyId, convertibleId), 'scenarios'] as const,
+};
+
+// Hooks
+function useConvertibles(companyId: string, filters?: ConvertibleFilters);
+function useConvertible(companyId: string, convertibleId: string);
+function useConvertibleInterest(companyId: string, convertibleId: string);
+function useCreateConvertible(companyId: string);          // POST mutation
+function useUpdateConvertible(companyId: string);          // PUT mutation
+function useRedeemConvertible(companyId: string);          // POST mutation
+function useCancelConvertible(companyId: string);          // POST mutation
+function useConvertToEquity(companyId: string);            // POST mutation (see convertible-conversion.md)
+```
+
+**Cache invalidation on convert to equity**:
+- Invalidate `convertibleKeys.all` (status changes to CONVERTED)
+- Invalidate `['cap-table', companyId]` (new shares issued)
+- Invalidate `['transactions', companyId]` (conversion transaction created)
+- Invalidate `['shareholders', companyId]` (shareholder may gain new holdings)
+
+### FE-11: i18n Keys
+
+Namespace: `convertibles`
+
+```
+convertibles.title = "Instrumentos Conversiveis" / "Convertible Instruments"
+convertibles.subtitle = "Gerencie mutuo conversivel, investimento-anjo e instrumentos MISTO/MAIS" / "Manage convertible loans, angel investments, and MISTO/MAIS instruments"
+convertibles.new = "Novo Instrumento" / "New Instrument"
+convertibles.edit = "Editar Instrumento" / "Edit Instrument"
+
+convertibles.form.instrumentType = "Tipo de Instrumento" / "Instrument Type"
+convertibles.form.investor = "Investidor" / "Investor"
+convertibles.form.principalAmount = "Valor Principal" / "Principal Amount"
+convertibles.form.interestRate = "Taxa de Juros (% a.a.)" / "Interest Rate (% p.a.)"
+convertibles.form.interestType = "Tipo de Juros" / "Interest Type"
+convertibles.form.interestTypeSimple = "Simples" / "Simple"
+convertibles.form.interestTypeCompound = "Composto" / "Compound"
+convertibles.form.dayCountConvention = "Convencao de Dias" / "Day Count Convention"
+convertibles.form.issueDate = "Data de Emissao" / "Issue Date"
+convertibles.form.maturityDate = "Data de Vencimento" / "Maturity Date"
+convertibles.form.maturityMonths = "Prazo (meses)" / "Term (months)"
+convertibles.form.valuationCap = "Valuation Cap" / "Valuation Cap"
+convertibles.form.discountRate = "Taxa de Desconto (%)" / "Discount Rate (%)"
+convertibles.form.qualifiedFinancing = "Financiamento Qualificado Minimo" / "Qualified Financing Threshold"
+convertibles.form.mfnClause = "Clausula MFN (Nacao Mais Favorecida)" / "MFN Clause (Most Favored Nation)"
+convertibles.form.create = "Criar Instrumento" / "Create Instrument"
+convertibles.form.save = "Salvar Alteracoes" / "Save Changes"
+
+convertibles.form.anjoSection = "Termos Investimento-Anjo" / "Angel Investment Terms"
+convertibles.form.minimumHolding = "Periodo Minimo de Retencao (meses)" / "Minimum Holding Period (months)"
+convertibles.form.maximumHolding = "Periodo Maximo de Retencao (meses)" / "Maximum Holding Period (months)"
+convertibles.form.remunerationRate = "Taxa de Remuneracao (% a.a.)" / "Remuneration Rate (% p.a.)"
+convertibles.form.profitParticipation = "Participacao nos Lucros" / "Profit Participation"
+
+convertibles.stats.outstandingCount = "Instrumentos Vigentes" / "Outstanding Instruments"
+convertibles.stats.totalPrincipal = "Total Principal" / "Total Principal"
+convertibles.stats.totalAccruedInterest = "Total Juros Acumulados" / "Total Accrued Interest"
+convertibles.stats.totalValue = "Valor Total" / "Total Value"
+
+convertibles.table.investor = "Investidor" / "Investor"
+convertibles.table.type = "Tipo" / "Type"
+convertibles.table.principal = "Principal" / "Principal"
+convertibles.table.accruedInterest = "Juros Acumulados" / "Accrued Interest"
+convertibles.table.totalValue = "Valor Total" / "Total Value"
+convertibles.table.status = "Status" / "Status"
+convertibles.table.maturityDate = "Vencimento" / "Maturity"
+convertibles.table.daysRemaining = "Dias Restantes" / "Days Remaining"
+convertibles.table.empty = "Nenhum instrumento conversivel" / "No convertible instruments"
+convertibles.table.emptyCta = "Criar instrumento" / "Create instrument"
+
+convertibles.status.outstanding = "Vigente" / "Outstanding"
+convertibles.status.converted = "Convertido" / "Converted"
+convertibles.status.redeemed = "Resgatado" / "Redeemed"
+convertibles.status.matured = "Vencido" / "Matured"
+convertibles.status.cancelled = "Cancelado" / "Cancelled"
+
+convertibles.type.mutuoConversivel = "Mutuo Conversivel" / "Convertible Loan"
+convertibles.type.investimentoAnjo = "Investimento-Anjo" / "Angel Investment"
+convertibles.type.misto = "MISTO" / "MISTO"
+convertibles.type.mais = "MAIS" / "MAIS"
+
+convertibles.interest.title = "Evolucao dos Juros" / "Interest Accrual"
+convertibles.interest.period = "Periodo" / "Period"
+convertibles.interest.days = "Dias" / "Days"
+convertibles.interest.amount = "Juros no Periodo" / "Period Interest"
+convertibles.interest.cumulative = "Total Acumulado" / "Cumulative Total"
+
+convertibles.maturityWarning = "Este instrumento vence em {days} dias ({date})" / "This instrument matures in {days} days ({date})"
+convertibles.anjoWarning = "Instrumento em periodo de retencao obrigatoria ate {date}. Conversao nao permitida durante este periodo." / "Instrument in mandatory holding period until {date}. Conversion not permitted during this period."
+convertibles.livePreview = "Valor na Maturidade" / "Value at Maturity"
+
+convertibles.redeem.title = "Resgatar Instrumento" / "Redeem Instrument"
+convertibles.redeem.amount = "Valor de Resgate" / "Redemption Amount"
+convertibles.redeem.date = "Data de Resgate" / "Redemption Date"
+convertibles.redeem.notes = "Observacoes" / "Notes"
+convertibles.redeem.submit = "Resgatar Instrumento" / "Redeem Instrument"
+
+convertibles.cancel.title = "Cancelar Instrumento" / "Cancel Instrument"
+convertibles.cancel.warning = "Esta acao cancelara o instrumento conversivel permanentemente" / "This will permanently cancel the convertible instrument"
+convertibles.cancel.reason = "Motivo do Cancelamento" / "Cancellation Reason"
+convertibles.cancel.confirm = "Cancelar Instrumento" / "Cancel Instrument"
+```
+
+### FE-12: Error Handling UI
+
+| Error Code | HTTP Status | UI Behavior |
+|------------|-------------|-------------|
+| `CONVERTIBLE_NOT_FOUND` | 404 | Redirect to convertibles list with toast "Instrumento nao encontrado" |
+| `CONVERTIBLE_NOT_OUTSTANDING` | 422 | Toast warning "Instrumento nao esta vigente" |
+| `CONVERTIBLE_ALREADY_CONVERTED` | 422 | Toast info "Este instrumento ja foi convertido" + refresh detail |
+| `CONVERTIBLE_HOLDING_PERIOD` | 422 | Toast warning with holding period end date from `details.holdingPeriodEnd` |
+| `CONVERTIBLE_MATURED` | 422 | Toast error "Este instrumento esta vencido" |
+| `VAL_INVALID_INPUT` | 400 | Map `validationErrors` to form field errors via `applyServerErrors()` |
+| `SYS_RATE_LIMITED` | 429 | Toast warning with retry countdown |
+
+**Maturity warning**: Persistent yellow banner on detail page when `daysRemaining <= 30`. Uses `MaturityWarning` component with `cream-100` background, `cream-700` text.
+
+**Loading states**:
+- Convertibles list: skeleton table rows (5 rows) + skeleton stat cards
+- Convertible detail: skeleton header + skeleton stat cards + skeleton tabs
+- Interest chart: skeleton rectangle matching chart dimensions
 
 ---
 

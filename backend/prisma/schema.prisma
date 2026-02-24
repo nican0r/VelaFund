@@ -689,11 +689,13 @@ model FundingRound {
 }
 
 enum RoundType {
+  PRE_SEED
   SEED
   SERIES_A
   SERIES_B
   SERIES_C
   BRIDGE
+  OTHER
 
   @@map("round_type")
 }

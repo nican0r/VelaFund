@@ -11,11 +11,13 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum RoundTypeDto {
+  PRE_SEED = 'PRE_SEED',
   SEED = 'SEED',
   SERIES_A = 'SERIES_A',
   SERIES_B = 'SERIES_B',
   SERIES_C = 'SERIES_C',
   BRIDGE = 'BRIDGE',
+  OTHER = 'OTHER',
 }
 
 export class CreateFundingRoundDto {

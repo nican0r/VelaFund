@@ -468,6 +468,10 @@ const MESSAGES: Record<string, Record<string, string>> = {
     'pt-BR': 'A outorga precisa estar vinculada a um acionista para emitir ações',
     en: 'Grant must be linked to a shareholder to issue shares',
   },
+  'errors.opt.notGrantee': {
+    'pt-BR': 'Apenas o beneficiário da outorga ou um administrador pode realizar esta ação',
+    en: 'Only the grant beneficiary or an administrator can perform this action',
+  },
   // ─── CONVERTIBLE INSTRUMENT MESSAGES ──────────────────────────────
   'errors.convertible.notFound': {
     'pt-BR': 'Instrumento conversível não encontrado',
@@ -509,7 +513,7 @@ const MESSAGES: Record<string, Record<string, string>> = {
     'pt-BR': 'Período mínimo de retenção do Investimento-Anjo não foi cumprido',
     en: 'Investimento-Anjo minimum holding period has not been met',
   },
-  'errors.conv.zeroPremoneeyShares': {
+  'errors.conv.zeroPremoneyShares': {
     'pt-BR': 'Não existem ações pré-money emitidas — impossível calcular preço de conversão',
     en: 'No pre-money shares issued — cannot calculate conversion price',
   },

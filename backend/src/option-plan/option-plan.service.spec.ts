@@ -130,6 +130,7 @@ describe('OptionPlanService', () => {
         update: jest.fn(),
       },
       shareholder: { findFirst: jest.fn() },
+      companyMember: { findFirst: jest.fn() },
       $transaction: jest.fn((fn: any) => fn(prisma)),
     };
 
@@ -835,6 +836,11 @@ describe('OptionPlanService', () => {
       });
     }
 
+    beforeEach(() => {
+      // Mock grantee validation: user-1 is linked to shareholder sh-1 (the grantee)
+      prisma.shareholder.findFirst.mockResolvedValue({ id: 'sh-1' });
+    });
+
     it('should create an exercise request', async () => {
       prisma.optionGrant.findFirst.mockResolvedValue(fullyVestedGrant());
       prisma.optionExerciseRequest.findFirst.mockResolvedValue(null);
@@ -1206,13 +1212,20 @@ describe('OptionPlanService', () => {
   });
 
   describe('cancelExercise', () => {
+    beforeEach(() => {
+      // Mock grantee validation: user-1 is linked to shareholder sh-1 (the grantee)
+      prisma.shareholder.findFirst.mockResolvedValue({ id: 'sh-1' });
+    });
+
     it('should cancel a pending exercise request', async () => {
-      prisma.optionExerciseRequest.findFirst.mockResolvedValue(mockExercise());
+      prisma.optionExerciseRequest.findFirst.mockResolvedValue(
+        mockExercise({ grant: { shareholderId: 'sh-1' } }),
+      );
       prisma.optionExerciseRequest.update.mockResolvedValue(
         mockExercise({ status: 'CANCELLED' }),
       );
 
-      const result = await service.cancelExercise('company-1', 'exercise-1');
+      const result = await service.cancelExercise('company-1', 'exercise-1', 'user-1');
 
       expect(result.status).toBe('CANCELLED');
       expect(prisma.optionExerciseRequest.update).toHaveBeenCalledWith(
@@ -1226,27 +1239,41 @@ describe('OptionPlanService', () => {
       prisma.optionExerciseRequest.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.cancelExercise('company-1', 'exercise-1'),
+        service.cancelExercise('company-1', 'exercise-1', 'user-1'),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw BusinessRuleException if already cancelled', async () => {
       prisma.optionExerciseRequest.findFirst.mockResolvedValue(
-        mockExercise({ status: 'CANCELLED' }),
+        mockExercise({ status: 'CANCELLED', grant: { shareholderId: 'sh-1' } }),
       );
 
       await expect(
-        service.cancelExercise('company-1', 'exercise-1'),
+        service.cancelExercise('company-1', 'exercise-1', 'user-1'),
       ).rejects.toThrow(BusinessRuleException);
     });
 
     it('should throw BusinessRuleException if not pending', async () => {
       prisma.optionExerciseRequest.findFirst.mockResolvedValue(
-        mockExercise({ status: 'COMPLETED' }),
+        mockExercise({ status: 'COMPLETED', grant: { shareholderId: 'sh-1' } }),
       );
 
       await expect(
-        service.cancelExercise('company-1', 'exercise-1'),
+        service.cancelExercise('company-1', 'exercise-1', 'user-1'),
+      ).rejects.toThrow(BusinessRuleException);
+    });
+
+    it('should throw BusinessRuleException if user is not grantee or admin', async () => {
+      prisma.optionExerciseRequest.findFirst.mockResolvedValue(
+        mockExercise({ grant: { shareholderId: 'sh-1' } }),
+      );
+      // Not linked as shareholder
+      prisma.shareholder.findFirst.mockResolvedValue(null);
+      // Not an admin member
+      prisma.companyMember.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.cancelExercise('company-1', 'exercise-1', 'user-1'),
       ).rejects.toThrow(BusinessRuleException);
     });
   });

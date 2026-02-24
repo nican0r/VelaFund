@@ -30,6 +30,37 @@ The profile is **opt-in** — companies start with no profile. An ADMIN explicit
 
 ---
 
+## MVP Scope
+
+### In Scope (MVP)
+
+| Feature | Notes |
+|---------|-------|
+| **Public access** | Profiles shared via unique URL, accessible without authentication |
+| **Email-gated access** | Viewer enters email before viewing; email recorded for analytics |
+| **Profile editor** | Tabbed editor for info, metrics, team, documents, share settings, analytics |
+| **Key metrics** | Up to 6 custom metrics with format options and icon selector |
+| **Founding team** | Up to 10 team members with photo upload, drag-and-drop reordering |
+| **Dataroom documents (linked)** | Documents displayed on the profile are managed in the Dataroom feature and linked here — no separate upload on the profile |
+| **Litigation display** | Summary view on public profile with expandable full details on click; one-time fetch at profile creation |
+| **View analytics** | Total/unique views, timeline chart, top document downloads, recent viewers |
+| **Share modal** | Copy link, access type selector, custom slug editor |
+| **Preview mode** | Inline preview of public profile layout without publishing |
+| **Publishing lifecycle** | DRAFT -> PUBLISHED -> ARCHIVED status transitions with appropriate access control |
+| **Name/logo sync** | Company name and logo are pre-populated from the Company entity at profile creation, then independently editable on the profile |
+
+### Out of Scope (Post-MVP)
+
+| Feature | Reason |
+|---------|--------|
+| **Password protection** | `accessType: PASSWORD` is defined in the data model but not implemented in the frontend for MVP. Only `PUBLIC` and `EMAIL_GATED` are available in the UI. |
+| **Litigation re-fetch** | Litigation data is fetched once at profile creation via BigDataCorp. Manual or scheduled re-fetch is not available in MVP. |
+| **Concurrent edit conflict detection** | Last-write-wins strategy is used. No optimistic locking, conflict detection UI, or real-time collaboration indicators in MVP. |
+| **Auto-save** | Profile edits require an explicit save action. Auto-save with debounce may be added post-MVP. |
+| **QR code generation** | QR code for the share URL is optional and may be deferred to post-MVP. |
+
+---
+
 ## User Stories
 
 ### US-1: Create Company Profile
@@ -1200,6 +1231,1123 @@ PRECONDITION: Profile is PUBLISHED
 
 POSTCONDITION: Profile viewed, analytics recorded
 ```
+
+---
+
+## Frontend Specification
+
+### Page Routing
+
+| Route | Purpose | Auth | Layout |
+|-------|---------|------|--------|
+| `/companies/:companyId/profile` | Profile editor (or "Create Profile" prompt if none exists) | Required (ADMIN, FINANCE) | Dashboard shell with sidebar |
+| `/companies/:companyId/profile/analytics` | Analytics dashboard (also accessible as a tab within the editor) | Required (ADMIN, FINANCE) | Dashboard shell with sidebar |
+| `/p/:slug` | Public shared profile page | None required | Standalone page — no sidebar, no top bar, no dashboard shell |
+
+### Sidebar Navigation
+
+Add a "Profile" (`Perfil`) item in the sidebar under company navigation, positioned between "Documents" and "Settings":
+
+```
+□ Documents
+■ Profile          ← NEW
+□ Settings
+```
+
+- Icon: `building-2` (Lucide)
+- Route: `/companies/:companyId/profile`
+- Visible to: ADMIN, FINANCE roles
+- Active state follows standard sidebar active styling (navy-800 bg, white text, 3px blue-600 left bar)
+
+### Profile Editor Page Layout
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  h1: Perfil da Empresa        [Preview] [Publish/Draft] │
+│  Status badge: DRAFT / PUBLISHED / ARCHIVED              │
+├─────────────────────────────────────────────────────────┤
+│  Tabs: [Informacoes] [Metricas] [Equipe] [Documentos] [Compartilhar] [Analytics] │
+├─────────────────────────────────────────────────────────┤
+│  Tab Content Area                                        │
+│  (renders the active tab component)                      │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Page Header**:
+- Title: `h1` "Perfil da Empresa" — color `navy-900`
+- Status badge: positioned to the right of the title, using the `StatusBadge` component:
+  - DRAFT: `gray-100` bg, `gray-600` text
+  - PUBLISHED: `green-100` bg, `green-700` text
+  - ARCHIVED: `cream-100` bg, `cream-700` text
+- Action buttons (right-aligned):
+  - "Preview" button: Secondary variant (`white` bg, `gray-200` border, `gray-700` text)
+  - "Publish" button: Primary variant (`blue-600` bg, `white` text) — shown when status is DRAFT
+  - "Unpublish" button: Secondary variant — shown when status is PUBLISHED
+  - "Archive" button: Destructive variant — shown in a "more actions" dropdown (three-dot menu)
+
+**Tab Bar**:
+- Uses shadcn/ui `Tabs` component
+- Six tabs: Informacoes, Metricas, Equipe, Documentos, Compartilhar, Analytics
+- Default active tab: Informacoes
+- Tab state is persisted in the URL query parameter `?tab=info|metrics|team|documents|share|analytics`
+
+**Empty State (No Profile Exists)**:
+- When `GET /api/v1/companies/:companyId/profile` returns 404, display an empty state instead of the editor:
+  - Centered illustration: `building-2` icon at 64px, `gray-300` tint
+  - Title: `h3` "Crie o perfil da sua empresa" (`gray-700`)
+  - Description: `body` "Compartilhe informacoes da sua empresa com investidores e stakeholders" (`gray-500`, max-width 400px)
+  - CTA button: Primary variant "Criar Perfil"
+  - Clicking the CTA sends `POST /api/v1/companies/:companyId/profile` with empty body, then redirects to the editor
+
+### Tab: Informacoes (Info)
+
+**Component**: `ProfileInfoTab`
+
+**Layout**: Form card with standard card styling (white bg, `gray-200` border, `radius-lg`, `24px` padding).
+
+**Form Fields**:
+
+| Field | Type | Placeholder | Validation | Max Length |
+|-------|------|-------------|------------|------------|
+| Headline | Text input | "Uma frase sobre sua empresa..." | Optional | 200 chars |
+| Description | Textarea (4 rows min, auto-expand) | "Descreva sua empresa, produto e mercado..." | Optional | 5000 chars |
+| Sector | Select dropdown | "Selecione o setor" | Optional, must be valid `CompanySector` enum | — |
+| Founded Year | Number input | "2020" | Optional, integer 1900–current year | 4 digits |
+| Website | Text input | "https://suaempresa.com.br" | Optional, valid URL format | 200 chars |
+| Location | Text input | "Sao Paulo, SP" | Optional | 100 chars |
+
+**Sector Dropdown Options** (display labels in PT-BR):
+
+| Enum Value | Display Label |
+|------------|---------------|
+| FINTECH | Fintech |
+| HEALTHTECH | Healthtech |
+| EDTECH | Edtech |
+| AGRITECH | Agritech |
+| LEGALTECH | Legaltech |
+| INSURTECH | Insurtech |
+| PROPTECH | Proptech |
+| RETAILTECH | Retailtech |
+| LOGTECH | Logtech |
+| HRTECH | HRtech |
+| MARTECH | Martech |
+| CLEANTECH | Cleantech |
+| BIOTECH | Biotech |
+| DEEPTECH | Deeptech |
+| SAAS | SaaS |
+| MARKETPLACE | Marketplace |
+| ECOMMERCE | E-commerce |
+| AI_ML | IA / Machine Learning |
+| BLOCKCHAIN_WEB3 | Blockchain / Web3 |
+| CYBERSECURITY | Ciberseguranca |
+| IOT | IoT |
+| ENTERTAINMENT | Entretenimento |
+| FOODTECH | Foodtech |
+| MOBILITY | Mobilidade |
+| SOCIAL_IMPACT | Impacto Social |
+| OTHER | Outro |
+
+**Save Behavior**:
+- "Salvar" button at the bottom of the form, Primary variant
+- On click: sends `PUT /api/v1/companies/:companyId/profile` with the form data
+- On success: show success toast "Perfil atualizado com sucesso"
+- On error: show error toast with translated `messageKey`
+- Button shows loading spinner while saving (maintain button width)
+- Character counter shown below Description field (`{current}/{max}`)
+
+### Tab: Metricas (Metrics)
+
+**Component**: `ProfileMetricsTab`
+
+**Layout**: List of metric cards in a vertical stack, with "Add Metric" button at the top.
+
+**Metric Card** (`MetricCard`):
+```
+┌─────────────────────────────────────────────────────────┐
+│  ☰ (drag handle)   [Icon Selector]                [✕]  │
+│                                                          │
+│  Label: [________________]   Value: [________________]   │
+│  Format: [▼ NUMBER      ]                                │
+└─────────────────────────────────────────────────────────┘
+```
+
+- Each card is a white card with `gray-200` border, `radius-md`, `16px` padding
+- Drag handle: 6-dot grip icon (left side), `gray-400`, cursor `grab`
+- Remove button: Ghost variant, `gray-400` icon, top-right corner
+- Icon selector: Popover with a grid of common Lucide icons (users, trending-up, building, dollar-sign, bar-chart, target, globe, heart, zap, shield, briefcase, code). Clicking opens the popover; selecting an icon closes it.
+- Label input: Text, max 50 chars
+- Value input: Text, max 100 chars
+- Format dropdown: `NUMBER`, `CURRENCY_BRL`, `CURRENCY_USD`, `PERCENTAGE`, `TEXT`
+
+**Template Quick-Add Buttons**:
+Below the "Add Metric" button, show a row of template chips:
+
+| Template | Label | Format | Icon |
+|----------|-------|--------|------|
+| Funcionarios | Funcionarios | NUMBER | users |
+| ARR | ARR | CURRENCY_BRL | trending-up |
+| MRR | MRR | CURRENCY_BRL | trending-up |
+| Receita Mensal | Receita Mensal | CURRENCY_BRL | dollar-sign |
+| Clientes | Clientes | NUMBER | building |
+| Setor | Setor | TEXT | briefcase |
+
+- Template chips: `gray-100` bg, `gray-600` text, `radius-full` (pill), `caption` size
+- Clicking a template adds a new metric with pre-filled label, format, and icon (value left empty for user to fill)
+- A template chip is disabled if a metric with that label already exists
+
+**Limits**:
+- "Add Metric" button disabled when 6 metrics exist, with helper text "Maximo de 6 metricas atingido" (`gray-500`, `caption`)
+
+**Save Behavior**:
+- "Salvar Metricas" button at the bottom
+- Sends `PUT /api/v1/companies/:companyId/profile/metrics` with the full list of metrics
+- Metrics are sent in their current display order (order field = array index)
+
+**Drag-and-Drop**: Uses `@dnd-kit/core` and `@dnd-kit/sortable` for reordering.
+
+### Tab: Equipe (Team)
+
+**Component**: `ProfileTeamTab`
+
+**Layout**: Grid of team member cards (2 columns on desktop, 1 on mobile) with "Add Member" button at the top.
+
+**Team Member Card** (`TeamMemberCard`):
+```
+┌─────────────────────────────────────────┐
+│  ☰ (drag handle)                   [✕]  │
+│                                          │
+│       ┌──────────┐                       │
+│       │  Photo   │  ← Click to upload    │
+│       │  Upload  │     or show initials   │
+│       └──────────┘                       │
+│                                          │
+│  Name:     [________________________]    │
+│  Title:    [________________________]    │
+│  LinkedIn: [________________________]    │
+└──────────────────────────────────────────┘
+```
+
+- Card: white bg, `gray-200` border, `radius-lg`, `24px` padding
+- Photo upload circle: 80px diameter, `radius-full`, `gray-100` bg with `camera` icon placeholder. On hover, shows "Upload" overlay. Clicking triggers file input (accepts PNG, JPG, JPEG, max 2 MB). After upload, shows the photo with a small "edit" overlay on hover.
+- Photo upload flow: File selected -> `POST /api/v1/companies/:companyId/profile/team/photo` -> returns `photoUrl` -> stored in the team member card state
+- Initials avatar: When no photo, show initials from first and last name on `blue-600` bg, white text
+- Name input: Text, required, max 100 chars
+- Title input: Text, required, max 100 chars
+- LinkedIn URL input: Text, optional, placeholder "https://linkedin.com/in/..."
+- Drag handle and remove button: Same as metric cards
+
+**Limits**:
+- "Add Member" button disabled when 10 members exist, with helper text "Maximo de 10 membros atingido"
+
+**Save Behavior**:
+- "Salvar Equipe" button at the bottom
+- Sends `PUT /api/v1/companies/:companyId/profile/team` with the full list of team members
+- Members are sent in their current display order
+
+**Drag-and-Drop**: Uses `@dnd-kit/core` and `@dnd-kit/sortable` for reordering.
+
+### Tab: Documentos (Documents)
+
+**Component**: `ProfileDocumentsTab`
+
+**Layout**: Read-only display of documents linked from the Company Dataroom.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Documentos do Dataroom                                  │
+│  body-sm: "Gerencie seus documentos no Dataroom"         │
+│  [Gerenciar no Dataroom →]    ← Link to dataroom page   │
+├─────────────────────────────────────────────────────────┤
+│  Category Tabs: [Pitch Deck] [Financeiro] [Juridico] [Outros] │
+├─────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────┐    │
+│  │ [Thumbnail] Document Name.pdf   12 pgs   2.4 MB │    │
+│  ├─────────────────────────────────────────────────┤    │
+│  │ [Thumbnail] Another Doc.pdf      8 pgs   1.1 MB │    │
+│  └─────────────────────────────────────────────────┘    │
+│                                                          │
+│  Empty state: "Nenhum documento nesta categoria.         │
+│  Adicione documentos no Dataroom."                       │
+└─────────────────────────────────────────────────────────┘
+```
+
+- This tab does NOT allow uploading or removing documents — it is read-only
+- Documents are fetched from the Company Dataroom (same data source as the dataroom management page)
+- "Gerenciar no Dataroom" link navigates to `/companies/:companyId/dataroom`
+- Document list shows: thumbnail (if available), file name, page count, file size
+- Category tabs filter documents by their dataroom category
+- No save button on this tab
+
+### Tab: Compartilhar (Share)
+
+**Component**: `ProfileShareTab`
+
+**Layout**: Share settings card.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Link de compartilhamento                                │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │ https://app.navia.com.br/p/luminatech-a3f2 [📋] │    │
+│  └─────────────────────────────────────────────────┘    │
+│                                                          │
+│  Slug personalizado                                      │
+│  ┌────────────────────────────┐                          │
+│  │ app.navia.com.br/p/ [____] │  [Salvar]               │
+│  └────────────────────────────┘                          │
+│  Helper: "Letras minusculas, numeros e hifens. 3-50 caracteres." │
+│                                                          │
+│  Tipo de acesso                                          │
+│  ○ Publico — Qualquer pessoa com o link pode visualizar  │
+│  ● Email — Visitante informa email antes de visualizar   │
+│                                                          │
+│  (Password option hidden for MVP)                        │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Share URL Display**:
+- Full URL shown in a read-only input with a "Copy" icon button (clipboard icon)
+- On copy: icon changes to checkmark for 2 seconds, tooltip shows "Copiado!"
+- Uses `navigator.clipboard.writeText()` for copy functionality
+
+**Custom Slug Editor**:
+- Prefix "app.navia.com.br/p/" shown as static text (styled as `gray-500`)
+- Editable slug input after the prefix
+- "Salvar" button to confirm slug change
+- Validation: lowercase, alphanumeric, hyphens only, 3-50 chars, cannot start/end with hyphen
+- On save: sends `PUT /api/v1/companies/:companyId/profile/slug`
+- On conflict (409): show inline error "Este slug ja esta em uso"
+
+**Access Type Selector**:
+- Radio button group with two options:
+  - `PUBLIC`: "Publico" — description: "Qualquer pessoa com o link pode visualizar"
+  - `EMAIL_GATED`: "Email" — description: "Visitante informa email antes de visualizar"
+- Password option (`PASSWORD`) is NOT shown in the MVP UI
+- Changing access type sends `PUT /api/v1/companies/:companyId/profile` with `{ accessType: "..." }`
+
+### Tab: Analytics
+
+**Component**: `ProfileAnalyticsTab`
+
+**Layout**:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Period: [7d] [30d] [90d] [Todos]                        │
+├─────────────────────────────────────────────────────────┤
+│  ┌────────────┐ ┌────────────┐ ┌────────────┐           │
+│  │ Total Views│ │ Unique     │ │ Period     │           │
+│  │     47     │ │ Viewers    │ │ Views      │           │
+│  │            │ │     23     │ │     35     │           │
+│  └────────────┘ └────────────┘ └────────────┘           │
+├─────────────────────────────────────────────────────────┤
+│  Views by Day (Recharts Line Chart)                      │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │         ╱╲                                       │    │
+│  │   ╱╲  ╱  ╲   ╱╲                                 │    │
+│  │  ╱  ╲╱    ╲ ╱  ╲                                │    │
+│  │ ╱         ╲╱    ╲                               │    │
+│  └─────────────────────────────────────────────────┘    │
+├─────────────────────────────────────────────────────────┤
+│  Top Document Downloads                                  │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │ Document Name                        Downloads  │    │
+│  │ LuminaTech_PitchDeck_2024.pdf            18     │    │
+│  │ Financeiro_Q4_2025.xlsx                  12     │    │
+│  └─────────────────────────────────────────────────┘    │
+├─────────────────────────────────────────────────────────┤
+│  Recent Viewers                                          │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │ Email              │ Date        │ View Count   │    │
+│  │ investor@vc.com    │ 22/02/2026  │ 3            │    │
+│  │ partner@fund.com   │ 21/02/2026  │ 1            │    │
+│  └─────────────────────────────────────────────────┘    │
+│  (Only shown when accessType is EMAIL_GATED)             │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Period Selector**:
+- Segmented control (button group) with options: 7d, 30d, 90d, Todos
+- Default: 30d
+- Changing period refetches analytics data
+
+**Stat Cards**:
+- 3 stat cards in a row (following design-system.md stat card pattern)
+- Total Views: all-time total
+- Unique Viewers: unique by email (for email-gated) or by IP (for public)
+- Period Views: views in the selected period
+
+**Views by Day Chart**:
+- Recharts `LineChart` with `ResponsiveContainer`
+- X-axis: dates (formatted as dd/MM per i18n.md)
+- Y-axis: view count
+- Line color: `blue-600` (#1B6B93)
+- Area fill: `blue-50` (#EAF5FA) at 30% opacity
+- Grid lines: `gray-200`, dashed
+- Tooltip: white bg, `shadow-lg`, shows date and view count
+
+**Top Document Downloads Table**:
+- Simple table showing document name and download count
+- Sorted by download count descending
+- Max 10 rows
+- If no downloads: show "Nenhum download registrado" empty state
+
+**Recent Viewers Table**:
+- Columns: Email, Date (formatted dd/MM/yyyy), View Count
+- Sorted by most recent first
+- Max 20 rows with "Ver mais" link if more exist
+- Only shown when `accessType` is `EMAIL_GATED` (for `PUBLIC` profiles, viewer emails are not collected)
+- If no viewers: show "Nenhum visualizador registrado" empty state
+
+**Data Source**: `GET /api/v1/companies/:companyId/profile/analytics?period={period}`
+
+### Public Profile Page (`/p/:slug`)
+
+**Component**: `PublicProfilePage`
+
+This is a standalone page with NO dashboard shell — no sidebar, no top bar, no authentication required. It uses its own minimal layout.
+
+**Layout**:
+```
+┌─────────────────────────────────────────────────────────┐
+│                   max-width: 960px                       │
+│                   centered, padding 32px                 │
+│                                                          │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │  [Company Logo 64px]                             │    │
+│  │  Company Name (h1, navy-900)                     │    │
+│  │  Headline (body-lg, gray-600)                    │    │
+│  │  📍 Location • 📅 Founded 2022 • 🏷 Fintech     │    │
+│  │  🔗 website.com.br                               │    │
+│  └─────────────────────────────────────────────────┘    │
+│                                                          │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │  Description (body, gray-600, white-space pre-   │    │
+│  │  wrap for line breaks)                            │    │
+│  └─────────────────────────────────────────────────┘    │
+│                                                          │
+│  ┌──────┐ ┌──────┐ ┌──────┐                             │
+│  │[icon]│ │[icon]│ │[icon]│   ← Metrics grid            │
+│  │value │ │value │ │value │     3 cols desktop           │
+│  │label │ │label │ │label │     2 cols tablet            │
+│  └──────┘ └──────┘ └──────┘     1 col mobile             │
+│                                                          │
+│  ┌─────────┐ ┌─────────┐ ┌─────────┐                    │
+│  │ [Photo] │ │[Initials]│ │ [Photo] │  ← Team grid      │
+│  │  Name   │ │  Name    │ │  Name   │    3 cols desktop  │
+│  │  Title  │ │  Title   │ │  Title  │    2 cols tablet   │
+│  │ [in]    │ │ [in]     │ │ [in]    │    1 col mobile    │
+│  └─────────┘ └─────────┘ └─────────┘                    │
+│                                                          │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │  Documents by Category                            │    │
+│  │  Tabs: [Pitch Deck] [Financeiro] [Juridico]      │    │
+│  │  ┌─────────────────────────────────────────┐     │    │
+│  │  │ [📄] Document Name    12 pgs   [View] [↓] │     │    │
+│  │  └─────────────────────────────────────────┘     │    │
+│  └─────────────────────────────────────────────────┘    │
+│                                                          │
+│  ┌─────────────────────────────────────────────────┐    │
+│  │  Verificacao Litigiosa                            │    │
+│  │  Nivel de Risco: MEDIO (badge)                    │    │
+│  │  Consultado em: 23/02/2026                        │    │
+│  │                                                    │    │
+│  │  ▸ 2 processos ativos • R$ 225.000 em disputa     │    │
+│  │                                                    │    │
+│  │  [Click to expand / collapse]                      │    │
+│  │  ┌───────────────────────────────────────────┐    │    │
+│  │  │ Processo    │ Vara   │ Tipo  │ Valor │ Data│    │    │
+│  │  │ 000123...   │ TJSP   │ CIVIL │ 150k  │ 2024│    │    │
+│  │  │ 000456...   │ TJSP   │ TRAB  │  75k  │ 2023│    │    │
+│  │  └───────────────────────────────────────────┘    │    │
+│  └─────────────────────────────────────────────────┘    │
+│                                                          │
+│  ─────────────────────────────────────────────────────  │
+│  Powered by Navia                      ← Footer          │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Sections** (rendered in this order, each section only shown if data exists):
+
+1. **Header** (`PublicProfileHeader`):
+   - Company logo: 64px, `radius-lg`, fallback to first letter on `navy-900` bg
+   - Company name: `h1`, `navy-900`
+   - Headline: `body-lg`, `gray-600`, below company name
+   - Metadata row: location (with `map-pin` icon), founded year (with `calendar` icon), sector badge (`blue-50` bg, `blue-600` text, pill shape). Items separated by bullet character. Only shown if data exists.
+   - Website: `blue-600` link with `external-link` icon, opens in new tab
+
+2. **Description**: Full text with `white-space: pre-wrap` to preserve line breaks. `body` size, `gray-600`. In a card with `24px` padding.
+
+3. **Metrics** (`PublicMetricsGrid`):
+   - Grid layout: 3 columns on desktop (>= 1024px), 2 columns on tablet (>= 768px), 1 column on mobile
+   - Each metric card: white bg, `gray-200` border, `radius-lg`, `24px` padding, centered content
+   - Icon: 24px, `blue-600` color, centered above value
+   - Value: `h2` size (24px), `navy-900`, bold. Formatted using `formattedValue` from API.
+   - Label: `caption` size (12px), `gray-500`, below value
+   - Section only rendered if at least one metric exists
+
+4. **Team** (`PublicTeamGrid`):
+   - Section title: `h2` "Equipe Fundadora"
+   - Grid layout: 3 columns desktop, 2 tablet, 1 mobile
+   - Each card: white bg, `gray-200` border, `radius-lg`, `24px` padding, centered content
+   - Photo: 80px circle, `radius-full`. Fallback to initials on `blue-600` bg.
+   - Name: `body` weight 600, `gray-800`
+   - Title: `body-sm`, `gray-500`
+   - LinkedIn: Small `linkedin` icon button, `gray-400`, hover `blue-600`, opens in new tab
+   - Section only rendered if at least one team member exists
+
+5. **Documents** (`PublicDocumentList`):
+   - Section title: `h2` "Documentos"
+   - Category tabs for filtering
+   - Each document row: thumbnail (48px height, `radius-sm`), document name (`body`, `gray-700`), page count (`caption`, `gray-500`), view and download buttons
+   - "View" button opens document in new tab (inline PDF viewer via pre-signed URL)
+   - "Download" button triggers file download via pre-signed URL
+   - Section only rendered if at least one document exists
+
+6. **Litigation** (`PublicLitigationSection`):
+   - Section title: `h2` "Verificacao Litigiosa"
+   - Risk level badge:
+     - LOW: `green-100` bg, `green-700` text, "Baixo"
+     - MEDIUM: `cream-100` bg, `cream-700` text, "Medio"
+     - HIGH: `#FEE2E2` bg, `#991B1B` text, "Alto"
+   - Fetched date: "Consultado em: dd/MM/yyyy" (`caption`, `gray-500`)
+   - **Summary view** (always visible): "{N} processos ativos * R$ {value} em disputa" as a single line summary
+   - **Expandable details** (collapsed by default): Click "Ver detalhes" to expand a table with lawsuit details:
+     - Columns: Processo (process ID), Vara (court), Tipo (case type), Valor (value, formatted as R$), Data (filing date)
+     - Collapse button: "Ocultar detalhes"
+     - Uses shadcn/ui `Collapsible` component
+   - **Pending state**: When `litigationStatus === 'PENDING'`, show: "Verificacao em andamento..." with a subtle loading indicator (pulsing dot)
+   - **Failed state**: When `litigationStatus === 'FAILED'`, show: "Verificacao indisponivel no momento" in `gray-500`
+   - Section only rendered if litigation data has been fetched (status is not null)
+
+7. **Footer**:
+   - Divider: `1px solid gray-200`
+   - "Powered by Navia" text: `caption`, `gray-400`, centered
+   - Optional: Navia logo (small, grayscale)
+
+**Profile Not Available States**:
+- When profile is DRAFT or ARCHIVED: show a centered page with "Este perfil nao esta disponivel" (`h2`, `gray-700`) and "Entre em contato com a empresa para mais informacoes" (`body`, `gray-500`). No login prompt.
+- When slug does not exist: same "not available" page (no distinction to prevent enumeration, per SEC-5).
+
+### Email Gate Modal
+
+**Component**: `EmailGateModal`
+
+Shown as a full-page overlay when `accessType === 'EMAIL_GATED'` before the profile content loads.
+
+```
+┌────────────────────────────────────────┐
+│                                        │
+│          ┌──────────────────┐          │
+│          │  [Company Logo]  │          │
+│          │                  │          │
+│          │  Company Name    │          │
+│          │                  │          │
+│          │  Insira seu      │          │
+│          │  email para      │          │
+│          │  visualizar      │          │
+│          │                  │          │
+│          │  [email input ]  │          │
+│          │  [View Profile]  │          │
+│          │                  │          │
+│          │  Seu email e     │          │
+│          │  utilizado apenas│          │
+│          │  para analytics. │          │
+│          └──────────────────┘          │
+│                                        │
+│          Background: gray-50           │
+└────────────────────────────────────────┘
+```
+
+- Overlay: full viewport, `gray-50` bg
+- Card: white bg, `shadow-lg`, `radius-xl`, max-width 420px, centered vertically and horizontally
+- Company logo: 48px, centered, `radius-lg`
+- Company name: `h3`, `navy-900`, centered
+- Prompt text: `body`, `gray-600`, centered
+- Email input: Standard input field, type `email`, placeholder "seu@email.com"
+- Submit button: Primary variant, full-width, "Visualizar Perfil"
+- Disclaimer: `caption`, `gray-400`, centered, below the button
+- Validation: Email format validation client-side. On invalid email, show inline error below input.
+- On submit: Calls `GET /api/v1/profiles/:slug?email={email}` — on success, stores email in session state and renders the profile. The email is passed as a query parameter on the initial fetch only; subsequent page interactions do not require re-entering.
+
+### Preview Mode
+
+**Component**: `ProfilePreviewBanner`
+
+When ADMIN clicks "Preview" in the editor, the page transitions to preview mode:
+
+1. A sticky banner appears at the top of the page:
+   - Background: `cream-100` (warning-tinted)
+   - Text: "Voce esta visualizando o preview do perfil" (`body-sm`, `cream-700`)
+   - "Sair do Preview" button: Secondary variant, right-aligned
+   - Height: 48px
+
+2. Below the banner, the `PublicProfilePage` component renders with the current profile data (same component used for `/p/:slug`), but:
+   - Fetches data from the authenticated endpoint `GET /api/v1/companies/:companyId/profile` (not the public endpoint)
+   - No view is recorded
+   - Email gate is NOT shown (even if access type is EMAIL_GATED)
+
+3. Clicking "Sair do Preview" returns to the editor view on the same tab the user was on before.
+
+### Component List
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| `ProfileEditorPage` | `app/(dashboard)/companies/[companyId]/profile/page.tsx` | Main profile editor page with tabs |
+| `ProfileInfoTab` | `components/profile/ProfileInfoTab.tsx` | Info form (headline, description, sector, etc.) |
+| `ProfileMetricsTab` | `components/profile/ProfileMetricsTab.tsx` | Metrics list with add/edit/reorder |
+| `MetricCard` | `components/profile/MetricCard.tsx` | Individual metric card in the editor |
+| `MetricForm` | `components/profile/MetricForm.tsx` | Metric editing form fields |
+| `ProfileTeamTab` | `components/profile/ProfileTeamTab.tsx` | Team member list with add/edit/reorder |
+| `TeamMemberCard` | `components/profile/TeamMemberCard.tsx` | Individual team member card in the editor |
+| `TeamMemberForm` | `components/profile/TeamMemberForm.tsx` | Team member editing form fields |
+| `ProfileDocumentsTab` | `components/profile/ProfileDocumentsTab.tsx` | Read-only document list linked from dataroom |
+| `ProfileShareTab` | `components/profile/ProfileShareTab.tsx` | Share URL, slug editor, access type selector |
+| `ProfileAnalyticsTab` | `components/profile/ProfileAnalyticsTab.tsx` | Analytics dashboard with charts and tables |
+| `AnalyticsChart` | `components/profile/AnalyticsChart.tsx` | Recharts line chart for views by day |
+| `ViewersTable` | `components/profile/ViewersTable.tsx` | Recent viewers table |
+| `PublicProfilePage` | `app/p/[slug]/page.tsx` | Public profile page (standalone layout) |
+| `PublicProfileHeader` | `components/profile/public/PublicProfileHeader.tsx` | Company name, logo, headline, metadata |
+| `PublicMetricsGrid` | `components/profile/public/PublicMetricsGrid.tsx` | Metrics cards grid |
+| `PublicTeamGrid` | `components/profile/public/PublicTeamGrid.tsx` | Team member cards grid |
+| `PublicDocumentList` | `components/profile/public/PublicDocumentList.tsx` | Document list with category tabs |
+| `PublicLitigationSection` | `components/profile/public/PublicLitigationSection.tsx` | Litigation summary and expandable details |
+| `EmailGateModal` | `components/profile/public/EmailGateModal.tsx` | Email entry modal for email-gated profiles |
+| `ProfilePreviewBanner` | `components/profile/ProfilePreviewBanner.tsx` | Sticky banner shown during preview mode |
+| `ShareUrlCopyButton` | `components/profile/ShareUrlCopyButton.tsx` | Copy-to-clipboard button with feedback |
+| `StatusBadge` | `components/profile/StatusBadge.tsx` | DRAFT/PUBLISHED/ARCHIVED status badge |
+
+### TanStack Query Hooks
+
+All hooks live in `hooks/profile/`.
+
+```typescript
+// hooks/profile/useProfile.ts
+// Fetches the company profile for the editor
+// GET /api/v1/companies/:companyId/profile
+export function useProfile(companyId: string) {
+  return useQuery({
+    queryKey: ['profile', companyId],
+    queryFn: () => api.get(`/api/v1/companies/${companyId}/profile`),
+  });
+}
+
+// hooks/profile/useUpdateProfile.ts
+// Updates profile info fields
+// PUT /api/v1/companies/:companyId/profile
+export function useUpdateProfile(companyId: string) {
+  return useMutation({
+    mutationFn: (data: UpdateProfileDto) =>
+      api.put(`/api/v1/companies/${companyId}/profile`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile', companyId] });
+    },
+  });
+}
+
+// hooks/profile/useUpdateMetrics.ts
+// Replaces all metrics
+// PUT /api/v1/companies/:companyId/profile/metrics
+export function useUpdateMetrics(companyId: string) {
+  return useMutation({
+    mutationFn: (data: UpdateMetricsDto) =>
+      api.put(`/api/v1/companies/${companyId}/profile/metrics`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile', companyId] });
+    },
+  });
+}
+
+// hooks/profile/useUpdateTeam.ts
+// Replaces all team members
+// PUT /api/v1/companies/:companyId/profile/team
+export function useUpdateTeam(companyId: string) {
+  return useMutation({
+    mutationFn: (data: UpdateTeamDto) =>
+      api.put(`/api/v1/companies/${companyId}/profile/team`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile', companyId] });
+    },
+  });
+}
+
+// hooks/profile/usePublishProfile.ts
+// POST /api/v1/companies/:companyId/profile/publish
+export function usePublishProfile(companyId: string) {
+  return useMutation({
+    mutationFn: () =>
+      api.post(`/api/v1/companies/${companyId}/profile/publish`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile', companyId] });
+    },
+  });
+}
+
+// hooks/profile/useUnpublishProfile.ts
+// POST /api/v1/companies/:companyId/profile/unpublish
+export function useUnpublishProfile(companyId: string) {
+  return useMutation({
+    mutationFn: () =>
+      api.post(`/api/v1/companies/${companyId}/profile/unpublish`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile', companyId] });
+    },
+  });
+}
+
+// hooks/profile/useArchiveProfile.ts
+// POST /api/v1/companies/:companyId/profile/archive
+export function useArchiveProfile(companyId: string) {
+  return useMutation({
+    mutationFn: () =>
+      api.post(`/api/v1/companies/${companyId}/profile/archive`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile', companyId] });
+    },
+  });
+}
+
+// hooks/profile/useUpdateSlug.ts
+// PUT /api/v1/companies/:companyId/profile/slug
+export function useUpdateSlug(companyId: string) {
+  return useMutation({
+    mutationFn: (data: { slug: string }) =>
+      api.put(`/api/v1/companies/${companyId}/profile/slug`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile', companyId] });
+    },
+  });
+}
+
+// hooks/profile/useProfileAnalytics.ts
+// GET /api/v1/companies/:companyId/profile/analytics?period=:period
+export function useProfileAnalytics(companyId: string, period: string = '30d') {
+  return useQuery({
+    queryKey: ['profile-analytics', companyId, period],
+    queryFn: () =>
+      api.get(`/api/v1/companies/${companyId}/profile/analytics?period=${period}`),
+  });
+}
+
+// hooks/profile/usePublicProfile.ts
+// GET /api/v1/profiles/:slug?email=:email
+export function usePublicProfile(slug: string, email?: string) {
+  const params = email ? `?email=${encodeURIComponent(email)}` : '';
+  return useQuery({
+    queryKey: ['public-profile', slug, email],
+    queryFn: () => api.get(`/api/v1/profiles/${slug}${params}`),
+    enabled: !!slug && (/* accessType is PUBLIC */ true || !!email),
+  });
+}
+
+// hooks/profile/useUploadTeamPhoto.ts
+// POST /api/v1/companies/:companyId/profile/team/photo
+export function useUploadTeamPhoto(companyId: string) {
+  return useMutation({
+    mutationFn: (file: File) => {
+      const formData = new FormData();
+      formData.append('photo', file);
+      return api.upload(`/api/v1/companies/${companyId}/profile/team/photo`, formData);
+    },
+  });
+}
+```
+
+### Loading States
+
+| Context | Loading Pattern |
+|---------|-----------------|
+| Profile editor initial load | Skeleton screen: rectangular blocks matching the tab bar and form layout |
+| Public profile page | Skeleton screen: company header skeleton, 3 metric card skeletons, 3 team card skeletons |
+| Analytics tab | Skeleton screen: 3 stat card skeletons, chart area skeleton (rectangular block), table skeleton (5 rows) |
+| Save actions | Button loading spinner (replaces label, maintains width) |
+| Photo upload | Circular skeleton pulse in the photo area |
+| Tab switching | No loading state (data is already fetched with the profile) |
+
+### Empty States
+
+| Context | Empty State |
+|---------|-------------|
+| No profile exists | Centered: `building-2` icon (64px, gray-300), "Crie o perfil da sua empresa" (h3), description text, "Criar Perfil" CTA button |
+| No metrics | "Adicione metricas para destacar numeros importantes da sua empresa" with "Adicionar Metrica" button |
+| No team members | "Adicione membros da equipe fundadora" with "Adicionar Membro" button |
+| No documents in dataroom | "Nenhum documento no Dataroom. Adicione documentos para exibi-los no perfil." with "Ir para Dataroom" link |
+| No analytics data | "Nenhuma visualizacao registrada ainda. Compartilhe o link do perfil para comecar a rastrear visualizacoes." |
+| No downloads in analytics | "Nenhum download registrado" (caption, gray-500) |
+| No viewers in analytics | "Nenhum visualizador registrado" (caption, gray-500) |
+
+### Error States
+
+| Context | Error Handling |
+|---------|----------------|
+| Profile save failure | Toast: error message from `messageKey` translation |
+| Metric save failure | Toast: error message. Form retains unsaved state for user to retry. |
+| Team save failure | Toast: error message. Form retains unsaved state for user to retry. |
+| Slug conflict (409) | Inline error below slug input: "Este slug ja esta em uso" |
+| Photo upload failure | Toast: "Falha ao enviar foto. Tente novamente." |
+| Publish failure (empty profile) | Toast: "Perfil nao pode ser publicado sem conteudo. Adicione descricao, metricas, equipe ou documentos." |
+| Public profile not found | Full-page: "Este perfil nao esta disponivel" |
+| Email validation (email gate) | Inline error below input: "Formato de email invalido" |
+| Analytics fetch failure | Toast: error message. Show "Erro ao carregar analytics. Tente novamente." in the tab area with a retry button. |
+
+### Frontend i18n Keys
+
+The following keys must be added to both `messages/pt-BR.json` and `messages/en.json`:
+
+**PT-BR (`messages/pt-BR.json`)**:
+```json
+{
+  "profile": {
+    "title": "Perfil da Empresa",
+    "createPrompt": "Crie o perfil da sua empresa",
+    "createDescription": "Compartilhe informacoes da sua empresa com investidores e stakeholders",
+    "createButton": "Criar Perfil",
+    "tabs": {
+      "info": "Informacoes",
+      "metrics": "Metricas",
+      "team": "Equipe",
+      "documents": "Documentos",
+      "share": "Compartilhar",
+      "analytics": "Analytics"
+    },
+    "status": {
+      "draft": "Rascunho",
+      "published": "Publicado",
+      "archived": "Arquivado"
+    },
+    "actions": {
+      "publish": "Publicar",
+      "unpublish": "Despublicar",
+      "archive": "Arquivar",
+      "preview": "Preview",
+      "save": "Salvar",
+      "exitPreview": "Sair do Preview"
+    },
+    "info": {
+      "headline": "Headline",
+      "headlinePlaceholder": "Uma frase sobre sua empresa...",
+      "description": "Descricao",
+      "descriptionPlaceholder": "Descreva sua empresa, produto e mercado...",
+      "sector": "Setor",
+      "sectorPlaceholder": "Selecione o setor",
+      "foundedYear": "Ano de Fundacao",
+      "foundedYearPlaceholder": "2020",
+      "website": "Website",
+      "websitePlaceholder": "https://suaempresa.com.br",
+      "location": "Localizacao",
+      "locationPlaceholder": "Sao Paulo, SP",
+      "saved": "Perfil atualizado com sucesso"
+    },
+    "metrics": {
+      "title": "Metricas",
+      "add": "Adicionar Metrica",
+      "maxReached": "Maximo de 6 metricas atingido",
+      "save": "Salvar Metricas",
+      "saved": "Metricas atualizadas com sucesso",
+      "emptyState": "Adicione metricas para destacar numeros importantes da sua empresa",
+      "labelPlaceholder": "Nome da metrica",
+      "valuePlaceholder": "Valor",
+      "templates": {
+        "employees": "Funcionarios",
+        "arr": "ARR",
+        "mrr": "MRR",
+        "monthlyRevenue": "Receita Mensal",
+        "clients": "Clientes",
+        "sector": "Setor"
+      },
+      "formats": {
+        "number": "Numero",
+        "currencyBrl": "Moeda (BRL)",
+        "currencyUsd": "Moeda (USD)",
+        "percentage": "Porcentagem",
+        "text": "Texto"
+      }
+    },
+    "team": {
+      "title": "Equipe Fundadora",
+      "add": "Adicionar Membro",
+      "maxReached": "Maximo de 10 membros atingido",
+      "save": "Salvar Equipe",
+      "saved": "Equipe atualizada com sucesso",
+      "emptyState": "Adicione membros da equipe fundadora",
+      "uploadPhoto": "Enviar foto",
+      "namePlaceholder": "Nome completo",
+      "titlePlaceholder": "Cargo / Funcao",
+      "linkedinPlaceholder": "https://linkedin.com/in/..."
+    },
+    "documents": {
+      "title": "Documentos do Dataroom",
+      "description": "Gerencie seus documentos no Dataroom",
+      "manageInDataroom": "Gerenciar no Dataroom",
+      "emptyState": "Nenhum documento no Dataroom. Adicione documentos para exibi-los no perfil.",
+      "emptyCategory": "Nenhum documento nesta categoria.",
+      "goToDataroom": "Ir para Dataroom"
+    },
+    "share": {
+      "title": "Compartilhamento",
+      "shareUrl": "Link de compartilhamento",
+      "copyLink": "Copiar link",
+      "copied": "Copiado!",
+      "customSlug": "Slug personalizado",
+      "slugHelper": "Letras minusculas, numeros e hifens. 3-50 caracteres.",
+      "slugSaved": "Slug atualizado com sucesso",
+      "slugConflict": "Este slug ja esta em uso",
+      "accessType": {
+        "label": "Tipo de acesso",
+        "public": "Publico",
+        "publicDescription": "Qualquer pessoa com o link pode visualizar",
+        "emailGated": "Email",
+        "emailGatedDescription": "Visitante informa email antes de visualizar"
+      }
+    },
+    "analytics": {
+      "title": "Analytics",
+      "totalViews": "Visualizacoes Totais",
+      "uniqueViewers": "Visitantes Unicos",
+      "periodViews": "Visualizacoes no Periodo",
+      "viewsByDay": "Visualizacoes por Dia",
+      "topDownloads": "Top Downloads",
+      "recentViewers": "Visitantes Recentes",
+      "noViews": "Nenhuma visualizacao registrada ainda. Compartilhe o link do perfil para comecar a rastrear visualizacoes.",
+      "noDownloads": "Nenhum download registrado",
+      "noViewers": "Nenhum visualizador registrado",
+      "viewMore": "Ver mais",
+      "periods": {
+        "7d": "7 dias",
+        "30d": "30 dias",
+        "90d": "90 dias",
+        "all": "Todos"
+      },
+      "error": "Erro ao carregar analytics. Tente novamente.",
+      "retry": "Tentar novamente"
+    },
+    "public": {
+      "poweredBy": "Powered by Navia",
+      "foundingTeam": "Equipe Fundadora",
+      "documents": "Documentos",
+      "viewDocument": "Visualizar",
+      "downloadDocument": "Baixar",
+      "emailGate": {
+        "title": "Insira seu email para visualizar o perfil",
+        "placeholder": "seu@email.com",
+        "submit": "Visualizar Perfil",
+        "disclaimer": "Seu email e utilizado apenas para fins de analytics.",
+        "invalidEmail": "Formato de email invalido"
+      },
+      "litigation": {
+        "title": "Verificacao Litigiosa",
+        "riskLevel": {
+          "low": "Baixo",
+          "medium": "Medio",
+          "high": "Alto"
+        },
+        "fetchedAt": "Consultado em",
+        "activeLawsuits": "processos ativos",
+        "inDispute": "em disputa",
+        "expandDetails": "Ver detalhes",
+        "collapseDetails": "Ocultar detalhes",
+        "pending": "Verificacao em andamento...",
+        "failed": "Verificacao indisponivel no momento",
+        "columns": {
+          "processId": "Processo",
+          "court": "Vara",
+          "caseType": "Tipo",
+          "value": "Valor",
+          "filingDate": "Data"
+        }
+      },
+      "notAvailable": "Este perfil nao esta disponivel",
+      "notAvailableDescription": "Entre em contato com a empresa para mais informacoes",
+      "archived": "Este perfil foi arquivado"
+    },
+    "preview": {
+      "banner": "Voce esta visualizando o preview do perfil",
+      "exit": "Sair do Preview"
+    }
+  }
+}
+```
+
+**EN (`messages/en.json`)**:
+```json
+{
+  "profile": {
+    "title": "Company Profile",
+    "createPrompt": "Create your company profile",
+    "createDescription": "Share your company information with investors and stakeholders",
+    "createButton": "Create Profile",
+    "tabs": {
+      "info": "Information",
+      "metrics": "Metrics",
+      "team": "Team",
+      "documents": "Documents",
+      "share": "Share",
+      "analytics": "Analytics"
+    },
+    "status": {
+      "draft": "Draft",
+      "published": "Published",
+      "archived": "Archived"
+    },
+    "actions": {
+      "publish": "Publish",
+      "unpublish": "Unpublish",
+      "archive": "Archive",
+      "preview": "Preview",
+      "save": "Save",
+      "exitPreview": "Exit Preview"
+    },
+    "info": {
+      "headline": "Headline",
+      "headlinePlaceholder": "A short tagline about your company...",
+      "description": "Description",
+      "descriptionPlaceholder": "Describe your company, product, and market...",
+      "sector": "Sector",
+      "sectorPlaceholder": "Select sector",
+      "foundedYear": "Founded Year",
+      "foundedYearPlaceholder": "2020",
+      "website": "Website",
+      "websitePlaceholder": "https://yourcompany.com",
+      "location": "Location",
+      "locationPlaceholder": "Sao Paulo, SP",
+      "saved": "Profile updated successfully"
+    },
+    "metrics": {
+      "title": "Metrics",
+      "add": "Add Metric",
+      "maxReached": "Maximum of 6 metrics reached",
+      "save": "Save Metrics",
+      "saved": "Metrics updated successfully",
+      "emptyState": "Add metrics to highlight important numbers about your company",
+      "labelPlaceholder": "Metric name",
+      "valuePlaceholder": "Value",
+      "templates": {
+        "employees": "Employees",
+        "arr": "ARR",
+        "mrr": "MRR",
+        "monthlyRevenue": "Monthly Revenue",
+        "clients": "Clients",
+        "sector": "Sector"
+      },
+      "formats": {
+        "number": "Number",
+        "currencyBrl": "Currency (BRL)",
+        "currencyUsd": "Currency (USD)",
+        "percentage": "Percentage",
+        "text": "Text"
+      }
+    },
+    "team": {
+      "title": "Founding Team",
+      "add": "Add Member",
+      "maxReached": "Maximum of 10 members reached",
+      "save": "Save Team",
+      "saved": "Team updated successfully",
+      "emptyState": "Add founding team members",
+      "uploadPhoto": "Upload photo",
+      "namePlaceholder": "Full name",
+      "titlePlaceholder": "Role / Position",
+      "linkedinPlaceholder": "https://linkedin.com/in/..."
+    },
+    "documents": {
+      "title": "Dataroom Documents",
+      "description": "Manage your documents in the Dataroom",
+      "manageInDataroom": "Manage in Dataroom",
+      "emptyState": "No documents in the Dataroom. Add documents to display them on the profile.",
+      "emptyCategory": "No documents in this category.",
+      "goToDataroom": "Go to Dataroom"
+    },
+    "share": {
+      "title": "Sharing",
+      "shareUrl": "Share link",
+      "copyLink": "Copy link",
+      "copied": "Copied!",
+      "customSlug": "Custom slug",
+      "slugHelper": "Lowercase letters, numbers, and hyphens. 3-50 characters.",
+      "slugSaved": "Slug updated successfully",
+      "slugConflict": "This slug is already in use",
+      "accessType": {
+        "label": "Access type",
+        "public": "Public",
+        "publicDescription": "Anyone with the link can view",
+        "emailGated": "Email",
+        "emailGatedDescription": "Visitor enters email before viewing"
+      }
+    },
+    "analytics": {
+      "title": "Analytics",
+      "totalViews": "Total Views",
+      "uniqueViewers": "Unique Viewers",
+      "periodViews": "Period Views",
+      "viewsByDay": "Views by Day",
+      "topDownloads": "Top Downloads",
+      "recentViewers": "Recent Viewers",
+      "noViews": "No views recorded yet. Share the profile link to start tracking views.",
+      "noDownloads": "No downloads recorded",
+      "noViewers": "No viewers recorded",
+      "viewMore": "View more",
+      "periods": {
+        "7d": "7 days",
+        "30d": "30 days",
+        "90d": "90 days",
+        "all": "All time"
+      },
+      "error": "Failed to load analytics. Try again.",
+      "retry": "Try again"
+    },
+    "public": {
+      "poweredBy": "Powered by Navia",
+      "foundingTeam": "Founding Team",
+      "documents": "Documents",
+      "viewDocument": "View",
+      "downloadDocument": "Download",
+      "emailGate": {
+        "title": "Enter your email to view the profile",
+        "placeholder": "your@email.com",
+        "submit": "View Profile",
+        "disclaimer": "Your email is used for analytics purposes only.",
+        "invalidEmail": "Invalid email format"
+      },
+      "litigation": {
+        "title": "Litigation Verification",
+        "riskLevel": {
+          "low": "Low",
+          "medium": "Medium",
+          "high": "High"
+        },
+        "fetchedAt": "Fetched on",
+        "activeLawsuits": "active lawsuits",
+        "inDispute": "in dispute",
+        "expandDetails": "View details",
+        "collapseDetails": "Hide details",
+        "pending": "Verification in progress...",
+        "failed": "Verification unavailable at the moment",
+        "columns": {
+          "processId": "Process",
+          "court": "Court",
+          "caseType": "Type",
+          "value": "Value",
+          "filingDate": "Date"
+        }
+      },
+      "notAvailable": "This profile is not available",
+      "notAvailableDescription": "Contact the company for more information",
+      "archived": "This profile has been archived"
+    },
+    "preview": {
+      "banner": "You are viewing the profile preview",
+      "exit": "Exit Preview"
+    }
+  }
+}
+```
+
+**Error keys** (already defined in the Error Codes section of this spec — these map to the `errors.profile.*` namespace):
+- `errors.profile.notFound` — PT: "Perfil da empresa nao encontrado" / EN: "Company profile not found"
+- `errors.profile.alreadyExists` — PT: "Empresa ja possui um perfil" / EN: "Company already has a profile"
+- `errors.profile.companyNotActive` — PT: "Empresa nao esta ativa para criacao de perfil" / EN: "Company is not active for profile creation"
+- `errors.profile.empty` — PT: "Perfil nao pode ser publicado sem conteudo" / EN: "Profile cannot be published without content"
+- `errors.profile.emailRequired` — PT: "Email e obrigatorio para acessar este perfil" / EN: "Email is required to access this profile"
 
 ---
 

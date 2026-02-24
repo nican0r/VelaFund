@@ -173,10 +173,10 @@ interface InvitationToken {
 
 ## API Endpoints
 
-### POST /api/v1/companies/:id/members/invite
+### POST /api/v1/companies/:companyId/members/invite
 **Description**: Invite a new member by email. Creates a pending CompanyMember and sends an invitation email.
 
-**Auth**: Required. `X-Company-Id` header required. User must be ADMIN.
+**Auth**: Required. User must be an active member of the company (`:companyId` in URL path). User must be ADMIN.
 
 **Request**:
 ```json
@@ -212,10 +212,10 @@ interface InvitationToken {
 
 ---
 
-### POST /api/v1/companies/:id/members/:memberId/resend-invitation
+### POST /api/v1/companies/:companyId/members/:memberId/resend-invitation
 **Description**: Re-send an invitation email. Generates a new token and invalidates the old one.
 
-**Auth**: Required. `X-Company-Id` header required. User must be ADMIN.
+**Auth**: Required. User must be an active member of the company (`:companyId` in URL path). User must be ADMIN.
 
 **Response** (200 OK):
 ```json
@@ -237,10 +237,10 @@ interface InvitationToken {
 
 ---
 
-### GET /api/v1/companies/:id/members
+### GET /api/v1/companies/:companyId/members
 **Description**: List all members of a company, including pending invitations.
 
-**Auth**: Required. `X-Company-Id` header required.
+**Auth**: Required. User must be an active member of the company (`:companyId` in URL path).
 
 **Query Parameters**:
 - `status` (optional): Filter by member status (`PENDING`, `ACTIVE`, `REMOVED`)
@@ -284,18 +284,17 @@ interface InvitationToken {
     "total": 2,
     "page": 1,
     "limit": 20,
-    "totalPages": 1,
-    "hasMore": false
+    "totalPages": 1
   }
 }
 ```
 
 ---
 
-### PUT /api/v1/companies/:id/members/:memberId
+### PUT /api/v1/companies/:companyId/members/:memberId
 **Description**: Update a member's role or permissions.
 
-**Auth**: Required. `X-Company-Id` header required. User must be ADMIN.
+**Auth**: Required. User must be an active member of the company (`:companyId` in URL path). User must be ADMIN.
 
 **Request**:
 ```json
@@ -331,10 +330,10 @@ interface InvitationToken {
 
 ---
 
-### DELETE /api/v1/companies/:id/members/:memberId
+### DELETE /api/v1/companies/:companyId/members/:memberId
 **Description**: Remove a member from the company. Sets member status to REMOVED.
 
-**Auth**: Required. `X-Company-Id` header required. User must be ADMIN.
+**Auth**: Required. User must be an active member of the company (`:companyId` in URL path). User must be ADMIN.
 
 **Response** (200 OK):
 ```json
@@ -429,7 +428,7 @@ PRECONDITION: Company is ACTIVE, user is ADMIN
    - Role (ADMIN, FINANCE, LEGAL, INVESTOR, EMPLOYEE)
    - Optional: personal message
 3. Admin clicks "Send Invitation"
-4. Frontend sends POST /api/v1/companies/:id/members/invite
+4. Frontend sends POST /api/v1/companies/:companyId/members/invite
 5. Backend validates:
    - Email is not already an active member
    - Email does not have a pending invitation
@@ -514,30 +513,30 @@ POSTCONDITION: New member has ACTIVE status, can access company data per role
 ### EC-1: Invitation Sent to Email Already a Member
 **Scenario**: Admin tries to invite maria@example.com, but she is already an ACTIVE member.
 **Handling**:
-- Backend returns `409 Conflict` with error code `COMPANY_MEMBER_EXISTS`
-- Error message: "This email is already an active member of this company"
+- Backend returns `409 Conflict` with error code `COMPANY_MEMBER_EXISTS` and messageKey `errors.company.memberExists`
+- Frontend resolves the messageKey to display the localized error message
 - Admin can update the existing member's role instead
 
 ### EC-2: User Tries to Accept Expired Invitation
 **Scenario**: User clicks invitation link after 7-day expiry.
 **Handling**:
-- GET /api/v1/invitations/:token returns `410 Gone`
-- Frontend shows: "This invitation has expired. Please ask the admin to re-send it."
+- GET /api/v1/invitations/:token returns `410 Gone` with error code `COMPANY_INVITATION_EXPIRED` and messageKey `errors.company.invitationExpired`
+- Frontend resolves the messageKey to display the localized expiration message
 - Provides company name and admin email for convenience
 
 ### EC-3: Last ADMIN Tries to Leave Company
 **Scenario**: The only ADMIN tries to change their role or remove themselves.
 **Handling**:
-- Backend returns `422 Unprocessable Entity` with error code `COMPANY_LAST_ADMIN`
-- Error message: "Cannot remove the last admin. Assign another admin first."
+- Backend returns `422 Unprocessable Entity` with error code `COMPANY_LAST_ADMIN` and messageKey `errors.company.lastAdmin`
+- Frontend resolves the messageKey to display the localized error message
 - Frontend disables the role change / remove button for the last admin
 
 ### EC-4: Concurrent Invitations to Same Email
 **Scenario**: Two admins simultaneously try to invite the same email.
 **Handling**:
 - Database unique constraint on (companyId, email) WHERE status = 'PENDING' prevents duplicate
-- Second request fails with `409 Conflict`
-- Error message: "An invitation for this email is already pending"
+- Second request fails with `409 Conflict` with error code `COMPANY_INVITATION_PENDING` and messageKey `errors.company.invitationPending`
+- Frontend resolves the messageKey to display the localized error message
 
 ### EC-5: User Accepts Invitation With Different Email
 **Scenario**: User logs in with a different email than the invitation was sent to (e.g., invitation sent to work email, user signs up with personal email).
@@ -578,10 +577,16 @@ POSTCONDITION: New member has ACTIVE status, can access company data per role
 
 ```typescript
 // /backend/src/company/company-member.service.ts
-import { Injectable, ConflictException, GoneException, ForbiddenException } from '@nestjs/common';
+import { Injectable, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../notifications/email.service';
 import { randomBytes } from 'crypto';
+import {
+  AppException,
+  ConflictException,
+  BusinessRuleException,
+  NotFoundException,
+} from '../common/exceptions/app.exception';
 
 @Injectable()
 export class CompanyMemberService {
@@ -596,7 +601,11 @@ export class CompanyMemberService {
       where: { companyId, email: dto.email, status: 'ACTIVE' },
     });
     if (existingActive) {
-      throw new ConflictException('This email is already an active member of this company');
+      throw new ConflictException(
+        'COMPANY_MEMBER_EXISTS',
+        'errors.company.memberExists',
+        { email: dto.email },
+      );
     }
 
     // Check for existing pending invitation
@@ -604,7 +613,11 @@ export class CompanyMemberService {
       where: { companyId, email: dto.email, status: 'PENDING' },
     });
     if (existingPending) {
-      throw new ConflictException('An invitation for this email is already pending');
+      throw new ConflictException(
+        'COMPANY_INVITATION_PENDING',
+        'errors.company.invitationPending',
+        { email: dto.email },
+      );
     }
 
     // Create member + invitation token in transaction
@@ -658,11 +671,15 @@ export class CompanyMemberService {
     });
 
     if (!invitation || invitation.usedAt) {
-      throw new NotFoundException('Invitation not found or already used');
+      throw new NotFoundException('invitation', token);
     }
 
     if (invitation.expiresAt < new Date()) {
-      throw new GoneException('Invitation has expired');
+      throw new AppException(
+        'COMPANY_INVITATION_EXPIRED',
+        'errors.company.invitationExpired',
+        HttpStatus.GONE,
+      );
     }
 
     // Check user is not already an active member
@@ -674,7 +691,10 @@ export class CompanyMemberService {
       },
     });
     if (existingMember) {
-      throw new ConflictException('You are already an active member of this company');
+      throw new ConflictException(
+        'COMPANY_MEMBER_EXISTS',
+        'errors.company.memberExists',
+      );
     }
 
     // Check 20-company membership limit
@@ -682,7 +702,11 @@ export class CompanyMemberService {
       where: { userId, status: { in: ['PENDING', 'ACTIVE'] } },
     });
     if (membershipCount >= 20) {
-      throw new UnprocessableEntityException('Maximum of 20 company memberships reached');
+      throw new BusinessRuleException(
+        'COMPANY_MEMBER_LIMIT_REACHED',
+        'errors.company.memberLimitReached',
+        { limit: 20, current: membershipCount },
+      );
     }
 
     // Accept invitation (email match NOT required)
@@ -745,3 +769,1074 @@ export class CompanyMemberService {
 ## Related Specifications
 
 *Cross-references to be completed in Phase 5 of the spec alignment project.*
+
+---
+
+## Frontend Architecture
+
+### Page Routes
+
+| Route | Auth | Layout | Description |
+|-------|------|--------|-------------|
+| `/dashboard/members` | Required (ADMIN only) | Dashboard shell | Members list page |
+| `/invitations/:token` | Public (view), Required (accept) | Auth layout (centered card) | Invitation acceptance page |
+
+**Note**: One company per user for the MVP -- no company switcher is needed.
+
+### Component Tree
+
+```
+MembersPage
+  +-- PageHeader ("Membros" + "Convidar Membro" button)
+  +-- MembersTable
+  |     +-- RoleBadge (per row)
+  |     +-- StatusBadge (per row)
+  |     +-- RoleChangeDropdown (ADMIN only, per row)
+  |     +-- ResendInvitationButton (PENDING rows only)
+  |     +-- MemberRemoveConfirmation (triggered from actions)
+  +-- InviteMemberModal (triggered from header button)
+
+InvitationAcceptPage
+  +-- InvitationExpiredPage (error state)
+  +-- InvitationEmailMismatch (error state)
+  +-- PersonalInfoForm (inline, for new users after Privy signup)
+```
+
+---
+
+## Frontend Components
+
+### 1. MembersPage
+
+**File**: `app/(dashboard)/members/page.tsx`
+
+**Description**: Main members list page. Only accessible by ADMIN users. Other roles are redirected to `/dashboard`.
+
+**Layout**: Dashboard shell with full content width.
+
+**Structure**:
+- Page header: h1 "Membros" (`navy-900`) with "Convidar Membro" primary button (right-aligned, ADMIN only)
+- Description: body-sm, `gray-500`, "Gerencie os membros e permissoes da sua empresa"
+- Below header: `MembersTable` component
+
+**Permission**: Route-level guard redirects non-ADMIN users to `/dashboard`.
+
+**Data Fetching**: Uses TanStack Query to fetch `GET /api/v1/companies/:companyId/members`.
+
+```typescript
+// hooks/use-members.ts
+import { useQuery } from '@tanstack/react-query';
+
+export function useMembers(companyId: string, params?: {
+  page?: number;
+  limit?: number;
+  status?: string;
+  role?: string;
+  search?: string;
+  sort?: string;
+}) {
+  const query = new URLSearchParams();
+  if (params?.page) query.set('page', String(params.page));
+  if (params?.limit) query.set('limit', String(params.limit));
+  if (params?.status) query.set('status', params.status);
+  if (params?.role) query.set('role', params.role);
+  if (params?.search) query.set('search', params.search);
+  if (params?.sort) query.set('sort', params.sort);
+
+  const path = `/api/v1/companies/${companyId}/members?${query}`;
+
+  return useQuery({
+    queryKey: ['members', companyId, params],
+    queryFn: () => api.getList<CompanyMember>(path),
+  });
+}
+```
+
+---
+
+### 2. MembersTable
+
+**File**: `components/members/members-table.tsx`
+
+**Description**: Data table displaying company members with inline actions.
+
+**Columns**:
+
+| Column | Content | Width | Alignment |
+|--------|---------|-------|-----------|
+| Nome | Avatar (32px circle) + full name (or email for PENDING) | flex | Left |
+| E-mail | Member email | 200px | Left |
+| Papel | `RoleBadge` component | 120px | Left |
+| Status | `StatusBadge` component | 100px | Left |
+| Data de Entrada | `acceptedAt` formatted as `dd/MM/yyyy` (Brazilian format) | 140px | Left |
+| Acoes | Action buttons (ADMIN only) | 120px | Right |
+
+**Actions Column** (ADMIN only, per row):
+- `RoleChangeDropdown`: Triggered by clicking the `RoleBadge` in the role column. Not shown for the current user's own row.
+- Remove button: Trash icon (ghost variant). Not shown for the current user's own row.
+- `ResendInvitationButton`: Shown only for PENDING members.
+
+**Visual Spec**:
+- Container: white bg, `radius-lg` (12px), `1px solid gray-200`, overflow hidden
+- Header row: `gray-50` bg, `gray-500` text, caption (12px), weight 500, uppercase
+- Row: 52px height, body (14px), `gray-700`, `1px solid gray-100` bottom border
+- Row hover: `gray-50` bg
+- Numeric / date cells: `tabular-nums` font feature
+- Pagination: standard pagination below table (20 items per page)
+
+**States**:
+
+| State | Visual | Trigger |
+|-------|--------|---------|
+| Loading | Skeleton rows (pulsing `gray-200` rectangles matching layout) | Initial load |
+| Data | Populated table with pagination | Data loaded |
+| Empty | Centered illustration + "Nenhum membro encontrado" + "Convide membros para colaborar na gestao da empresa" + "Convidar Membro" CTA button | No members found |
+| Error | Error message + "Tentar novamente" retry button | API error |
+
+---
+
+### 3. InviteMemberModal
+
+**File**: `components/members/invite-member-modal.tsx`
+
+**Description**: Modal dialog for inviting a new member to the company. Triggered by the "Convidar Membro" button on MembersPage.
+
+**Visual Spec**:
+- Modal: medium size (560px max-width)
+- Overlay: `navy-900` at 50% opacity
+- Header: h3 "Convidar Membro" + X close button
+- Body: 24px padding, 20px gap between fields
+- Footer: `gray-100` bg strip, 16px padding, "Cancelar" (secondary) + "Enviar Convite" (primary) right-aligned
+
+**Fields**:
+
+| Field | Type | Label | Placeholder | Validation | Required |
+|-------|------|-------|-------------|------------|----------|
+| `email` | email input | E-mail do membro | nome@empresa.com | Valid email format | Yes |
+| `role` | select dropdown | Papel | -- | Must be valid role enum | Yes (default: EMPLOYEE) |
+| `message` | textarea (3 rows) | Mensagem (opcional) | Mensagem opcional para o convite | Max 500 characters | No |
+
+**Role Dropdown Options** (each with description visible in dropdown):
+
+| Value | Label (PT-BR) | Description (PT-BR) |
+|-------|---------------|---------------------|
+| `ADMIN` | Administrador | Acesso total a empresa e configuracoes |
+| `FINANCE` | Financeiro | Gestao financeira e relatorios |
+| `LEGAL` | Juridico | Documentos legais e compliance |
+| `INVESTOR` | Investidor | Visualizacao de investimentos proprios |
+| `EMPLOYEE` | Colaborador | Visualizacao de opcoes e documentos proprios |
+
+**Submit**: `POST /api/v1/companies/:companyId/members/invite` with `{ email, role, message }`.
+
+**Mutation**:
+
+```typescript
+// hooks/use-invite-member.ts
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+export function useInviteMember(companyId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: { email: string; role: string; message?: string }) =>
+      api.post(`/api/v1/companies/${companyId}/members/invite`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['members', companyId] });
+    },
+  });
+}
+```
+
+**States**:
+
+| State | Visual | Trigger |
+|-------|--------|---------|
+| Idle | Form with empty fields (role defaults to EMPLOYEE) | Modal opens |
+| Submitting | "Enviar Convite" button shows spinner, all fields disabled | Submit clicked |
+| Success | Modal closes, success toast: "Convite enviado para {email}" | 201 response |
+| Email Duplicate | Inline error on email field: "Este e-mail ja e membro da empresa" | 409 COMPANY_MEMBER_EXISTS |
+| Pending Duplicate | Inline error on email field: "Ja existe um convite pendente para este e-mail" | 409 COMPANY_INVITATION_PENDING |
+| Validation Error | Field-level error messages mapped from `validationErrors` | 400 VAL_INVALID_INPUT |
+| Server Error | Error toast, form re-enabled | 500 |
+
+---
+
+### 4. RoleBadge
+
+**File**: `components/members/role-badge.tsx`
+
+**Description**: Colored pill badge displaying the member's role.
+
+**Visual Spec**: Pill badge with `radius-full`, caption (12px), weight 500, padding `2px 8px`.
+
+**Colors**:
+
+| Role | Background | Text |
+|------|-----------|------|
+| ADMIN | `navy-100` (#D6E4F0) | `navy-700` (#134170) |
+| FINANCE | `blue-50` (#EAF5FA) | `blue-600` (#1B6B93) |
+| LEGAL | `green-100` (#E8F5E4) | `green-700` (#6BAF5E) |
+| INVESTOR | `cream-100` (#FAF4E3) | `cream-700` (#C4A44E) |
+| EMPLOYEE | `gray-100` (#F3F4F6) | `gray-600` (#4B5563) |
+
+**Props**:
+
+```typescript
+interface RoleBadgeProps {
+  role: 'ADMIN' | 'FINANCE' | 'LEGAL' | 'INVESTOR' | 'EMPLOYEE';
+}
+```
+
+---
+
+### 5. RoleChangeDropdown
+
+**File**: `components/members/role-change-dropdown.tsx`
+
+**Description**: Inline dropdown for changing a member's role. Only visible to ADMIN users. Triggered by clicking the `RoleBadge` in the table.
+
+**Behavior**:
+- Trigger: Clicking the `RoleBadge` in the table row (only when current user is ADMIN and target is not self)
+- Dropdown shows all 5 roles with descriptions (same as InviteMemberModal role dropdown)
+- On select: Confirmation dialog opens before submitting
+
+**Confirmation Dialog**:
+- Title: "Alterar Papel"
+- Message: "Alterar o papel de {name} de {oldRole} para {newRole}?"
+- Buttons: "Cancelar" (secondary) + "Confirmar" (primary)
+
+**Submit**: `PUT /api/v1/companies/:companyId/members/:memberId` with `{ role }`.
+
+**Constraints**:
+- Cannot change own role (current user's row shows a static RoleBadge without dropdown trigger)
+- Cannot demote the last ADMIN (backend enforces, frontend shows error toast)
+
+**Mutation**:
+
+```typescript
+// hooks/use-update-member.ts
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+export function useUpdateMember(companyId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ memberId, data }: { memberId: string; data: { role?: string } }) =>
+      api.put(`/api/v1/companies/${companyId}/members/${memberId}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['members', companyId] });
+    },
+  });
+}
+```
+
+---
+
+### 6. MemberRemoveConfirmation
+
+**File**: `components/members/member-remove-confirmation.tsx`
+
+**Description**: Destructive confirmation dialog for removing a member from the company.
+
+**Trigger**: Remove (trash icon) button in the actions column of MembersTable.
+
+**Visual Spec**:
+- Modal: small size (400px max-width)
+- Overlay: `navy-900` at 50% opacity
+- Icon: Destructive icon (red trash or warning icon)
+- Title: h3 "Remover Membro"
+- Message: body, `gray-600`, "Remover {name} da empresa? Esta acao nao pode ser desfeita."
+- Buttons: "Cancelar" (secondary) + "Remover" (destructive variant, red)
+
+**Constraints**:
+- Cannot remove self (button hidden for current user's own row)
+- Cannot remove last ADMIN (backend enforces with 422 COMPANY_LAST_ADMIN)
+
+**Submit**: `DELETE /api/v1/companies/:companyId/members/:memberId`.
+
+**Mutation**:
+
+```typescript
+// hooks/use-remove-member.ts
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+export function useRemoveMember(companyId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (memberId: string) =>
+      api.delete(`/api/v1/companies/${companyId}/members/${memberId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['members', companyId] });
+    },
+  });
+}
+```
+
+---
+
+### 7. ResendInvitationButton
+
+**File**: `components/members/resend-invitation-button.tsx`
+
+**Description**: Button to resend an invitation email for pending members.
+
+**Visual Spec**:
+- Button: ghost variant, "Reenviar convite" text
+- Size: sm (32px height, 13px font)
+- Only rendered for members with status `PENDING`
+
+**Behavior**:
+- On click: `POST /api/v1/companies/:companyId/members/:memberId/resend-invitation`
+- On success: toast "Convite reenviado"
+- After sending: button disabled for 60 seconds (local cooldown timer)
+- Loading: button shows spinner while request is in flight
+
+**Mutation**:
+
+```typescript
+// hooks/use-resend-invitation.ts
+import { useMutation } from '@tanstack/react-query';
+
+export function useResendInvitation(companyId: string) {
+  return useMutation({
+    mutationFn: (memberId: string) =>
+      api.post(`/api/v1/companies/${companyId}/members/${memberId}/resend-invitation`, {}),
+  });
+}
+```
+
+---
+
+### 8. InvitationAcceptPage
+
+**File**: `app/(public)/invitations/[token]/page.tsx`
+
+**Description**: Public invitation acceptance page. No auth required to view, auth required to accept.
+
+**Layout**: Auth layout (centered card on `gray-50` background, no sidebar or top bar).
+
+**Visual Spec**:
+- Card: max-w 480px, white bg, `shadow-lg`, `radius-xl` (16px), padding 32px
+- Company logo: 48px, centered (or placeholder circle with company initial on `blue-600` bg)
+- Company name: h2, `navy-900`, centered
+- Role: `RoleBadge`, centered below company name
+- Invited by: body-sm, `gray-500`, centered, "Convidado por {name}"
+- Divider: `1px solid gray-200`, margin-y 24px
+- Action buttons: Primary variant, full width, size lg
+- Alternative link: ghost text link below the primary button
+
+**Flow**:
+
+1. On mount: `GET /api/v1/invitations/:token` to validate token
+2. Render based on token validity and auth state:
+
+| Token State | Auth State | UI |
+|-------------|-----------|-----|
+| Valid | Not logged in | Company info + "Criar Conta" (primary) + "Ja tenho conta" (ghost link) |
+| Valid | Logged in | Company info + "Aceitar Convite" (primary) |
+| Valid, new user just signed up | Logged in, `isNew: true` | Company info + inline PersonalInfoForm |
+| Expired | Any | `InvitationExpiredPage` |
+| Invalid / not found | Any | `InvitationExpiredPage` |
+| Email mismatch | Logged in | `InvitationEmailMismatch` |
+| Already member | Logged in | "Voce ja e membro desta empresa" + "Ir para o Dashboard" link |
+
+**PersonalInfoForm** (inline, for new users):
+- Renders inside the invitation card after Privy signup completes
+- Fields: firstName (required), lastName (required), email (pre-filled from Privy/invitation, editable)
+- Submit button: "Continuar"
+- On submit: `PUT /api/v1/users/me` then auto-accept invitation via `POST /api/v1/invitations/:token/accept`
+
+**Query**:
+
+```typescript
+// hooks/use-invitation.ts
+import { useQuery } from '@tanstack/react-query';
+
+export function useInvitation(token: string) {
+  return useQuery({
+    queryKey: ['invitation', token],
+    queryFn: () => api.get<InvitationDetails>(`/api/v1/invitations/${token}`),
+    retry: false, // Don't retry 404/410 errors
+  });
+}
+
+interface InvitationDetails {
+  companyName: string;
+  companyLogoUrl: string | null;
+  role: string;
+  invitedByName: string;
+  invitedAt: string;
+  expiresAt: string;
+  email: string;
+  hasExistingAccount: boolean;
+}
+```
+
+**Accept Mutation**:
+
+```typescript
+// hooks/use-accept-invitation.ts
+import { useMutation } from '@tanstack/react-query';
+
+export function useAcceptInvitation() {
+  return useMutation({
+    mutationFn: (token: string) =>
+      api.post<AcceptInvitationResponse>(`/api/v1/invitations/${token}/accept`, {}),
+  });
+}
+
+interface AcceptInvitationResponse {
+  memberId: string;
+  companyId: string;
+  companyName: string;
+  role: string;
+  status: string;
+  acceptedAt: string;
+}
+```
+
+---
+
+### 9. InvitationExpiredPage
+
+**File**: Rendered as a state within `InvitationAcceptPage` (not a separate route).
+
+**Description**: Error state shown when the invitation token is expired or invalid.
+
+**Visual Spec**:
+- Same card layout as InvitationAcceptPage
+- Icon: Warning icon (48px, `gray-400`)
+- Title: h2, `navy-900`, "Convite Expirado"
+- Message: body, `gray-500`, "Este convite expirou ou e invalido"
+- CTA: body-sm, `gray-500`, "Solicite um novo convite ao administrador da empresa"
+
+**Triggers**: `GET /api/v1/invitations/:token` returns 404 or 410.
+
+---
+
+### 10. InvitationEmailMismatch
+
+**File**: Rendered as a state within `InvitationAcceptPage` (not a separate route).
+
+**Description**: Error state shown when the logged-in user's email does not match the invitation email. Note: per BR-6 email match is NOT required for acceptance, but this state is shown as an informational warning if the backend returns a 403 for other reasons, or can be used for UX guidance.
+
+**Visual Spec**:
+- Same card layout as InvitationAcceptPage
+- Icon: Info icon (48px, `blue-600`)
+- Title: h2, `navy-900`, "E-mail Incorreto"
+- Message: body, `gray-500`, "Este convite foi enviado para {masked-email}. Faca login com o e-mail correto."
+- CTA button: Secondary variant, full width, "Sair e entrar com outro e-mail"
+- CTA behavior: Triggers logout, then opens Privy login modal
+
+---
+
+## Frontend User Flows
+
+### Flow 1: Invite Member (Admin)
+
+```
+ADMIN on /dashboard/members
+  |
+  +-- [clicks "Convidar Membro"] --> InviteMemberModal opens
+  |     |
+  |     +-- [fills email + role + optional message] --> submits
+  |     |     |
+  |     |     +-- [201 success] --> close modal + toast "Convite enviado" + refetch table
+  |     |     +-- [409 COMPANY_MEMBER_EXISTS] --> inline error: "Este e-mail ja e membro da empresa"
+  |     |     +-- [409 COMPANY_INVITATION_PENDING] --> inline error: "Ja existe um convite pendente"
+  |     |     +-- [400 validation] --> field-level errors
+  |     |     +-- [500 error] --> error toast
+  |     |
+  |     +-- [clicks Cancel or outside] --> modal closes, no action
+```
+
+**Step-by-step**:
+
+```
+PRECONDITION: User is ADMIN of company
+ACTOR: ADMIN
+TRIGGER: Clicks "Convidar Membro" button
+
+1. [UI] InviteMemberModal opens with overlay (animation: fade in 200ms + slide up 250ms)
+2. [UI] Modal shows: email input, role dropdown (default: EMPLOYEE), optional message textarea
+3. [UI] Admin fills email address
+4. [UI] Admin selects role from dropdown (sees descriptions for each role)
+5. [UI] Admin optionally types invitation message (max 500 chars)
+6. [UI] Admin clicks "Enviar Convite"
+7. [Frontend] Client-side validation (email format, role required)
+   -> IF invalid: show field-level errors, STOP
+8. [Frontend] POST /api/v1/companies/:companyId/members/invite with { email, role, message }
+9. [Backend] Checks if email is already a member or has pending invitation
+   -> IF already active member: return 409 COMPANY_MEMBER_EXISTS
+   -> IF pending invitation: return 409 COMPANY_INVITATION_PENDING
+10. [Backend] Creates CompanyMember in PENDING status, generates InvitationToken, sends email
+11. [Backend] Returns 201 { member: { id, email, role, status: 'PENDING', expiresAt } }
+12. [UI] Modal closes (animation: reverse of open)
+13. [UI] Success toast: "Convite enviado para {email}" (auto-dismiss 5 seconds)
+14. [Frontend] MembersTable refetches via queryClient.invalidateQueries to show new PENDING member
+
+POSTCONDITION: New PENDING member in table, invitation email sent
+SIDE EFFECTS: Audit log (COMPANY_MEMBER_INVITED), invitation email via AWS SES
+```
+
+---
+
+### Flow 2: Invited User -- New to Platform
+
+```
+New user receives invitation email
+  |
+  +-- [clicks invitation link] --> /invitations/:token
+  |     |
+  |     +-- [token valid] --> shows company info + role + "Criar Conta" button
+  |     |     |
+  |     |     +-- [clicks "Criar Conta"] --> Privy signup modal
+  |     |     |     |
+  |     |     |     +-- [Privy signup success] --> POST /api/v1/auth/login (sync)
+  |     |     |     |     |
+  |     |     |     |     +-- [new user created] --> show inline PersonalInfoForm
+  |     |     |     |           |
+  |     |     |     |           +-- [fills name + submits] --> PUT /api/v1/users/me
+  |     |     |     |           |     |
+  |     |     |     |           |     +-- [success] --> auto-accept invitation
+  |     |     |     |           |           |
+  |     |     |     |           |           +-- POST /api/v1/invitations/:token/accept
+  |     |     |     |           |           +-- [success] --> redirect to /dashboard
+  |     |     |     |           |           +-- [error] --> error toast
+  |     |     |     |           |
+  |     |     |     |           +-- [validation error] --> field errors
+  |     |     |     |
+  |     |     |     +-- [Privy signup fails] --> Privy handles error display
+  |     |     |
+  |     |     +-- [clicks "Ja tenho conta"] --> Privy login modal
+  |     |           +-- (continues as existing user flow)
+  |     |
+  |     +-- [token expired] --> InvitationExpiredPage
+  |     +-- [token invalid] --> InvitationExpiredPage
+```
+
+**Step-by-step**:
+
+```
+PRECONDITION: User has no Navia account
+ACTOR: Invited user (new)
+TRIGGER: Clicks invitation link in email
+
+1. [UI] Browser navigates to /invitations/:token
+2. [Frontend] InvitationAcceptPage mounts, shows centered loading spinner
+3. [Frontend] GET /api/v1/invitations/:token
+4. [Backend] Validates token, returns { companyName, companyLogoUrl, role, invitedByName, email, hasExistingAccount: false }
+   -> IF invalid/expired: return 404 or 410
+5. [UI] Card renders: company logo (48px), company name (h2), RoleBadge, "Convidado por {name}"
+6. [UI] Divider, then "Criar Conta" primary button (full width, lg) + "Ja tenho conta" ghost link
+7. [UI] User clicks "Criar Conta"
+8. [Frontend] Opens Privy signup modal
+9. [UI] User completes Privy signup (email + verification code, or social login)
+10. [Frontend] POST /api/v1/auth/login to sync with backend
+11. [Backend] Creates new user, returns { user, isNew: true }
+12. [UI] InvitationAcceptPage detects authenticated + isNew state
+13. [UI] Card content transitions to inline PersonalInfoForm:
+    - firstName input (required)
+    - lastName input (required)
+    - email input (pre-filled from Privy/invitation, editable)
+    - "Continuar" primary button (full width)
+14. [UI] User fills in name fields
+15. [UI] User clicks "Continuar"
+16. [Frontend] PUT /api/v1/users/me with { firstName, lastName, email }
+    -> IF validation error: show field-level errors, STOP
+17. [Backend] Updates user profile, returns updated user
+18. [Frontend] Automatically calls POST /api/v1/invitations/:token/accept
+19. [Backend] Updates CompanyMember: status -> ACTIVE, userId linked, token marked used
+20. [Backend] Returns { companyId, companyName, role, status: 'ACTIVE' }
+21. [Frontend] AuthContext updates: user profile, hasCompany=true, companyId set
+22. [UI] Redirect to /dashboard
+23. [UI] Welcome toast: "Bem-vindo a {companyName}!" (auto-dismiss 5 seconds)
+
+POSTCONDITION: User has account + is ACTIVE member of company
+SIDE EFFECTS: Audit logs (AUTH_LOGIN_SUCCESS, COMPANY_MEMBER_ACCEPTED), welcome email
+```
+
+---
+
+### Flow 3: Invited User -- Already Has Account (Logged In)
+
+```
+PRECONDITION: User already has Navia account and is logged in
+ACTOR: Existing user
+TRIGGER: Clicks invitation link in email
+
+1. [UI] Browser navigates to /invitations/:token
+2. [Frontend] InvitationAcceptPage mounts, shows loading spinner
+3. [Frontend] GET /api/v1/invitations/:token
+4. [Backend] Returns invitation details (hasExistingAccount: true)
+5. [UI] Card renders: company logo, name, RoleBadge, "Convidado por {name}"
+6. [Frontend] Detects user is already authenticated
+7. [UI] Shows "Aceitar Convite" primary button (full width, lg)
+8. [UI] User clicks "Aceitar Convite"
+9. [Frontend] POST /api/v1/invitations/:token/accept
+10. [Backend] Links user to company, updates CompanyMember to ACTIVE
+    -> IF email mismatch: acceptance still allowed per BR-6
+    -> IF already member: return 409 COMPANY_MEMBER_EXISTS
+11. [Backend] Returns { companyId, companyName, role }
+12. [Frontend] AuthContext updates: hasCompany=true, companyId set
+13. [UI] Redirect to /dashboard
+14. [UI] Success toast: "Voce agora e membro de {companyName}!"
+
+POSTCONDITION: User is ACTIVE member
+SIDE EFFECTS: Audit log (COMPANY_MEMBER_ACCEPTED)
+```
+
+---
+
+### Flow 4: Invited User -- Already Has Account (Not Logged In)
+
+```
+PRECONDITION: User has Navia account but not currently logged in
+ACTOR: Existing user
+TRIGGER: Clicks invitation link in email
+
+1. [UI] Browser navigates to /invitations/:token
+2. [Frontend] GET /api/v1/invitations/:token
+3. [Backend] Returns invitation details (hasExistingAccount: true)
+4. [UI] Card renders: company info + "Entrar" primary button + "Criar Conta" ghost link
+5. [UI] User clicks "Entrar"
+6. [Frontend] Opens Privy login modal
+7. [UI] User logs in via Privy
+8. [Frontend] POST /api/v1/auth/login -> existing user detected (isNew: false)
+9. [UI] InvitationAcceptPage updates to show "Aceitar Convite" button
+10-14. Same as Flow 3 steps 8-14
+
+POSTCONDITION: User is ACTIVE member
+SIDE EFFECTS: Audit logs (AUTH_LOGIN_SUCCESS, COMPANY_MEMBER_ACCEPTED)
+```
+
+---
+
+### Flow 5: Change Member Role
+
+```
+PRECONDITION: User is ADMIN
+ACTOR: ADMIN
+TRIGGER: Clicks role badge of another member in the table
+
+1. [UI] ADMIN clicks on a RoleBadge in another member's row
+2. [UI] RoleChangeDropdown opens showing 5 role options with descriptions
+3. [UI] Admin selects new role
+4. [UI] Confirmation dialog: "Alterar o papel de {name} de {oldRole} para {newRole}?"
+5. [UI] Admin clicks "Confirmar"
+6. [Frontend] PUT /api/v1/companies/:companyId/members/:memberId with { role }
+   -> IF 422 COMPANY_LAST_ADMIN: error toast "Nao e possivel alterar o papel do ultimo administrador"
+7. [Backend] Updates member role
+8. [Backend] Returns 200 with updated member
+9. [UI] Toast: "Papel alterado com sucesso" (auto-dismiss 5 seconds)
+10. [Frontend] queryClient.invalidateQueries to refetch members table
+
+POSTCONDITION: Member has new role
+SIDE EFFECTS: Audit log (COMPANY_ROLE_CHANGED)
+```
+
+---
+
+### Flow 6: Remove Member
+
+```
+PRECONDITION: User is ADMIN, target is not self
+ACTOR: ADMIN
+TRIGGER: Clicks remove (trash) icon on member row
+
+1. [UI] ADMIN clicks trash icon in actions column
+2. [UI] MemberRemoveConfirmation dialog opens
+3. [UI] Warning: "Remover {name} da empresa? Esta acao nao pode ser desfeita."
+4. [UI] Admin clicks "Remover" (destructive red button)
+5. [Frontend] DELETE /api/v1/companies/:companyId/members/:memberId
+   -> IF 422 COMPANY_LAST_ADMIN: error toast
+6. [Backend] Sets member status to REMOVED
+7. [UI] Toast: "Membro removido" (auto-dismiss 5 seconds)
+8. [Frontend] Refetch members table
+
+POSTCONDITION: Member status is REMOVED
+SIDE EFFECTS: Audit log (COMPANY_MEMBER_REMOVED)
+```
+
+---
+
+### Flow 7: Resend Invitation
+
+```
+PRECONDITION: Member has PENDING status, user is ADMIN
+ACTOR: ADMIN
+TRIGGER: Clicks "Reenviar convite" button on a PENDING member row
+
+1. [UI] ADMIN clicks "Reenviar convite" ghost button
+2. [UI] Button shows loading spinner
+3. [Frontend] POST /api/v1/companies/:companyId/members/:memberId/resend-invitation
+4. [Backend] Generates new token, invalidates old one, resends email
+5. [Backend] Returns 200 with { newExpiresAt }
+6. [UI] Toast: "Convite reenviado" (auto-dismiss 5 seconds)
+7. [UI] Resend button enters 60-second cooldown (disabled state with countdown or just disabled)
+
+POSTCONDITION: New invitation token generated with fresh 7-day expiry
+SIDE EFFECTS: New invitation email sent via AWS SES
+```
+
+---
+
+### Error Flows
+
+**Expired Invitation Token**:
+```
+1. [UI] User clicks invitation link from email
+2. [Frontend] GET /api/v1/invitations/:token returns 410 INVITATION_EXPIRED
+3. [UI] InvitationExpiredPage renders inside the card:
+   - Warning icon (48px, gray-400)
+   - "Convite Expirado" (h2, navy-900)
+   - "Este convite expirou ou e invalido" (body, gray-500)
+   - "Solicite um novo convite ao administrador da empresa" (body-sm, gray-500)
+```
+
+**Invalid/Used Invitation Token**:
+```
+1. [Frontend] GET /api/v1/invitations/:token returns 404 INVITATION_NOT_FOUND
+2. [UI] Same InvitationExpiredPage as above (user does not need to know why the token is invalid)
+```
+
+**Email Mismatch** (informational, since BR-6 allows any user to accept):
+```
+1. [Frontend] POST /api/v1/invitations/:token/accept returns 403
+2. [UI] InvitationEmailMismatch renders:
+   - "Este convite foi enviado para {masked-email}. Faca login com o e-mail correto."
+   - "Sair e entrar com outro e-mail" button (triggers logout + Privy login)
+```
+
+**Already a Member**:
+```
+1. [Frontend] POST /api/v1/invitations/:token/accept returns 409 COMPANY_MEMBER_EXISTS
+2. [UI] Message: "Voce ja e membro desta empresa"
+3. [UI] Link: "Ir para o Dashboard" -> navigates to /dashboard
+```
+
+---
+
+## UI States & Error Handling
+
+### MembersPage States
+
+| State | Visual | Trigger |
+|-------|--------|---------|
+| Loading | Page header (h1 + button) + skeleton table rows (pulsing gray-200 rectangles) | Initial load |
+| Data | Header + populated MembersTable + pagination | Data loaded successfully |
+| Empty | Header + centered empty state illustration + "Nenhum membro encontrado" + description + "Convidar Membro" CTA | No members returned |
+| Error | Header + centered error message + "Tentar novamente" retry button | API error |
+
+### InviteMemberModal States
+
+| State | Visual | Trigger |
+|-------|--------|---------|
+| Idle | Form with empty fields, role defaults to EMPLOYEE | Modal opens |
+| Submitting | "Enviar Convite" button shows spinner, all fields disabled | Submit clicked |
+| Success | Modal closing (animation), toast appearing | 201 response |
+| Email Duplicate | Inline error on email: "Este e-mail ja e membro da empresa" | 409 COMPANY_MEMBER_EXISTS |
+| Pending Duplicate | Inline error on email: "Ja existe um convite pendente para este e-mail" | 409 COMPANY_INVITATION_PENDING |
+| Validation Error | Field-level error messages from validationErrors array | 400 VAL_INVALID_INPUT |
+| Server Error | Error toast, form re-enabled for retry | 500 |
+
+### InvitationAcceptPage States
+
+| State | Visual | Trigger |
+|-------|--------|---------|
+| Loading | Centered spinner on gray-50 background | Token validation in progress |
+| Valid (Not Logged In) | Company info card + "Criar Conta" / "Entrar" buttons | Token valid, user not authenticated |
+| Valid (Logged In) | Company info card + "Aceitar Convite" button | Token valid, user authenticated |
+| Collecting Info (New User) | PersonalInfoForm inline in card | New user completed Privy signup |
+| Accepting | "Aceitar Convite" button shows spinner | Accept request in progress |
+| Accepted | Redirect to /dashboard in progress | 200 success |
+| Expired | InvitationExpiredPage (warning icon + message) | 404 or 410 response |
+| Email Mismatch | InvitationEmailMismatch (info icon + message + sign-out CTA) | 403 response |
+| Already Member | "Voce ja e membro desta empresa" + dashboard link | 409 COMPANY_MEMBER_EXISTS |
+
+### Error Code to UI Mapping
+
+| Error Code | HTTP | UI Behavior |
+|------------|------|-------------|
+| `COMPANY_MEMBER_EXISTS` | 409 | InviteMemberModal: inline error on email field. InvitationAcceptPage: "already member" message + dashboard link. |
+| `COMPANY_INVITATION_PENDING` | 409 | InviteMemberModal: inline error on email field |
+| `MEMBER_NOT_FOUND` | 404 | Toast: `errors.member.notFound` |
+| `MEMBER_CANNOT_REMOVE_SELF` | 422 | Toast: `errors.member.cannotRemoveSelf` (button hidden in UI, backend enforces as safety net) |
+| `COMPANY_LAST_ADMIN` | 422 | Toast: `errors.member.lastAdmin` |
+| `INVITATION_NOT_FOUND` | 404 | InvitationExpiredPage |
+| `INVITATION_EXPIRED` | 410 | InvitationExpiredPage |
+| `INVITATION_ALREADY_ACCEPTED` | 422 | "Already member" message + dashboard link |
+| `COMPANY_MEMBER_LIMIT_REACHED` | 422 | Toast: "Limite de empresas atingido" |
+| `VAL_INVALID_INPUT` | 400 | Map `validationErrors` array to form fields via `applyServerErrors()` |
+
+---
+
+## Component Visual Specifications
+
+### MembersPage Layout
+
+```
++-------------------------------------------------------------+
+|  h1: Membros                           [+ Convidar Membro]  |
+|  body-sm: Gerencie os membros e permissoes da sua empresa    |
++-------------------------------------------------------------+
+|                                                              |
+|  +----------------------------------------------------------+
+|  | Nome         | E-mail        | Papel  | Status | Data   | Acoes |
+|  |----------------------------------------------------------|
+|  | (avatar) Joao| joao@acme.com | ADMIN  | Ativo  | 15/01  | ...   |
+|  | (avatar) Maria| maria@ex.com | FINANCE| Ativo  | 20/01  | [R][T]|
+|  | (email icon) | new@ex.com    | LEGAL  |Pendente| --     | [RS]  |
+|  +----------------------------------------------------------+
+|  Showing 1-3 of 3                               < 1 >       |
+|                                                              |
++-------------------------------------------------------------+
+
+Legend: [R] = Role change, [T] = Trash/remove, [RS] = Resend
+```
+
+### InviteMemberModal Layout
+
+```
++-------------------------------------------+
+|  Convidar Membro                     [X]  |
++-------------------------------------------+
+|                                           |
+|  E-mail do membro                         |
+|  [nome@empresa.com                    ]   |
+|                                           |
+|  Papel                                    |
+|  [v Colaborador                       ]   |
+|    -- dropdown options with descriptions: |
+|    Administrador                          |
+|    Acesso total a empresa e config.       |
+|    Financeiro                             |
+|    Gestao financeira e relatorios         |
+|    ...                                    |
+|                                           |
+|  Mensagem (opcional)                      |
+|  [                                    ]   |
+|  [                                    ]   |
+|  [                                    ]   |
+|                                           |
++-------------------------------------------+
+|              [Cancelar] [Enviar Convite]   |
++-------------------------------------------+
+```
+
+### InvitationAcceptPage Layout (Not Logged In)
+
+```
++---------------------------------------+
+|                                       |
+|         [Company Logo 48px]           |
+|         Acme Tecnologia               |   <- h2, navy-900, centered
+|         [FINANCE badge]               |   <- RoleBadge, centered
+|         Convidado por Joao Silva      |   <- body-sm, gray-500
+|                                       |
+|  -----------------------------------  |   <- 1px gray-200 divider
+|                                       |
+|  [       Criar Conta (primary)      ] |   <- full width, lg
+|                                       |
+|         Ja tenho conta                |   <- ghost link, centered
+|                                       |
++---------------------------------------+
+```
+
+### InvitationAcceptPage Layout (New User -- PersonalInfoForm)
+
+```
++---------------------------------------+
+|                                       |
+|         [Company Logo 48px]           |
+|         Acme Tecnologia               |
+|         [FINANCE badge]               |
+|                                       |
+|  -----------------------------------  |
+|                                       |
+|  Nome                                 |
+|  [                                 ]  |
+|                                       |
+|  Sobrenome                            |
+|  [                                 ]  |
+|                                       |
+|  E-mail                               |
+|  [maria@example.com                ]  |  <- pre-filled
+|                                       |
+|  [         Continuar (primary)     ]  |  <- full width
+|                                       |
++---------------------------------------+
+```
+
+### Member Status Badge Colors
+
+| Status | Background | Text |
+|--------|-----------|------|
+| ACTIVE | `green-100` (#E8F5E4) | `green-700` (#6BAF5E) |
+| PENDING | `cream-100` (#FAF4E3) | `cream-700` (#C4A44E) |
+| SUSPENDED | `#FEE2E2` | `#991B1B` |
+| REMOVED | `gray-100` (#F3F4F6) | `gray-500` (#6B7280) |
+
+---
+
+## i18n Keys
+
+All user-facing strings must be added to both `messages/pt-BR.json` and `messages/en.json` per the i18n rules.
+
+### Members Page
+
+| Key | PT-BR | EN |
+|-----|-------|-----|
+| `members.title` | Membros | Members |
+| `members.description` | Gerencie os membros e permissoes da sua empresa | Manage your company's members and permissions |
+| `members.inviteButton` | Convidar Membro | Invite Member |
+| `members.table.name` | Nome | Name |
+| `members.table.email` | E-mail | Email |
+| `members.table.role` | Papel | Role |
+| `members.table.status` | Status | Status |
+| `members.table.joinedDate` | Data de Entrada | Joined Date |
+| `members.table.actions` | Acoes | Actions |
+| `members.table.empty` | Nenhum membro encontrado | No members found |
+| `members.table.emptyDescription` | Convide membros para colaborar na gestao da empresa | Invite members to collaborate on company management |
+
+### Invite Modal
+
+| Key | PT-BR | EN |
+|-----|-------|-----|
+| `members.invite.title` | Convidar Membro | Invite Member |
+| `members.invite.email` | E-mail do membro | Member email |
+| `members.invite.emailPlaceholder` | nome@empresa.com | name@company.com |
+| `members.invite.role` | Papel | Role |
+| `members.invite.message` | Mensagem (opcional) | Message (optional) |
+| `members.invite.messagePlaceholder` | Mensagem opcional para o convite | Optional message for the invitation |
+| `members.invite.submit` | Enviar Convite | Send Invitation |
+| `members.invite.cancel` | Cancelar | Cancel |
+| `members.invite.success` | Convite enviado para {email} | Invitation sent to {email} |
+
+### Role Labels & Descriptions
+
+| Key | PT-BR | EN |
+|-----|-------|-----|
+| `members.role.admin` | Administrador | Admin |
+| `members.role.adminDescription` | Acesso total a empresa e configuracoes | Full access to company and settings |
+| `members.role.finance` | Financeiro | Finance |
+| `members.role.financeDescription` | Gestao financeira e relatorios | Financial management and reports |
+| `members.role.legal` | Juridico | Legal |
+| `members.role.legalDescription` | Documentos legais e compliance | Legal documents and compliance |
+| `members.role.investor` | Investidor | Investor |
+| `members.role.investorDescription` | Visualizacao de investimentos proprios | View own investments |
+| `members.role.employee` | Colaborador | Employee |
+| `members.role.employeeDescription` | Visualizacao de opcoes e documentos proprios | View own options and documents |
+
+### Role Change
+
+| Key | PT-BR | EN |
+|-----|-------|-----|
+| `members.changeRole.title` | Alterar Papel | Change Role |
+| `members.changeRole.confirm` | Alterar o papel de {name} de {oldRole} para {newRole}? | Change {name}'s role from {oldRole} to {newRole}? |
+| `members.changeRole.success` | Papel alterado com sucesso | Role changed successfully |
+
+### Remove Member
+
+| Key | PT-BR | EN |
+|-----|-------|-----|
+| `members.remove.title` | Remover Membro | Remove Member |
+| `members.remove.confirm` | Remover {name} da empresa? Esta acao nao pode ser desfeita. | Remove {name} from the company? This cannot be undone. |
+| `members.remove.submit` | Remover | Remove |
+| `members.remove.cancel` | Cancelar | Cancel |
+| `members.remove.success` | Membro removido | Member removed |
+
+### Resend Invitation
+
+| Key | PT-BR | EN |
+|-----|-------|-----|
+| `members.resend.button` | Reenviar convite | Resend invitation |
+| `members.resend.success` | Convite reenviado | Invitation resent |
+
+### Member Status
+
+| Key | PT-BR | EN |
+|-----|-------|-----|
+| `members.status.active` | Ativo | Active |
+| `members.status.pending` | Pendente | Pending |
+| `members.status.suspended` | Suspenso | Suspended |
+| `members.status.removed` | Removido | Removed |
+
+### Invitation Accept Page
+
+| Key | PT-BR | EN |
+|-----|-------|-----|
+| `invitation.title` | Convite para {companyName} | Invitation to {companyName} |
+| `invitation.role` | Papel: {role} | Role: {role} |
+| `invitation.invitedBy` | Convidado por {name} | Invited by {name} |
+| `invitation.accept` | Aceitar Convite | Accept Invitation |
+| `invitation.createAccount` | Criar Conta | Create Account |
+| `invitation.signIn` | Ja tenho conta | I have an account |
+| `invitation.continue` | Continuar | Continue |
+| `invitation.welcome` | Bem-vindo a {companyName}! | Welcome to {companyName}! |
+| `invitation.alreadyMember` | Voce ja e membro desta empresa | You are already a member of this company |
+| `invitation.goToDashboard` | Ir para o Dashboard | Go to Dashboard |
+
+### Invitation Error States
+
+| Key | PT-BR | EN |
+|-----|-------|-----|
+| `invitation.expired.title` | Convite Expirado | Invitation Expired |
+| `invitation.expired.message` | Este convite expirou ou e invalido | This invitation has expired or is invalid |
+| `invitation.expired.cta` | Solicite um novo convite ao administrador da empresa | Request a new invitation from the company admin |
+| `invitation.emailMismatch.title` | E-mail Incorreto | Wrong Email |
+| `invitation.emailMismatch.message` | Este convite foi enviado para {email}. Faca login com o e-mail correto. | This invitation was sent to {email}. Sign in with the correct email. |
+| `invitation.emailMismatch.cta` | Sair e entrar com outro e-mail | Sign out and sign in with another email |
+
+### Error Messages
+
+| Key | PT-BR | EN |
+|-----|-------|-----|
+| `errors.member.alreadyExists` | Este e-mail ja e membro da empresa | This email is already a member of the company |
+| `errors.member.invitationPending` | Ja existe um convite pendente para este e-mail | There is already a pending invitation for this email |
+| `errors.member.notFound` | Membro nao encontrado | Member not found |
+| `errors.member.cannotRemoveSelf` | Voce nao pode remover a si mesmo | You cannot remove yourself |
+| `errors.member.lastAdmin` | Nao e possivel alterar o papel do ultimo administrador | Cannot change the role of the last admin |
+| `errors.member.limitReached` | Limite de empresas atingido | Company membership limit reached |
+
+---
+
+## TanStack Query Configuration
+
+### Query Keys
+
+| Key Pattern | Endpoint | Invalidated By |
+|------------|----------|----------------|
+| `['members', companyId, params]` | `GET /companies/:companyId/members` | Invite, role change, remove, resend |
+| `['invitation', token]` | `GET /invitations/:token` | Accept (navigates away) |
+
+### Retry Configuration
+
+```typescript
+// Do not retry auth, validation, or business rule errors
+const shouldRetry = (failureCount: number, error: ApiError) => {
+  if ([400, 401, 403, 404, 409, 410, 422].includes(error.statusCode)) {
+    return false;
+  }
+  return failureCount < 2; // Retry server errors up to 2 times
+};
+```
+
+### Optimistic Updates
+
+Role change and member removal do NOT use optimistic updates. The table refetches after mutation success to ensure data consistency.
+
+---
+
+## Accessibility Requirements
+
+- All interactive elements must have visible focus indicators (`2px solid blue-600` with 2px offset, using `focus-visible`)
+- Form inputs in InviteMemberModal must have associated `<label>` elements
+- RoleChangeDropdown must be keyboard-navigable (arrow keys, Enter to select, Escape to close)
+- MemberRemoveConfirmation dialog traps focus while open
+- Toast notifications include `role="alert"` for screen reader announcement
+- Table headers use `<th>` with `scope="col"`
+- Empty state and error state messages use `role="status"`
+- Minimum tap target: 44x44px on mobile, 32x32px on desktop
+- Color is never used alone to convey status -- always paired with text labels (RoleBadge, StatusBadge)

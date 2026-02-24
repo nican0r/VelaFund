@@ -442,6 +442,309 @@ POSTCONDITION: Shares issued on-chain, cap table updated, employee notified
 
 ---
 
+## Frontend Implementation
+
+### FE-1: Pages & Routes
+
+| Route | Page | Description |
+|-------|------|-------------|
+| `/dashboard/options` (Exercises tab) | ExercisesTab | Admin list of all exercise requests |
+| `/dashboard/options/exercises/[exerciseId]` | ExerciseDetailPage | Exercise detail with payment confirmation |
+
+**Entry points**:
+- Admin/Finance: "Exercises" tab within the Options page (`/dashboard/options`)
+- Employee: "Exercise Options" button on My Options page (`/dashboard/options/my-options`) triggers `ExerciseOptionsModal`
+- Employee: Exercise status visible on My Options page via `ExerciseStatusTracker`
+
+### FE-2: Page Layouts
+
+#### Exercises Tab (Admin View, within OptionsPage)
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  [Plans] [Grants] [Exercises ←active]                   │
+├─────────────────────────────────────────────────────────┤
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐   │
+│  │Pending       │ │Payment       │ │Completed     │   │
+│  │Payment       │ │Confirmed     │ │              │   │
+│  │  3           │ │  2           │ │  12          │   │
+│  └──────────────┘ └──────────────┘ └──────────────┘   │
+├─────────────────────────────────────────────────────────┤
+│  Filters: [Status ▼]  🔍 Search                        │
+├─────────────────────────────────────────────────────────┤
+│  Exercises Table (paginated)                            │
+│  ...                                                    │
+├─────────────────────────────────────────────────────────┤
+│  Showing 1-10 of 17                    < 1 2 >         │
+└─────────────────────────────────────────────────────────┘
+```
+
+#### Exercise Detail Page
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  ← Back to Exercises    StatusBadge    [Actions ▼]      │
+│  h1: Exercício — João Silva                             │
+│  body-sm: Solicitado em 15/02/2026                      │
+├─────────────────────────────────────────────────────────┤
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │
+│  │Quantity  │ │Strike    │ │Amount    │ │Grant     │  │
+│  │  5.000   │ │Price     │ │Due       │ │          │  │
+│  │          │ │R$ 1,50   │ │R$ 7.500  │ │ESOP 2026 │  │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘  │
+├─────────────────────────────────────────────────────────┤
+│  ExerciseStatusTracker (5-step horizontal indicator)    │
+│  ● Solicitado → ● Pgto Pendente → ○ Confirmado →      │
+│  ○ Ações Emitidas → ○ Concluído                        │
+├─────────────────────────────────────────────────────────┤
+│  ┌────────────────────────────────────────────────────┐ │
+│  │ PaymentReferenceDisplay                            │ │
+│  │ Referência: EX-2026-0042          [📋 Copiar]     │ │
+│  └────────────────────────────────────────────────────┘ │
+├─────────────────────────────────────────────────────────┤
+│  ┌────────────────────────────────────────────────────┐ │
+│  │ BankDetailsCard                                    │ │
+│  │ Banco: Banco do Brasil                             │ │
+│  │ Titular: Empresa XYZ Ltda.        [📋]            │ │
+│  │ Conta: 12345-6                    [📋]            │ │
+│  │ Agência: 1234                     [📋]            │ │
+│  │ PIX: empresa@pix.com             [📋]            │ │
+│  └────────────────────────────────────────────────────┘ │
+├─────────────────────────────────────────────────────────┤
+│  [Confirmar Pagamento]  [Cancelar Exercício]            │
+└─────────────────────────────────────────────────────────┘
+```
+
+### FE-3: Components
+
+| Component | Description | Props |
+|-----------|-------------|-------|
+| `ExerciseRequestForm` | Form with quantity slider+input, live cost calculation, payment method | `grantId: string`, `exercisableQuantity: number`, `strikePrice: number`, `onSuccess: () => void` |
+| `ExerciseStatusTracker` | Horizontal 5-step status indicator | `status: ExerciseStatus` |
+| `BankDetailsCard` | Card with bank name, account holder, account number, PIX key — all fields copyable | `bankDetails: BankDetails` |
+| `PaymentReferenceDisplay` | Large monospace reference code with copy button | `referenceCode: string` |
+| `ExerciseOptionsModal` | Multi-step modal for employee exercise request | `grantId: string`, `exercisableQuantity: number`, `strikePrice: number`, `onSuccess: () => void` |
+| `ConfirmExercisePaymentModal` | Admin modal to confirm payment receipt | `exerciseId: string`, `amountDue: number`, `onSuccess: () => void` |
+| `CancelExerciseModal` | Destructive confirmation modal | `exerciseId: string`, `onSuccess: () => void` |
+| `ExerciseStatCards` | 3 stat cards for exercise metrics (Pending, Confirmed, Completed) | `companyId: string` |
+| `ExerciseStatusBadge` | Status pill badge for exercise status | `status: ExerciseStatus` |
+
+### FE-4: Tables
+
+#### Exercises Table (Admin View)
+
+| Column | Field | Type | Sortable | Alignment |
+|--------|-------|------|----------|-----------|
+| Employee | `grant.shareholder.name` | text with avatar | Yes | Left |
+| Quantity | `quantity` | number | Yes | Right |
+| Amount Due | `amountDue` | currency (BRL) | Yes | Right |
+| Reference | `referenceCode` | monospace text (copyable) | No | Left |
+| Status | `status` | ExerciseStatusBadge | Yes | Center |
+| Requested | `createdAt` | date (dd/MM/yyyy) | Yes | Left |
+| Actions | — | icon buttons (confirm, cancel) | No | Right |
+
+- Default sort: `-createdAt`
+- Empty state: "Nenhuma solicitação de exercício" / "No exercise requests"
+- **Row highlight**: Rows with `PENDING_PAYMENT` status get a subtle `cream-50` background to draw attention
+- **Actions column**: "Confirm" button visible for ADMIN/FINANCE when status is `PENDING_PAYMENT`. "Cancel" visible for ADMIN when not completed.
+
+### FE-5: Forms
+
+#### Exercise Request (Employee, inside ExerciseOptionsModal)
+
+| Field | Label | Type | Validation | Required |
+|-------|-------|------|------------|----------|
+| `quantity` | Quantidade de Opções | slider + number input (dual control) | > 0, <= exercisable quantity, integer | Yes |
+| `paymentMethod` | Método de Pagamento | select (BANK_TRANSFER, PIX) | must select | Yes |
+
+- **Live calculation**: Below the quantity field, display: `{quantity} × R$ {strikePrice} = R$ {amountDue}`
+- **Slider**: Range from 1 to exercisable quantity. Steps of 100 (or 1 if exercisable < 100).
+- **Max exercisable display**: "Máximo exercível: {exercisableQuantity} opções" above the slider
+
+#### Confirm Payment (Admin, inside ConfirmExercisePaymentModal)
+
+| Field | Label | Type | Validation | Required |
+|-------|-------|------|------------|----------|
+| `paymentDate` | Data do Pagamento | date picker | <= today | Yes |
+| `paymentNotes` | Observações | textarea | max 500 chars | No |
+
+- **Warning**: Yellow banner "Ao confirmar o pagamento, as ações serão emitidas automaticamente na blockchain. Esta ação é irreversível."
+- **Summary display**: Shows exercise quantity, amount due, employee name, reference code
+- **Submit**: "Confirmar Pagamento e Emitir Ações"
+
+### FE-6: Visualizations
+
+#### Exercise Status Tracker
+
+- **Type**: Horizontal step indicator (not a chart)
+- **Steps** (5):
+  1. Solicitado / Requested — icon: clipboard
+  2. Pagamento Pendente / Pending Payment — icon: clock
+  3. Pagamento Confirmado / Payment Confirmed — icon: check-circle
+  4. Ações Emitidas / Shares Issued — icon: trending-up
+  5. Concluído / Completed — icon: check-double
+
+- **Active step**: `ocean-600` fill, white icon
+- **Completed steps**: `celadon-600` fill, white checkmark icon
+- **Pending steps**: `gray-200` fill, `gray-400` icon
+- **Connector lines**: `celadon-600` between completed steps, `gray-200` between pending
+- **Height**: 64px total (icon 32px + label 16px + gap)
+
+### FE-7: Modals & Dialogs
+
+| Modal | Size | Type | Steps | Key Elements |
+|-------|------|------|-------|--------------|
+| ExerciseOptionsModal | Medium (560px) | Wizard | 3 | Step 1: Quantity (slider + input + live calculation), Step 2: Review (summary + bank details preview), Step 3: Confirm (irreversible warning + submit) |
+| ConfirmExercisePaymentModal | Small (400px) | Form | 1 | Exercise summary, payment date, notes, warning about automatic share issuance, confirm button |
+| CancelExerciseModal | Small (400px) | Destructive | 1 | Warning text, cancellation reason textarea, red "Cancelar Exercício" button |
+
+**ExerciseOptionsModal wizard steps**:
+1. **Quantidade**: Slider + number input for quantity. Live cost calculation display. Payment method select.
+2. **Revisar**: Summary card (quantity, strike price, amount due, payment method). Bank details card with copy buttons. Payment reference code prominently displayed.
+3. **Confirmar**: "Após confirmar, realize a transferência bancária com a referência indicada." Checkbox: "Eu entendo que devo realizar o pagamento para concluir o exercício." Submit: "Solicitar Exercício"
+
+### FE-8: Status Badges
+
+| Status | Background | Text Color | Label (PT-BR) | Label (EN) |
+|--------|-----------|------------|----------------|------------|
+| `PENDING_PAYMENT` | `cream-100` | `cream-700` | Pagamento Pendente | Pending Payment |
+| `PAYMENT_CONFIRMED` | `blue-50` | `blue-600` | Pagamento Confirmado | Payment Confirmed |
+| `SHARES_ISSUED` | `green-100` | `green-700` | Ações Emitidas | Shares Issued |
+| `COMPLETED` | `green-100` | `green-700` | Concluído | Completed |
+| `CANCELLED` | `gray-100` | `gray-600` | Cancelado | Cancelled |
+
+### FE-9: Role-Based UI
+
+| Action | ADMIN | FINANCE | LEGAL | EMPLOYEE |
+|--------|-------|---------|-------|----------|
+| View Exercises tab | Yes | Yes | No | No |
+| View exercise detail | Yes | Yes | No | Own exercises only |
+| Confirm payment | Yes | Yes | No | No |
+| Cancel exercise | Yes | No | No | No |
+| Request exercise | No | No | No | Yes (from My Options) |
+| View bank details | Yes | Yes | No | Yes (own exercise only) |
+| View payment reference | Yes | Yes | No | Yes (own exercise only) |
+
+- **EMPLOYEE**: Initiates exercise from "My Options" page. Sees exercise status tracker and bank details on their grant card. Cannot access Exercises admin tab.
+- **FINANCE**: Can view all exercises and confirm payments. Cannot cancel exercises.
+- **ADMIN**: Full access to all exercise actions.
+
+### FE-10: API Integration (TanStack Query)
+
+```typescript
+// Query key factory
+const exerciseKeys = {
+  all: (companyId: string) => ['option-exercises', companyId] as const,
+  list: (companyId: string, filters?: ExerciseFilters) => [...exerciseKeys.all(companyId), 'list', filters] as const,
+  detail: (companyId: string, exerciseId: string) => [...exerciseKeys.all(companyId), exerciseId] as const,
+  myExercises: (companyId: string) => [...exerciseKeys.all(companyId), 'my'] as const,
+};
+
+// Hooks
+function useExerciseRequests(companyId: string, filters?: ExerciseFilters);
+function useExerciseRequest(companyId: string, exerciseId: string);
+function useMyExerciseRequests(companyId: string);
+function useRequestExercise(companyId: string);                         // POST mutation
+function useConfirmExercisePayment(companyId: string, exerciseId: string);  // POST mutation
+```
+
+**Cache invalidation on confirm payment**:
+- Invalidate `exerciseKeys.all` (exercise status changes)
+- Invalidate `optionKeys.grants.all` (grant exercised quantity updates)
+- Invalidate `optionKeys.plans.all` (plan exercised count updates)
+- Invalidate `['cap-table', companyId]` (new shares issued)
+- Invalidate `['transactions', companyId]` (exercise transaction created)
+
+### FE-11: i18n Keys
+
+Namespace: `options.exercises`
+
+```
+options.exercises.title = "Exercícios" / "Exercises"
+options.exercises.subtitle = "Solicitações de exercício de opções" / "Option exercise requests"
+
+options.exercises.stats.pendingPayment = "Pagamento Pendente" / "Pending Payment"
+options.exercises.stats.paymentConfirmed = "Pagamento Confirmado" / "Payment Confirmed"
+options.exercises.stats.completed = "Concluídos" / "Completed"
+
+options.exercises.table.employee = "Funcionário" / "Employee"
+options.exercises.table.quantity = "Quantidade" / "Quantity"
+options.exercises.table.amountDue = "Valor Devido" / "Amount Due"
+options.exercises.table.reference = "Referência" / "Reference"
+options.exercises.table.status = "Status" / "Status"
+options.exercises.table.requestedDate = "Data da Solicitação" / "Requested Date"
+options.exercises.table.actions = "Ações" / "Actions"
+options.exercises.table.empty = "Nenhuma solicitação de exercício" / "No exercise requests"
+
+options.exercises.status.pendingPayment = "Pagamento Pendente" / "Pending Payment"
+options.exercises.status.paymentConfirmed = "Pagamento Confirmado" / "Payment Confirmed"
+options.exercises.status.sharesIssued = "Ações Emitidas" / "Shares Issued"
+options.exercises.status.completed = "Concluído" / "Completed"
+options.exercises.status.cancelled = "Cancelado" / "Cancelled"
+
+options.exercises.request.title = "Exercer Opções" / "Exercise Options"
+options.exercises.request.step1 = "Quantidade" / "Quantity"
+options.exercises.request.step2 = "Revisar" / "Review"
+options.exercises.request.step3 = "Confirmar" / "Confirm"
+options.exercises.request.quantity = "Quantidade de Opções" / "Option Quantity"
+options.exercises.request.maxExercisable = "Máximo exercível: {count} opções" / "Max exercisable: {count} options"
+options.exercises.request.paymentMethod = "Método de Pagamento" / "Payment Method"
+options.exercises.request.bankTransfer = "Transferência Bancária" / "Bank Transfer"
+options.exercises.request.pix = "PIX" / "PIX"
+options.exercises.request.calculation = "{quantity} × R$ {price} = R$ {total}" / "{quantity} × R$ {price} = R$ {total}"
+options.exercises.request.paymentInstructions = "Após confirmar, realize a transferência bancária com a referência indicada" / "After confirming, make the bank transfer with the indicated reference"
+options.exercises.request.confirmCheckbox = "Eu entendo que devo realizar o pagamento para concluir o exercício" / "I understand that I must make the payment to complete the exercise"
+options.exercises.request.submit = "Solicitar Exercício" / "Request Exercise"
+
+options.exercises.payment.title = "Confirmar Pagamento" / "Confirm Payment"
+options.exercises.payment.date = "Data do Pagamento" / "Payment Date"
+options.exercises.payment.notes = "Observações" / "Notes"
+options.exercises.payment.warning = "Ao confirmar o pagamento, as ações serão emitidas automaticamente na blockchain. Esta ação é irreversível." / "Upon confirming payment, shares will be automatically issued on the blockchain. This action is irreversible."
+options.exercises.payment.confirm = "Confirmar Pagamento e Emitir Ações" / "Confirm Payment and Issue Shares"
+
+options.exercises.bank.title = "Dados Bancários" / "Bank Details"
+options.exercises.bank.bankName = "Banco" / "Bank"
+options.exercises.bank.accountHolder = "Titular" / "Account Holder"
+options.exercises.bank.accountNumber = "Conta" / "Account Number"
+options.exercises.bank.branchCode = "Agência" / "Branch Code"
+options.exercises.bank.pixKey = "Chave PIX" / "PIX Key"
+options.exercises.bank.reference = "Referência de Pagamento" / "Payment Reference"
+options.exercises.bank.copySuccess = "Copiado!" / "Copied!"
+
+options.exercises.cancel.title = "Cancelar Exercício" / "Cancel Exercise"
+options.exercises.cancel.warning = "Esta ação cancelará a solicitação de exercício" / "This will cancel the exercise request"
+options.exercises.cancel.reason = "Motivo do Cancelamento" / "Cancellation Reason"
+options.exercises.cancel.confirm = "Cancelar Exercício" / "Cancel Exercise"
+
+options.exercises.tracker.requested = "Solicitado" / "Requested"
+options.exercises.tracker.pendingPayment = "Pgto Pendente" / "Pending Payment"
+options.exercises.tracker.confirmed = "Confirmado" / "Confirmed"
+options.exercises.tracker.sharesIssued = "Ações Emitidas" / "Shares Issued"
+options.exercises.tracker.completed = "Concluído" / "Completed"
+```
+
+### FE-12: Error Handling UI
+
+| Error Code | HTTP Status | UI Behavior |
+|------------|-------------|-------------|
+| `OPT_INSUFFICIENT_VESTED` | 422 | Show on exercise form: inline error below quantity with "Opções insuficientes. Exercível: {exercisable}" from `details.exercisableQuantity` |
+| `OPT_EXERCISE_PENDING` | 422 | Toast info "Já existe uma solicitação de exercício pendente para esta concessão" with link to existing exercise from `details.existingExerciseId` |
+| `OPT_EXERCISE_NOT_FOUND` | 404 | Redirect to exercises list with toast "Solicitação de exercício não encontrada" |
+| `OPT_EXERCISE_WINDOW_CLOSED` | 422 | Toast error "O período de exercício está encerrado para esta concessão" |
+| `OPT_GRANT_TERMINATED` | 422 | Toast warning "Esta concessão foi cancelada ou expirada" |
+| `CHAIN_TX_FAILED` | 502 | Warning toast "Pagamento confirmado, mas emissão de ações na blockchain falhou. As ações serão emitidas assim que a blockchain estiver disponível." Keep exercise in PAYMENT_CONFIRMED status. Show retry option for admin. |
+| `CHAIN_TX_TIMEOUT` | 504 | Warning toast "Transação na blockchain em processamento. Aguarde confirmação." |
+| `VAL_INVALID_INPUT` | 400 | Map `validationErrors` to form field errors |
+| `SYS_RATE_LIMITED` | 429 | Toast warning with retry countdown |
+
+**Loading states**:
+- Exercises tab: skeleton stat cards (3) + skeleton table (5 rows)
+- Exercise detail: skeleton stat cards + skeleton status tracker + skeleton bank details card
+- Exercise modal: spinner on submit button, steps disabled during processing
+- Payment confirmation: progress indicator showing "Confirmando pagamento → Emitindo ações → Registrando na blockchain → Concluído"
+
+---
+
 ## Success Criteria
 
 - Exercise request creation: < 2 seconds

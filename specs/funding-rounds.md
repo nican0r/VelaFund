@@ -460,6 +460,361 @@ Close the funding round (issue shares to all investors).
 
 ---
 
+## Frontend Implementation
+
+### FE-1: Pages & Routes
+
+| Route | Page | Description |
+|-------|------|-------------|
+| `/dashboard/investments` | InvestmentsPage | Shared tab container with Rounds and Convertibles tabs |
+| `/dashboard/investments/rounds/new` | CreateRoundPage | Multi-field form to create a new funding round |
+| `/dashboard/investments/rounds/[roundId]` | RoundDetailPage | Round summary, commitments, pro-forma, actions |
+| `/dashboard/investments/rounds/[roundId]/edit` | EditRoundPage | Edit round details (DRAFT/OPEN status only) |
+
+**Navigation**: Sidebar item "Investments" under main navigation. Active state highlights when on any `/dashboard/investments/*` route.
+
+### FE-2: Page Layouts
+
+#### Rounds List (within InvestmentsPage, "Rounds" tab)
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  h1: Investments                   [+ New Round]        │
+│  body-sm: Manage funding rounds and convertibles        │
+├─────────────────────────────────────────────────────────┤
+│  [Rounds] [Convertibles]  ← Tab bar                    │
+├─────────────────────────────────────────────────────────┤
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │
+│  │Open Rounds│ │Total     │ │Total     │ │Avg       │  │
+│  │  2       │ │Raised    │ │Committed │ │Investment│  │
+│  │          │ │R$ 5.2M   │ │R$ 4.8M   │ │R$ 240K   │  │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘  │
+├─────────────────────────────────────────────────────────┤
+│  Filters: [Status ▼] [Type ▼] [Date Range]  🔍 Search  │
+├─────────────────────────────────────────────────────────┤
+│  Rounds Table (paginated)                               │
+│  ...                                                    │
+├─────────────────────────────────────────────────────────┤
+│  Showing 1-10 of 24                    < 1 2 3 >       │
+└─────────────────────────────────────────────────────────┘
+```
+
+#### Round Detail Page
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  ← Back to Rounds    Status Badge    [Edit] [Actions ▼] │
+│  h1: Series A Round                                     │
+│  body-sm: Created 15/01/2026                            │
+├─────────────────────────────────────────────────────────┤
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │
+│  │Target    │ │Raised    │ │Investors │ │Price/    │  │
+│  │R$ 5M     │ │R$ 3.2M   │ │  8       │ │Share     │  │
+│  │          │ │64%       │ │          │ │R$ 1,50   │  │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘  │
+├─────────────────────────────────────────────────────────┤
+│  ████████████████░░░░░░░░░  64% of target              │
+│  ▲ min close (R$2M)                                     │
+│  RoundProgressBar with min/target/hardcap markers       │
+├─────────────────────────────────────────────────────────┤
+│  [Commitments] [Pro-Forma] [Details]  ← Tab bar        │
+│  ...tab content...                                      │
+└─────────────────────────────────────────────────────────┘
+```
+
+### FE-3: Components
+
+| Component | Description | Props |
+|-----------|-------------|-------|
+| `RoundProgressBar` | Segmented progress bar showing current raised vs min close, target, and hard cap | `raised: number`, `minClose: number`, `target: number`, `hardCap?: number` |
+| `CommitmentTable` | Paginated table of investor commitments with payment status | `roundId: string`, `companyId: string` |
+| `ProFormaComparison` | Before/after cap table comparison showing dilution impact | `roundId: string`, `companyId: string` |
+| `DilutionChart` | Horizontal grouped bar chart (Recharts) comparing pre/post ownership | `proFormaData: ProFormaEntry[]` |
+| `AddCommitmentModal` | Modal form for adding a new investor commitment | `roundId: string`, `onSuccess: () => void` |
+| `ConfirmPaymentModal` | Small modal to confirm payment receipt for a commitment | `commitmentId: string`, `onSuccess: () => void` |
+| `CloseRoundModal` | Large 3-step wizard modal for round closing | `roundId: string`, `onSuccess: () => void` |
+| `CancelRoundModal` | Destructive confirmation modal for cancelling a round | `roundId: string`, `onSuccess: () => void` |
+| `RoundStatCard` | Stat card for round metrics (reuses design system stat card pattern) | `label: string`, `value: string`, `change?: string` |
+| `RoundStatusBadge` | Status pill badge for round status | `status: RoundStatus` |
+| `RoundFilters` | Filter bar with status dropdown, type dropdown, date range, search | `onFilterChange: (filters) => void` |
+
+### FE-4: Tables
+
+#### Rounds Table
+
+| Column | Field | Type | Sortable | Alignment |
+|--------|-------|------|----------|-----------|
+| Name | `name` | text link (navigates to detail) | Yes | Left |
+| Type | `roundType` | badge | Yes | Left |
+| Target | `targetAmount` | currency (BRL) | Yes | Right |
+| Raised | `totalRaised` | currency (BRL) | Yes | Right |
+| % Raised | computed | percentage with mini progress bar | Yes | Right |
+| Status | `status` | status badge | Yes | Center |
+| Target Close | `targetCloseDate` | date (dd/MM/yyyy) | Yes | Left |
+| Created | `createdAt` | date (dd/MM/yyyy) | Yes | Left |
+
+- Default sort: `-createdAt` (newest first)
+- Empty state: illustration + "Nenhuma rodada de investimento" + "Crie sua primeira rodada" CTA
+
+#### Commitments Table
+
+| Column | Field | Type | Sortable | Alignment |
+|--------|-------|------|----------|-----------|
+| Investor | `shareholder.name` | text with avatar | Yes | Left |
+| Amount | `committedAmount` | currency (BRL) | Yes | Right |
+| Shares | `sharesAllocated` | number | No | Right |
+| Payment Status | `paymentStatus` | status badge | Yes | Center |
+| Side Letter | `hasSideLetter` | boolean icon (check/dash) | No | Center |
+| Date | `createdAt` | date (dd/MM/yyyy) | Yes | Left |
+| Actions | — | icon buttons (confirm, cancel) | No | Right |
+
+- Default sort: `-createdAt`
+- Empty state: "Nenhum compromisso registrado" + "Adicionar compromisso" CTA
+- Summary footer row: Total committed amount, total shares
+
+### FE-5: Forms
+
+#### Create/Edit Round Form
+
+| Field | Label | Type | Validation | Required |
+|-------|-------|------|------------|----------|
+| `name` | Nome da Rodada | text input | min 3, max 100 chars | Yes |
+| `roundType` | Tipo de Rodada | select (SEED, SERIES_A, SERIES_B, SERIES_C, BRIDGE, OTHER) | must select one | Yes |
+| `shareClassId` | Classe de Ações | searchable select (from company share classes) | must exist | Yes |
+| `targetAmount` | Valor Alvo | currency input (BRL) | > 0, decimal(18,2) | Yes |
+| `minimumCloseAmount` | Valor Mínimo para Fechamento | currency input (BRL) | > 0, <= targetAmount | No |
+| `preMoneyValuation` | Valuation Pré-Money | currency input (BRL) | > 0, decimal(18,2) | Yes |
+| `pricePerShare` | Preço por Ação | currency input (BRL) | > 0, decimal(18,6) | Yes |
+| `startDate` | Data de Início | date picker | >= today (create only) | No |
+| `targetCloseDate` | Data Alvo de Fechamento | date picker | > startDate | No |
+
+- **Auto-calculated field**: Post-Money Valuation = Pre-Money + Target Amount (displayed as read-only)
+- **Layout**: Single column, grouped in sections: "Informações da Rodada", "Termos Financeiros", "Datas"
+- **Submit button**: "Criar Rodada" (create) / "Salvar Alterações" (edit)
+
+#### Add Commitment Form (inside modal)
+
+| Field | Label | Type | Validation | Required |
+|-------|-------|------|------------|----------|
+| `shareholderId` | Investidor | searchable select (shareholders with INVESTOR type) | must exist | Yes |
+| `committedAmount` | Valor do Compromisso | currency input (BRL) | > 0, <= remaining capacity | Yes |
+| `hasSideLetter` | Possui Side Letter | checkbox | — | No |
+
+- Shows remaining round capacity below the amount field
+- Submit button: "Adicionar Compromisso"
+
+### FE-6: Visualizations
+
+#### Pro-Forma Dilution Chart
+
+- **Type**: Horizontal grouped bar chart (Recharts `BarChart` with `layout="vertical"`)
+- **X-axis**: Ownership percentage (0–100%)
+- **Y-axis**: Shareholder names (top N shareholders + "Others")
+- **Bars**: Two bars per shareholder — "Before" (`navy-900`) and "After" (`ocean-600`)
+- **Labels**: Percentage on each bar
+- **Legend**: Bottom, "Antes da Rodada" / "Depois da Rodada"
+- **Container**: White card with `radius-lg`, title "Impacto de Diluição"
+
+#### Round Progress Gauge
+
+- **Type**: Linear progress bar with markers
+- **Track**: `gray-200` background, `ocean-600` fill
+- **Markers**: Vertical tick marks at min close (dashed `cream-700`), target (`ocean-600`), hard cap (`navy-900`) positions
+- **Labels**: Amount and percentage at current position, marker labels below
+- **Overflow**: If raised > target, bar extends to hard cap zone with different fill color (`celadon-600`)
+
+### FE-7: Modals & Dialogs
+
+| Modal | Size | Type | Steps | Key Elements |
+|-------|------|------|-------|--------------|
+| AddCommitmentModal | Medium (560px) | Form | 1 | Investor select, amount, side letter checkbox |
+| ConfirmPaymentModal | Small (400px) | Confirmation | 1 | Payment details display, confirm button |
+| CloseRoundModal | Large (720px) | Wizard | 3 | Step 1: Review (summary + commitment list), Step 2: Confirm (dilution preview + warnings), Step 3: Execute (progress indicator + blockchain status) |
+| CancelRoundModal | Small (400px) | Destructive | 1 | Warning text, cancel reason textarea, red "Cancelar Rodada" button |
+
+**CloseRoundModal wizard steps**:
+1. **Revisar**: Summary cards (total raised, investors, shares to issue), commitment list table, minimum close validation (blocks if not met)
+2. **Confirmar**: Pro-forma dilution chart, before/after ownership table, checkbox "Eu entendo que esta ação é irreversível"
+3. **Executar**: Progress indicator showing: Creating transactions → Issuing shares → Recording on blockchain → Updating cap table → Done. Each step shows spinner → checkmark.
+
+### FE-8: Status Badges
+
+#### Round Status
+
+| Status | Background | Text Color | Label (PT-BR) | Label (EN) |
+|--------|-----------|------------|----------------|------------|
+| `DRAFT` | `gray-100` | `gray-600` | Rascunho | Draft |
+| `OPEN` | `blue-50` | `blue-600` | Aberta | Open |
+| `FIRST_CLOSE` | `cream-100` | `cream-700` | Primeiro Fechamento | First Close |
+| `CLOSED` | `green-100` | `green-700` | Fechada | Closed |
+| `CANCELLED` | `#FEE2E2` | `#991B1B` | Cancelada | Cancelled |
+
+#### Payment Status
+
+| Status | Background | Text Color | Label (PT-BR) | Label (EN) |
+|--------|-----------|------------|----------------|------------|
+| `PENDING` | `cream-100` | `cream-700` | Pendente | Pending |
+| `RECEIVED` | `blue-50` | `blue-600` | Recebido | Received |
+| `CONFIRMED` | `green-100` | `green-700` | Confirmado | Confirmed |
+
+### FE-9: Role-Based UI
+
+| Action | ADMIN | FINANCE | LEGAL | INVESTOR |
+|--------|-------|---------|-------|----------|
+| View rounds list | All rounds | All rounds | All rounds | Rounds with own commitments |
+| View round detail | Full detail | Full detail | Full detail | Own commitment only |
+| Create round | Yes | No | No | No |
+| Edit round | Yes (DRAFT/OPEN) | No | No | No |
+| Add commitment | Yes | No | No | No |
+| Confirm payment | Yes | Yes | No | No |
+| Close round | Yes | Yes | No | No |
+| Cancel round | Yes | No | No | No |
+| Export data | CSV, PDF, XLSX | CSV, PDF, XLSX | CSV, PDF, XLSX | PDF only |
+
+- **UI behavior for restricted actions**: Buttons/menu items are hidden (not disabled) for roles without permission.
+- **INVESTOR view**: Filtered round list showing only rounds where they have commitments. Detail page shows only their own commitment info, not other investors.
+
+### FE-10: API Integration (TanStack Query)
+
+```typescript
+// Query key factory
+const roundKeys = {
+  all: (companyId: string) => ['rounds', companyId] as const,
+  list: (companyId: string, filters?: RoundFilters) => [...roundKeys.all(companyId), 'list', filters] as const,
+  detail: (companyId: string, roundId: string) => [...roundKeys.all(companyId), roundId] as const,
+  proForma: (companyId: string, roundId: string) => [...roundKeys.detail(companyId, roundId), 'pro-forma'] as const,
+  commitments: (companyId: string, roundId: string, filters?: CommitmentFilters) =>
+    [...roundKeys.detail(companyId, roundId), 'commitments', filters] as const,
+};
+
+// Hooks
+function useRounds(companyId: string, filters?: RoundFilters);
+function useRound(companyId: string, roundId: string);
+function useRoundProForma(companyId: string, roundId: string);
+function useRoundCommitments(companyId: string, roundId: string, filters?: CommitmentFilters);
+function useCreateRound(companyId: string);        // POST mutation
+function useUpdateRound(companyId: string);        // PUT mutation
+function useOpenRound(companyId: string);           // POST mutation (status change)
+function useAddCommitment(companyId: string, roundId: string);      // POST mutation
+function useConfirmPayment(companyId: string, roundId: string);     // POST mutation
+function useCloseRound(companyId: string, roundId: string);         // POST mutation
+function useCancelRound(companyId: string, roundId: string);        // POST mutation
+function useCancelCommitment(companyId: string, roundId: string);   // POST mutation
+```
+
+**Cache invalidation on close round**:
+- Invalidate `roundKeys.all` (round list and detail)
+- Invalidate `['cap-table', companyId]` (cap table updated)
+- Invalidate `['transactions', companyId]` (new transactions created)
+- Invalidate `['shareholders', companyId]` (new shareholders may be created)
+
+### FE-11: i18n Keys
+
+Namespace: `fundingRounds`
+
+```
+fundingRounds.title = "Rodadas de Investimento" / "Funding Rounds"
+fundingRounds.subtitle = "Gerencie rodadas de investimento e compromissos" / "Manage funding rounds and commitments"
+fundingRounds.newRound = "Nova Rodada" / "New Round"
+fundingRounds.editRound = "Editar Rodada" / "Edit Round"
+
+fundingRounds.form.name = "Nome da Rodada" / "Round Name"
+fundingRounds.form.roundType = "Tipo de Rodada" / "Round Type"
+fundingRounds.form.shareClass = "Classe de Ações" / "Share Class"
+fundingRounds.form.targetAmount = "Valor Alvo" / "Target Amount"
+fundingRounds.form.minimumClose = "Valor Mínimo para Fechamento" / "Minimum Close Amount"
+fundingRounds.form.preMoneyValuation = "Valuation Pré-Money" / "Pre-Money Valuation"
+fundingRounds.form.postMoneyValuation = "Valuation Pós-Money" / "Post-Money Valuation"
+fundingRounds.form.pricePerShare = "Preço por Ação" / "Price per Share"
+fundingRounds.form.startDate = "Data de Início" / "Start Date"
+fundingRounds.form.targetCloseDate = "Data Alvo de Fechamento" / "Target Close Date"
+fundingRounds.form.create = "Criar Rodada" / "Create Round"
+fundingRounds.form.save = "Salvar Alterações" / "Save Changes"
+
+fundingRounds.stats.openRounds = "Rodadas Abertas" / "Open Rounds"
+fundingRounds.stats.totalRaised = "Total Captado" / "Total Raised"
+fundingRounds.stats.totalCommitted = "Total Comprometido" / "Total Committed"
+fundingRounds.stats.avgInvestment = "Investimento Médio" / "Avg Investment"
+
+fundingRounds.table.name = "Nome" / "Name"
+fundingRounds.table.type = "Tipo" / "Type"
+fundingRounds.table.target = "Valor Alvo" / "Target"
+fundingRounds.table.raised = "Captado" / "Raised"
+fundingRounds.table.percentRaised = "% Captado" / "% Raised"
+fundingRounds.table.status = "Status" / "Status"
+fundingRounds.table.targetClose = "Fechamento Alvo" / "Target Close"
+fundingRounds.table.created = "Criado em" / "Created"
+fundingRounds.table.empty = "Nenhuma rodada de investimento" / "No funding rounds"
+fundingRounds.table.emptyCta = "Crie sua primeira rodada" / "Create your first round"
+
+fundingRounds.status.draft = "Rascunho" / "Draft"
+fundingRounds.status.open = "Aberta" / "Open"
+fundingRounds.status.firstClose = "Primeiro Fechamento" / "First Close"
+fundingRounds.status.closed = "Fechada" / "Closed"
+fundingRounds.status.cancelled = "Cancelada" / "Cancelled"
+
+fundingRounds.commitments.title = "Compromissos" / "Commitments"
+fundingRounds.commitments.add = "Adicionar Compromisso" / "Add Commitment"
+fundingRounds.commitments.investor = "Investidor" / "Investor"
+fundingRounds.commitments.amount = "Valor" / "Amount"
+fundingRounds.commitments.shares = "Ações" / "Shares"
+fundingRounds.commitments.paymentStatus = "Status do Pagamento" / "Payment Status"
+fundingRounds.commitments.sideLetter = "Side Letter" / "Side Letter"
+fundingRounds.commitments.date = "Data" / "Date"
+fundingRounds.commitments.empty = "Nenhum compromisso registrado" / "No commitments recorded"
+fundingRounds.commitments.remaining = "Capacidade restante" / "Remaining capacity"
+
+fundingRounds.proForma.title = "Cap Table Pro-Forma" / "Pro-Forma Cap Table"
+fundingRounds.proForma.before = "Antes da Rodada" / "Before Round"
+fundingRounds.proForma.after = "Depois da Rodada" / "After Round"
+fundingRounds.proForma.dilutionImpact = "Impacto de Diluição" / "Dilution Impact"
+
+fundingRounds.close.title = "Fechar Rodada" / "Close Round"
+fundingRounds.close.step1 = "Revisar" / "Review"
+fundingRounds.close.step2 = "Confirmar" / "Confirm"
+fundingRounds.close.step3 = "Executar" / "Execute"
+fundingRounds.close.irreversibleWarning = "Eu entendo que esta ação é irreversível" / "I understand this action is irreversible"
+fundingRounds.close.minimumNotMet = "O valor mínimo de fechamento não foi atingido" / "Minimum close amount has not been met"
+fundingRounds.close.executing = "Fechando rodada..." / "Closing round..."
+fundingRounds.close.creatingTransactions = "Criando transações..." / "Creating transactions..."
+fundingRounds.close.issuingShares = "Emitindo ações..." / "Issuing shares..."
+fundingRounds.close.recordingBlockchain = "Registrando na blockchain..." / "Recording on blockchain..."
+fundingRounds.close.updatingCapTable = "Atualizando cap table..." / "Updating cap table..."
+fundingRounds.close.success = "Rodada fechada com sucesso" / "Round closed successfully"
+
+fundingRounds.cancel.title = "Cancelar Rodada" / "Cancel Round"
+fundingRounds.cancel.warning = "Esta ação cancelará a rodada e todos os compromissos pendentes" / "This will cancel the round and all pending commitments"
+fundingRounds.cancel.confirm = "Cancelar Rodada" / "Cancel Round"
+
+fundingRounds.payment.pending = "Pendente" / "Pending"
+fundingRounds.payment.received = "Recebido" / "Received"
+fundingRounds.payment.confirmed = "Confirmado" / "Confirmed"
+```
+
+### FE-12: Error Handling UI
+
+| Error Code | HTTP Status | UI Behavior |
+|------------|-------------|-------------|
+| `ROUND_NOT_FOUND` | 404 | Redirect to rounds list with toast "Rodada não encontrada" |
+| `ROUND_NOT_OPEN` | 422 | Toast warning "Rodada não está aberta para compromissos" |
+| `ROUND_HARD_CAP_REACHED` | 422 | Toast warning with remaining capacity from `details.remainingCapacity` |
+| `ROUND_COMMITMENT_NOT_FOUND` | 404 | Toast error "Compromisso não encontrado" |
+| `ROUND_ALREADY_CLOSED` | 422 | Toast info "Esta rodada já foi fechada" + refresh page |
+| `ROUND_MINIMUM_NOT_MET` | 422 | Block Close Round wizard Step 1 with inline warning showing current vs minimum |
+| `ROUND_NOT_DRAFT` | 422 | Toast warning "Rodada não pode ser editada neste status" |
+| `VAL_INVALID_INPUT` | 400 | Map `validationErrors` to form field errors via `applyServerErrors()` |
+| `COMPANY_NOT_FOUND` | 404 | Redirect to company selector |
+| `SYS_RATE_LIMITED` | 429 | Toast warning with retry countdown from `details.retryAfter` |
+
+**Optimistic updates**: Commitment addition uses optimistic UI — the commitment appears in the table immediately and rolls back on error.
+
+**Loading states**:
+- Round list: skeleton table rows (5 rows)
+- Round detail: skeleton stat cards + skeleton progress bar + skeleton table
+- Close round wizard Step 3: real-time progress indicator (no skeleton)
+
+---
+
 ## Success Criteria
 
 - Accurate pro-forma modeling (100% accuracy)

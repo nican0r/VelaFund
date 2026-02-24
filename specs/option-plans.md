@@ -544,6 +544,513 @@ Get detailed vesting status for a specific grant.
 
 ---
 
+## Frontend Implementation
+
+### FE-1: Pages & Routes
+
+| Route | Page | Description |
+|-------|------|-------------|
+| `/dashboard/options` | OptionsPage | Tab container with Plans, Grants, and Exercises tabs |
+| `/dashboard/options/plans/new` | CreatePlanPage | Create option plan form |
+| `/dashboard/options/plans/[planId]` | PlanDetailPage | Plan detail with pool bar, grants list |
+| `/dashboard/options/plans/[planId]/edit` | EditPlanPage | Edit plan (ACTIVE status only) |
+| `/dashboard/options/grants/new` | CreateGrantPage | Create grant form with vesting preview |
+| `/dashboard/options/grants/[grantId]` | GrantDetailPage | Grant detail with vesting timeline |
+| `/dashboard/options/my-options` | MyOptionsPage | Employee self-service view of own grants |
+
+**Navigation**: Sidebar item "Options" under main navigation. "My Options" appears for EMPLOYEE role users as a separate navigation item or within the Options page.
+
+### FE-2: Page Layouts
+
+#### Plans List (within OptionsPage, "Plans" tab)
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  h1: Opções                        [+ Novo Plano]       │
+│  body-sm: Gerencie planos e concessões de opções        │
+├─────────────────────────────────────────────────────────┤
+│  [Plans] [Grants] [Exercises]  ← Tab bar                │
+├─────────────────────────────────────────────────────────┤
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │
+│  │Total Pool│ │Granted   │ │Exercised │ │Available │  │
+│  │ 150.000  │ │  85.000  │ │  20.000  │ │  45.000  │  │
+│  │          │ │56,7%     │ │13,3%     │ │30,0%     │  │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘  │
+├─────────────────────────────────────────────────────────┤
+│  Plans Table (paginated)                                │
+│  ...                                                    │
+├─────────────────────────────────────────────────────────┤
+│  Showing 1-5 of 5                                       │
+└─────────────────────────────────────────────────────────┘
+```
+
+#### Grants List (within OptionsPage, "Grants" tab)
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  [Plans] [Grants ←active] [Exercises]                   │
+├─────────────────────────────────────────────────────────┤
+│  Filters: [Plan ▼] [Status ▼]  🔍 Search               │
+├─────────────────────────────────────────────────────────┤
+│  Grants Table (paginated)                               │
+│  ...                                                    │
+├─────────────────────────────────────────────────────────┤
+│  Showing 1-10 of 32                    < 1 2 3 4 >     │
+└─────────────────────────────────────────────────────────┘
+```
+
+#### Plan Detail Page
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  ← Back to Plans    StatusBadge    [Edit] [Actions ▼]   │
+│  h1: Employee Stock Option Plan 2026                    │
+│  body-sm: Created 01/01/2026                            │
+├─────────────────────────────────────────────────────────┤
+│  Pool Utilization Bar (segmented)                       │
+│  ████████████████▓▓▓▓▓▓░░░░░░░░░ ─ ─ ─ ─ ─ ─          │
+│  Granted (56.7%) | Exercised (13.3%) | Cancelled (2%)   │
+│  | Available (28%)                                      │
+├─────────────────────────────────────────────────────────┤
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │
+│  │Pool Total│ │Granted   │ │Exercised │ │Available │  │
+│  │ 150.000  │ │  85.000  │ │  20.000  │ │  42.000  │  │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘  │
+├─────────────────────────────────────────────────────────┤
+│  ⚠️ PoolDepletionWarning (if available < 10% of pool)   │
+├─────────────────────────────────────────────────────────┤
+│  Plan Grants Table (filtered to this plan)              │
+│  ...                                                    │
+└─────────────────────────────────────────────────────────┘
+```
+
+#### Grant Detail Page
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  ← Back to Grants    StatusBadge    [Actions ▼]         │
+│  h1: Grant — João Silva                                 │
+│  body-sm: Plan: ESOP 2026 · Granted 01/03/2026         │
+├─────────────────────────────────────────────────────────┤
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │
+│  │Total     │ │Vested    │ │Unvested  │ │Exercis-  │  │
+│  │ 10.000   │ │  2.500   │ │  7.500   │ │able      │  │
+│  │          │ │25%       │ │75%       │ │  2.500   │  │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘  │
+├─────────────────────────────────────────────────────────┤
+│  VestingTimeline (horizontal bar with cliff + progress) │
+│  |▓▓▓▓▓▓▓▓▓░░░░░░░░░░░░░░░░░░░░░░░░|                  │
+│  Grant    Cliff    Today          Expiration            │
+├─────────────────────────────────────────────────────────┤
+│  [Vesting Schedule] [Details] [Exercises]  ← Tabs       │
+│  ...tab content...                                      │
+└─────────────────────────────────────────────────────────┘
+```
+
+#### My Options Page (Employee Self-Service)
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  h1: Minhas Opções                                      │
+│  body-sm: Visualize suas concessões e opções            │
+├─────────────────────────────────────────────────────────┤
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐  │
+│  │Total     │ │Vested    │ │Exercised │ │Exercis-  │  │
+│  │Options   │ │          │ │          │ │able      │  │
+│  │ 10.000   │ │  5.000   │ │  1.000   │ │  4.000   │  │
+│  └──────────┘ └──────────┘ └──────────┘ └──────────┘  │
+├─────────────────────────────────────────────────────────┤
+│  OptionGrantCard (one per grant)                        │
+│  ┌────────────────────────────────────────────────────┐ │
+│  │ ESOP 2026 · 10,000 options · R$ 1.50 strike       │ │
+│  │ VestingProgressRing 50%  [Exercise Options]        │ │
+│  │ 5,000 vested · 4,000 exercisable                   │ │
+│  └────────────────────────────────────────────────────┘ │
+├─────────────────────────────────────────────────────────┤
+│  Active Exercise Requests                               │
+│  ExerciseStatusTracker (if any pending exercises)       │
+└─────────────────────────────────────────────────────────┘
+```
+
+### FE-3: Components
+
+| Component | Description | Props |
+|-----------|-------------|-------|
+| `PoolUtilizationBar` | Segmented horizontal bar showing granted/exercised/cancelled/available | `granted: number`, `exercised: number`, `cancelled: number`, `total: number` |
+| `VestingTimeline` | Horizontal timeline with cliff marker, monthly dots, today marker, progress fill | `grantDate: Date`, `cliffDate: Date`, `endDate: Date`, `expirationDate: Date`, `vestedPercent: number` |
+| `VestingScheduleTable` | Table showing all vesting milestones with dates, quantities, and status | `vestingSchedule: VestingMilestone[]` |
+| `VestingProgressRing` | Circular progress indicator for vesting percentage | `percent: number`, `size?: 'sm' \| 'md' \| 'lg'` |
+| `OptionGrantCard` | Employee-facing card with grant summary, vesting progress, exercise button | `grant: OptionGrant` |
+| `ExerciseStatusTracker` | Horizontal 5-step indicator (Requested → Pending Payment → Confirmed → Shares Issued → Completed) | `status: ExerciseStatus` |
+| `BankDetailsCard` | Card displaying bank details for payment with copyable fields | `bankDetails: BankDetails`, `referenceCode: string` |
+| `PoolDepletionWarning` | Yellow alert banner when pool available < 10% of total | `available: number`, `total: number` |
+| `PlanStatusBadge` | Status pill badge for plan status | `status: PlanStatus` |
+| `GrantStatusBadge` | Status pill badge for grant status | `status: GrantStatus` |
+| `VestingFrequencyBadge` | Info badge showing vesting frequency | `frequency: VestingFrequency` |
+| `TerminationPolicyBadge` | Info badge showing termination policy | `policy: TerminationPolicy` |
+| `ClosePlanModal` | Warning modal for closing a plan | `planId: string`, `hasActiveGrants: boolean`, `onSuccess: () => void` |
+| `CancelGrantModal` | Destructive confirmation modal for cancelling a grant | `grantId: string`, `onSuccess: () => void` |
+
+### FE-4: Tables
+
+#### Plans Table
+
+| Column | Field | Type | Sortable | Alignment |
+|--------|-------|------|----------|-----------|
+| Name | `name` | text link (navigates to detail) | Yes | Left |
+| Pool Total | `totalPoolSize` | number | Yes | Right |
+| Granted | `totalGranted` | number | Yes | Right |
+| Available | computed (`totalPoolSize - totalGranted`) | number | No | Right |
+| Utilization | computed | mini horizontal bar (inline) + percentage | Yes | Left |
+| Frequency | `vestingFrequency` | VestingFrequencyBadge | Yes | Center |
+| Status | `status` | PlanStatusBadge | Yes | Center |
+| Created | `createdAt` | date (dd/MM/yyyy) | Yes | Left |
+
+- Default sort: `-createdAt`
+- Empty state: "Nenhum plano de opções" + "Criar plano" CTA
+
+#### Grants Table
+
+| Column | Field | Type | Sortable | Alignment |
+|--------|-------|------|----------|-----------|
+| Employee | `shareholder.name` | text with avatar | Yes | Left |
+| Plan | `optionPlan.name` | text link | Yes | Left |
+| Quantity | `quantity` | number | Yes | Right |
+| Strike Price | `strikePrice` | currency (BRL) | Yes | Right |
+| Vested | `vestedQuantity` | number | Yes | Right |
+| Vesting % | computed | mini progress bar + percentage | Yes | Left |
+| Status | `status` | GrantStatusBadge | Yes | Center |
+| Grant Date | `grantDate` | date (dd/MM/yyyy) | Yes | Left |
+
+- Default sort: `-grantDate`
+- Empty state: "Nenhuma concessão de opções" + "Criar concessão" CTA
+
+#### Vesting Schedule Table
+
+| Column | Field | Type | Alignment |
+|--------|-------|------|-----------|
+| Date | `vestingDate` | date (dd/MM/yyyy) | Left |
+| Type | `type` | badge (CLIFF / MONTHLY / QUARTERLY / ANNUALLY) | Center |
+| Quantity | `quantity` | number | Right |
+| Cumulative | `cumulativeQuantity` | number | Right |
+| % | `cumulativePercent` | percentage | Right |
+| Status | `status` | badge (Vested green / Pending gray / Upcoming blue) | Center |
+
+- No pagination (full schedule displayed)
+- Today row highlighted with `blue-50` background
+- Past rows: regular text. Future rows: `gray-400` text
+
+### FE-5: Forms
+
+#### Create/Edit Plan Form
+
+| Field | Label | Type | Validation | Required |
+|-------|-------|------|------------|----------|
+| `name` | Nome do Plano | text input | min 3, max 100 chars | Yes |
+| `totalPoolSize` | Tamanho Total do Pool | number input | > 0, integer | Yes |
+| `shareClassId` | Classe de Ações | searchable select (from company share classes) | must exist | Yes |
+| `cliffMonths` | Cliff (meses) | number input | >= 0, integer | Yes |
+| `vestingMonths` | Período de Vesting (meses) | number input | > cliffMonths, integer | Yes |
+| `vestingFrequency` | Frequência de Vesting | select (MONTHLY, QUARTERLY, ANNUALLY) | must select | Yes |
+| `terminationPolicy` | Política de Rescisão | select (FORFEITURE, ACCELERATION, PRO_RATA) | must select | Yes |
+
+- **Layout**: Single column, grouped: "Informações do Plano", "Termos de Vesting", "Políticas"
+- **Submit**: "Criar Plano" / "Salvar Alterações"
+
+#### Create Grant Form
+
+| Field | Label | Type | Validation | Required |
+|-------|-------|------|------------|----------|
+| `planId` | Plano de Opções | select (active plans) | must exist | Yes |
+| `shareholderId` | Funcionário | searchable select (shareholders, type INDIVIDUAL) | must exist | Yes |
+| `quantity` | Quantidade de Opções | number input | > 0, <= plan available | Yes |
+| `strikePrice` | Preço de Exercício | currency input (BRL) | > 0, decimal(18,6) | Yes |
+| `grantDate` | Data de Concessão | date picker | <= today | Yes |
+| `expirationDate` | Data de Expiração | date picker | > grantDate | Yes |
+| `vestingStartDate` | Início do Vesting | date picker | >= grantDate | Yes |
+| `cliffMonths` | Cliff (meses) | number input | >= 0 | Yes |
+| `vestingMonths` | Período de Vesting (meses) | number input | > cliffMonths | Yes |
+| `vestingFrequency` | Frequência | select (MONTHLY, QUARTERLY, ANNUALLY) | must select | Yes |
+| `singleTriggerAcceleration` | Aceleração Single Trigger | toggle + percentage input | 0-100 if enabled | No |
+| `doubleTriggerAcceleration` | Aceleração Double Trigger | toggle + percentage input | 0-100 if enabled | No |
+
+- **Pre-fill from plan**: When `planId` is selected, cliff, vesting months, vesting frequency, and strike price pre-fill from plan defaults. User can override.
+- **Live vesting preview**: Right side panel shows a simplified vesting schedule table updating as form values change. Shows cliff date, vesting milestones, and total vested per year.
+- **Available validation**: Shows "X opções disponíveis no plano" below quantity field. Error if quantity > available.
+- **Layout**: Two-column on desktop — form on left, vesting preview on right.
+- **Submit**: "Criar Concessão"
+
+### FE-6: Visualizations
+
+#### Vesting Timeline
+
+- **Type**: Custom horizontal bar (SVG or CSS)
+- **Structure**: Horizontal bar from grant date to expiration date
+  - Cliff segment: `gray-200` (from grant date to cliff end)
+  - Vested segment: `celadon-600` (from cliff end to today or full vesting date)
+  - Unvested segment: `gray-200` (from today to full vesting date)
+  - Expired segment: `gray-100` (from full vesting to expiration, if applicable)
+- **Markers**:
+  - Grant date: left edge label
+  - Cliff end: vertical dashed line with "Cliff" label
+  - Today: vertical solid line in `navy-900` with "Hoje" label
+  - Full vesting: vertical dashed line
+  - Expiration: right edge label
+- **Milestone dots**: Small circles at each vesting event (monthly/quarterly/annually)
+- **Height**: 48px bar + 24px labels
+
+#### Pool Utilization Bar
+
+- **Type**: Segmented horizontal stacked bar
+- **Segments** (left to right):
+  - Granted (not exercised): `ocean-600`
+  - Exercised: `celadon-600`
+  - Cancelled: `gray-300`
+  - Available: `gray-100` with dashed border
+- **Labels**: Percentage labels inside segments (if wide enough) or above
+- **Below**: Legend with color dots + labels + absolute numbers
+- **Height**: 32px bar + 24px legend
+
+### FE-7: Modals & Dialogs
+
+| Modal | Size | Type | Key Elements |
+|-------|------|------|--------------|
+| ClosePlanModal | Small (400px) | Warning | Warning about active grants if any: "Este plano possui {count} concessões ativas. Fechar o plano impedirá novas concessões." Checkbox: "Eu entendo" + "Fechar Plano" button |
+| CancelGrantModal | Small (400px) | Destructive | Warning text: "Cancelar esta concessão resultará na perda de {unvested} opções não adquiridas." Red "Cancelar Concessão" button |
+
+### FE-8: Status Badges
+
+#### Plan Status
+
+| Status | Background | Text Color | Label (PT-BR) | Label (EN) |
+|--------|-----------|------------|----------------|------------|
+| `ACTIVE` | `green-100` | `green-700` | Ativo | Active |
+| `CLOSED` | `gray-100` | `gray-600` | Fechado | Closed |
+
+#### Grant Status
+
+| Status | Background | Text Color | Label (PT-BR) | Label (EN) |
+|--------|-----------|------------|----------------|------------|
+| `ACTIVE` | `green-100` | `green-700` | Ativa | Active |
+| `EXERCISED` | `blue-50` | `blue-600` | Exercida | Exercised |
+| `CANCELLED` | `gray-100` | `gray-600` | Cancelada | Cancelled |
+| `EXPIRED` | `#FEE2E2` | `#991B1B` | Expirada | Expired |
+
+#### Vesting Frequency
+
+| Frequency | Background | Text Color | Label (PT-BR) | Label (EN) |
+|-----------|-----------|------------|----------------|------------|
+| `MONTHLY` | `blue-50` | `blue-600` | Mensal | Monthly |
+| `QUARTERLY` | `blue-50` | `blue-600` | Trimestral | Quarterly |
+| `ANNUALLY` | `blue-50` | `blue-600` | Anual | Annually |
+
+#### Termination Policy
+
+| Policy | Background | Text Color | Label (PT-BR) | Label (EN) |
+|--------|-----------|------------|----------------|------------|
+| `FORFEITURE` | `#FEE2E2` | `#991B1B` | Perda Total | Forfeiture |
+| `ACCELERATION` | `green-100` | `green-700` | Aceleração | Acceleration |
+| `PRO_RATA` | `cream-100` | `cream-700` | Pro-Rata | Pro-Rata |
+
+### FE-9: Role-Based UI
+
+| Action | ADMIN | FINANCE | LEGAL | EMPLOYEE |
+|--------|-------|---------|-------|----------|
+| View Plans tab | Yes | Yes | Yes | No |
+| View Grants tab | Yes | Yes | Yes | No |
+| View Exercises tab | Yes | Yes | No | No |
+| Create plan | Yes | No | No | No |
+| Edit plan | Yes (ACTIVE) | No | No | No |
+| Close plan | Yes | No | No | No |
+| Create grant | Yes | No | No | No |
+| Cancel grant | Yes | No | No | No |
+| View grant detail | Yes | Yes | Yes | Own grants only |
+| View My Options | No | No | No | Yes |
+| Request exercise | No | No | No | Yes (from My Options) |
+
+- **EMPLOYEE role**: Only sees "My Options" page. Cannot access Plans or Grants tabs. Navigates to `/dashboard/options/my-options`.
+- **FINANCE role**: Read-only access to Plans and Grants tabs. Can view Exercises tab for payment confirmation (see option-exercises.md).
+- **Hidden elements**: Tabs and action buttons not shown for unauthorized roles.
+
+### FE-10: API Integration (TanStack Query)
+
+```typescript
+// Query key factory
+const optionKeys = {
+  plans: {
+    all: (companyId: string) => ['option-plans', companyId] as const,
+    list: (companyId: string, filters?: PlanFilters) => [...optionKeys.plans.all(companyId), 'list', filters] as const,
+    detail: (companyId: string, planId: string) => [...optionKeys.plans.all(companyId), planId] as const,
+  },
+  grants: {
+    all: (companyId: string) => ['option-grants', companyId] as const,
+    list: (companyId: string, filters?: GrantFilters) => [...optionKeys.grants.all(companyId), 'list', filters] as const,
+    detail: (companyId: string, grantId: string) => [...optionKeys.grants.all(companyId), grantId] as const,
+    vesting: (companyId: string, grantId: string) => [...optionKeys.grants.detail(companyId, grantId), 'vesting'] as const,
+    myGrants: (companyId: string) => [...optionKeys.grants.all(companyId), 'my'] as const,
+  },
+};
+
+// Plan hooks
+function useOptionPlans(companyId: string, filters?: PlanFilters);
+function useOptionPlan(companyId: string, planId: string);
+function useCreateOptionPlan(companyId: string);         // POST mutation
+function useUpdateOptionPlan(companyId: string);         // PUT mutation
+function useCloseOptionPlan(companyId: string);          // POST mutation
+
+// Grant hooks
+function useOptionGrants(companyId: string, filters?: GrantFilters);
+function useOptionGrant(companyId: string, grantId: string);
+function useGrantVestingSchedule(companyId: string, grantId: string);
+function useCreateOptionGrant(companyId: string);        // POST mutation
+function useCancelOptionGrant(companyId: string);        // POST mutation
+function useMyOptionGrants(companyId: string);           // GET for employee self-service
+```
+
+**Cache invalidation on grant creation**: Invalidate `optionKeys.plans.detail` (pool utilization changes) and `optionKeys.grants.all`.
+
+### FE-11: i18n Keys
+
+Namespace: `options.plans` and `options.grants`
+
+```
+options.title = "Opções" / "Options"
+options.subtitle = "Gerencie planos e concessões de opções de compra" / "Manage stock option plans and grants"
+
+options.plans.title = "Planos de Opções" / "Option Plans"
+options.plans.new = "Novo Plano" / "New Plan"
+options.plans.edit = "Editar Plano" / "Edit Plan"
+options.plans.form.name = "Nome do Plano" / "Plan Name"
+options.plans.form.poolSize = "Tamanho Total do Pool" / "Total Pool Size"
+options.plans.form.shareClass = "Classe de Ações" / "Share Class"
+options.plans.form.cliffMonths = "Cliff (meses)" / "Cliff (months)"
+options.plans.form.vestingMonths = "Período de Vesting (meses)" / "Vesting Period (months)"
+options.plans.form.vestingFrequency = "Frequência de Vesting" / "Vesting Frequency"
+options.plans.form.terminationPolicy = "Política de Rescisão" / "Termination Policy"
+options.plans.form.create = "Criar Plano" / "Create Plan"
+options.plans.form.save = "Salvar Alterações" / "Save Changes"
+
+options.plans.stats.totalPool = "Pool Total" / "Total Pool"
+options.plans.stats.granted = "Concedido" / "Granted"
+options.plans.stats.exercised = "Exercido" / "Exercised"
+options.plans.stats.available = "Disponível" / "Available"
+
+options.plans.table.name = "Nome" / "Name"
+options.plans.table.poolTotal = "Pool Total" / "Pool Total"
+options.plans.table.granted = "Concedido" / "Granted"
+options.plans.table.available = "Disponível" / "Available"
+options.plans.table.utilization = "Utilização" / "Utilization"
+options.plans.table.frequency = "Frequência" / "Frequency"
+options.plans.table.status = "Status" / "Status"
+options.plans.table.created = "Criado em" / "Created"
+options.plans.table.empty = "Nenhum plano de opções" / "No option plans"
+options.plans.table.emptyCta = "Criar plano" / "Create plan"
+
+options.plans.status.active = "Ativo" / "Active"
+options.plans.status.closed = "Fechado" / "Closed"
+
+options.plans.close.title = "Fechar Plano" / "Close Plan"
+options.plans.close.warning = "Fechar o plano impedirá novas concessões" / "Closing the plan will prevent new grants"
+options.plans.close.activeGrants = "Este plano possui {count} concessões ativas" / "This plan has {count} active grants"
+options.plans.close.confirm = "Fechar Plano" / "Close Plan"
+
+options.plans.poolWarning = "Pool quase esgotado: apenas {available} opções disponíveis ({percent}%)" / "Pool nearly depleted: only {available} options available ({percent}%)"
+
+options.grants.title = "Concessões" / "Grants"
+options.grants.new = "Nova Concessão" / "New Grant"
+options.grants.form.plan = "Plano de Opções" / "Option Plan"
+options.grants.form.employee = "Funcionário" / "Employee"
+options.grants.form.quantity = "Quantidade de Opções" / "Option Quantity"
+options.grants.form.strikePrice = "Preço de Exercício" / "Strike Price"
+options.grants.form.grantDate = "Data de Concessão" / "Grant Date"
+options.grants.form.expirationDate = "Data de Expiração" / "Expiration Date"
+options.grants.form.vestingStartDate = "Início do Vesting" / "Vesting Start Date"
+options.grants.form.cliffMonths = "Cliff (meses)" / "Cliff (months)"
+options.grants.form.vestingMonths = "Período de Vesting (meses)" / "Vesting Period (months)"
+options.grants.form.frequency = "Frequência" / "Frequency"
+options.grants.form.singleTrigger = "Aceleração Single Trigger" / "Single Trigger Acceleration"
+options.grants.form.doubleTrigger = "Aceleração Double Trigger" / "Double Trigger Acceleration"
+options.grants.form.availableInPlan = "{count} opções disponíveis no plano" / "{count} options available in plan"
+options.grants.form.create = "Criar Concessão" / "Create Grant"
+options.grants.form.vestingPreview = "Prévia do Vesting" / "Vesting Preview"
+
+options.grants.table.employee = "Funcionário" / "Employee"
+options.grants.table.plan = "Plano" / "Plan"
+options.grants.table.quantity = "Quantidade" / "Quantity"
+options.grants.table.strikePrice = "Preço de Exercício" / "Strike Price"
+options.grants.table.vested = "Adquirido" / "Vested"
+options.grants.table.vestingPercent = "% Vesting" / "Vesting %"
+options.grants.table.status = "Status" / "Status"
+options.grants.table.grantDate = "Data de Concessão" / "Grant Date"
+options.grants.table.empty = "Nenhuma concessão de opções" / "No option grants"
+options.grants.table.emptyCta = "Criar concessão" / "Create grant"
+
+options.grants.detail.total = "Total" / "Total"
+options.grants.detail.vested = "Adquirido" / "Vested"
+options.grants.detail.unvested = "Não Adquirido" / "Unvested"
+options.grants.detail.exercisable = "Exercível" / "Exercisable"
+
+options.grants.status.active = "Ativa" / "Active"
+options.grants.status.exercised = "Exercida" / "Exercised"
+options.grants.status.cancelled = "Cancelada" / "Cancelled"
+options.grants.status.expired = "Expirada" / "Expired"
+
+options.grants.frequency.monthly = "Mensal" / "Monthly"
+options.grants.frequency.quarterly = "Trimestral" / "Quarterly"
+options.grants.frequency.annually = "Anual" / "Annually"
+
+options.grants.termination.forfeiture = "Perda Total" / "Forfeiture"
+options.grants.termination.acceleration = "Aceleração" / "Acceleration"
+options.grants.termination.proRata = "Pro-Rata" / "Pro-Rata"
+
+options.grants.cancel.title = "Cancelar Concessão" / "Cancel Grant"
+options.grants.cancel.warning = "Cancelar esta concessão resultará na perda de {unvested} opções não adquiridas" / "Cancelling this grant will forfeit {unvested} unvested options"
+options.grants.cancel.confirm = "Cancelar Concessão" / "Cancel Grant"
+
+options.grants.vesting.title = "Cronograma de Vesting" / "Vesting Schedule"
+options.grants.vesting.date = "Data" / "Date"
+options.grants.vesting.type = "Tipo" / "Type"
+options.grants.vesting.quantity = "Quantidade" / "Quantity"
+options.grants.vesting.cumulative = "Acumulado" / "Cumulative"
+options.grants.vesting.percent = "%" / "%"
+options.grants.vesting.status = "Status" / "Status"
+options.grants.vesting.vested = "Adquirido" / "Vested"
+options.grants.vesting.pending = "Pendente" / "Pending"
+options.grants.vesting.upcoming = "Futuro" / "Upcoming"
+
+options.myOptions.title = "Minhas Opções" / "My Options"
+options.myOptions.subtitle = "Visualize suas concessões e opções de compra" / "View your grants and stock options"
+options.myOptions.totalOptions = "Total de Opções" / "Total Options"
+options.myOptions.vested = "Adquiridas" / "Vested"
+options.myOptions.exercised = "Exercidas" / "Exercised"
+options.myOptions.exercisable = "Exercíveis" / "Exercisable"
+options.myOptions.exerciseButton = "Exercer Opções" / "Exercise Options"
+```
+
+### FE-12: Error Handling UI
+
+| Error Code | HTTP Status | UI Behavior |
+|------------|-------------|-------------|
+| `OPT_PLAN_NOT_FOUND` | 404 | Redirect to plans list with toast "Plano não encontrado" |
+| `OPT_PLAN_EXHAUSTED` | 422 | Show on grant form: inline error below quantity field with "Pool esgotado. Disponível: {available}, Solicitado: {requested}" |
+| `OPT_PLAN_CLOSED` | 422 | Toast warning "Este plano está fechado. Não é possível criar novas concessões." |
+| `OPT_GRANT_NOT_FOUND` | 404 | Redirect to grants list with toast "Concessão não encontrada" |
+| `OPT_GRANT_TERMINATED` | 422 | Toast warning "Esta concessão foi cancelada ou expirada" |
+| `OPT_INSUFFICIENT_VESTED` | 422 | Show on exercise form: inline error "Opções insuficientes. Exercível: {exercisable}, Solicitado: {requested}" |
+| `OPT_EXERCISE_PENDING` | 422 | Toast info "Já existe uma solicitação de exercício pendente" with link to existing request |
+| `VAL_INVALID_INPUT` | 400 | Map `validationErrors` to form field errors |
+| `SYS_RATE_LIMITED` | 429 | Toast warning with retry countdown |
+
+**Pool depletion warning**: Persistent `cream-100` banner on plan detail when available < 10% of total pool. Uses `PoolDepletionWarning` component.
+
+**Loading states**:
+- Plans list: skeleton stat cards + skeleton table (3 rows)
+- Plan detail: skeleton pool bar + skeleton stat cards + skeleton table
+- Grant detail: skeleton stat cards + skeleton vesting timeline + skeleton table
+- My Options: skeleton stat cards + skeleton grant cards (2 cards)
+
+---
+
 ## Success Criteria
 
 - Vesting calculations 100% accurate

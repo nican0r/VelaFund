@@ -18,6 +18,28 @@ Documents are stored in a dedicated S3 bucket (`navia-profile-documents`) with S
 
 ---
 
+## MVP Scope
+
+### In Scope (MVP)
+- **Upload with drag-drop zone**: Users can drag files onto a drop zone or click to browse, with progress indicator
+- **Category selection**: Dropdown to assign a category (Pitch Deck, Financials, Legal, Product, Team, Other) during upload
+- **Document list with category tabs**: Filterable view with one tab per category plus an "All" tab
+- **Delete with confirmation**: ADMIN/FINANCE can delete documents with a confirmation dialog
+- **PDF thumbnail display**: First-page thumbnail generated server-side, displayed in document list
+- **Download via pre-signed URLs**: Authenticated download for company members
+- **Public download for shared profile visitors**: Unauthenticated download through the public profile link, with download tracking
+- **Storage usage indicator**: Visual bar showing used vs. total storage (500 MB limit)
+
+### Out of Scope (Post-MVP)
+- **Document reordering**: No drag-and-drop reorder. Documents are ordered by upload date (newest first) within each category
+- **Document name editing after upload**: Name is set at upload time from the filename; cannot be changed afterwards
+- **Inline PDF viewer**: No in-browser PDF preview. Users download the file to view it
+- **Bulk upload**: Single file upload per operation
+- **Document versioning**: No version history; delete and re-upload to replace
+- **Access analytics dashboard**: Download tracking is recorded but no analytics UI in MVP
+
+---
+
 ## User Stories
 
 ### US-1: Upload Dataroom Documents
@@ -34,6 +56,381 @@ Documents are stored in a dedicated S3 bucket (`navia-profile-documents`) with S
 **As an** investor viewing a shared profile
 **I want to** download documents from the dataroom
 **So that** I can review materials offline or share them with my team
+
+---
+
+## Frontend Specification
+
+### Page Routing
+
+The dataroom document management UI is accessible from two routes:
+
+1. **Company Profile editor tab**: `/companies/:companyId/profile` — Documents tab within the profile editor. This is the primary entry point when editing the company profile.
+2. **Standalone documents page**: `/companies/:companyId/documents` — Direct access from the sidebar navigation. Renders the same document management UI as the profile tab.
+
+Both routes render the same `DataroomPage` component with identical functionality.
+
+**Public profile route**: `/p/:slug` — The public-facing company profile includes a read-only documents section. Visitors can browse by category and download files, but cannot upload or delete.
+
+### Dataroom Page Layout
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  h1: Documentos             [+ Upload Document]          │
+│  body-sm: Gerencie os documentos da sua empresa          │
+├─────────────────────────────────────────────────────────┤
+│  Category Tabs:                                          │
+│  [Todos] [Pitch Deck] [Financeiro] [Juridico] [Produto] [Equipe] [Outros] │
+├─────────────────────────────────────────────────────────┤
+│  Storage: 45 MB / 500 MB used                            │
+├─────────────────────────────────────────────────────────┤
+│  Document Grid/List                                      │
+│  ┌────────────────────────────────────────────────────┐ │
+│  │ [Thumbnail] │ Document Name.pdf      │ 2.4 MB     │ │
+│  │  or icon    │ Pitch Deck • 12 pages  │ 20/02/2026 │ │
+│  │             │                         │ [↓] [🗑]   │ │
+│  └────────────────────────────────────────────────────┘ │
+│  ┌────────────────────────────────────────────────────┐ │
+│  │ [Thumbnail] │ Financials_Q4.xlsx     │ 1.1 MB     │ │
+│  │  or icon    │ Financeiro              │ 18/02/2026 │ │
+│  │             │                         │ [↓] [🗑]   │ │
+│  └────────────────────────────────────────────────────┘ │
+├─────────────────────────────────────────────────────────┤
+│  Empty State (when no docs in selected category):        │
+│  "Nenhum documento nesta categoria"                      │
+│  [Upload Document]                                       │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Layout details**:
+- Page header follows the standard page header pattern (see design-system.md Section 5.5): title left-aligned, primary action button ("+ Upload Document") right-aligned
+- Category tabs use shadcn/ui `Tabs` component, horizontally scrollable on mobile
+- Storage usage bar sits below the tabs, using a `Progress` bar component with text label
+- Document list is a vertical stack of document item cards, ordered by `uploadedAt` descending (newest first) within the selected category
+- When the "Todos" (All) tab is active, documents are grouped by category with category headers, each group ordered by `uploadedAt` descending
+
+### Upload Modal/Dialog
+
+Triggered by the "+ Upload Document" button. Uses shadcn/ui `Dialog`.
+
+```
+┌────────────────────────────────────────┐
+│  Upload Document                    [X] │
+├────────────────────────────────────────┤
+│  ┌──────────────────────────────────┐  │
+│  │                                   │  │
+│  │  [cloud upload icon]              │  │
+│  │  Arraste um arquivo ou clique     │  │
+│  │  para selecionar                  │  │
+│  │                                   │  │
+│  │  PDF, PNG, JPG, XLSX, PPTX, DOCX │  │
+│  │  Maximo 25 MB                     │  │
+│  │                                   │  │
+│  └──────────────────────────────────┘  │
+│                                         │
+│  Category: [Dropdown selector]          │
+│  Name: [Auto-filled from filename]      │
+│                                         │
+│  ── Upload Progress ──                  │
+│  [████████████░░░░░░░░] 65%            │
+│                                         │
+│  [Cancel]                   [Upload]    │
+└────────────────────────────────────────┘
+```
+
+**Upload dialog behavior**:
+1. User opens dialog via "+ Upload Document" button
+2. User drags a file onto the drop zone or clicks to open the file browser
+3. On file selection:
+   - Frontend validates file type (PDF, PNG, JPG, JPEG, XLSX, PPTX, DOCX) and size (max 25 MB) immediately
+   - If invalid: show inline error in the drop zone (red border, error message)
+   - If valid: populate the "Name" field from the filename (without extension), show file icon/name in the drop zone
+4. User selects a category from the dropdown (required, no default)
+5. User optionally edits the display name
+6. User clicks "Upload":
+   - "Upload" button becomes disabled, shows spinner
+   - Progress bar appears below the form fields showing upload percentage
+   - On success: dialog closes, document list refreshes, success toast shown
+   - On failure: error toast shown (file type, size, or storage limit error), dialog stays open for retry
+7. "Cancel" button closes the dialog and aborts any in-progress upload
+
+**Drop zone states**:
+- Default: dashed `gray-300` border, `gray-50` background, cloud upload icon in `gray-400`
+- Drag hover: dashed `blue-600` border, `blue-50` background, icon color `blue-600`
+- File selected: solid `gray-200` border, shows filename and file size, replace icon with file type icon
+- Error: dashed `destructive` border, `red-50` background, error message below the zone
+
+### Document Item Component
+
+Each document is displayed as a horizontal card with the following layout:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  ┌──────────┐  Document Name.pdf                 2,4 MB    │
+│  │ Thumbnail │  [Pitch Deck badge] • 12 paginas  20/02/2026│
+│  │  64x64    │                                   [↓] [🗑]  │
+│  └──────────┘                                               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Thumbnail/icon** (64x64px, `radius-md`):
+- PDF files with a successful thumbnail: display the S3 thumbnail image (loaded via the `thumbnailKey` pre-signed URL)
+- PDF files without a thumbnail (generation failed or pending): `FileText` Lucide icon in `red-500` on `gray-50` background
+- XLSX/XLS files: `Sheet` Lucide icon in `green-600` on `gray-50` background
+- PPTX/PPT files: `Presentation` Lucide icon in `orange-500` on `gray-50` background
+- DOCX/DOC files: `FileText` Lucide icon in `blue-600` on `gray-50` background
+- Image files (PNG, JPG, JPEG): `Image` Lucide icon in `gray-500` on `gray-50` background
+
+**Metadata display**:
+- **Document name**: `body` (14px), `gray-800`, truncated with ellipsis if too long (max 1 line)
+- **Category badge**: Colored pill badge (see design-system.md Section 6.5) using the category label
+- **Page count** (PDFs only): " • {n} paginas" appended after the category badge, `body-sm`, `gray-500`
+- **File size**: Formatted in Brazilian style ("2,4 MB"), `body-sm`, `gray-500`, right-aligned
+- **Upload date**: `dd/MM/yyyy` format, `body-sm`, `gray-500`, right-aligned
+
+**Action buttons** (right side, visible on hover for desktop, always visible on mobile):
+- **Download**: Ghost icon button with `Download` Lucide icon. On click, fetches pre-signed URL via `useDocumentDownloadUrl` and opens in a new tab.
+- **Delete**: Ghost icon button with `Trash2` Lucide icon in `gray-500`, hover `destructive`. Only visible to ADMIN and FINANCE roles. On click, opens the delete confirmation dialog.
+
+**Category badge colors**:
+| Category | Background | Text |
+|----------|-----------|------|
+| Pitch Deck | `blue-50` | `blue-600` |
+| Financeiro | `green-100` | `green-700` |
+| Juridico | `cream-100` | `cream-700` |
+| Produto | `navy-50` | `navy-700` |
+| Equipe | `blue-100` | `blue-700` |
+| Outros | `gray-100` | `gray-600` |
+
+### Delete Confirmation Dialog
+
+Uses shadcn/ui `AlertDialog`.
+
+```
+┌────────────────────────────────────────┐
+│  Excluir Documento                      │
+│                                         │
+│  Tem certeza que deseja excluir         │
+│  "LuminaTech_PitchDeck.pdf"?            │
+│  Esta acao nao pode ser desfeita.       │
+│                                         │
+│  [Cancelar]          [Excluir] (red)    │
+└────────────────────────────────────────┘
+```
+
+- Document name displayed in bold within the confirmation message
+- "Excluir" button uses `destructive` variant
+- On confirm: calls `useDeleteDocument` mutation, shows success toast on completion, refreshes document list
+- On cancel: closes dialog, no action taken
+
+### Storage Usage Bar
+
+Displays current storage usage relative to the 500 MB limit.
+
+- Uses shadcn/ui `Progress` component
+- Label format: "{used} MB / 500 MB utilizados" (e.g., "45 MB / 500 MB utilizados")
+- Bar color: `blue-600` when under 80%, `cream-600` (warning) at 80-95%, `destructive` at 95%+
+- Sizes are formatted in Brazilian number format (comma as decimal separator)
+
+### Public Profile Document View
+
+The public profile page (`/p/:slug`) includes a read-only document section.
+
+**Layout**: Same category tabs and document list as the management view, but:
+- No "+ Upload Document" button
+- No delete buttons on document items
+- No storage usage bar
+- Download button is always visible (not hover-only)
+- Download triggers the public download endpoint (`GET /api/v1/profiles/:slug/documents/:documentId/download`) which records a `ProfileDocumentDownload` event
+
+**Access control**: Respects the profile's access settings (password protection, email gating). If the profile requires a password or email, the visitor must provide it before seeing documents (handled at the profile level, not per-document).
+
+### Component List
+
+| Component | File Path | Description |
+|-----------|-----------|-------------|
+| `DataroomPage` | `frontend/src/app/(dashboard)/companies/[companyId]/documents/page.tsx` | Standalone page wrapper, fetches data and renders the document management UI |
+| `DocumentCategoryTabs` | `frontend/src/components/dataroom/DocumentCategoryTabs.tsx` | Horizontal tab bar for filtering by category. Uses shadcn/ui `Tabs`. Tabs: Todos, Pitch Deck, Financeiro, Juridico, Produto, Equipe, Outros |
+| `DocumentList` | `frontend/src/components/dataroom/DocumentList.tsx` | Renders the list of `DocumentItem` components, handles grouping by category when "Todos" tab is active |
+| `DocumentItem` | `frontend/src/components/dataroom/DocumentItem.tsx` | Single document card with thumbnail, metadata, and action buttons |
+| `DocumentUploadDialog` | `frontend/src/components/dataroom/DocumentUploadDialog.tsx` | Modal dialog containing the drop zone, category selector, name input, and upload progress |
+| `DocumentDropZone` | `frontend/src/components/dataroom/DocumentDropZone.tsx` | Drag-and-drop file area with visual states (default, hover, selected, error). Uses native HTML5 drag events |
+| `DocumentUploadProgress` | `frontend/src/components/dataroom/DocumentUploadProgress.tsx` | Progress bar with percentage label, shown during active upload |
+| `DocumentDeleteDialog` | `frontend/src/components/dataroom/DocumentDeleteDialog.tsx` | Confirmation dialog for document deletion. Uses shadcn/ui `AlertDialog` |
+| `DocumentTypeIcon` | `frontend/src/components/dataroom/DocumentTypeIcon.tsx` | Maps MIME type to the appropriate Lucide icon and color |
+| `StorageUsageBar` | `frontend/src/components/dataroom/StorageUsageBar.tsx` | Progress bar showing storage used vs. 500 MB limit with color thresholds |
+| `DocumentEmptyState` | `frontend/src/components/dataroom/DocumentEmptyState.tsx` | Empty state illustration with message and upload CTA button |
+
+### TanStack Query Hooks
+
+```typescript
+// frontend/src/hooks/use-profile-documents.ts
+
+/**
+ * useProfileDocuments(companyId: string)
+ * Fetches all documents for the company profile.
+ * GET /api/v1/companies/:companyId/profile/documents
+ * Returns: ProfileDocument[]
+ * Query key: ['profile-documents', companyId]
+ * Refetch: on window focus, after upload/delete mutations
+ */
+
+/**
+ * useUploadDocument(companyId: string)
+ * Mutation: POST /api/v1/companies/:companyId/profile/documents
+ * Content-Type: multipart/form-data
+ * Body: { file, category, name? }
+ * onSuccess: invalidate ['profile-documents', companyId], show success toast
+ * onError: show error toast with messageKey translation
+ * Supports upload progress tracking via XMLHttpRequest or fetch with ReadableStream
+ */
+
+/**
+ * useDeleteDocument(companyId: string)
+ * Mutation: DELETE /api/v1/companies/:companyId/profile/documents/:documentId
+ * onSuccess: invalidate ['profile-documents', companyId], show success toast
+ * onError: show error toast with messageKey translation
+ */
+
+/**
+ * useDocumentDownloadUrl(companyId: string, documentId: string)
+ * Lazy query (enabled: false by default, triggered on demand)
+ * GET /api/v1/companies/:companyId/profile/documents/:documentId/download
+ * Returns: { downloadUrl: string, expiresIn: number }
+ * On success: open downloadUrl in new tab via window.open()
+ * No caching (staleTime: 0) — pre-signed URLs expire
+ */
+```
+
+### Loading States
+
+- **Initial page load**: Skeleton cards matching the document item layout — a `gray-200` pulsing rectangle (64x64) for the thumbnail, two skeleton lines for name/metadata, and small rectangles for action buttons. Show 3 skeleton cards.
+- **Upload in progress**: Progress bar with percentage inside the upload dialog. "Upload" button disabled with spinner. Drop zone shows the selected filename.
+- **Download in progress**: Download icon button shows a spinner while the pre-signed URL is being fetched (typically < 200ms).
+- **Delete in progress**: "Excluir" button in the confirmation dialog shows a spinner and is disabled until the mutation completes.
+
+### Error States
+
+| Error | Display | Recovery |
+|-------|---------|----------|
+| Invalid file type selected | Inline error in drop zone: "Tipo de arquivo nao suportado. Use PDF, PNG, JPG, XLSX, PPTX ou DOCX" | User selects a different file |
+| File exceeds 25 MB | Inline error in drop zone: "Arquivo excede o limite de 25 MB" | User selects a smaller file |
+| Storage limit exceeded (500 MB) | Error toast: "Limite de armazenamento de 500 MB excedido" | User deletes existing documents to free space |
+| Upload network failure | Error toast: "Falha ao enviar documento. Tente novamente." | User retries upload |
+| Delete failure | Error toast: "Falha ao excluir documento. Tente novamente." | User retries delete |
+| Download URL generation failure | Error toast: "Falha ao gerar link de download. Tente novamente." | User retries download |
+| Document list fetch failure | Error state in document list area with retry button | User clicks retry |
+
+### Empty States
+
+**No documents at all** (company has zero documents uploaded):
+- Centered illustration (document/folder icon, 64px, `gray-300`)
+- Title: "Nenhum documento" (`h3`, `gray-700`)
+- Description: "Adicione documentos ao seu dataroom para compartilhar com investidores" (`body`, `gray-500`, max-width 400px)
+- CTA: "Upload Document" button (primary variant)
+
+**No documents in selected category** (other categories have documents):
+- Centered, smaller than the full empty state
+- Text: "Nenhum documento nesta categoria" (`body`, `gray-500`)
+- CTA: "Upload Document" button (secondary variant)
+
+### Frontend i18n Keys
+
+All user-facing strings must be added to both `messages/pt-BR.json` and `messages/en.json`.
+
+**PT-BR translations**:
+
+| Key | PT-BR Value |
+|-----|-------------|
+| `dataroom.title` | Documentos |
+| `dataroom.subtitle` | Gerencie os documentos da sua empresa |
+| `dataroom.upload.title` | Upload de Documento |
+| `dataroom.upload.dropzone` | Arraste um arquivo ou clique para selecionar |
+| `dataroom.upload.formats` | PDF, PNG, JPG, XLSX, PPTX, DOCX |
+| `dataroom.upload.maxSize` | Maximo 25 MB |
+| `dataroom.upload.button` | Enviar |
+| `dataroom.upload.progress` | Enviando... {percent}% |
+| `dataroom.upload.success` | Documento enviado com sucesso |
+| `dataroom.upload.error` | Falha ao enviar documento. Tente novamente. |
+| `dataroom.upload.invalidType` | Tipo de arquivo nao suportado. Use PDF, PNG, JPG, XLSX, PPTX ou DOCX |
+| `dataroom.upload.tooLarge` | Arquivo excede o limite de 25 MB |
+| `dataroom.upload.nameLabel` | Nome |
+| `dataroom.upload.categoryLabel` | Categoria |
+| `dataroom.category.all` | Todos |
+| `dataroom.category.pitchDeck` | Pitch Deck |
+| `dataroom.category.financials` | Financeiro |
+| `dataroom.category.legal` | Juridico |
+| `dataroom.category.product` | Produto |
+| `dataroom.category.team` | Equipe |
+| `dataroom.category.other` | Outros |
+| `dataroom.document.pages` | {count} paginas |
+| `dataroom.document.page` | 1 pagina |
+| `dataroom.document.download` | Baixar |
+| `dataroom.document.delete` | Excluir |
+| `dataroom.delete.title` | Excluir Documento |
+| `dataroom.delete.message` | Tem certeza que deseja excluir "{name}"? Esta acao nao pode ser desfeita. |
+| `dataroom.delete.confirm` | Excluir |
+| `dataroom.delete.cancel` | Cancelar |
+| `dataroom.delete.success` | Documento excluido com sucesso |
+| `dataroom.delete.error` | Falha ao excluir documento. Tente novamente. |
+| `dataroom.storage.label` | {used} MB / {total} MB utilizados |
+| `dataroom.empty.title` | Nenhum documento |
+| `dataroom.empty.message` | Adicione documentos ao seu dataroom para compartilhar com investidores |
+| `dataroom.empty.action` | Upload de Documento |
+| `dataroom.empty.categoryMessage` | Nenhum documento nesta categoria |
+| `dataroom.download.error` | Falha ao gerar link de download. Tente novamente. |
+
+**EN translations**:
+
+| Key | EN Value |
+|-----|----------|
+| `dataroom.title` | Documents |
+| `dataroom.subtitle` | Manage your company documents |
+| `dataroom.upload.title` | Upload Document |
+| `dataroom.upload.dropzone` | Drag a file or click to browse |
+| `dataroom.upload.formats` | PDF, PNG, JPG, XLSX, PPTX, DOCX |
+| `dataroom.upload.maxSize` | Maximum 25 MB |
+| `dataroom.upload.button` | Upload |
+| `dataroom.upload.progress` | Uploading... {percent}% |
+| `dataroom.upload.success` | Document uploaded successfully |
+| `dataroom.upload.error` | Failed to upload document. Please try again. |
+| `dataroom.upload.invalidType` | Unsupported file type. Use PDF, PNG, JPG, XLSX, PPTX or DOCX |
+| `dataroom.upload.tooLarge` | File exceeds the 25 MB limit |
+| `dataroom.upload.nameLabel` | Name |
+| `dataroom.upload.categoryLabel` | Category |
+| `dataroom.category.all` | All |
+| `dataroom.category.pitchDeck` | Pitch Deck |
+| `dataroom.category.financials` | Financials |
+| `dataroom.category.legal` | Legal |
+| `dataroom.category.product` | Product |
+| `dataroom.category.team` | Team |
+| `dataroom.category.other` | Other |
+| `dataroom.document.pages` | {count} pages |
+| `dataroom.document.page` | 1 page |
+| `dataroom.document.download` | Download |
+| `dataroom.document.delete` | Delete |
+| `dataroom.delete.title` | Delete Document |
+| `dataroom.delete.message` | Are you sure you want to delete "{name}"? This action cannot be undone. |
+| `dataroom.delete.confirm` | Delete |
+| `dataroom.delete.cancel` | Cancel |
+| `dataroom.delete.success` | Document deleted successfully |
+| `dataroom.delete.error` | Failed to delete document. Please try again. |
+| `dataroom.storage.label` | {used} MB / {total} MB used |
+| `dataroom.empty.title` | No documents |
+| `dataroom.empty.message` | Add documents to your dataroom to share with investors |
+| `dataroom.empty.action` | Upload Document |
+| `dataroom.empty.categoryMessage` | No documents in this category |
+| `dataroom.download.error` | Failed to generate download link. Please try again. |
+
+### Accessibility Requirements
+
+- Upload drop zone is keyboard accessible: focusable with `tabindex="0"`, activates file browser on `Enter` or `Space`
+- Category tabs support keyboard navigation with arrow keys
+- All action buttons have `aria-label` attributes (e.g., `aria-label="Download Document Name.pdf"`)
+- Delete confirmation dialog traps focus when open
+- Upload progress is announced to screen readers via `aria-live="polite"` region
+- File type icons have `aria-hidden="true"` (decorative, the file name provides context)
+- Empty states use `role="status"` for screen reader announcement
 
 ---
 

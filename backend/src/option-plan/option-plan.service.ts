@@ -486,6 +486,10 @@ export class OptionPlanService {
     });
     if (!grant) throw new NotFoundException('optionGrant', grantId);
 
+    // Service-level authorization: EMPLOYEE can only exercise their own grants
+    // ADMINs can exercise any grant (BUG-2 fix)
+    await this.validateGranteeOrAdmin(companyId, userId, grant.shareholderId);
+
     // Grant must be ACTIVE (CANCELLED/EXPIRED/EXERCISED cannot exercise)
     if (grant.status !== 'ACTIVE') {
       throw new BusinessRuleException(
@@ -746,12 +750,15 @@ export class OptionPlanService {
     });
   }
 
-  async cancelExercise(companyId: string, exerciseId: string) {
+  async cancelExercise(companyId: string, exerciseId: string, userId: string) {
     const exercise = await this.prisma.optionExerciseRequest.findFirst({
       where: { id: exerciseId, grant: { companyId } },
-      select: { id: true, status: true },
+      select: { id: true, status: true, grant: { select: { shareholderId: true } } },
     });
     if (!exercise) throw new NotFoundException('optionExercise', exerciseId);
+
+    // Service-level authorization: EMPLOYEE can only cancel their own exercises (BUG-2 fix)
+    await this.validateGranteeOrAdmin(companyId, userId, exercise.grant.shareholderId);
 
     if (exercise.status === 'CANCELLED') {
       throw new BusinessRuleException(
@@ -957,6 +964,45 @@ export class OptionPlanService {
     }
 
     return schedule;
+  }
+
+  // ========================
+  // Authorization Helpers
+  // ========================
+
+  /**
+   * Validates that the current user is either the grantee (EMPLOYEE exercising
+   * their own grant) or an ADMIN for the company (BUG-2 fix).
+   * Checks Shareholder.userId link for grantee validation.
+   */
+  private async validateGranteeOrAdmin(
+    companyId: string,
+    userId: string,
+    shareholderId: string | null,
+  ): Promise<void> {
+    // Check if the user is the grantee (shareholder linked to this user)
+    if (shareholderId) {
+      const shareholder = await this.prisma.shareholder.findFirst({
+        where: { id: shareholderId, userId },
+        select: { id: true },
+      });
+
+      if (shareholder) return; // User is the grantee — allowed
+    }
+
+    // Not the grantee — check if user is ADMIN for this company
+    const member = await this.prisma.companyMember.findFirst({
+      where: { companyId, userId, status: 'ACTIVE' },
+      select: { role: true },
+    });
+
+    if (member?.role === 'ADMIN') return; // Admin — allowed
+
+    // Neither grantee nor admin — deny
+    throw new BusinessRuleException(
+      'OPT_NOT_GRANTEE',
+      'errors.opt.notGrantee',
+    );
   }
 
   // ========================

@@ -24,6 +24,29 @@ Key design decisions:
 
 ---
 
+## MVP Scope
+
+### In Scope
+
+- **Automatic BigDataCorp fetch on profile creation**: When a company profile is created, the system dispatches a Bull job to fetch litigation data from BigDataCorp. This is the only trigger — no manual or periodic re-fetch.
+- **Risk level badge**: Display a colored pill badge (LOW/MEDIUM/HIGH) based on active lawsuit count and total value in dispute.
+- **Summary statistics**: Show active lawsuit count, historical lawsuit count, total value in dispute, and protest count in a collapsed summary card.
+- **Expandable lawsuit table**: "Ver detalhes" toggle reveals a full table of individual lawsuits and protest records.
+- **Pending and failed status indicators**: Show spinner with message when fetch is in progress; show warning with message when fetch has failed.
+- **PII masking**: Individual plaintiff names are masked before storage (e.g., "J*** S***"). Company names in lawsuits are stored in full.
+- **Read-only display**: Litigation data is system-managed and displayed identically on both the internal profile editor and the public profile page. No user can edit, hide, or delete the data.
+
+### Out of Scope (Future Enhancements)
+
+- **Manual refresh button**: No ability for any user role to manually trigger a re-fetch of litigation data.
+- **Periodic re-fetch**: No scheduled job to periodically update litigation data. Data is a point-in-time snapshot from profile creation.
+- **Admin-triggered re-verification**: No admin endpoint or UI to re-run the BigDataCorp check.
+- **Litigation alerts/notifications**: No email, push, or in-app notifications when litigation data changes or when high-risk litigation is detected.
+- **Litigation data filtering/search**: No ability to filter or search within the lawsuit table.
+- **Litigation data export**: No dedicated export of litigation data (it is included in the profile data but has no standalone export).
+
+---
+
 ## User Stories
 
 ### US-1: Automatic Litigation Transparency
@@ -35,6 +58,314 @@ Key design decisions:
 **As a** platform operator
 **I want** litigation data to be immutable and system-managed
 **So that** founders cannot hide or manipulate their legal standing on the profile
+
+---
+
+## Frontend Specification
+
+This section defines the complete frontend rendering of litigation data, including component structure, layouts, states, styling, and i18n keys. An implementation agent should be able to build the entire litigation UI from this section without guessing.
+
+### Display Locations
+
+Litigation data is displayed in two locations:
+
+1. **Internal profile editor** (`/companies/:companyId/profile`): Read-only litigation section at the bottom of the "Informacoes" tab. Includes a "(dados gerenciados pelo sistema)" label to explain why the section is not editable. Visually distinct from editable sections (greyed-out / reduced-opacity container to signal non-editability).
+
+2. **Public profile page** (`/p/:slug`): Litigation section near the bottom of the page, before the "Powered by Navia" footer. Same card layout as the internal view but without the system-managed label.
+
+### Litigation Section States
+
+The `LitigationSection` container component renders one of three states based on `litigationStatus`:
+
+#### State 1: PENDING (fetch in progress)
+
+```
+┌─────────────────────────────────────────┐
+│  Verificacao Judicial                    │
+│  [Spinner] Verificacao em andamento...   │
+│  Os dados judiciais estao sendo          │
+│  consultados. Volte em alguns minutos.   │
+└─────────────────────────────────────────┘
+```
+
+- Section title: `h4` weight 600, `gray-800`
+- Spinner: `blue-600` circular spinner, 20px, inline with title text
+- Title text: `body` (14px), `gray-700`, bold
+- Description text: `body-sm` (13px), `gray-500`
+- Card: white background, `1px solid gray-200` border, `radius-lg` (12px), `24px` padding
+
+#### State 2: FAILED (fetch failed after retries)
+
+```
+┌─────────────────────────────────────────┐
+│  Verificacao Judicial                    │
+│  [WarningTriangle] Verificacao           │
+│  indisponivel                            │
+│  Nao foi possivel consultar os dados     │
+│  judiciais neste momento.                │
+└─────────────────────────────────────────┘
+```
+
+- Section title: `h4` weight 600, `gray-800`
+- Warning icon: Lucide `AlertTriangle` icon, 20px, `cream-700` (#C4A44E) color
+- Title text: `body` (14px), `gray-700`, bold
+- Description text: `body-sm` (13px), `gray-500`
+- Card: white background, `1px solid gray-200` border, `radius-lg` (12px), `24px` padding
+
+#### State 3: COMPLETED (data available — collapsed by default)
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Verificacao Judicial                                    │
+│  ┌─────────────────────────────────────────────────────┐│
+│  │ Risk Badge: [MEDIO] (cream-colored badge)           ││
+│  │                                                      ││
+│  │ 2 processos ativos  •  5 historicos                 ││
+│  │ R$ 225.000,00 em disputa                            ││
+│  │ 0 protestos                                          ││
+│  │                                                      ││
+│  │ Verificado em: 23/02/2026                           ││
+│  │                                                      ││
+│  │ [▸ Ver detalhes]                                     ││
+│  └─────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────┘
+```
+
+- Section title: `h4` weight 600, `gray-800`
+- Risk badge: Pill badge (`radius-full`), `caption` (12px), weight 500, padding `2px 8px`. Colors defined in [Risk Level Badge Colors](#risk-level-badge-colors).
+- Summary stats line 1: `body` (14px), `gray-700`. Active and historical counts separated by ` • ` (bullet).
+- Summary stats line 2: `body` (14px), `gray-700`. Currency formatted as `R$ 225.000,00`.
+- Summary stats line 3: `body` (14px), `gray-700`. Protest count.
+- Verified date: `body-sm` (13px), `gray-500`. Date formatted as `dd/MM/yyyy` using `Intl.DateTimeFormat('pt-BR')`.
+- Expand toggle: Ghost button variant, `blue-600` text, `body-sm` (13px). Chevron icon (Lucide `ChevronRight` when collapsed, `ChevronDown` when expanded) + text.
+- Card: white background, `1px solid gray-200` border, `radius-lg` (12px), `24px` padding.
+
+#### State 3b: COMPLETED (expanded — after clicking "Ver detalhes")
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Verificacao Judicial                                    │
+│  ┌─────────────────────────────────────────────────────┐│
+│  │ Risk Badge: [MEDIO] (cream-colored badge)           ││
+│  │ 2 processos ativos  •  R$ 225.000,00 em disputa    ││
+│  │ Verificado em: 23/02/2026                           ││
+│  │                                                      ││
+│  │ [▾ Ocultar detalhes]                                ││
+│  │                                                      ││
+│  │ ── Processos Judiciais ──                            ││
+│  │ ┌──────────────────────────────────────────────────┐││
+│  │ │ Processo    │ Tribunal │ Tipo  │ Valor    │Status│││
+│  │ ├──────────────────────────────────────────────────┤││
+│  │ │ 0000123-45..│ TJSP     │ Civel │R$150.000 │Ativo │││
+│  │ │ 0000456-78..│ TRT-2    │Trab.  │R$ 75.000 │Ativo │││
+│  │ │ 0000789-01..│ TJSP     │ Civel │R$ 30.000 │Arq.  │││
+│  │ └──────────────────────────────────────────────────┘││
+│  │                                                      ││
+│  │ ── Protestos ──                                      ││
+│  │ Nenhum protesto registrado.                         ││
+│  └─────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────┘
+```
+
+- In expanded mode, the summary is condensed to a single line (active count + value in dispute) to save vertical space.
+- Collapse toggle: Ghost button variant, `blue-600` text, `body-sm` (13px). Chevron icon rotated down.
+- Sub-section titles ("Processos Judiciais", "Protestos"): `body-sm` (13px), weight 600, `gray-500`, uppercase, with horizontal rule dividers (`1px solid gray-200`).
+
+**Lawsuit Table** (`LitigationDetailTable`):
+
+| Column | Field | Width | Alignment | Format |
+|--------|-------|-------|-----------|--------|
+| Processo | `processId` | Auto (flexible) | Left | Full process ID string (e.g., "0000123-45.2024.8.26.0100") |
+| Tribunal | `court` | Auto | Left | Plain text |
+| Tipo | `caseType` | 80px | Left | Translated via i18n key (e.g., `litigation.caseType.civil` -> "Civel") |
+| Valor | `valueInDispute` | 120px | Right | `R$ 150.000,00` using `Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })`. Show "—" if null. |
+| Status | `status` | 80px | Left | Badge: "Ativo" uses `green-100` bg / `green-700` text; "Arquivado" / "Extinto" uses `gray-100` bg / `gray-600` text |
+
+- Table follows design-system.md table styles: `gray-50` header, `gray-500` header text (caption size, uppercase), `52px` row height, `1px solid gray-100` row borders.
+- Numeric "Valor" column: right-aligned, `tabular-nums` font feature.
+- If there are no lawsuits, show empty state text: "Nenhum processo judicial registrado." (`body-sm`, `gray-500`, centered).
+- On mobile (`sm` breakpoint), the table scrolls horizontally.
+
+**Protest Table** (`LitigationProtestTable`):
+
+| Column | Field | Width | Alignment | Format |
+|--------|-------|-------|-----------|--------|
+| Data | `date` | 100px | Left | `dd/MM/yyyy` using `Intl.DateTimeFormat('pt-BR')` |
+| Valor | `amount` | 120px | Right | `R$ 5.000,00` using Brazilian currency format |
+| Cartorio | `notaryOffice` | Auto (flexible) | Left | Plain text |
+| Status | `status` | 80px | Left | Badge: "ATIVO" uses `cream-100` bg / `cream-700` text; "PAGO" uses `green-100` bg / `green-700` text; "CANCELADO" uses `gray-100` bg / `gray-600` text |
+
+- Same table styling as lawsuit table.
+- If there are no protests, show: "Nenhum protesto registrado." (`body-sm`, `gray-500`, centered).
+
+### Risk Level Badge Colors
+
+Following `design-system.md` badge patterns:
+
+| Risk Level | Label (PT-BR) | Label (EN) | Background | Text Color |
+|------------|---------------|------------|------------|------------|
+| LOW | Baixo | Low | `green-100` (#E8F5E4) | `green-700` (#6BAF5E) |
+| MEDIUM | Medio | Medium | `cream-100` (#FAF4E3) | `cream-700` (#C4A44E) |
+| HIGH | Alto | High | `#FEE2E2` | `#991B1B` |
+
+Badge styling: `radius-full` (pill), `caption` (12px), weight 500, padding `2px 8px`.
+
+### Internal Profile Editor View
+
+When the litigation section is rendered inside the internal profile editor (`/companies/:companyId/profile`), the following additional rules apply:
+
+- The entire litigation card has a subtle visual distinction to signal it is non-editable:
+  - Container: `opacity: 0.85` or `bg-gray-50` background instead of white to visually differentiate from editable form sections.
+  - A label "(dados gerenciados pelo sistema)" is displayed below the section title in `caption` (12px), `gray-400`, italic.
+- No edit buttons, no hide toggles, no action buttons of any kind.
+- The expand/collapse toggle for "Ver detalhes" still works normally (read-only does not mean non-interactive, just non-editable).
+- This section is placed at the bottom of the "Informacoes" tab, after all editable fields, separated by a `1px solid gray-200` divider with `32px` top margin.
+
+### Component Architecture
+
+All litigation components live in the frontend under a `litigation/` feature directory. Each component is a single responsibility:
+
+| Component | Responsibility | Props |
+|-----------|---------------|-------|
+| `LitigationSection` | Container that reads `litigationStatus` and renders the correct state (PENDING, FAILED, or COMPLETED). Handles the expand/collapse state. | `litigation: LitigationResponse` (the `litigation` object from the profile API response), `isInternalView?: boolean` (defaults to `false`) |
+| `LitigationSummaryCard` | Renders the risk badge, summary stats, verified date, and expand/collapse toggle. | `summary: LitigationSummary`, `fetchedAt: string`, `isExpanded: boolean`, `onToggleExpand: () => void` |
+| `LitigationDetailTable` | Renders the lawsuit rows in a table. | `lawsuits: Lawsuit[]` |
+| `LitigationProtestTable` | Renders the protest rows in a table. | `protests: Protest[]` |
+| `LitigationRiskBadge` | Renders the colored pill badge for LOW / MEDIUM / HIGH risk level. | `riskLevel: 'LOW' | 'MEDIUM' | 'HIGH'` |
+| `LitigationPendingState` | Renders the spinner + pending message. | None |
+| `LitigationFailedState` | Renders the warning icon + failure message. | None |
+
+#### Component Tree
+
+```
+LitigationSection
+  ├─ (if PENDING) LitigationPendingState
+  ├─ (if FAILED) LitigationFailedState
+  └─ (if COMPLETED)
+       ├─ LitigationSummaryCard
+       │    └─ LitigationRiskBadge
+       └─ (if expanded)
+            ├─ LitigationDetailTable
+            └─ LitigationProtestTable
+```
+
+#### TypeScript Types (Frontend)
+
+```typescript
+// Mirrors the API response shape for the litigation section
+interface LitigationResponse {
+  status: 'PENDING' | 'COMPLETED' | 'FAILED';
+  fetchedAt: string | null;
+  summary: LitigationSummary | null;
+  lawsuits?: Lawsuit[];
+  protestData?: ProtestData;
+  error?: string;
+}
+
+interface LitigationSummary {
+  activeLawsuits: number;
+  historicalLawsuits: number;
+  activeAdministrative: number;
+  protests: number;
+  totalValueInDispute: string; // Decimal as string
+  riskLevel: 'LOW' | 'MEDIUM' | 'HIGH';
+}
+
+interface Lawsuit {
+  processId: string;
+  court: string;
+  caseType: 'CIVIL' | 'LABOR' | 'CRIMINAL' | 'TAX' | 'ADMINISTRATIVE';
+  status: string;
+  filingDate: string;
+  lastUpdate: string;
+  valueInDispute: string | null;
+  plaintiffName: string; // Already masked by backend
+  defendantRole: string;
+  subject: string;
+}
+
+interface ProtestData {
+  totalProtests: number;
+  protests: Protest[];
+}
+
+interface Protest {
+  date: string;
+  amount: string;
+  notaryOffice: string;
+  status: string;
+}
+```
+
+### Frontend i18n Keys
+
+All user-facing strings must be added to both `messages/pt-BR.json` and `messages/en.json`. Keys follow the `litigation.*` namespace.
+
+| Key | PT-BR | EN |
+|-----|-------|-----|
+| `litigation.title` | Verificacao Judicial | Litigation Verification |
+| `litigation.verifiedAt` | Verificado em: {date} | Verified on: {date} |
+| `litigation.pending.title` | Verificacao em andamento... | Verification in progress... |
+| `litigation.pending.message` | Os dados judiciais estao sendo consultados. Volte em alguns minutos. | Litigation data is being fetched. Please check back in a few minutes. |
+| `litigation.failed.title` | Verificacao indisponivel | Verification unavailable |
+| `litigation.failed.message` | Nao foi possivel consultar os dados judiciais neste momento. | Unable to fetch litigation data at this time. |
+| `litigation.summary.activeLawsuits` | {count, plural, =0 {Nenhum processo ativo} =1 {1 processo ativo} other {# processos ativos}} | {count, plural, =0 {No active lawsuits} =1 {1 active lawsuit} other {# active lawsuits}} |
+| `litigation.summary.historicalLawsuits` | {count, plural, =0 {0 historicos} =1 {1 historico} other {# historicos}} | {count, plural, =0 {0 historical} =1 {1 historical} other {# historical}} |
+| `litigation.summary.valueInDispute` | {value} em disputa | {value} in dispute |
+| `litigation.summary.protests` | {count, plural, =0 {0 protestos} =1 {1 protesto} other {# protestos}} | {count, plural, =0 {0 protests} =1 {1 protest} other {# protests}} |
+| `litigation.summary.noProtests` | Nenhum protesto registrado | No protests registered |
+| `litigation.summary.noLawsuits` | Nenhum processo judicial registrado | No lawsuits registered |
+| `litigation.riskLevel.low` | Baixo | Low |
+| `litigation.riskLevel.medium` | Medio | Medium |
+| `litigation.riskLevel.high` | Alto | High |
+| `litigation.details.show` | Ver detalhes | Show details |
+| `litigation.details.hide` | Ocultar detalhes | Hide details |
+| `litigation.table.processId` | Processo | Process ID |
+| `litigation.table.court` | Tribunal | Court |
+| `litigation.table.caseType` | Tipo | Type |
+| `litigation.table.status` | Status | Status |
+| `litigation.table.filingDate` | Data | Date |
+| `litigation.table.value` | Valor | Value |
+| `litigation.table.plaintiff` | Autor | Plaintiff |
+| `litigation.table.subject` | Assunto | Subject |
+| `litigation.systemManaged` | Dados gerenciados pelo sistema | System-managed data |
+| `litigation.caseType.civil` | Civel | Civil |
+| `litigation.caseType.labor` | Trabalhista | Labor |
+| `litigation.caseType.criminal` | Criminal | Criminal |
+| `litigation.caseType.tax` | Tributario | Tax |
+| `litigation.caseType.administrative` | Administrativo | Administrative |
+| `litigation.protestTable.date` | Data | Date |
+| `litigation.protestTable.value` | Valor | Value |
+| `litigation.protestTable.notaryOffice` | Cartorio | Notary Office |
+| `litigation.protestTable.status` | Status | Status |
+| `litigation.section.lawsuits` | Processos Judiciais | Lawsuits |
+| `litigation.section.protests` | Protestos | Protests |
+
+### Formatting Rules
+
+All formatting follows the global rules from `i18n.md`:
+
+- **Currency values**: Always use Brazilian format regardless of UI language. `Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })` produces `R$ 225.000,00`.
+- **Dates**: Always use Brazilian format `dd/MM/yyyy`. `Intl.DateTimeFormat('pt-BR')` produces `23/02/2026`.
+- **Process IDs**: Display the full court case number as-is from the API (e.g., "0000123-45.2024.8.26.0100"). Do not truncate or abbreviate.
+- **Percentages**: Not applicable for litigation data.
+
+### Accessibility Requirements
+
+- The expand/collapse toggle must be a `<button>` element with `aria-expanded="true|false"` and `aria-controls` pointing to the detail section ID.
+- The detail section (lawsuit table + protest table) must have an `id` matching the `aria-controls` value and use `role="region"` with an `aria-label`.
+- Risk badge must include `aria-label` with the full risk level text (e.g., `aria-label="Nivel de risco: Medio"`).
+- Tables must use semantic `<table>`, `<thead>`, `<tbody>`, `<th scope="col">` markup.
+- PENDING and FAILED states must use `role="status"` for the message area so screen readers announce the state.
+- Spinner in PENDING state must have `aria-label="Carregando"` (or the EN equivalent based on locale).
+
+### Responsive Behavior
+
+| Breakpoint | Layout |
+|------------|--------|
+| `sm` (< 640px) | Summary stats stack vertically (one stat per line). Lawsuit and protest tables scroll horizontally. Risk badge and verified date stack below the summary. |
+| `md` (768px+) | Summary stats on a single line separated by bullets. Tables fit within the card width if columns are narrow enough, otherwise horizontal scroll. |
+| `lg` (1024px+) | Full layout as shown in the wireframes above. Tables fit comfortably. |
 
 ---
 

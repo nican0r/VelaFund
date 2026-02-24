@@ -12,7 +12,10 @@ import {
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import {
+  CurrentUser,
+  AuthenticatedUser,
+} from '../auth/decorators/current-user.decorator';
 import { paginate } from '../common/helpers/paginate';
 import { ConvertibleService } from './convertible.service';
 import { CreateConvertibleDto } from './dto/create-convertible.dto';
@@ -21,11 +24,6 @@ import { ListConvertiblesQueryDto } from './dto/list-convertibles-query.dto';
 import { RedeemConvertibleDto } from './dto/redeem-convertible.dto';
 import { CancelConvertibleDto } from './dto/cancel-convertible.dto';
 import { ConvertConvertibleDto } from './dto/convert-convertible.dto';
-
-interface AuthenticatedUser {
-  id: string;
-  email?: string;
-}
 
 @ApiTags('Convertible Instruments')
 @Controller('api/v1/companies/:companyId/convertibles')

@@ -403,9 +403,10 @@ export const Roles = (...roles: string[]) => SetMetadata(ROLES_KEY, roles);
 Checks the authenticated user's role against the required roles:
 
 ```typescript
-import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, HttpStatus } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from './roles.decorator';
+import { AppException } from '../common/exceptions/app.exception';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -424,9 +425,15 @@ export class RolesGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const member = request.companyMember; // Set by CompanyScopeGuard
 
-    if (!member) return false;
+    if (!member || !requiredRoles.includes(member.role)) {
+      throw new AppException(
+        'AUTH_FORBIDDEN',
+        'errors.auth.forbidden',
+        HttpStatus.FORBIDDEN,
+      );
+    }
 
-    return requiredRoles.includes(member.role);
+    return true;
   }
 }
 ```
@@ -448,10 +455,11 @@ export const RequirePermission = (permission: string) =>
 Resolves the effective permission considering role defaults and overrides:
 
 ```typescript
-import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, HttpStatus } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PERMISSION_KEY } from './require-permission.decorator';
 import { PermissionService } from './permission.service';
+import { AppException } from '../common/exceptions/app.exception';
 
 @Injectable()
 export class PermissionGuard implements CanActivate {
@@ -471,13 +479,29 @@ export class PermissionGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const member = request.companyMember;
 
-    if (!member) return false;
+    if (!member) {
+      throw new AppException(
+        'AUTH_FORBIDDEN',
+        'errors.auth.forbidden',
+        HttpStatus.FORBIDDEN,
+      );
+    }
 
-    return this.permissionService.hasPermission(
+    const hasPermission = this.permissionService.hasPermission(
       member.role,
       member.permissions,
       requiredPermission,
     );
+
+    if (!hasPermission) {
+      throw new AppException(
+        'AUTH_FORBIDDEN',
+        'errors.auth.forbidden',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    return true;
   }
 }
 ```
@@ -513,6 +537,7 @@ export class ShareholderController {
 
 ```typescript
 import { Injectable } from '@nestjs/common';
+import { ValidationError } from '../common/types';
 
 // Default permission matrix — derived from the Permission Matrix table above.
 // Each role maps to its set of granted permissions. Unlisted keys default to false.
@@ -577,17 +602,21 @@ export class PermissionService {
 
   /**
    * Validates that an override payload does not grant protected permissions
-   * to non-ADMIN roles.
+   * to non-ADMIN roles. Returns validation errors with messageKeys for i18n.
    */
   validateOverrides(
     role: string,
     overrides: Record<string, boolean>,
-  ): string[] {
-    const errors: string[] = [];
+  ): ValidationError[] {
+    const errors: ValidationError[] = [];
     if (role !== 'ADMIN') {
       for (const key of PROTECTED_PERMISSIONS) {
         if (overrides[key] === true) {
-          errors.push(`Cannot grant '${key}' to ${role} role via override`);
+          errors.push({
+            field: `permissions.${key}`,
+            message: `Cannot grant '${key}' to ${role} role via override`,
+            messageKey: 'errors.permission.protectedOverride',
+          });
         }
       }
     }
@@ -606,12 +635,12 @@ Permission-related operations use the standard error envelope defined in `api-st
 
 | HTTP Status | Error Code | When Triggered |
 |---|---|---|
-| 401 | `AUTH_INVALID_TOKEN` | Missing or invalid JWT. User is not authenticated. |
-| 401 | `AUTH_TOKEN_EXPIRED` | JWT has expired. User must re-authenticate. |
-| 403 | (standard HTTP) | User is authenticated but lacks the required role or permission. No specific error code; use the standard 403 response. |
-| 404 | `COMPANY_NOT_FOUND` | Company does not exist or user is not a member. Returns 404 instead of 403 to prevent enumeration. |
-| 422 | `COMPANY_LAST_ADMIN` | Cannot remove or demote the only ADMIN in a company. |
-| 422 | `COMPANY_MEMBER_NOT_FOUND` | Target member does not exist in this company. |
+| 401 | `AUTH_INVALID_TOKEN` | Missing or invalid JWT. User is not authenticated. Uses `messageKey: errors.auth.invalidToken`. |
+| 401 | `AUTH_TOKEN_EXPIRED` | JWT has expired. User must re-authenticate. Uses `messageKey: errors.auth.tokenExpired`. |
+| 403 | `AUTH_FORBIDDEN` | User is authenticated but lacks the required role or permission. Uses `messageKey: errors.auth.forbidden`. |
+| 404 | `COMPANY_NOT_FOUND` | Company does not exist or user is not a member. Uses `messageKey: errors.company.notFound`. Returns 404 instead of 403 to prevent enumeration. |
+| 422 | `COMPANY_LAST_ADMIN` | Cannot remove or demote the only ADMIN in a company. Uses `messageKey: errors.company.lastAdmin`. |
+| 404 | `COMPANY_MEMBER_NOT_FOUND` | Target member does not exist in this company. Uses `messageKey: errors.companyMember.notFound`. Returns 404 instead of 403 to prevent enumeration. |
 
 ### 403 Response Format
 
@@ -737,3 +766,976 @@ Every request verifies the Privy JWT independently. Permission results are never
 | [error-handling.md](../.claude/rules/error-handling.md) | Error codes: COMPANY_LAST_ADMIN; permission denial handling and logging |
 | [audit-logging.md](../.claude/rules/audit-logging.md) | Audit events: COMPANY_ROLE_CHANGED, PERMISSION_CHANGED |
 | [security.md](../.claude/rules/security.md) | Authorization enforcement, company scoping, row-level security via Prisma middleware |
+
+---
+
+# Frontend Specification
+
+> Everything above this line describes backend RBAC enforcement. The sections below define how the frontend **consumes and enforces** permissions in the UI layer.
+>
+> **Core Principle**: Unauthorized elements are **completely hidden** (not disabled or grayed out). If a user lacks permission, the element does not render in the DOM at all.
+
+---
+
+## Table of Contents (Frontend)
+
+17. [Frontend Architecture](#frontend-architecture)
+18. [PermissionContext](#permissioncontext)
+19. [usePermissions Hook](#usepermissions-hook)
+20. [PermissionGate Component](#permissiongate-component)
+21. [ProtectedRoute Component](#protectedroute-component)
+22. [Navigation Filtering](#navigation-filtering)
+23. [Frontend Permission Matrix](#frontend-permission-matrix)
+24. [Frontend Permission Enforcement Patterns](#frontend-permission-enforcement-patterns)
+25. [Frontend User Flows](#frontend-user-flows)
+26. [UI States and Error Handling](#ui-states-and-error-handling)
+27. [i18n Keys](#i18n-keys)
+28. [Component Specifications](#component-specifications)
+29. [Frontend Success Criteria](#frontend-success-criteria)
+
+---
+
+## Frontend Architecture
+
+**No dedicated page routes** — permissions are enforced across all pages, not on a separate permissions page. There is no `/dashboard/permissions` route.
+
+**Key design decisions**:
+- **HIDDEN, not disabled**: Unauthorized UI elements are not rendered at all. No grayed-out buttons, no locked icons, no "you need permission" tooltips. If you cannot use it, you cannot see it.
+- **Backend is the source of truth**: The frontend permission layer is a UX convenience. The backend always validates permissions independently on every request.
+- **One company per user for MVP**: The permission context loads for the user's single active company. No company-switching logic is needed.
+- **Permissions fetched once, refreshed on events**: The user's resolved permissions are fetched on initial load and cached in React context. They refresh on window refocus and when a role change notification is received.
+
+**Component hierarchy**:
+```
+<AuthProvider>                          // from authentication.md
+  <PermissionProvider companyId={id}>   // fetches role + permissions
+    <DashboardLayout>                   // sidebar uses usePermissions()
+      <ProtectedRoute permission="..."> // page-level guard
+        <PageContent>                   // uses PermissionGate for element-level
+        </PageContent>
+      </ProtectedRoute>
+    </DashboardLayout>
+  </PermissionProvider>
+</AuthProvider>
+```
+
+---
+
+## PermissionContext
+
+**File**: `frontend/src/contexts/permission-context.tsx`
+
+React context that provides the authenticated user's role and resolved permissions for the current company.
+
+### Context Shape
+
+```typescript
+interface PermissionContextValue {
+  role: Role | null;
+  permissions: string[];
+  isLoading: boolean;
+  error: Error | null;
+  hasPermission: (permission: string) => boolean;
+  hasRole: (role: Role | Role[]) => boolean;
+  canAccess: (resource: string, action: string) => boolean;
+  refetch: () => Promise<void>;
+}
+
+type Role = 'ADMIN' | 'FINANCE' | 'LEGAL' | 'INVESTOR' | 'EMPLOYEE';
+```
+
+### Data Source
+
+Fetches from: `GET /api/v1/companies/:companyId/members/me`
+
+Response shape:
+```json
+{
+  "success": true,
+  "data": {
+    "id": "member-uuid",
+    "userId": "user-uuid",
+    "role": "FINANCE",
+    "permissions": ["capTable:read", "capTable:write", "capTable:export", "transactions:read", "..."],
+    "status": "ACTIVE"
+  }
+}
+```
+
+The `permissions` array contains the **fully resolved** permission set (role defaults merged with overrides, computed server-side).
+
+### Provider Implementation
+
+```typescript
+import { createContext, useContext, useCallback, useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/hooks/use-auth';
+import { api } from '@/lib/api-client';
+
+const PermissionContext = createContext<PermissionContextValue | undefined>(undefined);
+
+interface PermissionProviderProps {
+  companyId: string;
+  children: React.ReactNode;
+}
+
+export function PermissionProvider({ companyId, children }: PermissionProviderProps) {
+  const { user } = useAuth();
+
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['member-permissions', companyId, user?.id],
+    queryFn: () => api.get<MemberPermissionsResponse>(
+      `/api/v1/companies/${companyId}/members/me`
+    ),
+    enabled: !!companyId && !!user?.id,
+    staleTime: 5 * 60 * 1000,       // 5 minutes
+    refetchOnWindowFocus: true,       // Refresh on tab focus
+    retry: 2,
+  });
+
+  const role = data?.role ?? null;
+  const permissions = data?.permissions ?? [];
+
+  const hasPermission = useCallback(
+    (permission: string) => permissions.includes(permission),
+    [permissions],
+  );
+
+  const hasRole = useCallback(
+    (target: Role | Role[]) => {
+      if (!role) return false;
+      return Array.isArray(target) ? target.includes(role) : role === target;
+    },
+    [role],
+  );
+
+  const canAccess = useCallback(
+    (resource: string, action: string) => hasPermission(`${resource}:${action}`),
+    [hasPermission],
+  );
+
+  const value = useMemo<PermissionContextValue>(
+    () => ({
+      role,
+      permissions,
+      isLoading,
+      error: error as Error | null,
+      hasPermission,
+      hasRole,
+      canAccess,
+      refetch,
+    }),
+    [role, permissions, isLoading, error, hasPermission, hasRole, canAccess, refetch],
+  );
+
+  return (
+    <PermissionContext.Provider value={value}>
+      {children}
+    </PermissionContext.Provider>
+  );
+}
+
+export function usePermissionContext() {
+  const context = useContext(PermissionContext);
+  if (!context) {
+    throw new Error('usePermissionContext must be used within a PermissionProvider');
+  }
+  return context;
+}
+```
+
+### Refresh Triggers
+
+| Trigger | Mechanism |
+|---------|-----------|
+| Initial page load | TanStack Query `queryFn` executes on mount |
+| Window refocus (tab switch back) | `refetchOnWindowFocus: true` |
+| Role change notification | Call `refetch()` from notification handler |
+| Manual refresh | Call `refetch()` from any component |
+
+### Error Behavior
+
+When the permissions fetch fails:
+- `isLoading` becomes `false`, `error` is set
+- `role` is `null`, `permissions` is `[]`
+- All `hasPermission()` calls return `false` (most restrictive fallback)
+- An error toast is shown: `errors.auth.permissionLoadFailed`
+- The user sees a degraded UI where no gated content appears
+
+---
+
+## usePermissions Hook
+
+**File**: `frontend/src/hooks/use-permissions.ts`
+
+Convenience hook that wraps `usePermissionContext()`. Components use this instead of consuming the context directly.
+
+```typescript
+import { usePermissionContext } from '@/contexts/permission-context';
+
+export interface UsePermissionsReturn {
+  role: Role | null;
+  permissions: string[];
+  isLoading: boolean;
+  hasPermission: (permission: string) => boolean;
+  hasRole: (role: Role | Role[]) => boolean;
+  canAccess: (resource: string, action: string) => boolean;
+}
+
+export function usePermissions(): UsePermissionsReturn {
+  const { role, permissions, isLoading, hasPermission, hasRole, canAccess } =
+    usePermissionContext();
+
+  return { role, permissions, isLoading, hasPermission, hasRole, canAccess };
+}
+```
+
+### Usage Examples
+
+```tsx
+// Check a specific permission
+const { hasPermission } = usePermissions();
+if (hasPermission('shareholders:create')) { /* show create button */ }
+
+// Check by role
+const { hasRole } = usePermissions();
+if (hasRole(['ADMIN', 'FINANCE'])) { /* show finance section */ }
+
+// Resource + action shorthand
+const { canAccess } = usePermissions();
+if (canAccess('capTable', 'export')) { /* show export button */ }
+```
+
+---
+
+## PermissionGate Component
+
+**File**: `frontend/src/components/auth/permission-gate.tsx`
+
+Wrapper component that conditionally renders children based on the user's permissions.
+
+### Props
+
+```typescript
+interface PermissionGateProps {
+  /** Permission key to check (e.g., 'shareholders:create') */
+  permission?: string;
+  /** Alternative: check by role instead of specific permission */
+  role?: Role | Role[];
+  /** Optional fallback when permission denied (defaults to null — hidden) */
+  fallback?: React.ReactNode;
+  /** Content to render when permission is granted */
+  children: React.ReactNode;
+}
+```
+
+### Implementation
+
+```tsx
+import { usePermissions } from '@/hooks/use-permissions';
+
+export function PermissionGate({
+  permission,
+  role,
+  fallback = null,
+  children,
+}: PermissionGateProps) {
+  const { hasPermission, hasRole, isLoading } = usePermissions();
+
+  // While permissions are loading, render nothing (prevents flash of unauthorized content)
+  if (isLoading) return null;
+
+  // Check permission if provided
+  if (permission && !hasPermission(permission)) {
+    return <>{fallback}</>;
+  }
+
+  // Check role if provided
+  if (role && !hasRole(role)) {
+    return <>{fallback}</>;
+  }
+
+  // If neither permission nor role is specified, always render
+  if (!permission && !role) {
+    return <>{children}</>;
+  }
+
+  return <>{children}</>;
+}
+```
+
+### Behavior
+
+| Scenario | Renders |
+|----------|---------|
+| `permission` provided, user has it | `children` |
+| `permission` provided, user lacks it | `fallback` (default: `null` — nothing) |
+| `role` provided, user matches | `children` |
+| `role` provided, user does not match | `fallback` (default: `null` — nothing) |
+| Neither `permission` nor `role` provided | `children` (always) |
+| Permissions loading | `null` (nothing — prevents flash) |
+
+### Usage
+
+```tsx
+// Hide a button for non-ADMIN users
+<PermissionGate permission="shareholders:create">
+  <Button>Adicionar Acionista</Button>
+</PermissionGate>
+
+// Gate by role with a custom fallback
+<PermissionGate role={['ADMIN', 'FINANCE']} fallback={<ReadOnlyBanner />}>
+  <EditableForm />
+</PermissionGate>
+
+// Multiple gates can be nested
+<PermissionGate permission="transactions:read">
+  <TransactionsTable />
+  <PermissionGate permission="transactions:create">
+    <Button>Nova Transacao</Button>
+  </PermissionGate>
+</PermissionGate>
+```
+
+---
+
+## ProtectedRoute Component
+
+**File**: `frontend/src/components/auth/protected-route.tsx`
+
+Route-level permission guard that protects entire pages. Unlike `PermissionGate` (which silently hides elements), `ProtectedRoute` **redirects** unauthorized users and shows a toast.
+
+### Props
+
+```typescript
+interface ProtectedRouteProps {
+  /** Permission key required to access this page */
+  permission?: string;
+  /** Alternative: role required to access this page */
+  role?: Role | Role[];
+  /** Page content */
+  children: React.ReactNode;
+}
+```
+
+### Implementation
+
+```tsx
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { usePermissions } from '@/hooks/use-permissions';
+import { useTranslations } from 'next-intl';
+import { toast } from '@/components/ui/toast';
+import { Spinner } from '@/components/ui/spinner';
+
+export function ProtectedRoute({
+  permission,
+  role,
+  children,
+}: ProtectedRouteProps) {
+  const { hasPermission, hasRole, isLoading } = usePermissions();
+  const router = useRouter();
+  const t = useTranslations('permissions');
+
+  const isAuthorized =
+    (!permission || hasPermission(permission)) &&
+    (!role || hasRole(role));
+
+  useEffect(() => {
+    if (!isLoading && !isAuthorized) {
+      toast.error(t('noAccess'));
+      router.replace('/dashboard');
+    }
+  }, [isLoading, isAuthorized, router, t]);
+
+  // Loading state: centered spinner on gray-50 background
+  if (isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center bg-gray-50">
+        <Spinner className="h-5 w-5 text-ocean-600" />
+      </div>
+    );
+  }
+
+  // Unauthorized: render nothing (redirect is happening via useEffect)
+  if (!isAuthorized) {
+    return null;
+  }
+
+  return <>{children}</>;
+}
+```
+
+### Behavior
+
+| State | Visual | Action |
+|-------|--------|--------|
+| Loading | Centered spinner (ocean-600, 20px) on gray-50 background | Wait for permissions |
+| Authorized | Renders `children` | None |
+| Unauthorized | Nothing rendered | Redirect to `/dashboard` + error toast |
+
+### Difference from PermissionGate
+
+| Aspect | PermissionGate | ProtectedRoute |
+|--------|---------------|----------------|
+| Scope | Element-level (button, section) | Page-level (entire route) |
+| Unauthorized behavior | Silently hides (renders `null`) | Redirects + toast notification |
+| Loading behavior | Renders `null` | Shows spinner |
+| Use case | Hiding buttons, columns, sections | Guarding `/dashboard/*` pages |
+
+### Usage in Page Components
+
+```tsx
+// app/dashboard/shareholders/page.tsx
+export default function ShareholdersPage() {
+  return (
+    <ProtectedRoute permission="shareholders:read">
+      <ShareholdersContent />
+    </ProtectedRoute>
+  );
+}
+
+// app/dashboard/members/page.tsx
+export default function MembersPage() {
+  return (
+    <ProtectedRoute permission="members:manage">
+      <MembersContent />
+    </ProtectedRoute>
+  );
+}
+```
+
+---
+
+## Navigation Filtering
+
+The sidebar navigation is filtered based on the user's role. Unauthorized items are **completely hidden** (not disabled, not grayed out).
+
+### Navigation Configuration
+
+```typescript
+// frontend/src/config/navigation.ts
+import {
+  LayoutDashboard,
+  PieChart,
+  Users,
+  ArrowLeftRight,
+  TrendingUp,
+  Target,
+  FileText,
+  UserPlus,
+  Settings,
+} from 'lucide-react';
+
+export interface NavItem {
+  label: string;           // i18n key
+  href: string;
+  icon: LucideIcon;
+  permission: string;      // Permission required to see this item
+}
+
+export const navConfig: NavItem[] = [
+  { label: 'dashboard.nav.dashboard', href: '/dashboard', icon: LayoutDashboard, permission: 'dashboard:read' },
+  { label: 'dashboard.nav.capTable', href: '/dashboard/cap-table', icon: PieChart, permission: 'capTable:read' },
+  { label: 'dashboard.nav.shareholders', href: '/dashboard/shareholders', icon: Users, permission: 'shareholders:read' },
+  { label: 'dashboard.nav.transactions', href: '/dashboard/transactions', icon: ArrowLeftRight, permission: 'transactions:read' },
+  { label: 'dashboard.nav.investments', href: '/dashboard/investments', icon: TrendingUp, permission: 'fundingRounds:read' },
+  { label: 'dashboard.nav.options', href: '/dashboard/options', icon: Target, permission: 'optionPlans:read' },
+  { label: 'dashboard.nav.documents', href: '/dashboard/documents', icon: FileText, permission: 'documents:read' },
+  { label: 'dashboard.nav.members', href: '/dashboard/members', icon: UserPlus, permission: 'members:manage' },
+  { label: 'dashboard.nav.settings', href: '/dashboard/settings', icon: Settings, permission: 'settings:manage' },
+];
+```
+
+### Visibility per Role
+
+| Nav Item | Route | ADMIN | FINANCE | LEGAL | INVESTOR | EMPLOYEE |
+|----------|-------|-------|---------|-------|----------|----------|
+| Dashboard | `/dashboard` | Yes | Yes | Yes | Yes | Yes |
+| Cap Table | `/dashboard/cap-table` | Yes | Yes | Yes | Yes (own holdings) | No |
+| Shareholders | `/dashboard/shareholders` | Yes | Yes | Yes | No | No |
+| Transactions | `/dashboard/transactions` | Yes | Yes | Yes | No | No |
+| Investments | `/dashboard/investments` | Yes | Yes | Yes | Yes (own) | No |
+| Options | `/dashboard/options` | Yes | Yes | No | No | Yes (own) |
+| Documents | `/dashboard/documents` | Yes | Yes | Yes | Yes (own) | Yes (own) |
+| Members | `/dashboard/members` | Yes | No | No | No | No |
+| Settings | `/dashboard/settings` | Yes | No | No | No | No |
+
+"Own" means the user can see the nav item but the backend filters results to only their own data. The frontend shows the navigation link; the backend enforces data scoping.
+
+### Sidebar Filtering Implementation
+
+```tsx
+// In Sidebar component
+import { navConfig } from '@/config/navigation';
+import { usePermissions } from '@/hooks/use-permissions';
+import { useTranslations } from 'next-intl';
+
+function SidebarNav() {
+  const { hasPermission } = usePermissions();
+  const t = useTranslations();
+
+  const visibleItems = navConfig.filter(item => hasPermission(item.permission));
+
+  return (
+    <nav>
+      {visibleItems.map(item => (
+        <NavItem key={item.href} {...item} label={t(item.label)} />
+      ))}
+    </nav>
+  );
+}
+```
+
+Sidebar visual styling follows design-system.md section 5.2:
+- Active: navy-800 bg, white text, 3px ocean-600 left border
+- Inactive: white/70% text, transparent background
+- Hover: navy-950 bg, white/90% text
+- No "locked" or "disabled" nav item style exists
+
+---
+
+## Frontend Permission Matrix
+
+Complete mapping of frontend permission keys to roles. This mirrors the backend permission matrix but uses the frontend permission key format (`resource:action`) for UI gating.
+
+| Permission | ADMIN | FINANCE | LEGAL | INVESTOR | EMPLOYEE |
+|-----------|-------|---------|-------|----------|----------|
+| `dashboard:read` | Yes | Yes | Yes | Yes | Yes |
+| `capTable:read` | Yes | Yes | Yes | Own | No |
+| `capTable:write` | Yes | Yes | No | No | No |
+| `capTable:export` | Yes | Yes | No | No | No |
+| `capTableSnapshots:read` | Yes | Yes | Yes | No | No |
+| `capTableSnapshots:export` | Yes | Yes | No | No | No |
+| `shareholders:read` | Yes | Yes | Yes | No | No |
+| `shareholders:create` | Yes | No | No | No | No |
+| `shareholders:edit` | Yes | No | No | No | No |
+| `shareholders:delete` | Yes | No | No | No | No |
+| `transactions:read` | Yes | Yes | Yes | No | No |
+| `transactions:create` | Yes | Yes | No | No | No |
+| `transactions:approve` | Yes | Yes | No | No | No |
+| `fundingRounds:read` | Yes | Yes | Yes | Own | No |
+| `fundingRounds:create` | Yes | Yes | No | No | No |
+| `fundingRounds:close` | Yes | Yes | No | No | No |
+| `fundingRounds:cancel` | Yes | No | No | No | No |
+| `convertibles:read` | Yes | Yes | Yes | Own | No |
+| `convertibles:create` | Yes | Yes | No | No | No |
+| `convertibles:convert` | Yes | Yes | No | No | No |
+| `optionPlans:read` | Yes | Yes | No | No | No |
+| `optionPlans:create` | Yes | No | No | No | No |
+| `optionPlans:modify` | Yes | No | No | No | No |
+| `optionGrants:read` | Yes | Yes | No | No | Own |
+| `optionGrants:create` | Yes | No | No | No | No |
+| `optionGrants:approveExercise` | Yes | Yes | No | No | No |
+| `documents:read` | Yes | Yes | Yes | Own | Own |
+| `documents:create` | Yes | No | Yes | No | No |
+| `documents:sign` | Yes | Yes | Yes | Yes | Yes |
+| `auditLogs:read` | Yes | No | Yes | No | No |
+| `auditLogs:export` | Yes | No | Yes | No | No |
+| `reports:view` | Yes | Yes | Yes | No | No |
+| `reports:export` | Yes | Yes | No | No | No |
+| `companySettings:read` | Yes | Yes | Yes | No | No |
+| `companySettings:modify` | Yes | No | No | No | No |
+| `members:manage` | Yes | No | No | No | No |
+| `members:read` | Yes | Yes | Yes | Yes | Yes |
+| `settings:manage` | Yes | No | No | No | No |
+
+**"Own" means**: The frontend shows the navigation item and page structure, but the backend filters query results to only return the user's own records. The frontend does not need to implement this filtering — it is enforced server-side.
+
+---
+
+## Frontend Permission Enforcement Patterns
+
+Five standard patterns are used throughout the application. Every UI element that depends on permissions must use one of these patterns.
+
+### Pattern 1: Hide Navigation Items
+
+```tsx
+// In Sidebar component
+{navConfig.filter(item => hasPermission(item.permission)).map(item => (
+  <NavItem key={item.href} {...item} />
+))}
+```
+
+### Pattern 2: Hide Action Buttons
+
+```tsx
+// In ShareholdersPage toolbar
+<PermissionGate permission="shareholders:create">
+  <Button onClick={openCreateModal}>
+    {t('shareholders.actions.add')}
+  </Button>
+</PermissionGate>
+```
+
+### Pattern 3: Protect Entire Pages
+
+```tsx
+// In page component
+export default function ShareholdersPage() {
+  return (
+    <ProtectedRoute permission="shareholders:read">
+      <ShareholdersContent />
+    </ProtectedRoute>
+  );
+}
+```
+
+### Pattern 4: Conditional Table Columns
+
+```tsx
+// In table definition
+const { hasPermission } = usePermissions();
+
+const columns = [
+  nameColumn,
+  emailColumn,
+  roleColumn,
+  ...(hasPermission('shareholders:edit') ? [actionsColumn] : []),
+];
+```
+
+### Pattern 5: Read-Only vs Editable Forms
+
+```tsx
+// In settings form
+const { hasPermission } = usePermissions();
+const isEditable = hasPermission('companySettings:modify');
+
+<Input
+  disabled={!isEditable}
+  value={company.name}
+  onChange={isEditable ? handleChange : undefined}
+/>
+```
+
+**Note on Pattern 5**: This is the one exception to the "hidden, not disabled" rule. Settings pages where a user has `companySettings:read` but not `companySettings:modify` show the form in a read-only/disabled state. This is intentional because the user needs to see the current values even if they cannot edit them.
+
+---
+
+## Frontend User Flows
+
+### Flow 1: Permission Check on Page Load
+
+```
+User navigates to any dashboard page
+  |
+  +-- [PermissionContext loaded] --> check route permission
+  |     |
+  |     +-- [has permission] --> render page content
+  |     |     |
+  |     |     +-- [within page] --> PermissionGate hides unauthorized elements
+  |     |
+  |     +-- [no permission] --> redirect to /dashboard
+  |           +-- toast: "Voce nao tem acesso a esta pagina"
+  |
+  +-- [PermissionContext loading] --> show page skeleton / spinner
+```
+
+Step-by-step:
+
+```
+PRECONDITION: User is authenticated, PermissionProvider wraps dashboard layout
+ACTOR: Any authenticated user
+TRIGGER: Navigation to a /dashboard/* page
+
+1. [Frontend] PermissionContext checks if permissions are loaded
+   -> IF loading: show full-page skeleton (spinner centered, ocean-600)
+2. [Frontend] ProtectedRoute evaluates hasPermission(routePermission)
+   -> IF false: redirect to /dashboard + toast "Voce nao tem acesso a esta pagina"
+3. [UI] Page content renders
+4. [Frontend] Within page, PermissionGate components evaluate their permissions
+5. [UI] Authorized elements render; unauthorized elements are completely absent from DOM
+6. [Frontend] Table columns filtered by hasPermission() for action columns
+7. [UI] User sees only the actions they are authorized to perform
+
+POSTCONDITION: Page shows only authorized content
+SIDE EFFECTS: None (read-only permission check, no audit log)
+```
+
+### Flow 2: Unauthorized Direct URL Access
+
+```
+User types URL directly or uses bookmark to a page they cannot access
+  |
+  +-- [e.g., EMPLOYEE navigates to /dashboard/members]
+  |     |
+  |     +-- [ProtectedRoute checks permission 'members:manage']
+  |     |     |
+  |     |     +-- [EMPLOYEE lacks 'members:manage'] --> redirect to /dashboard
+  |     |           +-- toast: "Voce nao tem acesso a esta pagina"
+  |     |
+  |     +-- [permission granted] --> render page (normal flow)
+```
+
+Step-by-step:
+
+```
+PRECONDITION: User is authenticated with EMPLOYEE role
+ACTOR: EMPLOYEE user
+TRIGGER: Direct navigation to /dashboard/members (bookmark, typed URL, shared link)
+
+1. [Frontend] Next.js App Router loads the members page component
+2. [Frontend] ProtectedRoute evaluates hasPermission('members:manage')
+3. [Frontend] EMPLOYEE does not have 'members:manage' -> isAuthorized = false
+4. [Frontend] useEffect fires: router.replace('/dashboard')
+5. [UI] Toast notification: "Voce nao tem acesso a esta pagina" (error variant)
+6. [UI] User lands on /dashboard, which they can access
+
+POSTCONDITION: User is on /dashboard; they never saw the members page content
+SIDE EFFECTS: None on frontend. Backend would return 403/404 if an API call had been made.
+```
+
+### Flow 3: Role Change Takes Effect
+
+```
+Admin changes user X's role from FINANCE to INVESTOR
+  |
+  +-- [Backend updates role] --> X's permissions change server-side
+  |     |
+  |     +-- [X switches tabs / refocuses window]
+  |     |     +-- [PermissionContext refetches GET /members/me]
+  |     |     +-- [new role: INVESTOR with reduced permissions]
+  |     |     +-- [sidebar re-filters: fewer nav items visible]
+  |     |
+  |     +-- [X is currently on /dashboard/shareholders (now unauthorized)]
+  |           +-- [next navigation triggers ProtectedRoute check]
+  |           +-- [redirect to /dashboard + toast]
+  |
+  +-- [X makes an API call before refetch]
+        +-- [backend enforces new INVESTOR role]
+        +-- [403/404 returned]
+        +-- [frontend error handler shows toast]
+```
+
+Step-by-step:
+
+```
+PRECONDITION: Admin changes user X's role from FINANCE to INVESTOR
+ACTOR: User X (affected), Admin (initiator)
+TRIGGER: PUT /api/v1/companies/:companyId/members/:memberId { role: 'INVESTOR' }
+
+1. [Backend] Updates X's role in database
+2. [Admin UI] Toast: "Papel alterado com sucesso"
+3. [User X Frontend] On next window refocus or page navigation:
+   - PermissionContext refetches GET /api/v1/companies/:companyId/members/me
+   - Returns new role: INVESTOR, reduced permissions array
+4. [User X UI] Sidebar re-renders with filtered navConfig
+   - Shareholders, Transactions, Options, Members, Settings: HIDDEN
+   - Dashboard, Cap Table (own), Investments (own), Documents (own): VISIBLE
+5. [User X] If currently on a now-unauthorized page (e.g., /dashboard/shareholders):
+   - Page remains visible until next navigation (we do not force-redirect mid-session)
+   - Next navigation triggers ProtectedRoute which redirects to /dashboard
+6. [User X] If they make an API call before the frontend refetches:
+   - Backend returns 403 AUTH_FORBIDDEN (or 404 for enumeration prevention)
+   - Frontend error handler shows toast: "Voce nao tem permissao para acessar este recurso"
+
+POSTCONDITION: User X sees INVESTOR-level navigation and content
+SIDE EFFECTS: COMPANY_ROLE_CHANGED audit log (from the admin's action)
+```
+
+### Flow 4: Permission Override Applied
+
+```
+Admin grants 'shareholders:create' to FINANCE member Y
+  |
+  +-- [Backend updates Y's permissions JSON]
+  |     |
+  |     +-- [Y refocuses window / navigates]
+  |     |     +-- [PermissionContext refetches]
+  |     |     +-- [permissions array now includes 'shareholders:create']
+  |     |
+  |     +-- [Y visits /dashboard/shareholders]
+  |           +-- [PermissionGate for 'shareholders:create' now passes]
+  |           +-- ["Adicionar Acionista" button is now visible]
+```
+
+Step-by-step:
+
+```
+PRECONDITION: Admin sets override { "shareholders:create": true } on FINANCE member Y
+ACTOR: Admin (initiator), User Y (affected)
+TRIGGER: PUT /api/v1/companies/:companyId/members/:memberId { permissions: { "shareholders:create": true } }
+
+1. [Backend] Updates Y's CompanyMember.permissions JSON
+2. [Backend] Permission resolution: override['shareholders:create'] = true
+3. [Admin UI] Toast: "Permissoes atualizadas com sucesso"
+4. [User Y Frontend] On refetch:
+   - GET /api/v1/companies/:companyId/members/me returns updated permissions array
+   - Array now includes 'shareholders:create'
+5. [User Y UI] On /dashboard/shareholders:
+   - PermissionGate with permission="shareholders:create" evaluates to true
+   - "Adicionar Acionista" button renders in the toolbar
+6. [User Y] Clicks "Adicionar Acionista"
+   - Backend validates: override grants 'shareholders:create' -> allowed
+   - Shareholder creation proceeds normally
+
+POSTCONDITION: FINANCE member Y can see and use the "Adicionar Acionista" button
+SIDE EFFECTS: PERMISSION_CHANGED audit log (from admin's action)
+```
+
+---
+
+## UI States and Error Handling
+
+### PermissionContext States
+
+| State | Visual | Behavior |
+|-------|--------|----------|
+| Loading | Full-page skeleton / spinner | All PermissionGates render `null`; ProtectedRoutes show spinner |
+| Loaded | Normal rendering with permission filtering | `hasPermission()` evaluates against cached permissions array |
+| Error | Fallback to most restrictive (all permissions denied) + error toast | Toast: `errors.auth.permissionLoadFailed`; sidebar shows only Dashboard |
+
+### ProtectedRoute States
+
+| State | Visual | Behavior |
+|-------|--------|----------|
+| Checking | Centered spinner (ocean-600, 20px) on gray-50 background | No content rendered yet |
+| Authorized | Renders page content (`children`) | Normal page rendering |
+| Unauthorized | Nothing rendered (blank) | Redirect to `/dashboard` + error toast |
+
+### Error Code to UI Mapping
+
+| Error Code | HTTP | Frontend Behavior |
+|------------|------|-------------------|
+| `AUTH_FORBIDDEN` | 403 | Redirect to /dashboard + toast: `errors.auth.forbidden` |
+| `AUTH_INVALID_TOKEN` | 401 | Call `logout()`, redirect to `/login?expired=true` |
+| `AUTH_TOKEN_EXPIRED` | 401 | Call `logout()`, redirect to `/login?expired=true` |
+| `COMPANY_NOT_FOUND` | 404 | Same behavior as 403 (enumeration prevention) |
+| `COMPANY_MEMBER_NOT_FOUND` | 404 | Same behavior as 403 (enumeration prevention) |
+
+### TanStack Query Error Handling
+
+```typescript
+// In API client or query configuration
+function handleApiError(error: ApiError) {
+  if (error.statusCode === 401) {
+    // Auth errors: logout and redirect
+    logout();
+    router.push('/login?expired=true');
+    return;
+  }
+
+  if (error.statusCode === 403 || error.statusCode === 404) {
+    // Permission errors: redirect to dashboard
+    toast.error(t(error.messageKey));
+    router.push('/dashboard');
+    return;
+  }
+
+  // Other errors: show toast
+  toast.error(t(error.messageKey));
+}
+```
+
+TanStack Query retry policy for permission errors:
+- **Do not retry** 401, 403, 404 (these are definitive)
+- **Retry** 500, 502, 503 up to 2 times with exponential backoff
+
+---
+
+## i18n Keys
+
+All user-facing strings for the permission system. These must be added to both `frontend/messages/pt-BR.json` and `frontend/messages/en.json`.
+
+### Permission Messages
+
+| Key | PT-BR | EN |
+|-----|-------|-----|
+| `permissions.noAccess` | Voce nao tem acesso a esta pagina | You don't have access to this page |
+| `permissions.loading` | Verificando permissoes... | Checking permissions... |
+
+### Error Messages
+
+| Key | PT-BR | EN |
+|-----|-------|-----|
+| `errors.auth.forbidden` | Voce nao tem permissao para realizar esta acao | You don't have permission to perform this action |
+| `errors.auth.insufficientPermissions` | Voce nao tem permissao para acessar este recurso | You don't have permission to access this resource |
+| `errors.auth.permissionLoadFailed` | Erro ao carregar permissoes. Tente recarregar a pagina. | Failed to load permissions. Try refreshing the page. |
+
+### Navigation Labels
+
+| Key | PT-BR | EN |
+|-----|-------|-----|
+| `dashboard.nav.dashboard` | Dashboard | Dashboard |
+| `dashboard.nav.capTable` | Cap Table | Cap Table |
+| `dashboard.nav.shareholders` | Acionistas | Shareholders |
+| `dashboard.nav.transactions` | Transacoes | Transactions |
+| `dashboard.nav.investments` | Investimentos | Investments |
+| `dashboard.nav.options` | Opcoes | Options |
+| `dashboard.nav.documents` | Documentos | Documents |
+| `dashboard.nav.members` | Membros | Members |
+| `dashboard.nav.settings` | Configuracoes | Settings |
+
+---
+
+## Component Specifications
+
+### PermissionGate — Visual Spec
+
+- **No visual representation**: This is a logic-only wrapper component
+- When permission denied: renders `null` (or optional `fallback`)
+- No loading state of its own (relies on parent `PermissionContext` being loaded first)
+- No border, background, padding, or any visual footprint
+- When hidden: the element is completely absent from the DOM, not `display: none`
+
+### Sidebar Navigation — Visual Spec
+
+Per design-system.md section 5.2:
+
+- Only `<NavItem>` elements the user has permission for are rendered
+- Active state: `navy-800` bg, white text, 3px `ocean-600` left border accent
+- Inactive state: transparent bg, white/70% text
+- Hover state: `navy-950` bg, white/90% text
+- **No "locked", "disabled", or "coming soon" indicators** — items simply do not appear
+- Navigation items: 40px height, 12px horizontal padding, 8px border-radius, 6px icon-to-text gap
+
+### ProtectedRoute — Visual Spec
+
+- **Checking state**: Centered `<Spinner>` component
+  - Color: `ocean-600` (#1B6B93)
+  - Size: 20px
+  - Container: `flex h-full items-center justify-center bg-gray-50`
+- **Unauthorized state**: Nothing rendered (redirect is in progress)
+  - No error page, no "access denied" screen — user is immediately redirected
+- **Authorized state**: Renders children with no wrapper elements (fragment only)
+
+### Permission Error Toast — Visual Spec
+
+Per design-system.md section 6.7:
+
+- Position: top-right, 16px from edges
+- Container: white bg, shadow-lg, radius-lg
+- Width: 360px
+- Left border accent: 3px in destructive red (#DC2626)
+- Icon: red warning icon (Lucide `ShieldAlert` or `Ban`)
+- Text: `body` (14px), gray-700
+- Auto-dismiss: persistent (error toasts do not auto-dismiss)
+- Close button: ghost X button
+
+---
+
+## Frontend Success Criteria
+
+- [ ] `PermissionContext` fetches and caches user permissions on dashboard load
+- [ ] `PermissionContext` refreshes on window refocus and role change notifications
+- [ ] `PermissionContext` error state falls back to most restrictive (deny all)
+- [ ] `usePermissions()` hook provides `hasPermission()`, `hasRole()`, and `canAccess()`
+- [ ] `PermissionGate` hides unauthorized elements (not disabled — completely absent from DOM)
+- [ ] `PermissionGate` renders `null` while permissions are loading (no flash of unauthorized content)
+- [ ] `ProtectedRoute` redirects unauthorized users to `/dashboard` with error toast
+- [ ] `ProtectedRoute` shows spinner during permission check
+- [ ] Sidebar navigation filters items based on user permissions
+- [ ] ADMIN sees all 9 nav items; EMPLOYEE sees only Dashboard, Options, Documents
+- [ ] Table action columns are conditionally rendered based on permissions
+- [ ] Settings form is read-only for non-ADMIN users who have `companySettings:read`
+- [ ] Direct URL access to unauthorized pages triggers redirect + toast
+- [ ] Role change takes effect on next window refocus or navigation
+- [ ] API 403/404 errors trigger redirect to `/dashboard` with error toast
+- [ ] API 401 errors trigger logout + redirect to `/login?expired=true`
+- [ ] All permission-related strings use i18n keys (no hardcoded strings)
+- [ ] Both `pt-BR.json` and `en.json` contain all permission i18n keys
+- [ ] Permission components have unit tests with 80%+ coverage
+- [ ] PermissionGate, ProtectedRoute, and usePermissions are tested for all role variants

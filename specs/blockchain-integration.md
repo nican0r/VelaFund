@@ -91,55 +91,31 @@ Navia uses the Open Cap Table Protocol (OCP) smart contracts deployed on Base Ne
 
 ## Data Models
 
-### AdminWallet Entity
+### Admin Wallet
 
-```typescript
-interface AdminWallet {
-  id: string;
-  company_id: string;                  // Foreign key (unique)
-  wallet_address: string;              // Ethereum address (unique)
-  privy_wallet_id: string;             // Privy embedded wallet ID (unique)
-  is_active: boolean;
-  created_at: Date;
-}
-```
+There is no separate `AdminWallet` entity. The company creator's `User.walletAddress` (Privy embedded wallet) serves as the smart contract admin. See [company-blockchain-admin.md](./company-blockchain-admin.md) for full architecture details.
+
+The link is: `Company.createdById` → `User.walletAddress` → OCP smart contract owner.
 
 ### BlockchainTransaction Entity
 
+Matches the Prisma schema `BlockchainTransaction` model:
+
 ```typescript
 interface BlockchainTransaction {
-  id: string;
-  transaction_id: string;              // Foreign key to Transaction (unique)
-
-  // Blockchain Data
-  transaction_hash: string;            // Ethereum tx hash (unique)
-  from_address: string;                // Admin wallet address
-  to_address: string | null;           // Recipient (for transfers)
-  contract_address: string;            // OCP contract address
-
-  // Transaction Details
-  transaction_data: {                  // ABI-encoded function call
-    function_name: string;
-    parameters: any;
-  };
-
-  // Status Tracking
-  status: 'pending' | 'submitted' | 'confirmed' | 'failed';
-  submitted_at: Date | null;
-  confirmed_at: Date | null;
-  failed_at: Date | null;
-  failure_reason: string | null;
-
-  // Block Information
-  block_number: number | null;
-  block_hash: string | null;
-
-  // Gas Information
-  gas_used: number | null;
-  gas_sponsored: boolean;              // Always true (Privy sponsorship)
-
-  created_at: Date;
-  updated_at: Date;
+  id: string;                          // UUID primary key
+  transactionId: string;               // FK to Transaction (equity transaction that triggered this)
+  txHash: string | null;               // Ethereum tx hash (0x...)
+  blockNumber: number | null;          // Block where tx was included
+  blockHash: string | null;            // Hash of the block
+  gasUsed: string | null;              // Gas consumed (string for precision)
+  status: 'PENDING' | 'SUBMITTED' | 'CONFIRMED' | 'FAILED';
+  errorMessage: string | null;         // Error details if FAILED
+  attempts: number;                    // Retry attempt count (default 0)
+  submittedAt: Date | null;            // When tx was sent to network
+  confirmedAt: Date | null;            // When tx reached 12 confirmations
+  createdAt: Date;
+  updatedAt: Date;
 }
 ```
 
@@ -147,61 +123,164 @@ interface BlockchainTransaction {
 
 ## API Endpoints
 
-### POST /api/v1/blockchain/admin-wallet
-**Description**: Create admin wallet for company (internal/automated)
+### Get Blockchain Sync Status
 
-**Request**:
+```
+GET /api/v1/companies/:companyId/blockchain/status
+```
+
+Returns the blockchain sync status for a company's OCP smart contract.
+
+**Response** (200 OK):
+
 ```json
 {
-  "company_id": "uuid"
+  "success": true,
+  "data": {
+    "contractAddress": "0xabc123...",
+    "adminWalletAddress": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+    "network": "base",
+    "chainId": 8453,
+    "syncStatus": "SYNCED",
+    "lastSyncAt": "2026-01-20T10:05:00.000Z",
+    "lastBlockSynced": 1234567,
+    "pendingTransactions": 0,
+    "explorerBaseUrl": "https://basescan.org"
+  }
 }
 ```
 
-**Response** (201 Created):
+| Field | Type | Description |
+|-------|------|-------------|
+| `contractAddress` | string | OCP smart contract address on Base |
+| `adminWalletAddress` | string | Creator's wallet address (contract owner) |
+| `network` | string | Network name (`base`) |
+| `chainId` | number | Chain ID (`8453` for Base mainnet) |
+| `syncStatus` | string | `SYNCED`, `SYNCING`, `BEHIND`, `ERROR` |
+| `lastSyncAt` | ISO 8601 | Last successful sync timestamp |
+| `lastBlockSynced` | number | Most recent block number synced |
+| `pendingTransactions` | number | Count of unconfirmed transactions |
+| `explorerBaseUrl` | string | Block explorer base URL for links |
+
+**Error Response** (404 — no contract deployed):
+
 ```json
 {
-  "wallet_address": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
-  "privy_wallet_id": "priv_wallet_xyz",
-  "contract_address": "0x..."
+  "success": false,
+  "error": {
+    "code": "CHAIN_CONTRACT_NOT_DEPLOYED",
+    "message": "Contrato ainda nao foi implantado para esta empresa",
+    "messageKey": "errors.chain.contractNotDeployed"
+  }
 }
 ```
 
 ---
 
-### GET /api/v1/companies/:companyId/blockchain/status
-**Description**: Get blockchain sync status
+### Get Transaction Blockchain Details
+
+```
+GET /api/v1/companies/:companyId/transactions/:transactionId/blockchain
+```
+
+Returns blockchain details for a specific equity transaction.
 
 **Response** (200 OK):
+
 ```json
 {
-  "contract_address": "0x...",
-  "admin_wallet": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
-  "network": "base",
-  "chain_id": 8453,
-  "sync_status": "synced",
-  "last_sync_at": "2024-01-20T10:05:00Z",
-  "last_block_synced": 1234567,
-  "pending_transactions": 0
+  "success": true,
+  "data": {
+    "id": "uuid",
+    "transactionId": "uuid",
+    "txHash": "0xabc123...",
+    "status": "CONFIRMED",
+    "blockNumber": 1234567,
+    "blockHash": "0xdef456...",
+    "gasUsed": "150000",
+    "attempts": 1,
+    "submittedAt": "2026-01-20T10:02:00.000Z",
+    "confirmedAt": "2026-01-20T10:02:30.000Z",
+    "explorerUrl": "https://basescan.org/tx/0xabc123..."
+  }
+}
+```
+
+**Error Response** (404 — no blockchain record):
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "CHAIN_TX_NOT_FOUND",
+    "message": "Registro blockchain nao encontrado para esta transacao",
+    "messageKey": "errors.chain.txNotFound"
+  }
 }
 ```
 
 ---
 
-### GET /api/v1/transactions/:transactionId/blockchain
-**Description**: Get blockchain details for a transaction
+### Force Blockchain Reconciliation
 
-**Response** (200 OK):
+```
+POST /api/v1/companies/:companyId/blockchain/reconcile
+```
+
+Triggers an on-demand reconciliation between on-chain and off-chain cap table state. Returns immediately with job status.
+
+**Response** (202 Accepted):
+
 ```json
 {
-  "transaction_hash": "0x...",
-  "status": "confirmed",
-  "block_number": 1234567,
-  "confirmed_at": "2024-01-20T10:02:30Z",
-  "explorer_url": "https://basescan.org/tx/0x...",
-  "gas_used": 150000,
-  "gas_sponsored": true
+  "success": true,
+  "data": {
+    "jobId": "uuid",
+    "status": "QUEUED",
+    "message": "Reconciliacao iniciada"
+  }
 }
 ```
+
+**Error Response** (429 — reconciliation already in progress):
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "CHAIN_RECONCILIATION_IN_PROGRESS",
+    "message": "Reconciliacao ja esta em andamento",
+    "messageKey": "errors.chain.reconciliationInProgress"
+  }
+}
+```
+
+---
+
+## Permission Matrix
+
+| Action | ADMIN | FINANCE | LEGAL | INVESTOR | EMPLOYEE |
+|--------|-------|---------|-------|----------|----------|
+| View blockchain status | Yes | Yes | Yes | No | No |
+| View transaction blockchain details | Yes | Yes | Yes | No | No |
+| Force reconciliation | Yes | No | No | No | No |
+
+---
+
+## Error Codes
+
+| Code | HTTP Status | messageKey | Description |
+|------|-------------|-----------|-------------|
+| `CHAIN_CONTRACT_NOT_DEPLOYED` | 404 | `errors.chain.contractNotDeployed` | Company has no deployed OCP smart contract |
+| `CHAIN_TX_NOT_FOUND` | 404 | `errors.chain.txNotFound` | No blockchain record for the given transaction |
+| `CHAIN_TX_FAILED` | 422 | `errors.chain.txFailed` | On-chain transaction reverted |
+| `CHAIN_TX_TIMEOUT` | 422 | `errors.chain.txTimeout` | Transaction not confirmed within expected time |
+| `CHAIN_GAS_ESTIMATION_FAILED` | 422 | `errors.chain.gasEstimationFailed` | Gas estimation failed (possible contract error) |
+| `CHAIN_RPC_UNAVAILABLE` | 502 | `errors.chain.rpcUnavailable` | Base Network RPC endpoint unreachable |
+| `CHAIN_NONCE_CONFLICT` | 422 | `errors.chain.nonceConflict` | Nonce conflict during transaction submission |
+| `CHAIN_REORG_DETECTED` | 422 | `errors.chain.reorgDetected` | Block reorganization affected a transaction |
+| `CHAIN_RECONCILIATION_IN_PROGRESS` | 429 | `errors.chain.reconciliationInProgress` | Reconciliation job already running |
+| `CHAIN_SYNC_FAILED` | 502 | `errors.chain.syncFailed` | Blockchain sync job failed |
 
 ---
 
@@ -502,6 +581,477 @@ export class BlockchainService {
 - Zero gas fee charges to users
 - Real-time transaction status updates
 - Clear error messages for failures
+
+---
+
+# Frontend Specification
+
+---
+
+## Table of Contents (Frontend)
+
+1. [Frontend Architecture](#frontend-architecture)
+2. [Component Hierarchy](#component-hierarchy)
+3. [Component Specifications](#component-specifications)
+4. [Frontend User Flows](#frontend-user-flows)
+5. [UI States and Error Handling](#ui-states-and-error-handling)
+6. [TanStack Query Integration](#tanstack-query-integration)
+7. [i18n Keys](#i18n-keys)
+8. [Frontend Success Criteria](#frontend-success-criteria)
+
+---
+
+## Frontend Architecture
+
+### MVP Scope
+
+The blockchain integration frontend is **read-only** — users view blockchain status and transaction confirmations but never initiate blockchain operations directly. All blockchain operations are triggered automatically by backend business logic (share issuance, transfer, etc.).
+
+The frontend surfaces blockchain information in three places:
+
+1. **BlockchainStatusBadge** — Compact sync status indicator shown on the Cap Table page header.
+2. **BlockchainStatusModal** — Expanded status details shown when clicking the badge.
+3. **BlockchainTransactionBadge** — Per-transaction confirmation status shown inline in transaction tables/detail pages.
+4. **BlockchainTransactionDetail** — Full blockchain details shown in a slide-over panel from transaction detail page.
+
+### State Management
+
+Blockchain status is fetched via TanStack Query with polling:
+
+- **Sync status**: Polled every 30 seconds while cap table page is active.
+- **Transaction status**: Polled every 5 seconds while a transaction is in `PENDING` or `SUBMITTED` state.
+- Polling stops automatically when the component unmounts or the status reaches a terminal state (`CONFIRMED` or `FAILED`).
+
+---
+
+## Component Hierarchy
+
+```
+components/blockchain/
+  blockchain-status-badge.tsx       → BlockchainStatusBadge
+  blockchain-status-modal.tsx       → BlockchainStatusModal
+  blockchain-transaction-badge.tsx  → BlockchainTransactionBadge
+  blockchain-transaction-detail.tsx → BlockchainTransactionDetail
+```
+
+Usage locations:
+
+```
+app/(dashboard)/cap-table/page.tsx
+  └─ Page header area
+       └─ BlockchainStatusBadge
+            └─ (click) → BlockchainStatusModal
+
+app/(dashboard)/transactions/page.tsx
+  └─ Transaction table rows
+       └─ BlockchainTransactionBadge (per row)
+
+app/(dashboard)/transactions/[id]/page.tsx
+  └─ Transaction detail page
+       ├─ BlockchainTransactionBadge
+       └─ (click "Ver detalhes blockchain") → BlockchainTransactionDetail (slide-over)
+```
+
+### Component Registry
+
+| Component | File | Description |
+|-----------|------|-------------|
+| `BlockchainStatusBadge` | `components/blockchain/blockchain-status-badge.tsx` | Compact sync status indicator |
+| `BlockchainStatusModal` | `components/blockchain/blockchain-status-modal.tsx` | Full blockchain status details |
+| `BlockchainTransactionBadge` | `components/blockchain/blockchain-transaction-badge.tsx` | Per-transaction confirmation badge |
+| `BlockchainTransactionDetail` | `components/blockchain/blockchain-transaction-detail.tsx` | Full blockchain tx details panel |
+
+---
+
+## Component Specifications
+
+### 1. BlockchainStatusBadge
+
+**File**: `components/blockchain/blockchain-status-badge.tsx`
+
+**Props**:
+```typescript
+interface BlockchainStatusBadgeProps {
+  companyId: string;
+}
+```
+
+**Visual Structure**:
+```
++------------------------------------------+
+|  ● Sincronizado com blockchain (2 min)   |  ← Clickable badge, green dot
++------------------------------------------+
+
++------------------------------------------+
+|  ● Sincronizando...                      |  ← Yellow dot, pulse animation
++------------------------------------------+
+
++------------------------------------------+
+|  ● Blockchain indisponivel               |  ← Red dot
++------------------------------------------+
+```
+
+**Badge States**:
+
+| syncStatus | Dot Color | Label | Additional |
+|------------|-----------|-------|------------|
+| `SYNCED` | `green-600` | "Sincronizado com blockchain ({time ago})" | — |
+| `SYNCING` | `cream-700` | "Sincronizando..." | Pulse animation on dot |
+| `BEHIND` | `cream-700` | "Sincronizacao atrasada ({time ago})" | — |
+| `ERROR` | `#DC2626` | "Blockchain indisponivel" | — |
+| Loading | `gray-400` | Skeleton text (120px) | — |
+| No contract | `gray-400` | "Contrato nao implantado" | — |
+
+**Styling**:
+- Container: `inline-flex items-center gap-1.5`, cursor pointer, `radius-full`, `px-3 py-1`, `gray-100` bg, hover `gray-200` bg.
+- Dot: `8px` circle with the status color.
+- Text: `caption` (12px), `gray-600`.
+- Click opens `BlockchainStatusModal`.
+
+**Behavior**:
+1. On mount: fetches `GET /api/v1/companies/:companyId/blockchain/status`.
+2. Polls every 30 seconds via `refetchInterval`.
+3. On click: opens `BlockchainStatusModal` dialog.
+4. On 404 (no contract): shows "Contrato nao implantado" in gray.
+5. On network error: shows "Blockchain indisponivel" in red.
+
+---
+
+### 2. BlockchainStatusModal
+
+**File**: `components/blockchain/blockchain-status-modal.tsx`
+
+**Props**:
+```typescript
+interface BlockchainStatusModalProps {
+  companyId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+```
+
+**Visual Structure**:
+```
++--------------------------------------------------+
+|  Status do Blockchain                    [X]     |
++--------------------------------------------------+
+|                                                  |
+|  Status       ● Sincronizado                     |  ← Badge with green dot
+|                                                  |
+|  Contrato     0xabc123...def456  [Copiar] [↗]   |  ← Truncated, copy + explorer link
+|                                                  |
+|  Admin        0x742d35...f0bEb   [Copiar] [↗]   |
+|                                                  |
+|  Rede         Base (Chain ID: 8453)              |
+|                                                  |
+|  Ultimo Sync  20/01/2026 10:05                   |  ← Brazilian date format
+|                                                  |
+|  Ultimo Bloco 1.234.567                          |  ← Brazilian number format
+|                                                  |
+|  Pendentes    0 transacoes                       |
+|                                                  |
++--------------------------------------------------+
+|                        [Reconciliar Agora]        |  ← Secondary button, ADMIN only
++--------------------------------------------------+
+```
+
+**Component**: Uses shadcn/ui `Dialog`.
+
+**Fields**:
+
+| Label | Value Source | Format |
+|-------|-------------|--------|
+| Status | `syncStatus` | Status badge with colored dot |
+| Contrato | `contractAddress` | Truncated (`0xabc1...ef45`) + copy button + Basescan link |
+| Admin | `adminWalletAddress` | Truncated + copy button + Basescan link |
+| Rede | `network` + `chainId` | "Base (Chain ID: 8453)" |
+| Ultimo Sync | `lastSyncAt` | `dd/MM/yyyy HH:mm` Brazilian format |
+| Ultimo Bloco | `lastBlockSynced` | Brazilian number format (`1.234.567`) |
+| Pendentes | `pendingTransactions` | "{n} transacoes" |
+
+**Behavior**:
+1. "Copiar" button copies full address to clipboard, shows check icon for 2 seconds.
+2. "[↗]" link opens Basescan address page in new tab: `{explorerBaseUrl}/address/{address}`.
+3. "Reconciliar Agora" button: visible only to ADMIN role. Calls `POST /api/v1/companies/:companyId/blockchain/reconcile`. Shows spinner during request, success toast on 202, error toast on 429.
+
+---
+
+### 3. BlockchainTransactionBadge
+
+**File**: `components/blockchain/blockchain-transaction-badge.tsx`
+
+**Props**:
+```typescript
+interface BlockchainTransactionBadgeProps {
+  status: 'PENDING' | 'SUBMITTED' | 'CONFIRMED' | 'FAILED';
+  txHash?: string | null;
+  explorerBaseUrl?: string;
+}
+```
+
+**Visual Structure**:
+```
+[● Confirmado]        ← green badge, clickable if txHash exists
+[● Enviado]           ← yellow badge with pulse
+[● Pendente]          ← gray badge
+[● Falhou]            ← red badge
+```
+
+**Badge Variants**:
+
+| Status | Background | Text | Dot | Behavior |
+|--------|-----------|------|-----|----------|
+| `CONFIRMED` | `green-100` | `green-700` | Solid green | Click opens explorer tx page |
+| `SUBMITTED` | `cream-100` | `cream-700` | Pulsing yellow | — |
+| `PENDING` | `gray-100` | `gray-600` | Solid gray | — |
+| `FAILED` | `#FEE2E2` | `#991B1B` | Solid red | — |
+
+**Styling**: Same as design-system badges — `caption` (12px), weight 500, `radius-full`, `px-2 py-0.5`.
+
+**Behavior**:
+- If `txHash` exists and status is `CONFIRMED`: badge is clickable, opens `{explorerBaseUrl}/tx/{txHash}` in new tab.
+- Shows tooltip on hover with full tx hash (if available).
+
+---
+
+### 4. BlockchainTransactionDetail
+
+**File**: `components/blockchain/blockchain-transaction-detail.tsx`
+
+**Props**:
+```typescript
+interface BlockchainTransactionDetailProps {
+  companyId: string;
+  transactionId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+```
+
+**Visual Structure** (shadcn/ui Sheet, slide-over from right):
+```
++--------------------------------------------------+
+|  Detalhes Blockchain                     [X]     |
++--------------------------------------------------+
+|                                                  |
+|  Status         ● Confirmado                     |
+|                                                  |
+|  Hash           0xabc123...def456                |
+|                 [Copiar] [Ver no Basescan ↗]     |
+|                                                  |
+|  Bloco          1.234.567                        |
+|                 [Ver bloco no Basescan ↗]        |
+|                                                  |
+|  Gas Usado      150.000                          |
+|                                                  |
+|  Tentativas     1                                |
+|                                                  |
+|  Enviado em     20/01/2026 10:02                 |
+|                                                  |
+|  Confirmado em  20/01/2026 10:02                 |
+|                                                  |
++--------------------------------------------------+
+```
+
+**Loading State**: Skeleton lines matching the layout above.
+
+**Error State**: If blockchain details not found (404), show: "Registro blockchain nao encontrado para esta transacao" with gray icon.
+
+**Behavior**:
+1. On open: fetches `GET /api/v1/companies/:companyId/transactions/:transactionId/blockchain`.
+2. If status is `PENDING` or `SUBMITTED`: polls every 5 seconds.
+3. Copy and explorer link buttons behave same as BlockchainStatusModal.
+
+---
+
+## Frontend User Flows
+
+### Flow: View Blockchain Sync Status
+
+```
+User views Cap Table page
+  │
+  ├─ [contract deployed] ─→ BlockchainStatusBadge shows sync status
+  │     │
+  │     ├─ [user clicks badge] ─→ BlockchainStatusModal opens
+  │     │     │
+  │     │     ├─ [ADMIN clicks "Reconciliar Agora"] ─→ POST /reconcile
+  │     │     │     │
+  │     │     │     ├─ [202 success] ─→ Toast: "Reconciliacao iniciada"
+  │     │     │     └─ [429 in progress] ─→ Toast: "Reconciliacao ja em andamento"
+  │     │     │
+  │     │     └─ [user copies address] ─→ Address copied, check icon shown
+  │     │
+  │     └─ [user does nothing] ─→ Badge auto-updates every 30s
+  │
+  └─ [no contract] ─→ Badge shows "Contrato nao implantado"
+```
+
+### Flow: View Transaction Blockchain Details
+
+```
+User views Transaction detail page
+  │
+  ├─ [blockchain record exists] ─→ BlockchainTransactionBadge shows status
+  │     │
+  │     ├─ [CONFIRMED + has txHash] ─→ Badge is clickable → opens Basescan
+  │     │
+  │     ├─ [PENDING/SUBMITTED] ─→ Badge polls every 5s for updates
+  │     │
+  │     └─ [user clicks "Ver detalhes blockchain"] ─→ BlockchainTransactionDetail opens
+  │           │
+  │           ├─ [data loaded] ─→ Shows full tx details with copy/explorer links
+  │           └─ [404 not found] ─→ Shows "Registro nao encontrado" message
+  │
+  └─ [no blockchain record] ─→ No badge shown (transaction not yet synced)
+```
+
+---
+
+## UI States and Error Handling
+
+### BlockchainStatusBadge States
+
+| State | Visual | Behavior |
+|-------|--------|----------|
+| Loading | Gray dot + skeleton text | Polling not started yet |
+| Synced | Green dot + "Sincronizado..." | Normal state |
+| Syncing | Yellow pulsing dot | Active sync in progress |
+| Behind | Yellow dot + time since last sync | Sync is delayed |
+| Error | Red dot + "Blockchain indisponivel" | RPC or service error |
+| No contract | Gray dot + "Contrato nao implantado" | Company has no deployed contract |
+| Network error | Red dot | TanStack Query retry (3x) then show error |
+
+### BlockchainTransactionBadge States
+
+| State | Visual |
+|-------|--------|
+| PENDING | Gray badge "Pendente" |
+| SUBMITTED | Yellow pulsing badge "Enviado" |
+| CONFIRMED | Green badge "Confirmado" (clickable) |
+| FAILED | Red badge "Falhou" |
+
+---
+
+## TanStack Query Integration
+
+### Query Key Factory
+
+```typescript
+export const blockchainKeys = {
+  all: ['blockchain'] as const,
+  status: (companyId: string) =>
+    [...blockchainKeys.all, 'status', companyId] as const,
+  transaction: (companyId: string, transactionId: string) =>
+    [...blockchainKeys.all, 'transaction', companyId, transactionId] as const,
+};
+```
+
+### Hooks
+
+```typescript
+export function useBlockchainStatus(companyId: string) {
+  return useQuery({
+    queryKey: blockchainKeys.status(companyId),
+    queryFn: () => api.get(`/api/v1/companies/${companyId}/blockchain/status`),
+    refetchInterval: 30_000, // Poll every 30 seconds
+    retry: 3,
+  });
+}
+
+export function useBlockchainTransaction(
+  companyId: string,
+  transactionId: string,
+  options?: { enabled?: boolean },
+) {
+  return useQuery({
+    queryKey: blockchainKeys.transaction(companyId, transactionId),
+    queryFn: () =>
+      api.get(
+        `/api/v1/companies/${companyId}/transactions/${transactionId}/blockchain`,
+      ),
+    enabled: options?.enabled ?? true,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      // Poll every 5s while pending/submitted, stop when terminal
+      if (status === 'PENDING' || status === 'SUBMITTED') return 5_000;
+      return false;
+    },
+    retry: 3,
+  });
+}
+
+export function useReconcileBlockchain(companyId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api.post(`/api/v1/companies/${companyId}/blockchain/reconcile`, {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: blockchainKeys.status(companyId),
+      });
+    },
+  });
+}
+```
+
+---
+
+## i18n Keys
+
+| Key | PT-BR | EN |
+|-----|-------|----|
+| `blockchain.status.synced` | `Sincronizado com blockchain` | `Synced with blockchain` |
+| `blockchain.status.syncing` | `Sincronizando...` | `Syncing...` |
+| `blockchain.status.behind` | `Sincronizacao atrasada` | `Sync behind` |
+| `blockchain.status.error` | `Blockchain indisponivel` | `Blockchain unavailable` |
+| `blockchain.status.noContract` | `Contrato nao implantado` | `Contract not deployed` |
+| `blockchain.modal.title` | `Status do Blockchain` | `Blockchain Status` |
+| `blockchain.modal.contract` | `Contrato` | `Contract` |
+| `blockchain.modal.admin` | `Admin` | `Admin` |
+| `blockchain.modal.network` | `Rede` | `Network` |
+| `blockchain.modal.lastSync` | `Ultimo Sync` | `Last Sync` |
+| `blockchain.modal.lastBlock` | `Ultimo Bloco` | `Last Block` |
+| `blockchain.modal.pending` | `Pendentes` | `Pending` |
+| `blockchain.modal.pendingCount` | `{count} transacoes` | `{count} transactions` |
+| `blockchain.modal.reconcile` | `Reconciliar Agora` | `Reconcile Now` |
+| `blockchain.modal.copy` | `Copiar` | `Copy` |
+| `blockchain.modal.copied` | `Copiado!` | `Copied!` |
+| `blockchain.modal.viewExplorer` | `Ver no Basescan` | `View on Basescan` |
+| `blockchain.tx.confirmed` | `Confirmado` | `Confirmed` |
+| `blockchain.tx.submitted` | `Enviado` | `Submitted` |
+| `blockchain.tx.pending` | `Pendente` | `Pending` |
+| `blockchain.tx.failed` | `Falhou` | `Failed` |
+| `blockchain.tx.detailTitle` | `Detalhes Blockchain` | `Blockchain Details` |
+| `blockchain.tx.hash` | `Hash` | `Hash` |
+| `blockchain.tx.block` | `Bloco` | `Block` |
+| `blockchain.tx.gasUsed` | `Gas Usado` | `Gas Used` |
+| `blockchain.tx.attempts` | `Tentativas` | `Attempts` |
+| `blockchain.tx.submittedAt` | `Enviado em` | `Submitted at` |
+| `blockchain.tx.confirmedAt` | `Confirmado em` | `Confirmed at` |
+| `blockchain.tx.notFound` | `Registro blockchain nao encontrado para esta transacao` | `No blockchain record found for this transaction` |
+| `blockchain.reconcile.success` | `Reconciliacao iniciada` | `Reconciliation started` |
+| `blockchain.reconcile.inProgress` | `Reconciliacao ja esta em andamento` | `Reconciliation already in progress` |
+
+---
+
+## Frontend Success Criteria
+
+- [ ] BlockchainStatusBadge renders correct state for all syncStatus values
+- [ ] BlockchainStatusBadge polls every 30 seconds and updates automatically
+- [ ] BlockchainStatusModal displays all fields with correct formatting (Brazilian dates/numbers)
+- [ ] Copy-to-clipboard works for contract address and admin wallet address
+- [ ] Basescan links open correct URLs in new tabs
+- [ ] "Reconciliar Agora" button visible only to ADMIN role
+- [ ] BlockchainTransactionBadge renders correct badge variant for all 4 statuses
+- [ ] BlockchainTransactionBadge is clickable for CONFIRMED transactions with txHash
+- [ ] BlockchainTransactionDetail polls every 5s for PENDING/SUBMITTED, stops for CONFIRMED/FAILED
+- [ ] All components handle loading, error, and empty states gracefully
+- [ ] All user-facing strings use i18n keys (no hardcoded text)
+- [ ] Number formatting uses Brazilian format (dots for thousands)
+- [ ] Date formatting uses Brazilian format (dd/MM/yyyy HH:mm)
+- [ ] Components follow design-system.md spacing, colors, and typography
+- [ ] Keyboard accessibility: all interactive elements focusable and operable
 
 ---
 

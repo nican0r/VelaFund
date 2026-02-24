@@ -235,6 +235,49 @@ export class ConvertibleService {
 
   // ─── INTEREST CALCULATION ────────────────────────────────────────────
 
+  /**
+   * Calculate accrued interest on-the-fly from issue date to now.
+   * Used by interest breakdown, conversion scenarios, and actual conversion
+   * to ensure interest is always current (not stale DB value).
+   */
+  private calculateAccruedInterest(convertible: {
+    principalAmount: Prisma.Decimal;
+    interestRate: Prisma.Decimal;
+    interestType: string;
+    issueDate: Date;
+  }): Prisma.Decimal {
+    const now = new Date();
+    const issueDate = new Date(convertible.issueDate);
+    const daysElapsed = Math.max(
+      0,
+      Math.floor(
+        (now.getTime() - issueDate.getTime()) / (1000 * 60 * 60 * 24),
+      ),
+    );
+
+    const principal = convertible.principalAmount;
+    const rate = convertible.interestRate;
+
+    if (convertible.interestType === 'SIMPLE') {
+      // I = P × r × (days / 365)
+      return principal
+        .mul(rate)
+        .mul(new Prisma.Decimal(daysElapsed))
+        .div(new Prisma.Decimal(365));
+    } else {
+      // A = P × (1 + r/365)^days, interest = A - P
+      const dailyRate = rate.div(new Prisma.Decimal(365));
+      const onePlusDailyRate = new Prisma.Decimal(1).add(dailyRate);
+      const compoundFactor = Math.pow(
+        onePlusDailyRate.toNumber(),
+        daysElapsed,
+      );
+      return principal
+        .mul(new Prisma.Decimal(compoundFactor))
+        .sub(principal);
+    }
+  }
+
   async getInterestBreakdown(companyId: string, convertibleId: string) {
     const convertible = await this.prisma.convertibleInstrument.findFirst({
       where: { id: convertibleId, companyId },
@@ -253,37 +296,12 @@ export class ConvertibleService {
       ),
     );
 
-    const principal = convertible.principalAmount;
-    const rate = convertible.interestRate;
-
-    let calculatedInterest: Prisma.Decimal;
-    if (convertible.interestType === 'SIMPLE') {
-      // I = P × r × (days / 365)
-      calculatedInterest = principal
-        .mul(rate)
-        .mul(new Prisma.Decimal(daysElapsed))
-        .div(new Prisma.Decimal(365));
-    } else {
-      // A = P × (1 + r/365)^days, interest = A - P
-      const dailyRate = rate.div(new Prisma.Decimal(365));
-      const onePlusDailyRate = new Prisma.Decimal(1).add(dailyRate);
-      // Use approximation for compound: P * ((1 + r/365)^days - 1)
-      // Since Prisma.Decimal doesn't have pow(), use the formula:
-      // compound = P * (e^(days * ln(1 + r/365)) - 1) ≈ P * ((1 + r*days/365) + r²*days*(days-1)/(2*365²))
-      // For MVP precision, use iterative monthly compounding approach
-      const compoundFactor = Math.pow(
-        onePlusDailyRate.toNumber(),
-        daysElapsed,
-      );
-      calculatedInterest = principal
-        .mul(new Prisma.Decimal(compoundFactor))
-        .sub(principal);
-    }
+    const calculatedInterest = this.calculateAccruedInterest(convertible);
 
     // Generate monthly breakdown
     const breakdown = this.generateInterestBreakdown(
-      principal,
-      rate,
+      convertible.principalAmount,
+      convertible.interestRate,
       convertible.interestType,
       issueDate,
       now,
@@ -291,14 +309,14 @@ export class ConvertibleService {
 
     return {
       convertibleId: convertible.id,
-      principalAmount: principal.toString(),
-      interestRate: rate.toString(),
+      principalAmount: convertible.principalAmount.toString(),
+      interestRate: convertible.interestRate.toString(),
       interestType: convertible.interestType,
       issueDate: convertible.issueDate.toISOString(),
       calculationDate: now.toISOString(),
       daysElapsed,
       accruedInterest: calculatedInterest.toString(),
-      totalValue: principal.add(calculatedInterest).toString(),
+      totalValue: convertible.principalAmount.add(calculatedInterest).toString(),
       interestBreakdown: breakdown,
     };
   }
@@ -503,13 +521,13 @@ export class ConvertibleService {
     if (preMoneyShares.eq(0)) {
       throw new BusinessRuleException(
         'CONV_ZERO_PREMONEY_SHARES',
-        'errors.conv.zeroPremoneeyShares',
+        'errors.conv.zeroPremoneyShares',
       );
     }
 
-    const conversionAmount = convertible.principalAmount.add(
-      convertible.accruedInterest,
-    );
+    // Calculate interest on-the-fly instead of reading stale DB value (BUG-4 fix)
+    const calculatedInterest = this.calculateAccruedInterest(convertible);
+    const conversionAmount = convertible.principalAmount.add(calculatedInterest);
     const discountRate = convertible.discountRate;
     const valuationCap = convertible.valuationCap;
 
@@ -715,16 +733,15 @@ export class ConvertibleService {
     if (preMoneyShares.eq(0)) {
       throw new BusinessRuleException(
         'CONV_ZERO_PREMONEY_SHARES',
-        'errors.conv.zeroPremoneeyShares',
+        'errors.conv.zeroPremoneyShares',
       );
     }
 
-    // Calculate conversion
+    // Calculate conversion — use on-the-fly interest instead of stale DB value (BUG-4 fix)
     const roundValuation = new Prisma.Decimal(dto.roundValuation);
     const roundPricePerShare = roundValuation.div(preMoneyShares);
-    const conversionAmount = convertible.principalAmount.add(
-      convertible.accruedInterest,
-    );
+    const calculatedInterest = this.calculateAccruedInterest(convertible);
+    const conversionAmount = convertible.principalAmount.add(calculatedInterest);
 
     // Calculate all methods and pick best (MFN)
     let bestPrice = roundPricePerShare;

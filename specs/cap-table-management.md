@@ -102,23 +102,23 @@ For blockchain reconciliation (verifying off-chain cap table matches on-chain re
 ```typescript
 interface CapTable {
   id: string;                          // UUID
-  company_id: string;                  // Foreign key to Company (unique)
+  companyId: string;                   // Foreign key to Company (unique)
 
   // Current State
-  total_shares: number;                // Total authorized and issued shares
-  total_shareholders: number;          // Count of active shareholders
-  last_updated: Date;                  // Last transaction date
+  totalShares: number;                 // Total authorized and issued shares
+  totalShareholders: number;           // Count of active shareholders
+  lastUpdated: Date;                   // Last transaction date
 
   // Blockchain Integration
-  blockchain_state_hash: string;       // Hash of on-chain state for verification
-  last_sync_at: Date;                  // Last sync with blockchain
+  blockchainStateHash: string;         // Hash of on-chain state for verification
+  lastSyncAt: Date;                    // Last sync with blockchain
 
   // OCT Compliance
-  oct_data: OCTCapTable;               // Full OCT-format cap table
+  octData: OCTCapTable;                // Full OCT-format cap table
 
   // Metadata
-  created_at: Date;
-  updated_at: Date;
+  createdAt: Date;
+  updatedAt: Date;
 }
 ```
 
@@ -127,21 +127,21 @@ interface CapTable {
 ```typescript
 interface CapTableEntry {
   id: string;                          // UUID
-  cap_table_id: string;                // Foreign key to CapTable
-  shareholder_id: string;              // Foreign key to Shareholder
-  share_class_id: string;              // Foreign key to ShareClass
+  capTableId: string;                  // Foreign key to CapTable
+  shareholderId: string;               // Foreign key to Shareholder
+  shareClassId: string;                // Foreign key to ShareClass
 
   // Ownership
   shares: number;                      // Number of shares owned
   percentage: number;                  // Ownership percentage of company
-  voting_power: number;                // Total votes (shares x votes_per_share)
+  votingPower: number;                 // Total votes (shares x votesPerShare)
 
   // Acquisition
-  acquired_at: Date;                   // Date of acquisition
-  cost_basis: number | null;           // Price per share paid
+  acquiredAt: Date;                    // Date of acquisition
+  costBasis: number | null;            // Price per share paid
 
   // Metadata
-  updated_at: Date;
+  updatedAt: Date;
 }
 ```
 
@@ -150,20 +150,20 @@ interface CapTableEntry {
 ```typescript
 interface HistoricalSnapshot {
   id: string;                          // UUID
-  cap_table_id: string;                // Foreign key to CapTable
-  snapshot_date: Date;                 // Date of this snapshot
+  capTableId: string;                  // Foreign key to CapTable
+  snapshotDate: Date;                  // Date of this snapshot
 
   // Snapshot Data
-  oct_data: OCTCapTable;               // Full OCT-format cap table at this date
+  octData: OCTCapTable;                // Full OCT-format cap table at this date
   entries: CapTableEntry[];            // All cap table entries at this date
 
   // Blockchain
-  blockchain_state_hash: string;       // On-chain state hash at snapshot time
-  block_number: number;                // Blockchain block number
+  blockchainStateHash: string;         // On-chain state hash at snapshot time
+  blockNumber: number;                 // Blockchain block number
 
   // Metadata
-  created_at: Date;
-  created_by: string;                  // User ID who created snapshot
+  createdAt: Date;
+  createdBy: string;                   // User ID who created snapshot
   notes: string | null;                // Optional notes (e.g., "Series A closing")
 }
 ```
@@ -219,47 +219,52 @@ interface OCTStockIssuance {
 **Description**: Get current cap table
 
 **Query Parameters**:
-- `view` (optional): "current" (default), "fully-diluted", or "authorized"
-- `share_class_id` (optional): Filter by specific share class
+- `view` (optional): `"current"` (default), `"fully-diluted"`, or `"authorized"`
+- `shareClassId` (optional): Filter by specific share class
 
 **Response** (200 OK):
 ```json
 {
-  "company": {
-    "id": "uuid",
-    "name": "Startup XYZ Ltda.",
-    "entity_type": "LTDA"
-  },
-  "summary": {
-    "total_shares": 1000000,
-    "total_shareholders": 8,
-    "total_share_classes": 2,
-    "last_updated": "2024-01-20T10:00:00Z"
-  },
-  "entries": [
-    {
-      "shareholder_id": "uuid",
-      "shareholder_name": "João Founder",
-      "share_class": "Quotas Ordinárias",
-      "shares": 600000,
-      "ownership_percentage": 60.0,
-      "voting_power": 600000,
-      "voting_percentage": 60.0
+  "success": true,
+  "data": {
+    "company": {
+      "id": "uuid",
+      "name": "Startup XYZ Ltda.",
+      "entityType": "LTDA"
     },
-    {
-      "shareholder_id": "uuid",
-      "shareholder_name": "Investor ABC",
-      "share_class": "Quotas Preferenciais",
-      "shares": 250000,
-      "ownership_percentage": 25.0,
-      "voting_power": 0,
-      "voting_percentage": 0.0
+    "summary": {
+      "totalShares": 1000000,
+      "totalShareholders": 8,
+      "totalShareClasses": 2,
+      "lastUpdated": "2024-01-20T10:00:00Z"
+    },
+    "entries": [
+      {
+        "shareholderId": "uuid",
+        "shareholderName": "João Founder",
+        "shareClass": "Quotas Ordinárias",
+        "shareClassId": "uuid",
+        "shares": 600000,
+        "ownershipPercentage": 60.0,
+        "votingPower": 600000,
+        "votingPercentage": 60.0
+      },
+      {
+        "shareholderId": "uuid",
+        "shareholderName": "Investor ABC",
+        "shareClass": "Quotas Preferenciais",
+        "shareClassId": "uuid",
+        "shares": 250000,
+        "ownershipPercentage": 25.0,
+        "votingPower": 0,
+        "votingPercentage": 0.0
+      }
+    ],
+    "blockchainSync": {
+      "lastSyncAt": "2024-01-20T10:05:00Z",
+      "stateHash": "0x...",
+      "status": "SYNCED"
     }
-  ],
-  "blockchain_sync": {
-    "last_sync_at": "2024-01-20T10:05:00Z",
-    "state_hash": "0x...",
-    "status": "synced"
   }
 }
 ```
@@ -272,31 +277,36 @@ interface OCTStockIssuance {
 **Response** (200 OK):
 ```json
 {
-  "summary": {
-    "total_shares_outstanding": 1000000,
-    "total_options_outstanding": 150000,
-    "fully_diluted_shares": 1150000
-  },
-  "entries": [
-    {
-      "shareholder_name": "João Founder",
-      "current_shares": 600000,
-      "current_percentage": 60.0,
-      "options_vested": 0,
-      "options_unvested": 0,
-      "fully_diluted_shares": 600000,
-      "fully_diluted_percentage": 52.17
+  "success": true,
+  "data": {
+    "summary": {
+      "totalSharesOutstanding": 1000000,
+      "totalOptionsOutstanding": 150000,
+      "fullyDilutedShares": 1150000
     },
-    {
-      "shareholder_name": "Employee Pool",
-      "current_shares": 0,
-      "current_percentage": 0,
-      "options_vested": 75000,
-      "options_unvested": 75000,
-      "fully_diluted_shares": 150000,
-      "fully_diluted_percentage": 13.04
-    }
-  ]
+    "entries": [
+      {
+        "shareholderId": "uuid",
+        "shareholderName": "João Founder",
+        "currentShares": 600000,
+        "currentPercentage": 60.0,
+        "optionsVested": 0,
+        "optionsUnvested": 0,
+        "fullyDilutedShares": 600000,
+        "fullyDilutedPercentage": 52.17
+      },
+      {
+        "shareholderId": "uuid",
+        "shareholderName": "Employee Pool",
+        "currentShares": 0,
+        "currentPercentage": 0,
+        "optionsVested": 75000,
+        "optionsUnvested": 75000,
+        "fullyDilutedShares": 150000,
+        "fullyDilutedPercentage": 13.04
+      }
+    ]
+  }
 }
 ```
 
@@ -306,25 +316,29 @@ interface OCTStockIssuance {
 **Description**: Get point-in-time cap table snapshot
 
 **Query Parameters**:
-- `date` (required): ISO 8601 date (e.g., "2023-12-31")
+- `date` (required): ISO 8601 date (e.g., `"2023-12-31"`)
 
 **Response** (200 OK):
 ```json
 {
-  "snapshot_date": "2023-12-31",
-  "summary": {
-    "total_shares": 850000,
-    "total_shareholders": 6
-  },
-  "entries": [
-    {
-      "shareholder_name": "João Founder",
-      "shares": 600000,
-      "ownership_percentage": 70.59
-    }
-  ],
-  "blockchain_state_hash": "0x...",
-  "block_number": 1234567
+  "success": true,
+  "data": {
+    "snapshotDate": "2023-12-31",
+    "summary": {
+      "totalShares": 850000,
+      "totalShareholders": 6
+    },
+    "entries": [
+      {
+        "shareholderId": "uuid",
+        "shareholderName": "João Founder",
+        "shares": 600000,
+        "ownershipPercentage": 70.59
+      }
+    ],
+    "blockchainStateHash": "0x...",
+    "blockNumber": 1234567
+  }
 }
 ```
 
@@ -333,27 +347,38 @@ interface OCTStockIssuance {
 ### GET /api/v1/companies/:companyId/cap-table/history
 **Description**: Get cap table history (all snapshots)
 
+**Query Parameters**:
+- `page` (optional): Page number (default: 1)
+- `limit` (optional): Items per page (default: 20, max: 100)
+
 **Response** (200 OK):
 ```json
 {
-  "snapshots": [
+  "success": true,
+  "data": [
     {
       "id": "uuid",
-      "snapshot_date": "2024-01-20T10:00:00Z",
-      "total_shares": 1000000,
-      "total_shareholders": 8,
-      "trigger": "share_issuance",
+      "snapshotDate": "2024-01-20T10:00:00Z",
+      "totalShares": 1000000,
+      "totalShareholders": 8,
+      "trigger": "SHARE_ISSUANCE",
       "notes": "Series A closing"
     },
     {
       "id": "uuid",
-      "snapshot_date": "2023-12-31T23:59:59Z",
-      "total_shares": 850000,
-      "total_shareholders": 6,
-      "trigger": "manual_snapshot",
+      "snapshotDate": "2023-12-31T23:59:59Z",
+      "totalShares": 850000,
+      "totalShareholders": 6,
+      "trigger": "MANUAL_SNAPSHOT",
       "notes": "Year-end snapshot"
     }
-  ]
+  ],
+  "meta": {
+    "total": 12,
+    "page": 1,
+    "limit": 20,
+    "totalPages": 1
+  }
 }
 ```
 
@@ -363,6 +388,9 @@ interface OCTStockIssuance {
 **Description**: Export cap table in OCT JSON format
 
 **Response** (200 OK):
+
+Returns the raw OCT JSON file download with `Content-Type: application/json` and `Content-Disposition: attachment; filename="..."`. The OCT schema uses its own naming conventions (snake_case per OCT/OCF standard):
+
 ```json
 {
   "ocf_version": "1.0.0",
@@ -380,13 +408,24 @@ interface OCTStockIssuance {
 
 ---
 
+### POST /api/v1/companies/:companyId/cap-table/export
+**Description**: Export cap table in PDF, XLSX, or CSV format
+
+**Query Parameters**:
+- `format` (required): `"pdf"`, `"xlsx"`, or `"csv"`
+- `view` (optional): `"current"` (default), `"fully-diluted"`
+
+**Response** (200 OK): File download with appropriate `Content-Type` and `Content-Disposition` headers.
+
+---
+
 ### POST /api/v1/companies/:companyId/cap-table/snapshot
 **Description**: Create manual cap table snapshot
 
 **Request**:
 ```json
 {
-  "snapshot_date": "2024-01-20T23:59:59Z",
+  "snapshotDate": "2024-01-20T23:59:59Z",
   "notes": "End of Q1 snapshot"
 }
 ```
@@ -394,11 +433,14 @@ interface OCTStockIssuance {
 **Response** (201 Created):
 ```json
 {
-  "id": "uuid",
-  "snapshot_date": "2024-01-20T23:59:59Z",
-  "total_shares": 1000000,
-  "total_shareholders": 8,
-  "created_at": "2024-01-20T10:15:00Z"
+  "success": true,
+  "data": {
+    "id": "uuid",
+    "snapshotDate": "2024-01-20T23:59:59Z",
+    "totalShares": 1000000,
+    "totalShareholders": 8,
+    "createdAt": "2024-01-20T10:15:00Z"
+  }
 }
 ```
 
@@ -601,6 +643,608 @@ POSTCONDITION: Cap table exported in OCT standard format
   - Total Shares: 0
   - Total Shareholders: 0
 - Display message: "No shareholders added yet. Add your first shareholder to get started."
+
+---
+
+## Frontend Implementation
+
+### Routes
+
+| Route | Page | Access |
+|-------|------|--------|
+| `/companies/[companyId]/cap-table` | Cap table dashboard (default: current view) | ADMIN, FINANCE, LEGAL, INVESTOR (restricted) |
+
+The cap table is a single-page dashboard with view toggles, not separate pages. The URL query parameter `?view=current|fully-diluted|authorized` controls the active view. Historical snapshots open in a drawer overlay.
+
+### Page Layout
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  h1: Cap Table                            [Snapshot ▾] [Export ▾]  │
+│  body-sm: Real-time equity ownership overview                       │
+├─────────────────────────────────────────────────────────────────────┤
+│  [Current]  [Fully-Diluted]  [Authorized]     🔍 Search  [Filter]  │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌────────────┐│
+│  │ Total Shares │ │ Shareholders │ │Share Classes  │ │ Last Sync  ││
+│  │ 1.000.000    │ │ 8            │ │ 2            │ │ Synced ✓   ││
+│  │              │ │              │ │              │ │ 5 min ago  ││
+│  └──────────────┘ └──────────────┘ └──────────────┘ └────────────┘│
+│                                                                     │
+│  ┌─────────────────────────────┐ ┌─────────────────────────────┐   │
+│  │  Ownership by Shareholder   │ │  Distribution by Class      │   │
+│  │       (Donut Chart)         │ │       (Bar Chart)           │   │
+│  │                             │ │                             │   │
+│  │    ┌───┐                    │ │  ██████████  ON  60%        │   │
+│  │   /  60% \  João            │ │  ████████    PN-A 25%       │   │
+│  │  |  25%  |  Investor        │ │  ██████      PN-B 15%       │   │
+│  │   \  15% /  Pool            │ │                             │   │
+│  │    └───┘                    │ │                             │   │
+│  │  Legend: • João • Inv • Pool│ │                             │   │
+│  └─────────────────────────────┘ └─────────────────────────────┘   │
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │  Shareholder  │ Share Class │   Shares  │  %     │ Voting  │   │
+│  ├───────────────┼────────────┼───────────┼────────┼─────────┤   │
+│  │  João Founder │ ON         │   600.000 │ 60,00% │ 600.000 │   │
+│  │  Investor ABC │ PN-A       │   250.000 │ 25,00% │       0 │   │
+│  │  ESOP Pool    │ ON         │   150.000 │ 15,00% │ 150.000 │   │
+│  ├───────────────┼────────────┼───────────┼────────┼─────────┤   │
+│  │  TOTAL        │            │ 1.000.000 │100,00% │ 750.000 │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │  ⛓ Blockchain: Synced  │  Last sync: 20/01/2024 10:05     │   │
+│  │  State hash: 0x1a2b...  │  Block: #1.234.567              │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### View Toggle Behavior
+
+| View | Data Source | Extra Columns | Description |
+|------|-----------|---------------|-------------|
+| **Current** (default) | `GET /cap-table?view=current` | Shares, %, Voting Power, Voting % | Actual issued shares |
+| **Fully-Diluted** | `GET /cap-table?view=fully-diluted` | Current Shares, Options Vested, Options Unvested, FD Shares, FD % | Includes all options |
+| **Authorized** | `GET /cap-table?view=authorized` | Authorized, Issued, Available, % Issued | Per share class authorized vs issued |
+
+### Fully-Diluted View (Extra Columns)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Shareholder  │ Current  │ Curr % │ Vested │ Unvested │ FD Total │  FD %  │
+├───────────────┼──────────┼────────┼────────┼──────────┼──────────┼────────┤
+│  João Founder │  600.000 │ 60,00% │      0 │        0 │  600.000 │ 52,17% │
+│  Investor ABC │  250.000 │ 25,00% │      0 │        0 │  250.000 │ 21,74% │
+│  ESOP Pool    │        0 │  0,00% │ 75.000 │   75.000 │  150.000 │ 13,04% │
+│  ─── dilution indicator: João 60,00% → 52,17% (▼ 7,83%)                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+Dilution indicators show `▼ X,XX%` in destructive red next to shareholders whose percentage decreased.
+
+### Stat Cards
+
+| Card | Value | Subtitle | Active (highlighted) |
+|------|-------|----------|---------------------|
+| Total Shares | `summary.totalShares` formatted Brazilian | — | Yes (blue bg) |
+| Shareholders | `summary.totalShareholders` | — | No |
+| Share Classes | `summary.totalShareClasses` | — | No |
+| Blockchain Sync | Status badge (SYNCED/SYNCING/ERROR) | Time since last sync | No |
+
+Stat card for blockchain sync shows:
+- `SYNCED` → green badge, "X min ago"
+- `SYNCING` → cream/warning badge with spinner
+- `ERROR` → red badge, "Sync failed — Retry" link
+
+### Charts (Recharts)
+
+**Ownership Donut Chart** (left card):
+- Donut style, inner radius 60%
+- Center label: "100%" or total share count
+- Color palette: `chart-1` through `chart-8` (see design-system.md §8.2)
+- Legend: right side, color dot + shareholder name + percentage
+- Click segment → navigate to shareholder detail
+- Group shareholders with < 3% into "Others" segment
+
+**Distribution Bar Chart** (right card):
+- Horizontal bars, one per share class
+- Bar fill: sequential chart colors
+- Label on bar: share class name + percentage
+- Y-axis: share class names
+- X-axis: percentage (0–100%)
+
+### Data Table
+
+**Columns (Current View)**:
+
+| Column | Type | Sortable | Alignment |
+|--------|------|----------|-----------|
+| Shareholder | Text (name + type badge) | Yes | Left |
+| Share Class | Text (class name + type badge) | Yes | Left |
+| Shares | Number (Brazilian format) | Yes | Right |
+| Ownership % | Percentage (Brazilian format, 2 decimals) | Yes (default desc) | Right |
+| Voting Power | Number (Brazilian format) | Yes | Right |
+| Voting % | Percentage (Brazilian format, 2 decimals) | Yes | Right |
+
+**Summary Row**: Pinned at table bottom with `gray-100` background, bold text. Shows "TOTAL" label, sum of shares, "100,00%", sum of voting power, "100,00%".
+
+**Table Features**:
+- Sort by clicking column headers (default: ownership % descending)
+- Filter by share class via dropdown above table
+- Search by shareholder name
+- Click row → navigate to shareholder detail page
+- Empty state: illustration + "No shareholders added yet. Add your first shareholder to get started." + CTA button
+
+### Snapshot History Drawer
+
+Triggered by "Snapshot" dropdown → "View History". Opens as a right-side drawer:
+
+```
+┌──────────────────────────────────┐
+│  Snapshot History           [X]  │
+│                                  │
+│  ┌────────────────────────────┐  │
+│  │ 📸 20/01/2024 10:00       │  │
+│  │ Series A closing           │  │
+│  │ 1.000.000 shares • 8 sh.  │  │
+│  │ Trigger: SHARE_ISSUANCE   │  │
+│  │                   [View]  │  │
+│  └────────────────────────────┘  │
+│  ┌────────────────────────────┐  │
+│  │ 📸 31/12/2023 23:59       │  │
+│  │ Year-end snapshot          │  │
+│  │ 850.000 shares • 6 sh.    │  │
+│  │ Trigger: MANUAL_SNAPSHOT  │  │
+│  │                   [View]  │  │
+│  └────────────────────────────┘  │
+│                                  │
+│  [+ Create Manual Snapshot]      │
+└──────────────────────────────────┘
+```
+
+Clicking "View" on a snapshot replaces the main cap table content with the historical data and shows a **historical banner**:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  ⚠ Viewing cap table as of 31/12/2023  │  [← Back to Current]     │
+│  Blockchain hash: 0x1a2b... • Block: #1.234.567                    │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Create Snapshot Dialog
+
+Triggered by "Snapshot" dropdown → "Create Snapshot" or the button in the history drawer:
+
+```
+┌──────────────────────────────────────┐
+│  Create Manual Snapshot              │
+│                                      │
+│  Snapshot Date *                     │
+│  ┌──────────────────────────────┐    │
+│  │ 20/01/2024                   │    │
+│  └──────────────────────────────┘    │
+│                                      │
+│  Notes (optional)                    │
+│  ┌──────────────────────────────┐    │
+│  │ End of Q1 snapshot           │    │
+│  └──────────────────────────────┘    │
+│                                      │
+│  ℹ Snapshots are immutable and       │
+│    cannot be edited after creation.  │
+│                                      │
+│           [Cancel]  [Create Snapshot]│
+└──────────────────────────────────────┘
+```
+
+### Export Dialog
+
+Triggered by "Export" dropdown. Shows format options:
+
+```
+┌──────────────────────────────────────┐
+│  Export Cap Table                     │
+│                                      │
+│  Format                              │
+│  ○ PDF  — Formatted report           │
+│  ○ Excel (.xlsx) — Spreadsheet       │
+│  ○ CSV  — Raw data                   │
+│  ○ OCT JSON — Open Cap Table format  │
+│                                      │
+│  View                                │
+│  ○ Current  ○ Fully-Diluted          │
+│                                      │
+│             [Cancel]  [Export]        │
+└──────────────────────────────────────┘
+```
+
+- PDF: calls `POST /cap-table/export?format=pdf`
+- XLSX: calls `POST /cap-table/export?format=xlsx`
+- CSV: calls `POST /cap-table/export?format=csv`
+- OCT JSON: calls `GET /cap-table/export/oct`
+
+All downloads trigger browser file save dialog.
+
+### Access Control by Role
+
+| Element | ADMIN | FINANCE | LEGAL | INVESTOR | EMPLOYEE |
+|---------|-------|---------|-------|----------|----------|
+| View current cap table | Full | Full | Full | Full or own only* | Own only |
+| View fully-diluted | Yes | Yes | Yes | Yes* | No |
+| View historical snapshots | Yes | Yes | Yes | No | No |
+| Create manual snapshot | Yes | No | No | No | No |
+| Export (all formats) | Yes | Yes | Yes | PDF only* | No |
+| View blockchain sync | Yes | Yes | Yes | No | No |
+
+*Investor access depends on shareholder agreement settings per BR-7.
+
+Employees see a simplified view showing only their own holdings (shares, percentage, vesting if applicable). No charts, no other shareholders.
+
+### Zod Schemas
+
+```typescript
+import { z } from 'zod';
+
+// Create manual snapshot
+export const createSnapshotSchema = z.object({
+  snapshotDate: z.string().datetime({ message: 'errors.val.invalidDate' }),
+  notes: z.string().max(500).optional(),
+});
+
+// Cap table query params
+export const capTableQuerySchema = z.object({
+  view: z.enum(['current', 'fully-diluted', 'authorized']).default('current'),
+  shareClassId: z.string().uuid().optional(),
+});
+
+// Snapshot history query params
+export const snapshotHistoryQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
+
+// Export params
+export const capTableExportSchema = z.object({
+  format: z.enum(['pdf', 'xlsx', 'csv']),
+  view: z.enum(['current', 'fully-diluted']).default('current'),
+});
+```
+
+### TanStack Query Hooks
+
+```typescript
+// GET /companies/:companyId/cap-table?view=current|fully-diluted|authorized
+export function useCapTable(companyId: string, params?: {
+  view?: 'current' | 'fully-diluted' | 'authorized';
+  shareClassId?: string;
+}) {
+  const query = new URLSearchParams();
+  if (params?.view) query.set('view', params.view);
+  if (params?.shareClassId) query.set('shareClassId', params.shareClassId);
+
+  return useQuery({
+    queryKey: ['cap-table', companyId, params],
+    queryFn: () => api.get(`/api/v1/companies/${companyId}/cap-table?${query}`),
+    refetchInterval: 30_000, // Poll every 30s for real-time updates
+  });
+}
+
+// GET /companies/:companyId/cap-table/snapshot?date=YYYY-MM-DD
+export function useCapTableSnapshot(companyId: string, date: string | null) {
+  return useQuery({
+    queryKey: ['cap-table-snapshot', companyId, date],
+    queryFn: () => api.get(`/api/v1/companies/${companyId}/cap-table/snapshot?date=${date}`),
+    enabled: !!date,
+  });
+}
+
+// GET /companies/:companyId/cap-table/history
+export function useCapTableHistory(companyId: string, params?: {
+  page?: number;
+  limit?: number;
+}) {
+  const query = new URLSearchParams();
+  if (params?.page) query.set('page', String(params.page));
+  if (params?.limit) query.set('limit', String(params.limit));
+
+  return useQuery({
+    queryKey: ['cap-table-history', companyId, params],
+    queryFn: () => api.getList(`/api/v1/companies/${companyId}/cap-table/history?${query}`),
+  });
+}
+
+// POST /companies/:companyId/cap-table/snapshot
+export function useCreateSnapshot(companyId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { snapshotDate: string; notes?: string }) =>
+      api.post(`/api/v1/companies/${companyId}/cap-table/snapshot`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cap-table-history', companyId] });
+    },
+  });
+}
+
+// GET /companies/:companyId/cap-table/export/oct (file download)
+export function useExportOCT(companyId: string) {
+  return useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/v1/companies/${companyId}/cap-table/export/oct`);
+      const blob = await res.blob();
+      return blob;
+    },
+  });
+}
+
+// POST /companies/:companyId/cap-table/export (PDF/XLSX/CSV file download)
+export function useExportCapTable(companyId: string) {
+  return useMutation({
+    mutationFn: async (params: { format: 'pdf' | 'xlsx' | 'csv'; view?: string }) => {
+      const query = new URLSearchParams({ format: params.format });
+      if (params.view) query.set('view', params.view);
+      const res = await fetch(`/api/v1/companies/${companyId}/cap-table/export?${query}`);
+      const blob = await res.blob();
+      return blob;
+    },
+  });
+}
+```
+
+### Component Hierarchy
+
+```
+app/(dashboard)/companies/[companyId]/cap-table/
+  page.tsx                          ← CapTablePage (main page, manages view state)
+  _components/
+    CapTableHeader.tsx              ← Page title + Snapshot dropdown + Export dropdown
+    ViewToggle.tsx                  ← Current | Fully-Diluted | Authorized tabs
+    CapTableStats.tsx               ← 4 stat cards row
+    CapTableCharts.tsx              ← Charts container (2-column grid)
+      OwnershipDonutChart.tsx       ← Recharts donut by shareholder
+      ClassDistributionBarChart.tsx ← Recharts horizontal bar by share class
+    CapTableDataTable.tsx           ← Main data table with sort/filter
+      CapTableSummaryRow.tsx        ← Pinned totals row
+    FullyDilutedTable.tsx           ← Extended table for FD view
+      DilutionIndicator.tsx         ← ▼ X,XX% red indicator
+    AuthorizedTable.tsx             ← Authorized vs issued per class
+    BlockchainSyncFooter.tsx        ← Sync status bar at bottom
+    HistoricalBanner.tsx            ← Yellow banner when viewing snapshot
+    SnapshotHistoryDrawer.tsx       ← Right-side drawer with snapshot list
+      SnapshotCard.tsx              ← Individual snapshot in list
+    CreateSnapshotDialog.tsx        ← Modal form for manual snapshot
+    ExportDialog.tsx                ← Modal with format/view selection
+    CapTableEmptyState.tsx          ← Shown when no shareholders exist
+    EmployeeOwnPositionView.tsx     ← Simplified view for EMPLOYEE role
+```
+
+### i18n Keys
+
+**PT-BR** (`messages/pt-BR.json`):
+```json
+{
+  "capTable": {
+    "title": "Cap Table",
+    "description": "Visão geral em tempo real da distribuição acionária",
+    "views": {
+      "current": "Atual",
+      "fullyDiluted": "Totalmente Diluído",
+      "authorized": "Autorizado"
+    },
+    "stats": {
+      "totalShares": "Total de Ações",
+      "shareholders": "Acionistas",
+      "shareClasses": "Classes de Ações",
+      "blockchainSync": "Blockchain"
+    },
+    "sync": {
+      "synced": "Sincronizado",
+      "syncing": "Sincronizando...",
+      "error": "Erro de sincronização",
+      "lastSync": "Última sincronização",
+      "retry": "Tentar novamente",
+      "minutesAgo": "há {minutes} min",
+      "stateHash": "Hash de estado",
+      "block": "Bloco"
+    },
+    "charts": {
+      "ownershipTitle": "Participação por Acionista",
+      "distributionTitle": "Distribuição por Classe",
+      "others": "Outros"
+    },
+    "table": {
+      "shareholder": "Acionista",
+      "shareClass": "Classe de Ações",
+      "shares": "Ações",
+      "ownership": "Participação %",
+      "votingPower": "Poder de Voto",
+      "votingPercentage": "Voto %",
+      "total": "TOTAL",
+      "empty": "Nenhum acionista cadastrado ainda.",
+      "emptyAction": "Adicione seu primeiro acionista para começar.",
+      "search": "Buscar acionista...",
+      "filterByClass": "Filtrar por classe"
+    },
+    "fullyDiluted": {
+      "currentShares": "Ações Atuais",
+      "currentPercentage": "% Atual",
+      "optionsVested": "Opções Adquiridas",
+      "optionsUnvested": "Opções Não Adquiridas",
+      "fdShares": "Total Diluído",
+      "fdPercentage": "% Diluído",
+      "dilution": "Diluição",
+      "summary": {
+        "outstanding": "Ações Emitidas",
+        "options": "Opções em Aberto",
+        "total": "Total Diluído"
+      }
+    },
+    "authorized": {
+      "authorized": "Autorizado",
+      "issued": "Emitido",
+      "available": "Disponível",
+      "percentIssued": "% Emitido"
+    },
+    "snapshot": {
+      "title": "Histórico de Snapshots",
+      "create": "Criar Snapshot",
+      "viewHistory": "Ver Histórico",
+      "date": "Data do Snapshot",
+      "notes": "Notas (opcional)",
+      "notesPlaceholder": "Ex: Fechamento do trimestre",
+      "immutableWarning": "Snapshots são imutáveis e não podem ser editados após a criação.",
+      "trigger": {
+        "SHARE_ISSUANCE": "Emissão de Ações",
+        "SHARE_TRANSFER": "Transferência",
+        "SHARE_CANCELLATION": "Cancelamento",
+        "MANUAL_SNAPSHOT": "Snapshot Manual",
+        "MONTHLY_AUTO": "Automático Mensal",
+        "ROUND_CLOSE": "Fechamento de Rodada"
+      },
+      "shares": "ações",
+      "shareholders": "acionistas"
+    },
+    "historical": {
+      "banner": "Visualizando cap table em {date}",
+      "backToCurrent": "← Voltar ao Atual",
+      "blockchainHash": "Hash blockchain",
+      "blockNumber": "Bloco"
+    },
+    "export": {
+      "title": "Exportar Cap Table",
+      "format": "Formato",
+      "pdf": "PDF — Relatório formatado",
+      "xlsx": "Excel (.xlsx) — Planilha",
+      "csv": "CSV — Dados brutos",
+      "oct": "OCT JSON — Open Cap Table",
+      "view": "Visualização",
+      "button": "Exportar",
+      "downloading": "Baixando..."
+    },
+    "employee": {
+      "title": "Minha Participação",
+      "description": "Suas ações e participação na empresa",
+      "shares": "Suas Ações",
+      "ownership": "Sua Participação",
+      "shareClass": "Classe",
+      "noHoldings": "Você ainda não possui ações nesta empresa."
+    }
+  }
+}
+```
+
+**EN** (`messages/en.json`):
+```json
+{
+  "capTable": {
+    "title": "Cap Table",
+    "description": "Real-time equity ownership overview",
+    "views": {
+      "current": "Current",
+      "fullyDiluted": "Fully Diluted",
+      "authorized": "Authorized"
+    },
+    "stats": {
+      "totalShares": "Total Shares",
+      "shareholders": "Shareholders",
+      "shareClasses": "Share Classes",
+      "blockchainSync": "Blockchain"
+    },
+    "sync": {
+      "synced": "Synced",
+      "syncing": "Syncing...",
+      "error": "Sync error",
+      "lastSync": "Last sync",
+      "retry": "Retry",
+      "minutesAgo": "{minutes} min ago",
+      "stateHash": "State hash",
+      "block": "Block"
+    },
+    "charts": {
+      "ownershipTitle": "Ownership by Shareholder",
+      "distributionTitle": "Distribution by Class",
+      "others": "Others"
+    },
+    "table": {
+      "shareholder": "Shareholder",
+      "shareClass": "Share Class",
+      "shares": "Shares",
+      "ownership": "Ownership %",
+      "votingPower": "Voting Power",
+      "votingPercentage": "Voting %",
+      "total": "TOTAL",
+      "empty": "No shareholders added yet.",
+      "emptyAction": "Add your first shareholder to get started.",
+      "search": "Search shareholder...",
+      "filterByClass": "Filter by class"
+    },
+    "fullyDiluted": {
+      "currentShares": "Current Shares",
+      "currentPercentage": "Current %",
+      "optionsVested": "Options Vested",
+      "optionsUnvested": "Options Unvested",
+      "fdShares": "FD Total",
+      "fdPercentage": "FD %",
+      "dilution": "Dilution",
+      "summary": {
+        "outstanding": "Outstanding Shares",
+        "options": "Outstanding Options",
+        "total": "Fully Diluted Total"
+      }
+    },
+    "authorized": {
+      "authorized": "Authorized",
+      "issued": "Issued",
+      "available": "Available",
+      "percentIssued": "% Issued"
+    },
+    "snapshot": {
+      "title": "Snapshot History",
+      "create": "Create Snapshot",
+      "viewHistory": "View History",
+      "date": "Snapshot Date",
+      "notes": "Notes (optional)",
+      "notesPlaceholder": "E.g., End of quarter",
+      "immutableWarning": "Snapshots are immutable and cannot be edited after creation.",
+      "trigger": {
+        "SHARE_ISSUANCE": "Share Issuance",
+        "SHARE_TRANSFER": "Transfer",
+        "SHARE_CANCELLATION": "Cancellation",
+        "MANUAL_SNAPSHOT": "Manual Snapshot",
+        "MONTHLY_AUTO": "Monthly Auto",
+        "ROUND_CLOSE": "Round Close"
+      },
+      "shares": "shares",
+      "shareholders": "shareholders"
+    },
+    "historical": {
+      "banner": "Viewing cap table as of {date}",
+      "backToCurrent": "← Back to Current",
+      "blockchainHash": "Blockchain hash",
+      "blockNumber": "Block"
+    },
+    "export": {
+      "title": "Export Cap Table",
+      "format": "Format",
+      "pdf": "PDF — Formatted report",
+      "xlsx": "Excel (.xlsx) — Spreadsheet",
+      "csv": "CSV — Raw data",
+      "oct": "OCT JSON — Open Cap Table",
+      "view": "View",
+      "button": "Export",
+      "downloading": "Downloading..."
+    },
+    "employee": {
+      "title": "My Holdings",
+      "description": "Your shares and ownership in the company",
+      "shares": "Your Shares",
+      "ownership": "Your Ownership",
+      "shareClass": "Class",
+      "noHoldings": "You don't own any shares in this company yet."
+    }
+  }
+}
+```
 
 ---
 

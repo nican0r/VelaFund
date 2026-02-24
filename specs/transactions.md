@@ -475,6 +475,605 @@ Cancels a transaction. Only allowed for transactions in DRAFT, PENDING_APPROVAL,
 
 ---
 
+## Frontend Implementation
+
+### Routes
+
+| Route | Page | Access |
+|-------|------|--------|
+| `/companies/[companyId]/transactions` | Transaction List | ADMIN, FINANCE, LEGAL, INVESTOR (own only) |
+| `/companies/[companyId]/transactions/new` | Create Transaction (Wizard) | ADMIN |
+| `/companies/[companyId]/transactions/[id]` | Transaction Detail | ADMIN, FINANCE, LEGAL |
+
+### Pages
+
+#### Transaction List Page
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  h1: Transactions                             [+ New Transaction]   │
+│  body-sm: Equity movements and transaction history                  │
+├─────────────────────────────────────────────────────────────────────┤
+│  Filters: [Type ▾] [Status ▾] [Share Class ▾] [From ▾] [To ▾]     │
+│  Date: [dd/mm/yyyy] to [dd/mm/yyyy]                    🔍 Search    │
+├─────────────────────────────────────────────────────────────────────┤
+│  Date       │ Type      │ From         │ To          │ Class │ Qty  │
+│─────────────│───────────│──────────────│─────────────│───────│──────│
+│  20/01/2026 │ ISSUANCE  │ —            │ Investor ABC│ PN-A  │150K  │
+│  18/01/2026 │ TRANSFER  │ João Founder │ Maria       │ ON    │ 50K  │
+│  15/01/2026 │ CANCEL    │ Ex-Employee  │ —           │ ON    │ 10K  │
+├─────────────────────────────────────────────────────────────────────┤
+│  │ Value       │ Status      │ Actions                              │
+│  │ R$ 1.500.000│ ● CONFIRMED │ View                                 │
+│  │ R$ 750.000  │ ● CONFIRMED │ View                                 │
+│  │ R$ 100.000  │ ● PENDING   │ View | Approve | Cancel              │
+├─────────────────────────────────────────────────────────────────────┤
+│  Showing 1-20 of 42                                    < 1 2 3 >   │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Table Columns:**
+
+| Column | Field | Align | Format |
+|--------|-------|-------|--------|
+| Date | `occurredAt` | Left | Brazilian date: `dd/MM/yyyy` |
+| Type | `transactionType` | Left | Badge (see Status Badge Mapping) |
+| From | `fromShareholderName` | Left | Text or "—" for issuances |
+| To | `toShareholderName` | Left | Text |
+| Share Class | `shareClassName` | Left | Text |
+| Quantity | `quantity` | Right | Brazilian number: `150.000` |
+| Value | `totalValue` | Right | Currency: `R$ 1.500.000,00` |
+| Status | `status` | Center | Badge (see Status Badge Mapping) |
+| Actions | — | Right | View (always), Approve (PENDING_APPROVAL), Cancel (DRAFT/PENDING/SUBMITTED) |
+
+**Status Badge Mapping:**
+
+| Status | Badge Color | Label (PT-BR) | Label (EN) |
+|--------|-------------|---------------|------------|
+| `DRAFT` | gray (gray-100 bg, gray-600 text) | Rascunho | Draft |
+| `PENDING_APPROVAL` | cream (cream-100 bg, cream-700 text) | Pendente | Pending |
+| `SUBMITTED` | blue (blue-50 bg, blue-600 text) | Enviado | Submitted |
+| `CONFIRMED` | green (green-100 bg, green-700 text) | Confirmado | Confirmed |
+| `FAILED` | red (#FEE2E2 bg, #991B1B text) | Falhou | Failed |
+| `CANCELLED` | gray (gray-100 bg, gray-500 text) | Cancelado | Cancelled |
+
+**Transaction Type Badge Mapping:**
+
+| Type | Badge Color | Label (PT-BR) | Label (EN) |
+|------|-------------|---------------|------------|
+| `ISSUANCE` | blue | Emissão | Issuance |
+| `TRANSFER` | navy | Transferência | Transfer |
+| `CONVERSION` | cream | Conversão | Conversion |
+| `CANCELLATION` | red | Cancelamento | Cancellation |
+| `SPLIT` | gray | Desdobramento | Split |
+
+**Empty State:**
+- Icon: `ArrowLeftRight` (lucide-react), 48px, gray-300
+- Title: "Nenhuma transação registrada" / "No transactions recorded"
+- Description: "Crie a primeira transação para movimentar participações." / "Create your first transaction to move equity."
+- CTA: "Nova Transação" / "New Transaction" button (primary)
+
+#### Create Transaction Page (3-Step Wizard)
+
+**Step Indicator:** 3 steps at the top of the form:
+1. Detalhes / Details
+2. Revisão / Review
+3. Confirmação / Confirmation
+
+**Step 1 — Details:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  ← Back to Transactions                                    │
+│  h1: New Transaction                                        │
+│  body-sm: Create a new equity transaction                   │
+├─────────────────────────────────────────────────────────────┤
+│  Step: ●───○───○  Details                                   │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │  Transaction Type *                                  │    │
+│  │  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐      │    │
+│  │  │Issue │ │Trans.│ │Conv. │ │Cancel│ │Split │      │    │
+│  │  └──────┘ └──────┘ └──────┘ └──────┘ └──────┘      │    │
+│  │                                                      │    │
+│  │  [Fields vary by type — see below]                   │    │
+│  │                                                      │    │
+│  │                              [Cancel]  [Next →]      │    │
+│  └─────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Type-Specific Fields (Step 1):**
+
+| Field | ISSUANCE | TRANSFER | CONVERSION | CANCELLATION | SPLIT |
+|-------|----------|----------|------------|--------------|-------|
+| From Shareholder | — | Required | Required | Required | — |
+| To Shareholder | Required | Required | Same (auto) | — | — |
+| Share Class | Required | Required | From Class (required) | Required | Required |
+| To Share Class | — | — | To Class (required) | — | — |
+| Quantity | Required | Required | Required | Required | — |
+| Price per Share | Optional | Optional | — | Optional | — |
+| Split Ratio | — | — | — | — | Required (e.g., "2:1") |
+| Notes | Optional | Optional | Optional | Optional | Optional |
+
+**Transaction Type Selector:** 5 selectable cards in a horizontal row:
+- Each card: icon + label + short description
+- ISSUANCE: `Plus` icon, "Emissão" / "Issuance", "Criar novas ações" / "Create new shares"
+- TRANSFER: `ArrowLeftRight` icon, "Transferência" / "Transfer", "Mover ações entre acionistas" / "Move shares between shareholders"
+- CONVERSION: `RefreshCw` icon, "Conversão" / "Conversion", "Converter entre classes" / "Convert between classes"
+- CANCELLATION: `XCircle` icon, "Cancelamento" / "Cancellation", "Recomprar ou cancelar ações" / "Buyback or cancel shares"
+- SPLIT: `GitBranch` icon, "Desdobramento" / "Split", "Dividir ou agrupar ações" / "Split or reverse-split shares"
+
+**Shareholder Selectors:** Searchable dropdown (combobox) showing shareholder name + CPF/CNPJ (masked) + current shares in the selected class.
+
+**Step 2 — Review:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Step: ○───●───○  Review                                    │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │  Transaction Summary                                 │    │
+│  │  ┌───────────────────────────────────────────┐       │    │
+│  │  │  Type:         Issuance                   │       │    │
+│  │  │  To:           Investor ABC               │       │    │
+│  │  │  Share Class:  Ações Preferenciais Classe A│       │    │
+│  │  │  Quantity:     150.000 shares              │       │    │
+│  │  │  Price:        R$ 10,00 per share          │       │    │
+│  │  │  Total Value:  R$ 1.500.000,00             │       │    │
+│  │  └───────────────────────────────────────────┘       │    │
+│  │                                                      │    │
+│  │  Dilution Impact                                     │    │
+│  │  ┌───────────────────────────────────────────┐       │    │
+│  │  │  ┌─────────┐      ┌─────────┐            │       │    │
+│  │  │  │ Before  │  →   │ After   │            │       │    │
+│  │  │  │ [donut] │      │ [donut] │            │       │    │
+│  │  │  └─────────┘      └─────────┘            │       │    │
+│  │  │                                           │       │    │
+│  │  │  Shareholder    │ Before  │ After  │ Chg  │       │    │
+│  │  │  João Founder   │ 70,59%  │ 60,00% │-10,6%│       │    │
+│  │  │  Maria          │ 29,41%  │ 25,00% │ -4,4%│       │    │
+│  │  │  Investor ABC   │  0,00%  │ 15,00% │+15,0%│       │    │
+│  │  └───────────────────────────────────────────┘       │    │
+│  │                                                      │    │
+│  │  [⚠️ Warning: Dilution exceeds 10% for João Founder] │    │
+│  │                                                      │    │
+│  │  Board Approval: Not required                        │    │
+│  │                                                      │    │
+│  │                     [← Back]  [Confirm →]            │    │
+│  └─────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Dilution Preview Component:**
+- Two side-by-side donut charts: "Before" and "After"
+- Before chart shows current ownership
+- After chart shows projected ownership post-transaction
+- Below charts: table showing each affected shareholder with before/after percentages and change
+- Change column: green for increases, red for decreases
+- Warning banner if any shareholder is diluted by more than 10%
+- Only shown for ISSUANCE and SPLIT types (types that change total shares)
+
+**Step 3 — Confirmation:**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Step: ○───○───●  Confirmation                              │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │  [If requiresBoardApproval = false]                  │    │
+│  │  ✓ Ready to submit                                   │    │
+│  │  This transaction will be submitted to the           │    │
+│  │  blockchain for processing.                          │    │
+│  │                                                      │    │
+│  │  [If requiresBoardApproval = true]                   │    │
+│  │  ⏳ Pending board approval                           │    │
+│  │  This transaction requires board approval before     │    │
+│  │  it can be submitted to the blockchain.              │    │
+│  │                                                      │    │
+│  │                 [← Back]  [Submit Transaction]       │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│  [After submission — shows inline result]                    │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │  ✓ Transaction submitted successfully                │    │
+│  │  Status: Submitted — waiting for blockchain          │    │
+│  │  confirmation (~24 seconds)                          │    │
+│  │                                                      │    │
+│  │  [View Transaction]  [Create Another]                │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│  [On error]                                                  │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │  ✕ Transaction failed                                │    │
+│  │  Error: Insufficient shares available                │    │
+│  │  Available: 10.000 | Requested: 15.000               │    │
+│  │                                                      │    │
+│  │  [← Back to Edit]  [Cancel]                          │    │
+│  └─────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Transaction Detail Page
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  ← Back to Transactions                                    │
+│  h1: Transaction #TXN-2026-0042          Badge: CONFIRMED   │
+│  body-sm: Share Issuance — 20/01/2026 14:30                │
+├─────────────────────────────────────────────────────────────┤
+│  Status Timeline                                            │
+│  ●─────────●─────────●─────────●                            │
+│  DRAFT    SUBMITTED  CONFIRMED                              │
+│  14:28    14:30      14:31                                  │
+├─────────────────────────────────────────────────────────────┤
+│  Transaction Details                                        │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │  Type:          Issuance                            │    │
+│  │  From:          — (new shares)                      │    │
+│  │  To:            Investor ABC                        │    │
+│  │  Share Class:   Ações Preferenciais Classe A        │    │
+│  │  Quantity:      150.000 shares                      │    │
+│  │  Price/Share:   R$ 10,00                            │    │
+│  │  Total Value:   R$ 1.500.000,00                     │    │
+│  │  Notes:         Series A investment                  │    │
+│  └─────────────────────────────────────────────────────┘    │
+├─────────────────────────────────────────────────────────────┤
+│  Blockchain                                                 │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │  Transaction Hash: 0xabc123...def456                │    │
+│  │  Block Number:     12345678                         │    │
+│  │  Confirmations:    24 / 12 required                 │    │
+│  │  [View on BaseScan →]                               │    │
+│  └─────────────────────────────────────────────────────┘    │
+├─────────────────────────────────────────────────────────────┤
+│  [If PENDING_APPROVAL status — show approval section]       │
+│  Approval Required                                          │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │  This transaction requires board approval.           │    │
+│  │  Approval Notes: [________________________]          │    │
+│  │                                                      │    │
+│  │            [Reject]  [Approve Transaction]           │    │
+│  └─────────────────────────────────────────────────────┘    │
+├─────────────────────────────────────────────────────────────┤
+│  [If cancellable — show cancel section]                     │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │  Cancel Reason: [________________________]           │    │
+│  │                           [Cancel Transaction]       │    │
+│  └─────────────────────────────────────────────────────┘    │
+├─────────────────────────────────────────────────────────────┤
+│  Created by: Nelson Pereira — 20/01/2026 14:28             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Status Timeline Component:** Horizontal step indicator showing transaction lifecycle:
+- Steps: DRAFT → PENDING_APPROVAL (if applicable) → SUBMITTED → CONFIRMED
+- Completed steps: filled circle, green
+- Current step: filled circle, blue, pulsing
+- Failed: red circle with X
+- Cancelled: gray circle with line-through
+- Each step shows timestamp below
+
+### Validation (Zod Schemas)
+
+```typescript
+import { z } from 'zod';
+
+const baseTransactionSchema = z.object({
+  transactionType: z.enum(['ISSUANCE', 'TRANSFER', 'CONVERSION', 'CANCELLATION', 'SPLIT']),
+  notes: z.string().max(500).optional(),
+});
+
+export const issuanceSchema = baseTransactionSchema.extend({
+  transactionType: z.literal('ISSUANCE'),
+  toShareholderId: z.string().uuid(),
+  shareClassId: z.string().uuid(),
+  quantity: z.number().int().positive(),
+  pricePerShare: z.string().regex(/^\d+(\.\d{1,2})?$/).optional(),
+});
+
+export const transferSchema = baseTransactionSchema.extend({
+  transactionType: z.literal('TRANSFER'),
+  fromShareholderId: z.string().uuid(),
+  toShareholderId: z.string().uuid(),
+  shareClassId: z.string().uuid(),
+  quantity: z.number().int().positive(),
+  pricePerShare: z.string().regex(/^\d+(\.\d{1,2})?$/).optional(),
+});
+
+export const conversionSchema = baseTransactionSchema.extend({
+  transactionType: z.literal('CONVERSION'),
+  fromShareholderId: z.string().uuid(),
+  shareClassId: z.string().uuid(),
+  toShareClassId: z.string().uuid(),
+  quantity: z.number().int().positive(),
+});
+
+export const cancellationSchema = baseTransactionSchema.extend({
+  transactionType: z.literal('CANCELLATION'),
+  fromShareholderId: z.string().uuid(),
+  shareClassId: z.string().uuid(),
+  quantity: z.number().int().positive(),
+  pricePerShare: z.string().regex(/^\d+(\.\d{1,2})?$/).optional(),
+});
+
+export const splitSchema = baseTransactionSchema.extend({
+  transactionType: z.literal('SPLIT'),
+  shareClassId: z.string().uuid(),
+  splitRatio: z.string().regex(/^\d+:\d+$/), // e.g., "2:1"
+});
+
+// Union schema — used by the wizard form
+export const createTransactionSchema = z.discriminatedUnion('transactionType', [
+  issuanceSchema,
+  transferSchema,
+  conversionSchema,
+  cancellationSchema,
+  splitSchema,
+]);
+```
+
+### TanStack Query Hooks
+
+```typescript
+// frontend/src/hooks/use-transactions.ts
+
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api-client';
+
+export function useTransactions(companyId: string, params?: {
+  page?: number;
+  limit?: number;
+  type?: string;
+  status?: string;
+  shareholderId?: string;
+  shareClassId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  sort?: string;
+}) {
+  return useQuery({
+    queryKey: ['transactions', companyId, params],
+    queryFn: () => api.getList<Transaction>(
+      `/api/v1/companies/${companyId}/transactions`,
+      params,
+    ),
+  });
+}
+
+export function useTransaction(companyId: string, id: string) {
+  return useQuery({
+    queryKey: ['transactions', companyId, id],
+    queryFn: () => api.get<TransactionDetail>(
+      `/api/v1/companies/${companyId}/transactions/${id}`,
+    ),
+    enabled: !!id,
+  });
+}
+
+export function useCreateTransaction(companyId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateTransactionDto) =>
+      api.post<Transaction>(`/api/v1/companies/${companyId}/transactions`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['cap-table', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['shareholders', companyId] });
+    },
+  });
+}
+
+export function useApproveTransaction(companyId: string, id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { notes?: string }) =>
+      api.post(`/api/v1/companies/${companyId}/transactions/${id}/approve`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions', companyId] });
+    },
+  });
+}
+
+export function useCancelTransaction(companyId: string, id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { reason: string }) =>
+      api.post(`/api/v1/companies/${companyId}/transactions/${id}/cancel`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions', companyId] });
+    },
+  });
+}
+```
+
+### Component Hierarchy
+
+```
+TransactionListPage
+├── PageHeader (title, description, "New Transaction" button)
+├── TransactionFilters
+│   ├── TypeDropdown
+│   ├── StatusDropdown
+│   ├── ShareClassDropdown
+│   ├── ShareholderDropdown (from/to)
+│   ├── DateRangePicker
+│   └── SearchInput
+├── TransactionTable
+│   ├── TableHeader (sortable columns)
+│   ├── TransactionRow (per row)
+│   │   ├── TypeBadge
+│   │   ├── StatusBadge
+│   │   ├── CurrencyCell (Brazilian format)
+│   │   └── RowActions (View, Approve, Cancel)
+│   ├── TablePagination
+│   └── EmptyState
+└── CancelConfirmDialog
+
+TransactionWizardPage
+├── PageHeader (back link, title)
+├── StepIndicator (3 steps)
+└── WizardForm
+    ├── Step1DetailsForm
+    │   ├── TransactionTypeSelector (5 card options)
+    │   └── TypeSpecificFields (dynamic based on selected type)
+    │       ├── ShareholderCombobox (from/to)
+    │       ├── ShareClassSelect
+    │       ├── QuantityInput
+    │       ├── PriceInput
+    │       └── NotesTextarea
+    ├── Step2ReviewForm
+    │   ├── TransactionSummaryCard
+    │   ├── DilutionPreview
+    │   │   ├── BeforeDonutChart
+    │   │   ├── AfterDonutChart
+    │   │   └── DilutionTable (before/after/change per shareholder)
+    │   ├── DilutionWarning (if > 10%)
+    │   └── BoardApprovalIndicator
+    └── Step3ConfirmForm
+        ├── ReadyToSubmitMessage / PendingApprovalMessage
+        ├── SubmitButton
+        └── ResultDisplay (success / error)
+
+TransactionDetailPage
+├── PageHeader (back link, title, status badge)
+├── StatusTimeline
+├── TransactionDetailsCard
+├── BlockchainStatusCard (tx hash, block, confirmations, BaseScan link)
+├── ApprovalSection (if PENDING_APPROVAL)
+│   ├── ApprovalNotesInput
+│   └── ApproveButton / RejectButton
+├── CancelSection (if cancellable)
+│   ├── CancelReasonInput
+│   └── CancelButton
+└── MetadataFooter (created by, date)
+```
+
+### i18n Translation Keys
+
+```json
+{
+  "transactions": {
+    "title": "Transações",
+    "description": "Movimentações de participação e histórico de transações",
+    "newButton": "Nova Transação",
+    "createTitle": "Nova Transação",
+    "createDescription": "Crie uma nova transação de participação",
+    "empty": {
+      "title": "Nenhuma transação registrada",
+      "description": "Crie a primeira transação para movimentar participações.",
+      "cta": "Nova Transação"
+    },
+    "types": {
+      "ISSUANCE": "Emissão",
+      "TRANSFER": "Transferência",
+      "CONVERSION": "Conversão",
+      "CANCELLATION": "Cancelamento",
+      "SPLIT": "Desdobramento"
+    },
+    "typeDescriptions": {
+      "ISSUANCE": "Criar novas ações para um acionista",
+      "TRANSFER": "Mover ações entre acionistas",
+      "CONVERSION": "Converter ações entre classes",
+      "CANCELLATION": "Recomprar ou cancelar ações",
+      "SPLIT": "Dividir ou agrupar ações"
+    },
+    "statuses": {
+      "DRAFT": "Rascunho",
+      "PENDING_APPROVAL": "Pendente",
+      "SUBMITTED": "Enviado",
+      "CONFIRMED": "Confirmado",
+      "FAILED": "Falhou",
+      "CANCELLED": "Cancelado"
+    },
+    "table": {
+      "date": "Data",
+      "type": "Tipo",
+      "from": "De",
+      "to": "Para",
+      "shareClass": "Classe",
+      "quantity": "Quantidade",
+      "value": "Valor",
+      "status": "Status",
+      "actions": "Ações",
+      "newShares": "— (novas ações)",
+      "cancelled": "— (canceladas)"
+    },
+    "wizard": {
+      "steps": {
+        "details": "Detalhes",
+        "review": "Revisão",
+        "confirmation": "Confirmação"
+      },
+      "form": {
+        "transactionType": "Tipo de Transação",
+        "fromShareholder": "Acionista de Origem",
+        "toShareholder": "Acionista de Destino",
+        "shareClass": "Classe de Ações",
+        "toShareClass": "Classe de Destino",
+        "quantity": "Quantidade",
+        "pricePerShare": "Preço por Ação",
+        "splitRatio": "Razão de Desdobramento",
+        "splitRatioPlaceholder": "Ex: 2:1",
+        "notes": "Observações",
+        "notesPlaceholder": "Notas opcionais sobre a transação",
+        "totalValue": "Valor Total",
+        "selectShareholder": "Selecione um acionista",
+        "selectShareClass": "Selecione uma classe",
+        "availableShares": "{shares} ações disponíveis"
+      },
+      "review": {
+        "title": "Resumo da Transação",
+        "dilutionTitle": "Impacto na Diluição",
+        "before": "Antes",
+        "after": "Depois",
+        "change": "Variação",
+        "dilutionWarning": "Diluição superior a 10% para {name}",
+        "boardApproval": "Aprovação do Conselho",
+        "boardRequired": "Requer aprovação do conselho",
+        "boardNotRequired": "Não requer aprovação"
+      },
+      "confirm": {
+        "readyTitle": "Pronto para enviar",
+        "readyDescription": "Esta transação será enviada para a blockchain para processamento.",
+        "pendingTitle": "Pendente de aprovação",
+        "pendingDescription": "Esta transação requer aprovação do conselho antes de ser enviada.",
+        "submitButton": "Enviar Transação",
+        "submitting": "Enviando...",
+        "successTitle": "Transação enviada com sucesso",
+        "successDescription": "Aguardando confirmação na blockchain (~24 segundos).",
+        "errorTitle": "Falha na transação",
+        "viewTransaction": "Ver Transação",
+        "createAnother": "Criar Outra",
+        "backToEdit": "Voltar para Editar"
+      }
+    },
+    "detail": {
+      "statusTimeline": "Linha do Tempo",
+      "transactionDetails": "Detalhes da Transação",
+      "blockchain": "Blockchain",
+      "txHash": "Hash da Transação",
+      "blockNumber": "Número do Bloco",
+      "confirmations": "Confirmações",
+      "requiredConfirmations": "necessárias",
+      "viewOnBaseScan": "Ver no BaseScan",
+      "approval": {
+        "title": "Aprovação Necessária",
+        "description": "Esta transação requer aprovação do conselho.",
+        "notesLabel": "Notas de Aprovação",
+        "approveButton": "Aprovar Transação",
+        "rejectButton": "Rejeitar"
+      },
+      "cancel": {
+        "reasonLabel": "Motivo do Cancelamento",
+        "reasonPlaceholder": "Descreva o motivo do cancelamento",
+        "cancelButton": "Cancelar Transação"
+      },
+      "createdBy": "Criado por {name} — {date}"
+    }
+  }
+}
+```
+
+---
+
 ## Error Codes
 
 | Code | HTTP Status | messageKey | Description |

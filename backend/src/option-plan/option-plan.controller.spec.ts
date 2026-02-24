@@ -555,7 +555,7 @@ describe('OptionPlanController', () => {
         status: 'CANCELLED',
       });
 
-      const result = await controller.cancelExercise('comp-1', 'exercise-1');
+      const result = await controller.cancelExercise('comp-1', 'exercise-1', mockUser);
 
       expect(result.status).toBe('CANCELLED');
     });
@@ -566,7 +566,7 @@ describe('OptionPlanController', () => {
       );
 
       await expect(
-        controller.cancelExercise('comp-1', 'exercise-1'),
+        controller.cancelExercise('comp-1', 'exercise-1', mockUser),
       ).rejects.toThrow(BusinessRuleException);
     });
 
@@ -576,7 +576,7 @@ describe('OptionPlanController', () => {
       );
 
       await expect(
-        controller.cancelExercise('comp-1', 'exercise-1'),
+        controller.cancelExercise('comp-1', 'exercise-1', mockUser),
       ).rejects.toThrow(BusinessRuleException);
     });
   });

@@ -267,3 +267,357 @@ Company-scoped endpoints use `@Roles()` to enforce role-based access:
 | GET /api/v1/companies/:companyId/* | Per @Roles() on endpoint | 404 Not Found |
 | POST /api/v1/companies/:companyId/* | Per @Roles() on endpoint | 404 Not Found |
 | Endpoints without @Roles() | Any authenticated user | N/A |
+
+---
+---
+
+## Frontend Flows
+
+This section extends the backend-focused flows above with detailed frontend routing, onboarding, session management, and UI state documentation.
+
+---
+
+### Frontend Flow Map
+
+```
+User navigates to any Navia URL
+  │
+  ├─ /login ─→ LoginPage renders
+  │     │
+  │     ├─ [already authenticated + has company] ─→ Redirect to /dashboard
+  │     ├─ [already authenticated + needsOnboarding] ─→ Redirect to /onboarding
+  │     └─ [not authenticated] ─→ Show login card
+  │           │
+  │           └─ User clicks "Entrar"
+  │                 │
+  │                 ├─ [Privy modal opens] ─→ User authenticates
+  │                 │     │
+  │                 │     ├─ [Privy success] ─→ POST /api/v1/auth/login
+  │                 │     │     │
+  │                 │     │     ├─ [new user, no profile] ─→ /onboarding Step 1
+  │                 │     │     ├─ [existing user, no company] ─→ /onboarding Step 2
+  │                 │     │     ├─ [existing user, has company] ─→ /dashboard
+  │                 │     │     ├─ [429 locked] ─→ Error toast, stay on /login
+  │                 │     │     ├─ [502 Privy down] ─→ Error toast, stay on /login
+  │                 │     │     └─ [5xx error] ─→ Error toast, stay on /login
+  │                 │     │
+  │                 │     └─ [Privy cancel/fail] ─→ Modal closes, no state change
+  │                 │
+  │                 └─ [?expired=true in URL] ─→ Info banner above button
+  │
+  ├─ /onboarding ─→ AuthGuard checks auth
+  │     │
+  │     ├─ [not authenticated] ─→ Redirect to /login
+  │     ├─ [has company already] ─→ Redirect to /dashboard
+  │     └─ [authenticated, needs onboarding] ─→ OnboardingWizard renders
+  │           │
+  │           ├─ [user.firstName is null] ─→ Step 1: PersonalInfoStep
+  │           │     │
+  │           │     ├─ [fills form + submits] ─→ PUT /api/v1/users/me
+  │           │     │     ├─ [success] ─→ Advance to Step 2
+  │           │     │     ├─ [400 validation] ─→ Field-level errors
+  │           │     │     └─ [5xx] ─→ Error toast
+  │           │     │
+  │           │     └─ [closes browser] ─→ Next login resumes at Step 1
+  │           │
+  │           └─ [user.firstName exists, no company] ─→ Step 2: CompanyCreationStep
+  │                 │
+  │                 ├─ [fills form + submits] ─→ POST /api/v1/companies
+  │                 │     ├─ [201 success] ─→ Redirect to /dashboard
+  │                 │     ├─ [409 CNPJ duplicate] ─→ Inline error on CNPJ field
+  │                 │     ├─ [400 validation] ─→ Field-level errors
+  │                 │     └─ [5xx] ─→ Error toast
+  │                 │
+  │                 └─ [closes browser] ─→ Next login resumes at Step 2
+  │
+  └─ /(dashboard)/* ─→ AuthGuard checks auth
+        │
+        ├─ [isLoading] ─→ Full-page spinner
+        ├─ [not authenticated] ─→ Redirect to /login
+        ├─ [needsOnboarding] ─→ Redirect to /onboarding
+        └─ [authenticated + has company] ─→ Render dashboard page
+              │
+              ├─ [any API call returns 401] ─→ Session expired flow
+              │     ├─ authContext.logout()
+              │     ├─ Toast: "Sua sessao expirou"
+              │     └─ Redirect to /login?expired=true
+              │
+              └─ [user clicks "Sair"] ─→ Logout flow
+                    ├─ POST /api/v1/auth/logout
+                    ├─ privy.logout()
+                    └─ Redirect to /login
+```
+
+---
+
+### Frontend Happy Path: Founder Signup (New User, No Invitation)
+
+```
+PRECONDITION: User has no existing Navia account
+ACTOR: New user (founder)
+TRIGGER: User navigates to /login
+
+1.  [UI] User sees LoginPage: Navia logo, "Bem-vindo ao Navia" heading, "Entrar" button
+2.  [UI] User clicks "Entrar" button
+3.  [Frontend] Calls privy.login() — Privy authentication modal opens
+4.  [UI] Privy modal displays: email, Google, and Apple login options
+5.  [UI] User selects a method and completes authentication
+6.  [Frontend] Privy onSuccess callback fires with auth token
+7.  [UI] "Entrar" button shows spinner, becomes disabled
+8.  [Frontend] Sends POST /api/v1/auth/login with Privy access token
+9.  [Backend] Verifies token, creates new User record, sets HTTP-only session cookie
+10. [Backend] Returns 200: { user: { id, email, firstName: null, ... }, isNewUser: true, hasCompany: false }
+11. [Frontend] AuthContext updates: isAuthenticated=true, needsOnboarding=true
+12. [Frontend] AuthGuard detects needsOnboarding, redirects to /onboarding
+13. [UI] OnboardingWizard renders Step 1 (PersonalInfoStep)
+    - Stepper: (1) Suas Informacoes [active, blue-600] ── (2) Sua Empresa [pending, gray-300]
+14. [UI] User fills firstName, lastName; email is pre-filled from Privy
+15. [UI] User clicks "Continuar"
+16. [Frontend] Client-side validation (React Hook Form + Zod)
+    → IF invalid: red borders + error text on fields, STOP
+17. [Frontend] Sends PUT /api/v1/users/me with { firstName, lastName, email }
+18. [Backend] Validates, updates user, returns updated profile
+19. [Frontend] AuthContext user data updated (firstName, lastName populated)
+20. [UI] OnboardingWizard advances to Step 2
+    - Stepper: (1) Suas Informacoes [complete, green check] ── (2) Sua Empresa [active, blue-600]
+21. [UI] User fills company name, entityType, CNPJ, optional fields
+22. [UI] User clicks "Criar Empresa"
+23. [Frontend] Client-side validation (including CNPJ checksum)
+    → IF invalid: red borders + error text on fields, STOP
+24. [Frontend] Sends POST /api/v1/companies with company data
+25. [Backend] Validates, creates company (DRAFT), queues CNPJ validation job
+26. [Backend] Returns 201: { id, name, status: 'DRAFT', ... }
+27. [Frontend] AuthContext: hasCompany=true, needsOnboarding=false
+28. [Frontend] Redirects to /dashboard
+29. [UI] Dashboard renders
+
+POSTCONDITION: User has profile + company in DRAFT status
+SIDE EFFECTS:
+  - Audit: AUTH_LOGIN_SUCCESS, COMPANY_CREATED
+  - CNPJ validation Bull job queued
+  - Blockchain contract deployment queued (after CNPJ validation)
+```
+
+---
+
+### Frontend Happy Path: Returning User Login (Has Company)
+
+```
+PRECONDITION: User has existing Navia account with at least one company
+ACTOR: Returning user
+TRIGGER: User navigates to /login
+
+1.  [UI] User sees LoginPage
+2.  [UI] User clicks "Entrar"
+3.  [Frontend] privy.login() — modal or auto-login (saved session)
+4.  [UI] User completes Privy auth
+5.  [Frontend] POST /api/v1/auth/login
+6.  [Backend] Verifies token, finds user, updates lastLoginAt, sets session cookie
+7.  [Backend] Returns 200: { user, isNewUser: false, hasCompany: true }
+8.  [Frontend] AuthContext: isAuthenticated=true, hasCompany=true, needsOnboarding=false
+9.  [Frontend] AuthGuard allows access
+10. [UI] User lands on /dashboard
+
+POSTCONDITION: User authenticated, on dashboard
+SIDE EFFECTS: Audit (AUTH_LOGIN_SUCCESS), User.lastLoginAt updated
+```
+
+---
+
+### Frontend Happy Path: Returning User with Incomplete Onboarding
+
+```
+PRECONDITION: User created account but did not finish onboarding
+ACTOR: Returning user
+TRIGGER: User logs in
+
+1-5. Same as Returning User Login
+6.   [Backend] Returns: { user: { firstName: "Joao" | null, ... }, isNewUser: false, hasCompany: false }
+7.   [Frontend] AuthContext: isAuthenticated=true, needsOnboarding=true
+8.   [Frontend] AuthGuard redirects to /onboarding
+9.   [Frontend] OnboardingWizard determines initial step:
+     → IF user.firstName is null: render Step 1
+     → IF user.firstName exists but no company: render Step 2
+10.  [UI] User completes remaining step(s)
+11.  [Frontend] On company creation success: redirect to /dashboard
+
+POSTCONDITION: User completes onboarding, reaches dashboard
+```
+
+---
+
+### Frontend Happy Path: Page Refresh with Valid Session
+
+```
+PRECONDITION: User had active session before refresh
+ACTOR: Authenticated user
+TRIGGER: Browser page refresh
+
+1.  [Frontend] App mounts, PrivyAuthProvider initializes
+2.  [Frontend] AuthContext: isLoading=true
+3.  [UI] AuthGuard renders full-page spinner (blue-600, centered on gray-50 bg)
+4.  [Frontend] usePrivy() checks for existing Privy session
+5.  [Frontend] If session exists: sends GET /api/v1/auth/me with session cookie
+6.  [Backend] Verifies token, returns user profile + company data
+    → IF valid: 200 with full profile
+    → IF invalid: 401
+7a. [Frontend] On 200: AuthContext populated, isLoading=false, page renders normally
+7b. [Frontend] On 401: triggers session expired flow → redirect to /login
+8.  [Frontend] If no Privy session: isAuthenticated=false → redirect to /login
+
+POSTCONDITION: User sees page (valid) or is on /login (expired)
+```
+
+---
+
+### Frontend Happy Path: Logout
+
+```
+PRECONDITION: User is authenticated
+ACTOR: Authenticated user
+TRIGGER: User clicks "Sair" in sidebar
+
+1. [UI] User clicks "Sair" in sidebar bottom section
+2. [Frontend] authContext.logout() called
+3. [Frontend] POST /api/v1/auth/logout
+4. [Backend] Clears navia-auth-token cookie, returns 200
+5. [Frontend] privy.logout() clears Privy session
+6. [Frontend] AuthContext: user=null, isAuthenticated=false
+7. [Frontend] Redirects to /login
+8. [UI] LoginPage renders (no expired banner)
+
+POSTCONDITION: Fully logged out (backend + Privy + frontend state)
+SIDE EFFECTS: Audit (AUTH_LOGOUT)
+```
+
+---
+
+### Frontend Error Path: Session Expiry
+
+```
+PRECONDITION: User has expired session (2h inactivity or 7d absolute)
+ACTOR: Authenticated user
+TRIGGER: Any API call returns 401
+
+1.  [Frontend] User action triggers API call
+2.  [Backend] AuthGuard detects expired token, returns 401
+3.  [Frontend] API client 401 interceptor fires
+4.  [Frontend] authContext.logout()
+5.  [Frontend] POST /api/v1/auth/logout (best-effort, failure ignored)
+6.  [Frontend] privy.logout()
+7.  [Frontend] AuthContext cleared
+8.  [UI] Toast (warning): "Sua sessao expirou. Faca login novamente."
+9.  [Frontend] Redirects to /login?expired=true
+10. [UI] LoginPage renders with info banner: blue-50 bg, blue-600 text
+
+POSTCONDITION: User on /login, session cleared
+```
+
+---
+
+### Frontend Error Path: Backend Sync Failure After Privy Auth
+
+```
+PRECONDITION: Privy auth succeeded, backend sync fails
+ACTOR: User
+TRIGGER: POST /api/v1/auth/login returns 5xx
+
+1.  [Frontend] Privy auth completes successfully
+2.  [Frontend] POST /api/v1/auth/login returns 500/502/503
+3.  [UI] Error toast shown (Sonner, destructive variant)
+    → 502: "Servico de autenticacao indisponivel. Tente novamente."
+    → 500: "Erro interno do servidor. Tente novamente."
+4.  [UI] "Entrar" button re-enabled
+5.  [Frontend] Privy remains authenticated (token valid) but AuthContext has no user
+6.  [UI] User can retry by clicking "Entrar" again
+
+POSTCONDITION: User on /login, Privy session active but no backend session
+```
+
+---
+
+### Frontend Error Path: Account Locked
+
+```
+PRECONDITION: IP has >= 5 failed attempts in 15 minutes
+ACTOR: User
+TRIGGER: Login attempt from locked IP
+
+1.  [Frontend] POST /api/v1/auth/login returns 429 AUTH_ACCOUNT_LOCKED
+2.  [UI] Error toast (destructive): "Conta bloqueada por excesso de tentativas. Tente novamente em 15 minutos."
+3.  [UI] "Entrar" button re-enabled
+4.  [Frontend] No redirect — user stays on /login
+
+POSTCONDITION: Login blocked until lockout expires
+```
+
+---
+
+### Frontend Error Path: Onboarding Validation Errors
+
+```
+PRECONDITION: User is on onboarding wizard
+ACTOR: User filling out form
+TRIGGER: Form submission with invalid data
+
+A) Client-side validation failure:
+1.  [UI] User clicks "Continuar" or "Criar Empresa"
+2.  [Frontend] React Hook Form + Zod validates
+3.  [UI] Invalid fields get red border (2px #DC2626) + error text below (12px, #DC2626)
+4.  [Frontend] No API call made
+
+B) Server-side validation failure (400):
+1.  [Frontend] Sends PUT /api/v1/users/me or POST /api/v1/companies
+2.  [Backend] Returns 400 with validationErrors array
+3.  [Frontend] applyServerErrors() maps errors to form fields
+4.  [UI] Fields show red borders + server error messages (translated via messageKey)
+
+C) CNPJ duplicate (409):
+1.  [Frontend] POST /api/v1/companies
+2.  [Backend] Returns 409 COMPANY_CNPJ_DUPLICATE
+3.  [Frontend] Sets inline error on CNPJ field
+4.  [UI] CNPJ field shows red border + "CNPJ ja cadastrado" message
+
+POSTCONDITION: User stays on current step, can fix errors and retry
+```
+
+---
+
+## Frontend Decision Points
+
+| # | Decision Point | Condition | Path | Outcome |
+|---|---------------|-----------|------|---------|
+| — | Route guard (/login) | Already authenticated + has company | Redirect | /dashboard |
+| — | Route guard (/login) | Already authenticated + needsOnboarding | Redirect | /onboarding |
+| — | Route guard (dashboard) | Not authenticated | Redirect | /login |
+| — | Route guard (dashboard) | Needs onboarding | Redirect | /onboarding |
+| 7 | Post-login routing | New user (firstName=null) | Onboarding | /onboarding Step 1 |
+| 7 | Post-login routing | Existing user, no company | Onboarding | /onboarding Step 2 |
+| 7 | Post-login routing | Existing user, has company | Dashboard | /dashboard |
+| 7 | Post-login routing | Has invitation token in URL | Invitation | /invitations/:token |
+| 9 | Onboarding step selection | user.firstName is null | Step 1 | PersonalInfoStep |
+| 9 | Onboarding step selection | user.firstName exists, no company | Step 2 | CompanyCreationStep |
+| 16 | Client validation (Step 1) | Form invalid | Error | Field-level errors shown |
+| 17 | Server response (Step 1) | 400 validation error | Error | Map to form fields |
+| 17 | Server response (Step 1) | 5xx server error | Error | Error toast |
+| 23 | Client validation (Step 2) | CNPJ checksum invalid | Error | Field error on CNPJ |
+| 24 | Server response (Step 2) | 409 CNPJ duplicate | Error | Inline error on CNPJ field |
+| 24 | Server response (Step 2) | 400 validation error | Error | Map to form fields |
+| — | API 401 interceptor | Any 401 response | Session expired | Toast + redirect /login?expired=true |
+
+---
+
+## Frontend State Transitions
+
+| Entity | Field | Before | After | Trigger |
+|--------|-------|--------|-------|---------|
+| AuthContext | isAuthenticated | false | true | Privy auth + backend sync success |
+| AuthContext | user | null | User object | POST /api/v1/auth/login success |
+| AuthContext | needsOnboarding | — | true | Login response: firstName=null OR hasCompany=false |
+| AuthContext | needsOnboarding | true | false | Company created (POST /api/v1/companies success) |
+| AuthContext | hasCompany | false | true | Company created |
+| AuthContext | isAuthenticated | true | false | Logout or 401 interceptor |
+| AuthContext | user | User object | null | Logout or 401 interceptor |
+| OnboardingWizard | currentStep | 1 | 2 | PersonalInfoStep submit success |
+| User (backend) | firstName | null | "Joao" | PUT /api/v1/users/me |
+| User (backend) | lastName | null | "Silva" | PUT /api/v1/users/me |

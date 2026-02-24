@@ -183,6 +183,381 @@ POSTCONDITION: Cap table verified against blockchain, discrepancies resolved
 
 ---
 
+## Frontend Specification
+
+### Page Location
+
+The reconciliation UI is embedded in the existing Cap Table page (`/dashboard/cap-table`), not a separate route. It adds:
+1. A "Reconcile" button in the Cap Table page header toolbar (right-aligned, next to "Export")
+2. A sync status indicator showing last sync time
+3. A slide-out panel for discrepancy details
+
+### Cap Table Page Header — Reconciliation Controls
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  h1: Cap Table              [Reconcile 🔄] [+ Export ▾] │
+│  body-sm: Company equity overview                       │
+│  🟢 Last synced: 23/02/2026 14:30    (or ⚠️ Sync issue)│
+├─────────────────────────────────────────────────────────┤
+│  Tab bar: Current | Fully Diluted | History             │
+└─────────────────────────────────────────────────────────┘
+```
+
+#### Sync Status Indicator
+
+A small inline indicator below the page description:
+
+| State | Icon | Text | Color |
+|-------|------|------|-------|
+| In sync | `CheckCircle` (Lucide) | "Last synced: {dd/MM/yyyy HH:mm}" | `green-700` text, `green-100` bg badge |
+| Syncing | `Loader2` (Lucide, spinning) | "Syncing with blockchain..." | `blue-600` text |
+| Sync stale (>1 hour) | `AlertTriangle` (Lucide) | "Last synced: {time} — may be outdated" | `cream-700` text, `cream-100` bg badge |
+| Sync failed | `XCircle` (Lucide) | "Blockchain sync unavailable" | `destructive-text` text, `red-50` bg badge |
+| Never synced | `Info` (Lucide) | "Not yet synced with blockchain" | `gray-500` text |
+
+#### Reconcile Button
+
+- Variant: `secondary` (white bg, gray-200 border)
+- Icon: `RefreshCw` (Lucide), 16px, left of label
+- Label: "Reconcile"
+- Size: `sm` (32px height)
+- Position: right side of page header, left of Export button
+- Disabled state: while reconciliation is in progress (shows spinner icon replacing RefreshCw)
+
+### Confirmation Dialog
+
+When user clicks "Reconcile":
+
+| Element | Specification |
+|---------|---------------|
+| Type | Modal dialog (medium: 560px) |
+| Title | "Reconcile Cap Table" (h3) |
+| Body | "This will compare your cap table with blockchain data on Base Network and automatically resolve any discrepancies. The on-chain state is the source of truth." |
+| Warning | Info alert (blue-50 bg): "This operation typically takes less than 10 seconds." |
+| Cancel button | Secondary variant, "Cancel" |
+| Confirm button | Primary variant, "Yes, Reconcile" |
+| Close | X button top-right, also closes on Escape key |
+
+### Loading State (During Reconciliation)
+
+After user confirms:
+1. Modal closes
+2. Reconcile button becomes disabled with `Loader2` spinning icon
+3. Sync status indicator changes to "Syncing with blockchain..."
+4. Cap table content remains visible and usable (non-blocking UI)
+
+### Success State — No Discrepancies
+
+When API returns `status: "success"` with empty `discrepancies[]`:
+
+1. Success toast (top-right): "Cap table is in sync with blockchain" (auto-dismiss 5s)
+2. Sync status indicator updates to "Last synced: {now}" with green CheckCircle
+3. Reconcile button re-enables
+
+### Success State — Discrepancies Found & Resolved
+
+When API returns `status: "discrepancies_found"`:
+
+1. Warning toast: "Discrepancies found and auto-resolved. Tap to view details." (persistent, dismissable)
+2. Clicking the toast (or a "View Details" link) opens the Discrepancy Slide-Out Panel
+3. Sync status indicator updates to "Last synced: {now}" with green CheckCircle (since discrepancies were resolved)
+4. Cap table data refreshes automatically (invalidate TanStack Query cache for cap table)
+
+### Discrepancy Slide-Out Panel
+
+A right-side slide-out panel (480px width) showing reconciliation details:
+
+```
+┌──────────────────────────────┐
+│  ← Back   Reconciliation Results │
+│                              │
+│  ┌──────────────────────────┐│
+│  │ Summary                  ││
+│  │ Reconciled: 23/02/2026   ││
+│  │ Discrepancies: 2 found   ││
+│  │ Resolution: Auto-synced  ││
+│  └──────────────────────────┘│
+│                              │
+│  Discrepancy Details         │
+│  ┌──────────────────────────┐│
+│  │ Shareholder │ Class │ On-chain │ Off-chain │ Diff  ││
+│  │ João Silva  │ ON    │ 600.000  │ 650.000   │-50.000││
+│  │ Maria S.    │ PN-A  │ 250.000  │ 245.000   │+5.000 ││
+│  └──────────────────────────┘│
+│                              │
+│  ℹ️ All discrepancies were   │
+│  automatically resolved      │
+│  using on-chain data as the  │
+│  source of truth.            │
+│                              │
+│  Admin has been notified via │
+│  email.                      │
+└──────────────────────────────┘
+```
+
+#### Discrepancy Table Columns
+
+| Column | Type | Alignment | Description |
+|--------|------|-----------|-------------|
+| Shareholder | text | left | Shareholder name |
+| Share Class | text | left | Share class name |
+| On-Chain | number | right | Shares recorded on blockchain (formatted Brazilian: `600.000`) |
+| Off-Chain | number | right | Shares recorded in database before sync |
+| Difference | number | right | Delta, prefixed with +/- sign. Green for positive, red for negative. |
+
+### Error States
+
+#### Blockchain RPC Unavailable (EC-2)
+
+When reconciliation fails due to RPC connectivity:
+
+1. Error toast: "Unable to connect to blockchain. Please try again later." (persistent)
+2. Sync status indicator changes to "Blockchain sync unavailable" with red XCircle
+3. Reconcile button re-enables (user can retry)
+
+#### Reconciliation Already In Progress
+
+If user triggers reconciliation while one is already running (race condition):
+
+1. Reconcile button remains disabled
+2. Info toast: "Reconciliation already in progress. Please wait." (auto-dismiss 5s)
+
+#### Blockchain Reorg Detected (EC-3)
+
+Not displayed to user in real-time (happens in background scheduled job). Admin receives email notification. Sync status indicator may show "Syncing with blockchain..." during reorg re-sync.
+
+### Accessibility
+
+- Reconcile button: `aria-label="Reconcile cap table with blockchain"`
+- Sync status: `role="status"` with `aria-live="polite"` for screen reader announcements
+- Confirmation modal: focus trapped, closes on Escape, focus returns to Reconcile button on close
+- Slide-out panel: `role="complementary"`, `aria-label="Reconciliation results"`, closeable with Escape
+- Discrepancy table: proper `<table>` semantics with `<thead>` and `<th scope="col">`
+
+### Responsive Behavior
+
+| Breakpoint | Reconcile Button | Sync Status | Slide-Out Panel |
+|------------|-----------------|-------------|-----------------|
+| `xl+` | Full: icon + "Reconcile" label | Inline below title | 480px right panel |
+| `md-lg` | Icon-only (RefreshCw) with tooltip | Below title, smaller text | Full-width overlay |
+| `sm` | Icon-only in toolbar | Hidden (visible on tap) | Full-screen overlay |
+
+### State Management (Frontend)
+
+```typescript
+// TanStack Query hooks
+useCapTableReconciliation(companyId: string)  // mutation hook for POST /reconcile
+useCapTableSyncStatus(companyId: string)      // query hook for last sync timestamp
+
+// Local state
+isReconciling: boolean          // tracks loading state
+showDiscrepancyPanel: boolean   // controls slide-out visibility
+lastReconciliationResult: ReconciliationResult | null  // stores last result for panel display
+```
+
+### API Integration
+
+```typescript
+// Mutation hook
+const reconcileMutation = useMutation({
+  mutationFn: () => api.post(`/api/v1/companies/${companyId}/cap-table/reconcile`, {}),
+  onSuccess: (data) => {
+    if (data.status === 'success') {
+      toast.success(t('capTable.reconciliation.inSync'));
+    } else {
+      toast.warning(t('capTable.reconciliation.discrepanciesFound'), {
+        action: { label: t('common.viewDetails'), onClick: () => setShowDiscrepancyPanel(true) },
+        duration: Infinity,
+      });
+      queryClient.invalidateQueries(['cap-table', companyId]);
+    }
+    queryClient.invalidateQueries(['sync-status', companyId]);
+  },
+  onError: (error) => {
+    if (error.code === 'CHAIN_RPC_UNAVAILABLE') {
+      toast.error(t('capTable.reconciliation.rpcUnavailable'));
+    } else {
+      toast.error(t('capTable.reconciliation.failed'));
+    }
+  },
+});
+```
+
+---
+
+## Backend Specification Additions
+
+### Request/Response DTOs
+
+```typescript
+// No request body needed — companyId comes from URL param
+
+// Response DTO
+class ReconciliationResultDto {
+  status: 'success' | 'discrepancies_found';
+  discrepancies: DiscrepancyDto[];
+  lastSyncAt: string;              // ISO 8601
+  blockchainStateHash: string;     // hex string
+  resolution?: 'automatic_sync_completed';
+}
+
+class DiscrepancyDto {
+  shareholderName: string;
+  shareholderId: string;
+  shareClass: string;
+  shareClassId: string;
+  onChainShares: string;           // Decimal as string
+  offChainShares: string;          // Decimal as string
+  difference: string;              // Decimal as string (signed)
+}
+```
+
+### Response Envelope
+
+The response MUST follow the standard API envelope:
+
+```json
+{
+  "success": true,
+  "data": {
+    "status": "success",
+    "discrepancies": [],
+    "lastSyncAt": "2026-02-23T14:30:00.000Z",
+    "blockchainStateHash": "0xabc..."
+  }
+}
+```
+
+### Concurrency Control
+
+Only one reconciliation can run per company at a time. Implementation:
+
+1. Use a Redis lock: `reconciliation:lock:{companyId}` with 30-second TTL
+2. If lock exists when `POST /reconcile` is called, return `409 Conflict` with error code `CAP_RECONCILIATION_IN_PROGRESS`
+3. Lock is released after reconciliation completes (success or failure)
+
+### Sync Status Storage
+
+Add a `lastBlockchainSyncAt` field to the Company model (or a separate `BlockchainSyncState` table):
+
+```prisma
+model Company {
+  // ... existing fields
+  lastBlockchainSyncAt  DateTime?  @map("last_blockchain_sync_at")
+  lastBlockchainHash    String?    @map("last_blockchain_hash")
+}
+```
+
+This is updated after every successful reconciliation (manual or scheduled).
+
+### Sync Status Endpoint
+
+Add a lightweight endpoint for the frontend to poll sync status without triggering reconciliation:
+
+```
+GET /api/v1/companies/:companyId/cap-table/sync-status
+```
+
+Response:
+```json
+{
+  "success": true,
+  "data": {
+    "lastSyncAt": "2026-02-23T14:30:00.000Z",
+    "blockchainStateHash": "0xabc...",
+    "status": "synced"
+  }
+}
+```
+
+Status values: `synced`, `stale` (>1 hour since last sync), `syncing`, `failed`, `never_synced`.
+
+### Scheduled Job Configuration
+
+```typescript
+// Daily reconciliation job — runs at 02:00 UTC for all ACTIVE companies
+@Cron('0 2 * * *')
+async handleDailyReconciliation() {
+  const activeCompanies = await this.prisma.company.findMany({
+    where: { status: 'ACTIVE', lastBlockchainSyncAt: { not: null } },
+  });
+
+  for (const company of activeCompanies) {
+    await this.reconciliationQueue.add('reconcile', {
+      companyId: company.id,
+      trigger: 'scheduled',
+    }, {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 5000 },
+    });
+  }
+}
+```
+
+- Only reconciles ACTIVE companies that have been synced at least once (have deployed smart contracts)
+- Jobs are queued (not run inline) to avoid blocking the scheduler
+- Each company job retries 3 times with exponential backoff (5s, 10s, 20s)
+
+### Email Notification for Discrepancies
+
+- Recipients: All users with ADMIN role in the company
+- Template: `reconciliation-discrepancy` (PT-BR and EN per user locale)
+- Subject: "[Navia] Discrepancia detectada no cap table — {companyName}"
+- Content: Number of discrepancies, summary table, link to cap table page
+- Triggered only when `status === 'discrepancies_found'`
+
+### Error Codes
+
+| Error Code | HTTP Status | messageKey | When |
+|------------|-------------|------------|------|
+| `CAP_RECONCILIATION_FAILED` | 502 | `errors.cap.reconciliationFailed` | General reconciliation failure |
+| `CAP_RECONCILIATION_IN_PROGRESS` | 409 | `errors.cap.reconciliationInProgress` | Another reconciliation already running for this company |
+| `CHAIN_RPC_UNAVAILABLE` | 502 | `errors.chain.rpcUnavailable` | Cannot connect to Base Network RPC |
+| `CHAIN_SYNC_BEHIND` | 422 | `errors.chain.syncBehind` | Node is behind and data may be stale |
+| `CHAIN_REORG_DETECTED` | 422 | `errors.chain.reorgDetected` | Blockchain reorganization detected during reconciliation |
+
+### Audit Events
+
+| Event | Metadata |
+|-------|----------|
+| `CAP_TABLE_RECONCILIATION_RUN` | `{ trigger: 'manual' \| 'scheduled' \| 'auto', durationMs: number, discrepancyCount: number, blockchainStateHash: string }` |
+| `CAP_TABLE_DISCREPANCY_FOUND` | `{ shareholderId: string, shareClassId: string, onChainShares: string, offChainShares: string, difference: string, resolution: 'auto_synced' }` |
+
+---
+
+## i18n Keys
+
+Add to both `messages/pt-BR.json` and `messages/en.json`:
+
+```
+capTable.reconciliation.button = "Reconciliar" / "Reconcile"
+capTable.reconciliation.confirmTitle = "Reconciliar Cap Table" / "Reconcile Cap Table"
+capTable.reconciliation.confirmBody = "Isso ira comparar seu cap table com os dados da blockchain na Base Network e resolver automaticamente quaisquer discrepancias. O estado on-chain e a fonte de verdade." / "This will compare your cap table with blockchain data on Base Network and automatically resolve any discrepancies. The on-chain state is the source of truth."
+capTable.reconciliation.confirmButton = "Sim, Reconciliar" / "Yes, Reconcile"
+capTable.reconciliation.syncing = "Sincronizando com blockchain..." / "Syncing with blockchain..."
+capTable.reconciliation.inSync = "Cap table sincronizado com blockchain" / "Cap table is in sync with blockchain"
+capTable.reconciliation.discrepanciesFound = "Discrepancias encontradas e auto-resolvidas. Toque para ver detalhes." / "Discrepancies found and auto-resolved. Tap to view details."
+capTable.reconciliation.rpcUnavailable = "Nao foi possivel conectar a blockchain. Tente novamente mais tarde." / "Unable to connect to blockchain. Please try again later."
+capTable.reconciliation.inProgress = "Reconciliacao ja em andamento. Aguarde." / "Reconciliation already in progress. Please wait."
+capTable.reconciliation.failed = "Falha na reconciliacao. Tente novamente." / "Reconciliation failed. Please try again."
+capTable.reconciliation.lastSynced = "Ultima sincronizacao: {date}" / "Last synced: {date}"
+capTable.reconciliation.syncStale = "Ultima sincronizacao: {date} — pode estar desatualizado" / "Last synced: {date} — may be outdated"
+capTable.reconciliation.syncFailed = "Sincronizacao com blockchain indisponivel" / "Blockchain sync unavailable"
+capTable.reconciliation.neverSynced = "Ainda nao sincronizado com blockchain" / "Not yet synced with blockchain"
+capTable.reconciliation.panelTitle = "Resultados da Reconciliacao" / "Reconciliation Results"
+capTable.reconciliation.discrepancyCount = "{count} discrepancia(s) encontrada(s)" / "{count} discrepancy(ies) found"
+capTable.reconciliation.autoResolved = "Todas as discrepancias foram automaticamente resolvidas usando os dados on-chain como fonte de verdade." / "All discrepancies were automatically resolved using on-chain data as the source of truth."
+capTable.reconciliation.adminNotified = "O administrador foi notificado por e-mail." / "Admin has been notified via email."
+errors.cap.reconciliationFailed = "Falha na reconciliacao do cap table" / "Cap table reconciliation failed"
+errors.cap.reconciliationInProgress = "Uma reconciliacao ja esta em andamento para esta empresa" / "A reconciliation is already in progress for this company"
+errors.chain.rpcUnavailable = "Nao foi possivel conectar ao provedor blockchain" / "Unable to connect to blockchain provider"
+errors.chain.syncBehind = "O no blockchain esta atrasado. Os dados podem estar desatualizados." / "Blockchain node is behind. Data may be stale."
+errors.chain.reorgDetected = "Reorganizacao de blockchain detectada durante a reconciliacao" / "Blockchain reorganization detected during reconciliation"
+```
+
+---
+
 ## Related Specifications
 
 | Specification | Relationship |

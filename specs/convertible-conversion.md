@@ -34,8 +34,9 @@ Conversion is tightly coupled with the funding round module (qualified financing
 7. [Technical Implementation](#technical-implementation)
 8. [Edge Cases & Error Handling](#edge-cases--error-handling)
 9. [Security Considerations](#security-considerations)
-10. [Success Criteria](#success-criteria)
-11. [Related Specifications](#related-specifications)
+10. [Frontend Implementation](#frontend-implementation)
+11. [Success Criteria](#success-criteria)
+12. [Related Specifications](#related-specifications)
 
 ---
 
@@ -996,6 +997,270 @@ export default function ConversionScenariosPage() {
 - Limit conversion API calls: 10 per hour per company
 - Prevent spam scenario modeling: 100 per day per user
 - Detect and block automated scraping attempts
+
+---
+
+## Frontend Implementation
+
+### FE-1: Pages & Routes
+
+No new top-level routes are required. Conversion functionality lives within the existing convertible detail page:
+
+| Location | Component | Description |
+|----------|-----------|-------------|
+| `/dashboard/investments/convertibles/[convertibleId]` (Scenarios tab) | ConversionScenariosTab | Scenario modeling with custom valuation input |
+| `/dashboard/investments/convertibles/[convertibleId]` (Convert action) | ConvertToEquityModal | 4-step conversion wizard triggered from action menu |
+
+**Entry points**:
+- "Scenarios" tab on convertible detail page → scenario modeling
+- "Convert to Equity" button in Actions dropdown (or primary button on Scenarios tab) → conversion wizard modal
+
+### FE-2: Page Layouts
+
+#### Scenarios Tab Layout
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  [Details/Terms] [Interest] [Scenarios ←active]  [Docs] │
+├─────────────────────────────────────────────────────────┤
+│  ┌────────────────────────────────────────────────────┐ │
+│  │ ConversionAmountCard                               │ │
+│  │ Valor para Conversão: R$ 522.400,00                │ │
+│  │ (Principal R$ 500K + Juros R$ 22.4K)               │ │
+│  └────────────────────────────────────────────────────┘ │
+├─────────────────────────────────────────────────────────┤
+│  Custom Valuation Input                                 │
+│  [R$ ____________] [Calcular]  + predefined buttons     │
+│  R$ 5M | R$ 10M | R$ 15M | R$ 20M                      │
+├─────────────────────────────────────────────────────────┤
+│  Scenarios Table                                        │
+│  (rows for each valuation with method comparison)       │
+├─────────────────────────────────────────────────────────┤
+│  ┌────────────────────────────────────────────────────┐ │
+│  │ Key Insights Card                                  │ │
+│  │ • Cap favorável acima de R$ X (cap trigger point)  │ │
+│  │ • Melhor caso: X ações (Y% ownership)              │ │
+│  │ • Pior caso: X ações (Y% ownership)                │ │
+│  └────────────────────────────────────────────────────┘ │
+├─────────────────────────────────────────────────────────┤
+│  [Convert to Equity]  ← Primary button                  │
+└─────────────────────────────────────────────────────────┘
+```
+
+### FE-3: Components
+
+| Component | Description | Props |
+|-----------|-------------|-------|
+| `ConversionScenariosTable` | Table showing conversion outcomes at different valuations | `scenarios: ConversionScenario[]`, `conversionAmount: number` |
+| `ScenarioRow` | Single scenario row with MFN method highlighting | `scenario: ConversionScenario`, `isBestCase: boolean` |
+| `MFNMethodBadge` | Badge showing which MFN method produced the result | `method: 'DISCOUNT' \| 'CAP' \| 'ROUND_PRICE'` |
+| `ConversionAmountCard` | Summary card showing total conversion value breakdown | `principal: number`, `accruedInterest: number` |
+| `CapTriggerInsight` | Insight card showing the valuation where cap becomes favorable | `capTriggerValuation: number`, `discountRate: number`, `valuationCap: number` |
+| `CustomValuationInput` | Currency input with calculate button and preset quick-select | `onCalculate: (valuation: number) => void`, `presets?: number[]` |
+| `ConvertToEquityModal` | 4-step wizard modal for executing conversion | `convertibleId: string`, `onSuccess: () => void` |
+| `ConversionResultCard` | Post-conversion summary showing shares issued and ownership | `result: ConversionResult` |
+
+### FE-4: Tables
+
+#### Scenarios Table
+
+| Column | Field | Type | Alignment | Notes |
+|--------|-------|------|-----------|-------|
+| Valuation | `roundValuation` | currency (BRL) | Right | |
+| Round Price | `roundPricePerShare` | currency (BRL, 6 decimals) | Right | |
+| Discount Method | `discountPrice` | currency (BRL, 6 decimals) | Right | Highlighted if winner |
+| Cap Method | `capPrice` | currency (BRL, 6 decimals) | Right | Highlighted if winner |
+| Best Method (MFN) | `mfnMethod` | MFNMethodBadge | Center | Shows which method won |
+| Shares Issued | `sharesIssued` | number | Right | `tabular-nums` |
+| Ownership % | `ownershipPercent` | percentage | Right | |
+| Dilution % | `dilutionPercent` | percentage (red if > 0) | Right | |
+
+- **Row highlight**: Row where MFN method switches from DISCOUNT to CAP gets a `cream-50` background with left `cream-700` border
+- **Best case row**: `green-50` background (most shares for investor)
+- **No pagination**: Typically 5-15 scenario rows
+- **Column headers**: `gray-500`, caption size, uppercase
+
+### FE-5: Forms
+
+#### Convert to Equity (inside ConvertToEquityModal, Step 2: Parameters)
+
+| Field | Label | Type | Validation | Required |
+|-------|-------|------|------------|----------|
+| `fundingRoundId` | Rodada de Investimento | select (open/active rounds) | must exist if provided | No |
+| `roundValuation` | Valuation da Rodada | currency input (BRL) | > 0 | Yes |
+| `shareClassId` | Classe de Ações | select (from company share classes) | must exist | Yes |
+| `notes` | Observações | textarea | max 500 chars | No |
+
+- If `fundingRoundId` is selected, `roundValuation` and `shareClassId` auto-fill from round data
+- Live conversion preview updates as fields change
+
+### FE-6: Visualizations
+
+#### Cap Trigger Chart
+
+- **Type**: Area chart (Recharts `AreaChart`)
+- **X-axis**: Valuation (BRL, formatted as abbreviated: R$ 5M, R$ 10M, etc.)
+- **Y-axis**: Shares issued
+- **Line 1**: Discount method result — `ocean-600`, solid
+- **Line 2**: Cap method result — `navy-900`, solid
+- **Intersection point**: Annotated with vertical dashed line and label "Cap favorável acima de R$ {value}"
+- **Fill**: Area below each line with 20% opacity
+- **Tooltip**: Shows valuation, shares via discount, shares via cap, MFN winner
+- **Container**: White card, title "Método de Conversão por Valuation"
+
+### FE-7: Modals & Dialogs
+
+#### ConvertToEquityModal
+
+| Property | Value |
+|----------|-------|
+| Size | Large (720px) |
+| Type | Wizard (4 steps) |
+
+**Step 1 — Revisar (Review)**:
+- ConversionAmountCard showing principal + interest breakdown
+- Current instrument terms summary (cap, discount, MFN status)
+- Qualified financing validation: if threshold set and not met, show warning with threshold value and block proceed
+
+**Step 2 — Parâmetros (Parameters)**:
+- Form fields (fundingRoundId, roundValuation, shareClassId, notes)
+- Live conversion calculation preview based on entered valuation
+
+**Step 3 — Prévia (Preview)**:
+- Full conversion calculation result:
+  - Conversion amount (principal + interest)
+  - Method used (with MFN comparison if applicable): Discount method price, Cap method price, Winner highlighted in `green-100` badge
+  - Shares to be issued
+  - Effective price per share
+  - Post-conversion ownership percentage
+  - Dilution impact on existing shareholders (mini before/after table)
+
+**Step 4 — Confirmar (Confirm)**:
+- Summary of irreversible action
+- Warning box: "Esta ação é irreversível. O instrumento conversível será marcado como convertido e as ações serão emitidas."
+- Checkbox: "Eu confirmo a conversão deste instrumento"
+- Execute button: "Converter para Equity" (disabled until checkbox checked)
+- Progress indicator after click: Converting → Issuing shares → Recording blockchain → Done
+
+### FE-8: Status Badges
+
+#### MFN Method Badges
+
+| Method | Background | Text Color | Label (PT-BR) | Label (EN) |
+|--------|-----------|------------|----------------|------------|
+| `DISCOUNT` | `ocean-100` | `ocean-600` | Desconto | Discount |
+| `CAP` | `navy-100` | `navy-700` | Cap | Cap |
+| `ROUND_PRICE` | `gray-100` | `gray-600` | Preço da Rodada | Round Price |
+
+### FE-9: Role-Based UI
+
+| Action | ADMIN | FINANCE | LEGAL | INVESTOR |
+|--------|-------|---------|-------|----------|
+| View Scenarios tab | Yes | Yes | Yes | No |
+| Model custom valuations | Yes | Yes | Yes | No |
+| Execute conversion | Yes | Yes | No | No |
+| View conversion result (post-conversion) | Yes | Yes | Yes | Own instrument only |
+
+- **INVESTOR**: Cannot see Scenarios tab. After conversion, sees conversion result on their instrument detail page (shares received, effective price).
+- **LEGAL**: Can view scenarios but "Convert to Equity" button is hidden.
+
+### FE-10: API Integration (TanStack Query)
+
+```typescript
+// Query key factory (extends convertibleKeys from convertible-instruments)
+const conversionKeys = {
+  scenarios: (companyId: string, convertibleId: string, valuations?: number[]) =>
+    [...convertibleKeys.detail(companyId, convertibleId), 'scenarios', valuations] as const,
+};
+
+// Hooks
+function useConvertibleScenarios(
+  companyId: string,
+  convertibleId: string,
+  valuations: number[],  // Array of valuation amounts to model
+  options?: { enabled?: boolean }
+);
+
+function useConvertToEquity(companyId: string);  // POST mutation
+```
+
+**`useConvertibleScenarios`**: Fetches scenario data for multiple valuations. Called when Scenarios tab loads (with default valuations) and when user enters custom valuation.
+
+**`useConvertToEquity` mutation**:
+- On success: invalidate `convertibleKeys.all`, `['cap-table', companyId]`, `['transactions', companyId]`, `['shareholders', companyId]`
+- On success: redirect to convertible detail (now shows CONVERTED status)
+- On error: show error toast, keep modal open at Step 4
+
+### FE-11: i18n Keys
+
+Namespace: `convertibles.scenarios` and `convertibles.convert`
+
+```
+convertibles.scenarios.title = "Cenários de Conversão" / "Conversion Scenarios"
+convertibles.scenarios.conversionAmount = "Valor para Conversão" / "Conversion Amount"
+convertibles.scenarios.principal = "Principal" / "Principal"
+convertibles.scenarios.interest = "Juros Acumulados" / "Accrued Interest"
+convertibles.scenarios.customValuation = "Valuation Personalizado" / "Custom Valuation"
+convertibles.scenarios.calculate = "Calcular" / "Calculate"
+convertibles.scenarios.valuation = "Valuation" / "Valuation"
+convertibles.scenarios.roundPrice = "Preço da Rodada" / "Round Price"
+convertibles.scenarios.discountMethod = "Método Desconto" / "Discount Method"
+convertibles.scenarios.capMethod = "Método Cap" / "Cap Method"
+convertibles.scenarios.bestMethod = "Melhor Método (MFN)" / "Best Method (MFN)"
+convertibles.scenarios.sharesIssued = "Ações Emitidas" / "Shares Issued"
+convertibles.scenarios.ownership = "Participação (%)" / "Ownership (%)"
+convertibles.scenarios.dilution = "Diluição (%)" / "Dilution (%)"
+convertibles.scenarios.capTrigger = "Cap favorável acima de R$ {value}" / "Cap favorable above R$ {value}"
+convertibles.scenarios.bestCase = "Melhor caso: {shares} ações ({percent}% ownership)" / "Best case: {shares} shares ({percent}% ownership)"
+convertibles.scenarios.worstCase = "Pior caso: {shares} ações ({percent}% ownership)" / "Worst case: {shares} shares ({percent}% ownership)"
+convertibles.scenarios.insights = "Insights" / "Key Insights"
+convertibles.scenarios.methodChart = "Método de Conversão por Valuation" / "Conversion Method by Valuation"
+
+convertibles.scenarios.method.discount = "Desconto" / "Discount"
+convertibles.scenarios.method.cap = "Cap" / "Cap"
+convertibles.scenarios.method.roundPrice = "Preço da Rodada" / "Round Price"
+
+convertibles.convert.title = "Converter para Equity" / "Convert to Equity"
+convertibles.convert.step1 = "Revisar" / "Review"
+convertibles.convert.step2 = "Parâmetros" / "Parameters"
+convertibles.convert.step3 = "Prévia" / "Preview"
+convertibles.convert.step4 = "Confirmar" / "Confirm"
+convertibles.convert.fundingRound = "Rodada de Investimento" / "Funding Round"
+convertibles.convert.roundValuation = "Valuation da Rodada" / "Round Valuation"
+convertibles.convert.shareClass = "Classe de Ações" / "Share Class"
+convertibles.convert.notes = "Observações" / "Notes"
+convertibles.convert.methodUsed = "Método Utilizado" / "Method Used"
+convertibles.convert.effectivePrice = "Preço Efetivo por Ação" / "Effective Price per Share"
+convertibles.convert.sharesIssued = "Ações a Emitir" / "Shares to Issue"
+convertibles.convert.postOwnership = "Participação Pós-Conversão" / "Post-Conversion Ownership"
+convertibles.convert.irreversibleWarning = "Esta ação é irreversível. O instrumento conversível será marcado como convertido e as ações serão emitidas." / "This action is irreversible. The convertible instrument will be marked as converted and shares will be issued."
+convertibles.convert.confirmCheckbox = "Eu confirmo a conversão deste instrumento" / "I confirm the conversion of this instrument"
+convertibles.convert.execute = "Converter para Equity" / "Convert to Equity"
+convertibles.convert.executing = "Convertendo..." / "Converting..."
+convertibles.convert.issuingShares = "Emitindo ações..." / "Issuing shares..."
+convertibles.convert.recordingBlockchain = "Registrando na blockchain..." / "Recording on blockchain..."
+convertibles.convert.success = "Instrumento convertido com sucesso" / "Instrument converted successfully"
+```
+
+### FE-12: Error Handling UI
+
+| Error Code | HTTP Status | UI Behavior |
+|------------|-------------|-------------|
+| `CONVERTIBLE_NOT_OUTSTANDING` | 422 | Toast warning "Instrumento não está vigente para conversão" |
+| `CONVERTIBLE_ALREADY_CONVERTED` | 422 | Toast info "Este instrumento já foi convertido" + close modal + refresh detail |
+| `CONVERTIBLE_HOLDING_PERIOD` | 422 | Toast warning "Período de retenção não atingido. Disponível a partir de {date}" with date from `details.holdingPeriodEnd` |
+| `CONVERTIBLE_TRIGGER_NOT_MET` | 422 | Toast warning "Financiamento qualificado mínimo não atingido. Requerido: R$ {threshold}" from `details.threshold` |
+| `CHAIN_TX_FAILED` | 502 | Warning toast "Conversão iniciada, mas confirmação na blockchain pendente. As ações serão emitidas após confirmação." Keep modal open, show retry option. |
+| `CHAIN_TX_TIMEOUT` | 504 | Warning toast "Transação na blockchain em processamento. Aguarde confirmação." Close modal, show pending status on detail page. |
+| `VAL_INVALID_INPUT` | 400 | Map `validationErrors` to form field errors in Step 2 |
+| `SYS_RATE_LIMITED` | 429 | Toast warning with retry countdown |
+
+**Scenario modeling errors**: If scenario API fails, show inline error card in Scenarios tab with "Não foi possível calcular cenários. Tente novamente." and retry button. Do not redirect.
+
+**Loading states**:
+- Scenarios tab: skeleton table (5 rows) + skeleton insight card
+- Modal Step 3 (Preview): spinner overlay while calculation runs
+- Modal Step 4 (Execute): step-by-step progress indicator (no skeleton)
 
 ---
 

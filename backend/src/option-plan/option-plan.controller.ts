@@ -219,7 +219,7 @@ export class OptionPlanController {
 
   @Post('option-grants/:grantId/exercise')
   @HttpCode(HttpStatus.CREATED)
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'EMPLOYEE')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
   @ApiOperation({ summary: 'Create an exercise request for a grant' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
@@ -287,7 +287,7 @@ export class OptionPlanController {
   }
 
   @Post('option-exercises/:exerciseId/cancel')
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'EMPLOYEE')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
   @ApiOperation({ summary: 'Cancel a pending exercise request' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
@@ -298,7 +298,8 @@ export class OptionPlanController {
   async cancelExercise(
     @Param('companyId') companyId: string,
     @Param('exerciseId') exerciseId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.optionPlanService.cancelExercise(companyId, exerciseId);
+    return this.optionPlanService.cancelExercise(companyId, exerciseId, user.id);
   }
 }

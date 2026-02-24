@@ -9,7 +9,13 @@ import {
 
 const mockUser = {
   id: 'user-1',
+  privyUserId: 'privy-1',
   email: 'admin@test.com',
+  walletAddress: null,
+  firstName: 'Admin',
+  lastName: 'User',
+  kycStatus: 'NOT_STARTED',
+  locale: 'pt-BR',
 };
 
 const mockConvertible = {

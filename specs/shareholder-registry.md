@@ -112,18 +112,18 @@ The shareholder registry is the central database of all equity holders in a comp
 ```typescript
 interface Shareholder {
   id: string;                          // UUID
-  company_id: string;                  // Foreign key to Company
-  user_id: string | null;              // Foreign key to User (if shareholder has platform account)
+  companyId: string;                   // Foreign key to Company
+  userId: string | null;               // Foreign key to User (if shareholder has platform account)
 
   // Identity Information
-  legal_name: string;                  // Full legal name
-  cpf_cnpj: string;                    // CPF (individuals) or CNPJ (companies)
-  shareholder_type: ShareholderType;   // FOUNDER | INVESTOR | EMPLOYEE | ADVISOR | CORPORATE
+  legalName: string;                   // Full legal name
+  cpfCnpj: string;                     // CPF (individuals) or CNPJ (companies)
+  shareholderType: ShareholderType;    // FOUNDER | INVESTOR | EMPLOYEE | ADVISOR | CORPORATE
 
   // Wallet Address (derived, not manually set)
   // Populated automatically from User.walletAddress when the shareholder signs up
   // Null until the shareholder creates a platform account and receives a Privy embedded wallet
-  wallet_address: string | null;
+  walletAddress: string | null;
 
   // Contact Information
   email: string | null;
@@ -133,47 +133,47 @@ interface Shareholder {
     city: string;
     state: string;
     country: string;
-    postal_code: string;
+    postalCode: string;
   } | null;
 
   // Tax & Residency
   nationality: string;                 // ISO country code (BR, US, etc.)
-  tax_residency: string;               // ISO country code
-  is_foreign: boolean;                 // Computed: tax_residency !== 'BR'
+  taxResidency: string;                // ISO country code
+  isForeign: boolean;                  // Computed: taxResidency !== 'BR'
 
   // Foreign Capital Compliance
-  rde_ied_number: string | null;       // Foreign investment registration number
-  rde_ied_date: Date | null;
+  rdeIedNumber: string | null;         // Foreign investment registration number
+  rdeIedDate: Date | null;
 
   // Beneficial Ownership
-  is_beneficial_owner: boolean;        // True if this is a corporate shareholder
-  beneficial_owners: {
+  isBeneficialOwner: boolean;          // True if this is a corporate shareholder
+  beneficialOwners: {
     name: string;
     cpf: string;
-    ownership_percentage: number;
+    ownershipPercentage: number;
   }[] | null;
 
   // Status
   status: ShareholderStatus;           // ACTIVE | INACTIVE | PENDING
 
   // Metadata
-  created_at: Date;
-  updated_at: Date;
-  created_by: string;                  // User ID who created this record
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy: string;                   // User ID who created this record
 }
 
 enum ShareholderType {
-  FOUNDER = 'founder',
-  INVESTOR = 'investor',
-  EMPLOYEE = 'employee',
-  ADVISOR = 'advisor',
-  CORPORATE = 'corporate'
+  FOUNDER = 'FOUNDER',
+  INVESTOR = 'INVESTOR',
+  EMPLOYEE = 'EMPLOYEE',
+  ADVISOR = 'ADVISOR',
+  CORPORATE = 'CORPORATE'
 }
 
 enum ShareholderStatus {
-  ACTIVE = 'active',
-  INACTIVE = 'inactive',
-  PENDING = 'pending'
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+  PENDING = 'PENDING'
 }
 ```
 
@@ -181,28 +181,28 @@ enum ShareholderStatus {
 
 ```typescript
 interface ShareholderOwnership {
-  shareholder_id: string;
-  shareholder_name: string;
+  shareholderId: string;
+  shareholderName: string;
 
   // Total Ownership
-  total_shares: number;                // Sum across all share classes
-  ownership_percentage: number;        // Percentage of company
-  voting_power: number;                // Total votes (shares × voting rights per class)
-  voting_percentage: number;           // Percentage of total votes
+  totalShares: number;                 // Sum across all share classes
+  ownershipPercentage: number;         // Percentage of company
+  votingPower: number;                 // Total votes (shares × voting rights per class)
+  votingPercentage: number;            // Percentage of total votes
 
   // Share Class Breakdown
   holdings: {
-    share_class_id: string;
-    share_class_name: string;
+    shareClassId: string;
+    shareClassName: string;
     shares: number;
-    percentage_of_class: number;
-    acquisition_date: Date;
-    cost_basis: number;                // Price per share paid
+    percentageOfClass: number;
+    acquisitionDate: Date;
+    costBasis: number;                 // Price per share paid
   }[];
 
   // Fully-Diluted
-  fully_diluted_shares: number;        // Includes unvested options
-  fully_diluted_percentage: number;
+  fullyDilutedShares: number;          // Includes unvested options
+  fullyDilutedPercentage: number;
 }
 ```
 
@@ -216,9 +216,9 @@ interface ShareholderOwnership {
 **Request**:
 ```json
 {
-  "legal_name": "João da Silva",
-  "cpf_cnpj": "012.345.678-01",
-  "shareholder_type": "investor",
+  "legalName": "João da Silva",
+  "cpfCnpj": "012.345.678-01",
+  "shareholderType": "INVESTOR",
   "email": "joao@example.com",
   "phone": "+55 11 98765-4321",
   "address": {
@@ -226,31 +226,38 @@ interface ShareholderOwnership {
     "city": "São Paulo",
     "state": "SP",
     "country": "BR",
-    "postal_code": "01310-100"
+    "postalCode": "01310-100"
   },
   "nationality": "BR",
-  "tax_residency": "BR"
+  "taxResidency": "BR"
 }
 ```
 
 **Response** (201 Created):
 ```json
 {
-  "id": "uuid",
-  "legal_name": "João da Silva",
-  "cpf_cnpj": "012.345.678-01",
-  "wallet_address": null,
-  "shareholder_type": "investor",
-  "is_foreign": false,
-  "status": "active",
-  "created_at": "2024-01-20T10:00:00Z"
+  "success": true,
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "companyId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "legalName": "João da Silva",
+    "cpfCnpj": "012.345.678-01",
+    "walletAddress": null,
+    "shareholderType": "INVESTOR",
+    "email": "joao@example.com",
+    "isForeign": false,
+    "status": "ACTIVE",
+    "createdAt": "2026-01-20T10:00:00.000Z"
+  }
 }
 ```
 
+All responses use the standard `{ "success": true, "data": {...} }` envelope per api-standards.md.
+
 **Error Responses**:
-- `400 Bad Request` - Invalid CPF/CNPJ format or missing required fields
-- `409 Conflict` - Shareholder with this CPF/CNPJ already exists in company
-- `403 Forbidden` - User lacks permission to add shareholders
+- `400 Bad Request` - Invalid CPF/CNPJ format or missing required fields (VAL_INVALID_INPUT)
+- `409 Conflict` - Shareholder with this CPF/CNPJ already exists in company (SHAREHOLDER_DUPLICATE)
+- `404 Not Found` - Company not found or user not a member (prevents enumeration)
 
 ---
 
@@ -258,42 +265,45 @@ interface ShareholderOwnership {
 **Description**: List all shareholders for a company
 
 **Query Parameters**:
-- `status` (optional): Filter by status (active, inactive, pending)
-- `shareholder_type` (optional): Filter by type (founder, investor, employee)
-- `is_foreign` (optional): Filter foreign shareholders (true/false)
+- `status` (optional): Filter by status (ACTIVE, INACTIVE, PENDING)
+- `shareholderType` (optional): Filter by type (FOUNDER, INVESTOR, EMPLOYEE, ADVISOR, CORPORATE)
+- `isForeign` (optional): Filter foreign shareholders (true/false)
+- `search` (optional): Search by name or email
 - `page` (optional): Page number (default: 1)
-- `limit` (optional): Results per page (default: 50, max: 100)
+- `limit` (optional): Results per page (default: 20, max: 100)
+- `sort` (optional): Sort field (default: `-createdAt`)
 
 **Response** (200 OK):
 ```json
 {
-  "shareholders": [
+  "success": true,
+  "data": [
     {
-      "id": "uuid",
-      "legal_name": "João da Silva",
-      "cpf_cnpj": "012.345.678-01",
-      "shareholder_type": "investor",
-      "is_foreign": false,
-      "ownership_percentage": 15.5,
-      "total_shares": 155000,
-      "status": "active"
+      "id": "uuid-1",
+      "legalName": "João da Silva",
+      "cpfCnpj": "012.345.678-01",
+      "shareholderType": "INVESTOR",
+      "isForeign": false,
+      "ownershipPercentage": "15.50",
+      "totalShares": "155000",
+      "status": "ACTIVE"
     },
     {
-      "id": "uuid",
-      "legal_name": "ABC Investimentos LTDA",
-      "cpf_cnpj": "12.345.678/0001-90",
-      "shareholder_type": "corporate",
-      "is_foreign": false,
-      "ownership_percentage": 25.0,
-      "total_shares": 250000,
-      "status": "active"
+      "id": "uuid-2",
+      "legalName": "ABC Investimentos LTDA",
+      "cpfCnpj": "12.345.678/0001-90",
+      "shareholderType": "CORPORATE",
+      "isForeign": false,
+      "ownershipPercentage": "25.00",
+      "totalShares": "250000",
+      "status": "ACTIVE"
     }
   ],
-  "pagination": {
-    "page": 1,
-    "limit": 50,
+  "meta": {
     "total": 12,
-    "total_pages": 1
+    "page": 1,
+    "limit": 20,
+    "totalPages": 1
   }
 }
 ```
@@ -306,50 +316,52 @@ interface ShareholderOwnership {
 **Response** (200 OK):
 ```json
 {
-  "id": "uuid",
-  "company_id": "uuid",
-  "legal_name": "João da Silva",
-  "cpf_cnpj": "012.345.678-01",
-  "wallet_address": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
-  "shareholder_type": "investor",
-  "email": "joao@example.com",
-  "phone": "+55 11 98765-4321",
-  "address": {
-    "street": "Av. Paulista, 1000",
-    "city": "São Paulo",
-    "state": "SP",
-    "country": "BR",
-    "postal_code": "01310-100"
-  },
-  "nationality": "BR",
-  "tax_residency": "BR",
-  "is_foreign": false,
-  "has_platform_account": true,
-  "status": "active",
-  "ownership": {
-    "total_shares": 155000,
-    "ownership_percentage": 15.5,
-    "voting_power": 155000,
-    "voting_percentage": 15.5,
-    "holdings": [
-      {
-        "share_class_id": "uuid",
-        "share_class_name": "Ações Preferenciais Classe A",
-        "shares": 155000,
-        "percentage_of_class": 77.5,
-        "acquisition_date": "2023-06-15",
-        "cost_basis": 10.00
-      }
-    ]
-  },
-  "created_at": "2023-06-15T10:00:00Z",
-  "updated_at": "2024-01-20T10:00:00Z"
+  "success": true,
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "companyId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "legalName": "João da Silva",
+    "cpfCnpj": "012.345.678-01",
+    "walletAddress": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+    "shareholderType": "INVESTOR",
+    "email": "joao@example.com",
+    "phone": "+55 11 98765-4321",
+    "address": {
+      "street": "Av. Paulista, 1000",
+      "city": "São Paulo",
+      "state": "SP",
+      "country": "BR",
+      "postalCode": "01310-100"
+    },
+    "nationality": "BR",
+    "taxResidency": "BR",
+    "isForeign": false,
+    "hasPlatformAccount": true,
+    "status": "ACTIVE",
+    "ownership": {
+      "totalShares": "155000",
+      "ownershipPercentage": "15.50",
+      "votingPower": "155000",
+      "votingPercentage": "15.50",
+      "holdings": [
+        {
+          "shareClassId": "uuid",
+          "shareClassName": "Ações Preferenciais Classe A",
+          "shares": "155000",
+          "percentageOfClass": "77.50",
+          "acquisitionDate": "2023-06-15",
+          "costBasis": "10.00"
+        }
+      ]
+    },
+    "createdAt": "2023-06-15T10:00:00.000Z",
+    "updatedAt": "2026-01-20T10:00:00.000Z"
+  }
 }
 ```
 
 **Error Responses**:
-- `404 Not Found` - Shareholder not found
-- `403 Forbidden` - User lacks permission to view this shareholder
+- `404 Not Found` - Shareholder not found (also returned for unauthorized access to prevent enumeration)
 
 ---
 
@@ -366,7 +378,7 @@ interface ShareholderOwnership {
     "city": "São Paulo",
     "state": "SP",
     "country": "BR",
-    "postal_code": "01452-000"
+    "postalCode": "01452-000"
   }
 }
 ```
@@ -374,17 +386,27 @@ interface ShareholderOwnership {
 **Response** (200 OK):
 ```json
 {
-  "id": "uuid",
-  "legal_name": "João da Silva",
-  "email": "joao.new@example.com",
-  "phone": "+55 11 91234-5678",
-  "updated_at": "2024-01-20T11:00:00Z"
+  "success": true,
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "legalName": "João da Silva",
+    "email": "joao.new@example.com",
+    "phone": "+55 11 91234-5678",
+    "address": {
+      "street": "Av. Brigadeiro Faria Lima, 2000",
+      "city": "São Paulo",
+      "state": "SP",
+      "country": "BR",
+      "postalCode": "01452-000"
+    },
+    "updatedAt": "2026-01-20T11:00:00.000Z"
+  }
 }
 ```
 
 **Business Rules**:
-- Cannot update: legal_name, cpf_cnpj (immutable after creation)
-- Cannot update: wallet_address (system-managed, derived from User.walletAddress)
+- Cannot update: `legalName`, `cpfCnpj` (immutable after creation)
+- Cannot update: `walletAddress` (system-managed, derived from User.walletAddress)
 - Can update: contact information, address, tax residency, RDE-IED information
 
 ---
@@ -392,41 +414,44 @@ interface ShareholderOwnership {
 ### DELETE /api/v1/companies/:companyId/shareholders/:shareholderId
 **Description**: Remove shareholder (only if no transaction history)
 
-**Response** (200 OK):
-```json
-{
-  "message": "Shareholder removed successfully"
-}
-```
+**Response**: `204 No Content` — empty body.
 
 **Error Responses**:
-- `400 Bad Request` - Cannot delete shareholder with transaction history
+- `422 Unprocessable Entity` - Cannot delete shareholder with transaction history (SHAREHOLDER_HAS_TRANSACTIONS)
+- `422 Unprocessable Entity` - Cannot delete shareholder with active ownership (SHAREHOLDER_HAS_SHARES)
 - `404 Not Found` - Shareholder not found
 
-**Business Rule**: Shareholders can only be deleted if they have zero shares and no historical transactions. Otherwise, set status to "inactive".
+**Business Rule**: Shareholders can only be deleted if they have zero shares and no historical transactions. Otherwise, set status to `INACTIVE`.
 
 ---
 
 ### GET /api/v1/companies/:companyId/shareholders/:shareholderId/transactions
 **Description**: Get transaction history for a specific shareholder
 
+**Query Parameters**: `page`, `limit`, `sort` (default: `-occurredAt`)
+
 **Response** (200 OK):
 ```json
 {
-  "shareholder_id": "uuid",
-  "shareholder_name": "João da Silva",
-  "transactions": [
+  "success": true,
+  "data": [
     {
       "id": "uuid",
-      "transaction_type": "issuance",
-      "share_class_name": "Ações Preferenciais Classe A",
+      "transactionType": "ISSUANCE",
+      "shareClassName": "Ações Preferenciais Classe A",
       "quantity": 155000,
-      "price_per_share": 10.00,
-      "total_value": 1550000.00,
-      "occurred_at": "2023-06-15T10:00:00Z",
-      "blockchain_tx_hash": "0x..."
+      "pricePerShare": "10.00",
+      "totalValue": "1550000.00",
+      "occurredAt": "2023-06-15T10:00:00.000Z",
+      "blockchainTxHash": "0x..."
     }
-  ]
+  ],
+  "meta": {
+    "total": 5,
+    "page": 1,
+    "limit": 20,
+    "totalPages": 1
+  }
 }
 ```
 
@@ -438,23 +463,26 @@ interface ShareholderOwnership {
 **Response** (200 OK):
 ```json
 {
-  "foreign_shareholders": [
-    {
-      "id": "uuid",
-      "legal_name": "John Smith",
-      "cpf_cnpj": "foreign-id-123",
-      "nationality": "US",
-      "tax_residency": "US",
-      "ownership_percentage": 5.0,
-      "total_investment_brl": 500000.00,
-      "rde_ied_number": "123456789",
-      "rde_ied_date": "2023-06-01"
+  "success": true,
+  "data": {
+    "shareholders": [
+      {
+        "id": "uuid",
+        "legalName": "John Smith",
+        "cpfCnpj": "foreign-id-123",
+        "nationality": "US",
+        "taxResidency": "US",
+        "ownershipPercentage": "5.00",
+        "totalInvestmentBrl": "500000.00",
+        "rdeIedNumber": "123456789",
+        "rdeIedDate": "2023-06-01"
+      }
+    ],
+    "summary": {
+      "totalForeignShareholders": 3,
+      "totalForeignOwnershipPercentage": "12.50",
+      "totalForeignCapitalBrl": "1250000.00"
     }
-  ],
-  "summary": {
-    "total_foreign_shareholders": 3,
-    "total_foreign_ownership_percentage": 12.5,
-    "total_foreign_capital_brl": 1250000.00
   }
 }
 ```
@@ -462,21 +490,21 @@ interface ShareholderOwnership {
 ---
 
 ### POST /api/v1/companies/:companyId/shareholders/:shareholderId/beneficial-owners
-**Description**: Add beneficial owner information for corporate shareholder
+**Description**: Set beneficial owner information for corporate shareholder
 
 **Request**:
 ```json
 {
-  "beneficial_owners": [
+  "beneficialOwners": [
     {
       "name": "Maria Santos",
       "cpf": "987.654.321-00",
-      "ownership_percentage": 60.0
+      "ownershipPercentage": 60.0
     },
     {
       "name": "Pedro Lima",
       "cpf": "111.222.333-44",
-      "ownership_percentage": 40.0
+      "ownershipPercentage": 40.0
     }
   ]
 }
@@ -485,43 +513,47 @@ interface ShareholderOwnership {
 **Response** (200 OK):
 ```json
 {
-  "shareholder_id": "uuid",
-  "beneficial_owners": [
-    {
-      "name": "Maria Santos",
-      "cpf": "987.654.321-00",
-      "ownership_percentage": 60.0
-    },
-    {
-      "name": "Pedro Lima",
-      "cpf": "111.222.333-44",
-      "ownership_percentage": 40.0
-    }
-  ]
+  "success": true,
+  "data": {
+    "shareholderId": "uuid",
+    "beneficialOwners": [
+      {
+        "name": "Maria Santos",
+        "cpf": "987.654.321-00",
+        "ownershipPercentage": 60.0
+      },
+      {
+        "name": "Pedro Lima",
+        "cpf": "111.222.333-44",
+        "ownershipPercentage": 40.0
+      }
+    ]
+  }
 }
 ```
 
 ---
 
-### GET /api/v1/shareholders/me
-**Description**: Get current user's shareholder information (investor/employee view)
+### GET /api/v1/users/me/investments
+**Description**: Get current user's shareholder information across all companies (investor/employee view). Note: follows user-scoped URL convention per api-standards.md.
 
 **Response** (200 OK):
 ```json
 {
-  "companies": [
+  "success": true,
+  "data": [
     {
-      "company_id": "uuid",
-      "company_name": "Startup XYZ Ltda.",
-      "shareholder_id": "uuid",
+      "companyId": "uuid",
+      "companyName": "Startup XYZ Ltda.",
+      "shareholderId": "uuid",
       "ownership": {
-        "total_shares": 50000,
-        "ownership_percentage": 5.0,
+        "totalShares": "50000",
+        "ownershipPercentage": "5.00",
         "holdings": [
           {
-            "share_class_name": "Quotas",
-            "shares": 50000,
-            "acquisition_date": "2022-01-15"
+            "shareClassName": "Quotas",
+            "shares": "50000",
+            "acquisitionDate": "2022-01-15"
           }
         ]
       }
@@ -787,6 +819,740 @@ POSTCONDITION: Admin has shareholder list for external use
 **Handling**:
 - Allow (same person can be shareholder in multiple companies)
 - Display info message: "ℹ️ This email is associated with shareholdings in 2 companies"
+
+---
+
+## Frontend Implementation
+
+### Routes
+
+| Route | Page | Access |
+|-------|------|--------|
+| `/companies/[companyId]/shareholders` | Shareholder list | ADMIN, FINANCE, LEGAL |
+| `/companies/[companyId]/shareholders/new` | Add shareholder (3-step form) | ADMIN |
+| `/companies/[companyId]/shareholders/[id]` | Shareholder detail (tabs) | ADMIN, FINANCE, LEGAL |
+| `/companies/[companyId]/shareholders/[id]/edit` | Edit shareholder | ADMIN |
+| `/my-investments` | Investor self-service (own holdings) | INVESTOR, EMPLOYEE |
+
+All company-scoped routes are nested under `app/(dashboard)/companies/[companyId]/shareholders/`.
+
+### List Page
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  h1: Acionistas                    [+ Novo Acionista] [Exportar]│
+│  body-sm: Registro de acionistas da empresa                     │
+├─────────────────────────────────────────────────────────────────┤
+│  Filters: [Tipo ▼] [Status ▼] [Estrangeiro ▼] [Search...]     │
+├─────────────────────────────────────────────────────────────────┤
+│  Nome            │ CPF/CNPJ    │ Tipo       │ % Prop.  │ Ações │
+│──────────────────┼─────────────┼────────────┼──────────┼───────│
+│  João da Silva   │ 012.***-01  │ INVESTIDOR │ 15,50%   │ ⋯    │
+│   🌐 Estrangeiro │             │            │          │       │
+│  ABC Invest LTDA │ 12.***/01-90│ CORPORAÇÃO │ 25,00%   │ ⋯    │
+│  Maria Santos    │ 987.***-00  │ FUNDADORA  │ 30,00%   │ ⋯    │
+├─────────────────────────────────────────────────────────────────┤
+│  Qtde Ações    │ Poder Voto │ KYC       │ Status   │          │
+│────────────────┼────────────┼───────────┼──────────┼──────────│
+│  155.000       │ 155.000    │ Verificado│ ATIVO    │ Ver/Edit │
+│                │            │           │          │          │
+│  250.000       │ 0          │ N/A       │ ATIVO    │ Ver/Edit │
+│  300.000       │ 300.000    │ Verificado│ ATIVO    │ Ver/Edit │
+├─────────────────────────────────────────────────────────────────┤
+│  Mostrando 1-20 de 12                            < 1 >         │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Table Columns:**
+
+| Column | Field | Format | Alignment |
+|--------|-------|--------|-----------|
+| Nome | `legalName` | Text + foreign badge if `isForeign` | Left |
+| CPF/CNPJ | `cpfCnpj` | Masked: `012.***-01` (list) / full (detail) | Left |
+| Tipo | `shareholderType` | Badge (see below) | Left |
+| % Propriedade | `ownershipPercentage` | `XX,XX%` (Brazilian format) | Right |
+| Qtde Ações | `totalShares` | `Intl.NumberFormat('pt-BR')` | Right |
+| Poder de Voto | `votingPower` (from ownership) | `Intl.NumberFormat('pt-BR')` | Right |
+| KYC | Derived from linked user | Badge: Verificado/Pendente/N/A | Left |
+| Status | `status` | Badge (see below) | Left |
+| Ações | Action menu | Icon buttons | Right |
+
+**Shareholder Type Badge Colors:**
+
+| Type | Label (PT-BR) | Background | Text |
+|------|---------------|------------|------|
+| `FOUNDER` | Fundador(a) | `navy-50` | `navy-700` |
+| `INVESTOR` | Investidor(a) | `blue-50` | `blue-600` |
+| `EMPLOYEE` | Funcionário(a) | `green-100` | `green-700` |
+| `ADVISOR` | Consultor(a) | `cream-100` | `cream-700` |
+| `CORPORATE` | Pessoa Jurídica | `gray-100` | `gray-600` |
+
+**Status Badge Colors:**
+
+| Status | Label (PT-BR) | Background | Text |
+|--------|---------------|------------|------|
+| `ACTIVE` | Ativo | `green-100` | `green-700` |
+| `INACTIVE` | Inativo | `gray-100` | `gray-500` |
+| `PENDING` | Pendente | `cream-100` | `cream-700` |
+
+**KYC Badge Colors:**
+
+| KYC Status | Label (PT-BR) | Background | Text |
+|------------|---------------|------------|------|
+| Verified | Verificado | `green-100` | `green-700` |
+| Pending | Pendente | `cream-100` | `cream-700` |
+| N/A | N/A | `gray-100` | `gray-500` |
+
+**Empty State:** Centered illustration + "Nenhum acionista cadastrado" + "Adicione o primeiro acionista para começar a construir o quadro societário." + Primary CTA button "Adicionar Acionista".
+
+### Create Shareholder Form (3-Step)
+
+Steps: **Identidade → Contato → Compliance**
+
+**Step 1 — Identidade:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  ← Voltar    h2: Novo Acionista                                 │
+│  Steps: [1. Identidade ●] — [2. Contato ○] — [3. Compliance ○]│
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Tipo de Acionista *                                            │
+│  ┌──────────┐ ┌────────────┐ ┌────────────┐                   │
+│  │ Pessoa   │ │ Pessoa     │ │ Funcionário│                   │
+│  │ Física   │ │ Jurídica   │ │            │                   │
+│  └──────────┘ └────────────┘ └────────────┘                   │
+│  ┌──────────┐ ┌────────────┐                                   │
+│  │ Fundador │ │ Consultor  │                                   │
+│  └──────────┘ └────────────┘                                   │
+│                                                                 │
+│  Nome Legal *             [________________________]            │
+│  CPF (or CNPJ if PJ) *   [________________________]            │
+│  Email *                  [________________________]            │
+│                                                                 │
+│  ┌────────────┐  ┌─────────────────┐                          │
+│  │  Cancelar  │  │  Próximo →      │                          │
+│  └────────────┘  └─────────────────┘                          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+- Type = CORPORATE: CPF field changes to CNPJ field with CNPJ mask
+- CPF mask: `XXX.XXX.XXX-XX` / CNPJ mask: `XX.XXX.XXX/XXXX-XX`
+- CPF/CNPJ validation on blur (format check)
+
+**Step 2 — Contato:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Steps: [1. Identidade ✓] — [2. Contato ●] — [3. Compliance ○]│
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Telefone                 [________________________]            │
+│  Endereço                                                       │
+│    Rua *                  [________________________]            │
+│    Cidade *               [________________________]            │
+│    Estado *               [____] (2-letter code)               │
+│    País *                 [BR ▼] (country selector)            │
+│    CEP                    [________________________]            │
+│                                                                 │
+│  ┌────────────┐  ┌─────────────────┐                          │
+│  │  ← Voltar  │  │  Próximo →      │                          │
+│  └────────────┘  └─────────────────┘                          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Step 3 — Compliance:**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  Steps: [1. Identidade ✓] — [2. Contato ✓] — [3. Compliance ●]│
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Nacionalidade *          [BR ▼] (country selector)            │
+│  Residência Fiscal *      [BR ▼] (country selector)            │
+│                                                                 │
+│  ⚠ (if taxResidency !== 'BR')                                  │
+│  Este acionista será marcado como estrangeiro.                  │
+│  O registro RDE-IED é obrigatório.                             │
+│                                                                 │
+│  Nº RDE-IED               [________________________]           │
+│  Data RDE-IED              [dd/mm/aaaa]                        │
+│  (visible only if isForeign)                                   │
+│                                                                 │
+│  ── Beneficiários Finais (only if CORPORATE) ─────            │
+│  (Repeatable rows — Name, CPF, % Propriedade)                 │
+│  [+ Adicionar Beneficiário]                                    │
+│  Validação: soma ≤ 100%, ao menos um ≥ 25%                    │
+│                                                                 │
+│  ┌────────────┐  ┌─────────────────┐                          │
+│  │  ← Voltar  │  │  Salvar         │                          │
+│  └────────────┘  └─────────────────┘                          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Detail Page (4 Tabs)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  ← Voltar    h2: João da Silva                                  │
+│              Badge: INVESTIDOR   Badge: ATIVO   KYC: Verificado │
+│              Avatar (initials)                      [Editar]    │
+├─────────────────────────────────────────────────────────────────┤
+│  [Visão Geral] [Participações] [Transações] [Compliance]       │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ── Tab: Visão Geral ──────────────────────────────            │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐           │
+│  │ Total Ações  │ │ % Propriedade│ │ Poder Voto   │           │
+│  │ 155.000      │ │ 15,50%       │ │ 155.000      │           │
+│  └──────────────┘ └──────────────┘ └──────────────┘           │
+│                                                                 │
+│  Informações Pessoais           Contato                        │
+│  Nome: João da Silva            Email: joao@example.com        │
+│  CPF: 012.345.678-01            Telefone: +55 11 98765-4321   │
+│  Tipo: Investidor               Endereço: Av. Paulista, 1000  │
+│  Nacionalidade: Brasileiro      São Paulo, SP - BR             │
+│  Resid. Fiscal: Brasil                                         │
+│                                                                 │
+│  ── Tab: Participações ────────────────────────────            │
+│  Classe               │ Qtde    │ % da Classe │ Custo Base    │
+│  ─────────────────────┼─────────┼─────────────┼───────────────│
+│  Ações Pref. Classe A │ 155.000 │ 77,50%      │ R$ 10,00     │
+│                                                                 │
+│  ── Tab: Transações ───────────────────────────────            │
+│  (Reuse TransactionTable filtered by shareholderId)            │
+│                                                                 │
+│  ── Tab: Compliance ───────────────────────────────            │
+│  KYC Status: Verificado ✓                                      │
+│  Estrangeiro: Não                                              │
+│  (If foreign: RDE-IED info)                                    │
+│  (If corporate: Beneficial owners table)                       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Export Dialog
+
+Triggered by "Exportar" button on list page.
+
+```
+┌─────────────────────────────────────────┐
+│  Exportar Lista de Acionistas           │
+│                                         │
+│  Formato:  [CSV ▼] / Excel / PDF       │
+│  Incluir:  (●) Somente ativos          │
+│            ( ) Todos                    │
+│  Campos:   [x] Nome                    │
+│            [x] CPF/CNPJ                │
+│            [x] Email                   │
+│            [x] % Propriedade           │
+│            [x] Total Ações             │
+│            [ ] Endereço                │
+│            [ ] Telefone                │
+│                                         │
+│  ┌────────────┐  ┌──────────────┐      │
+│  │  Cancelar  │  │  Exportar    │      │
+│  └────────────┘  └──────────────┘      │
+└─────────────────────────────────────────┘
+```
+
+### Investor Self-Service Page (`/my-investments`)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  h1: Minhas Participações                                       │
+│  body-sm: Suas participações societárias                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌───────────────────────────────────────────────────────┐     │
+│  │  Startup XYZ Ltda.                                     │     │
+│  │  ┌──────────────┐ ┌──────────────┐                    │     │
+│  │  │ 50.000 ações │ │ 5,00%        │                    │     │
+│  │  │ Total        │ │ Propriedade  │                    │     │
+│  │  └──────────────┘ └──────────────┘                    │     │
+│  │                                                        │     │
+│  │  Holdings:                                             │     │
+│  │  Quotas — 50.000 ações — Adquiridas em 15/01/2022    │     │
+│  │                                                        │     │
+│  │  [Ver Detalhes →]                                      │     │
+│  └───────────────────────────────────────────────────────┘     │
+│                                                                 │
+│  (Repeat for each company the user is a shareholder in)        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+- Read-only view
+- One card per company
+- "Ver Detalhes" links to the shareholder detail page (read-only for INVESTOR role)
+
+### Form Validation (Zod Schema)
+
+```typescript
+import { z } from 'zod';
+
+const addressSchema = z.object({
+  street: z.string().min(1).max(255),
+  city: z.string().min(1).max(100),
+  state: z.string().min(2).max(2),
+  country: z.string().min(2).max(2),
+  postalCode: z.string().max(20).optional(),
+});
+
+const beneficialOwnerSchema = z.object({
+  name: z.string().min(1).max(200),
+  cpf: z.string().regex(/^\d{3}\.\d{3}\.\d{3}-\d{2}$/),
+  ownershipPercentage: z.number().min(0).max(100),
+});
+
+export const createShareholderSchema = z.object({
+  legalName: z.string().min(1).max(200),
+  cpfCnpj: z.string().min(11).max(18),
+  shareholderType: z.enum(['FOUNDER', 'INVESTOR', 'EMPLOYEE', 'ADVISOR', 'CORPORATE']),
+  email: z.string().email(),
+  phone: z.string().max(20).optional(),
+  address: addressSchema.optional(),
+  nationality: z.string().min(2).max(2),
+  taxResidency: z.string().min(2).max(2),
+  rdeIedNumber: z.string().max(50).optional(),
+  rdeIedDate: z.string().optional(),
+  beneficialOwners: z.array(beneficialOwnerSchema)
+    .refine(owners => {
+      if (owners.length === 0) return true;
+      const total = owners.reduce((sum, o) => sum + o.ownershipPercentage, 0);
+      return total <= 100;
+    }, { message: 'Soma dos percentuais não pode exceder 100%' })
+    .refine(owners => {
+      if (owners.length === 0) return true;
+      return owners.some(o => o.ownershipPercentage >= 25);
+    }, { message: 'Ao menos um beneficiário deve ter ≥ 25%' })
+    .optional(),
+});
+
+export const updateShareholderSchema = z.object({
+  email: z.string().email().optional(),
+  phone: z.string().max(20).optional(),
+  address: addressSchema.optional(),
+  taxResidency: z.string().min(2).max(2).optional(),
+  rdeIedNumber: z.string().max(50).optional(),
+  rdeIedDate: z.string().optional(),
+});
+```
+
+### TanStack Query Hooks
+
+```typescript
+// hooks/use-shareholders.ts
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api-client';
+
+export function useShareholders(companyId: string, params?: {
+  page?: number; limit?: number; status?: string;
+  shareholderType?: string; isForeign?: boolean;
+  search?: string; sort?: string;
+}) {
+  return useQuery({
+    queryKey: ['shareholders', companyId, params],
+    queryFn: () => api.getList<ShareholderSummary>(
+      `/api/v1/companies/${companyId}/shareholders`,
+      params,
+    ),
+  });
+}
+
+export function useShareholder(companyId: string, id: string) {
+  return useQuery({
+    queryKey: ['shareholders', companyId, id],
+    queryFn: () => api.get<ShareholderDetail>(
+      `/api/v1/companies/${companyId}/shareholders/${id}`,
+    ),
+    enabled: !!id,
+  });
+}
+
+export function useCreateShareholder(companyId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateShareholderInput) =>
+      api.post<Shareholder>(
+        `/api/v1/companies/${companyId}/shareholders`,
+        data,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shareholders', companyId] });
+    },
+  });
+}
+
+export function useUpdateShareholder(companyId: string, id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: UpdateShareholderInput) =>
+      api.put<Shareholder>(
+        `/api/v1/companies/${companyId}/shareholders/${id}`,
+        data,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shareholders', companyId] });
+    },
+  });
+}
+
+export function useDeleteShareholder(companyId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api.delete(`/api/v1/companies/${companyId}/shareholders/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shareholders', companyId] });
+    },
+  });
+}
+
+export function useSetBeneficialOwners(companyId: string, shareholderId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { beneficialOwners: BeneficialOwner[] }) =>
+      api.post(
+        `/api/v1/companies/${companyId}/shareholders/${shareholderId}/beneficial-owners`,
+        data,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shareholders', companyId, shareholderId] });
+    },
+  });
+}
+
+export function useForeignShareholders(companyId: string) {
+  return useQuery({
+    queryKey: ['shareholders', companyId, 'foreign'],
+    queryFn: () => api.get<ForeignShareholdersReport>(
+      `/api/v1/companies/${companyId}/shareholders/foreign`,
+    ),
+  });
+}
+
+export function useMyInvestments() {
+  return useQuery({
+    queryKey: ['my-investments'],
+    queryFn: () => api.getList<MyInvestment>(`/api/v1/users/me/investments`),
+  });
+}
+
+export function useShareholderTransactions(companyId: string, shareholderId: string, params?: {
+  page?: number; limit?: number; sort?: string;
+}) {
+  return useQuery({
+    queryKey: ['shareholders', companyId, shareholderId, 'transactions', params],
+    queryFn: () => api.getList<ShareholderTransaction>(
+      `/api/v1/companies/${companyId}/shareholders/${shareholderId}/transactions`,
+      params,
+    ),
+    enabled: !!shareholderId,
+  });
+}
+```
+
+### Component Hierarchy
+
+```
+shareholders/
+├── page.tsx                          # List page
+│   ├── ShareholderFilters            # Type, status, foreign, search
+│   ├── ShareholderTable              # Data table
+│   │   ├── ShareholderTypeBadge      # Color-coded type badge
+│   │   ├── ShareholderStatusBadge    # Color-coded status badge
+│   │   ├── KycBadge                  # Verified/Pending/N/A
+│   │   ├── MaskedCpfCnpj            # Masked display of CPF/CNPJ
+│   │   └── ShareholderRowActions     # View/Edit/Delete dropdown
+│   ├── Pagination                    # Shared pagination component
+│   ├── ExportDialog                  # Export format/fields selection
+│   └── EmptyState                    # When no shareholders exist
+├── new/
+│   └── page.tsx                      # Create form (3-step wizard)
+│       └── ShareholderWizard
+│           ├── WizardStepIndicator
+│           ├── Step1Identity         # Type, name, CPF/CNPJ, email
+│           │   ├── TypeSelector      # Card-based type selection
+│           │   └── CpfCnpjInput     # Masked input with validation
+│           ├── Step2Contact          # Phone, address fields
+│           │   └── AddressForm      # Street, city, state, country, postal
+│           └── Step3Compliance       # Nationality, tax residency, UBO
+│               ├── ForeignWarning    # Warning banner if foreign
+│               ├── RdeIedFields      # RDE-IED number/date (conditional)
+│               └── BeneficialOwners  # Repeatable owner rows (conditional)
+├── [id]/
+│   ├── page.tsx                      # Detail page with tabs
+│   │   ├── ShareholderHeader         # Name, avatar, type/status/KYC badges
+│   │   ├── ShareholderStatCards      # Total shares, ownership %, voting
+│   │   ├── TabNavigation             # 4 tabs
+│   │   ├── OverviewTab              # Personal info, contact info
+│   │   ├── HoldingsTab             # Share class breakdown table
+│   │   ├── TransactionsTab          # Filtered transaction table
+│   │   └── ComplianceTab            # KYC, foreign status, UBO
+│   └── edit/
+│       └── page.tsx                  # Edit form (mutable fields only)
+│           └── ShareholderEditForm
+└── (my-investments route is separate: app/(dashboard)/my-investments/page.tsx)
+    └── MyInvestmentsPage
+        └── InvestmentCard            # One per company
+```
+
+### i18n Keys
+
+Add to `messages/pt-BR.json`:
+
+```json
+{
+  "shareholders": {
+    "title": "Acionistas",
+    "description": "Registro de acionistas da empresa",
+    "create": "Novo Acionista",
+    "edit": "Editar Acionista",
+    "export": "Exportar",
+    "table": {
+      "name": "Nome",
+      "cpfCnpj": "CPF/CNPJ",
+      "type": "Tipo",
+      "ownership": "% Propriedade",
+      "totalShares": "Total Ações",
+      "votingPower": "Poder de Voto",
+      "kyc": "KYC",
+      "status": "Status",
+      "actions": "Ações",
+      "empty": "Nenhum acionista cadastrado",
+      "emptyDescription": "Adicione o primeiro acionista para começar a construir o quadro societário.",
+      "foreign": "Estrangeiro"
+    },
+    "type": {
+      "FOUNDER": "Fundador(a)",
+      "INVESTOR": "Investidor(a)",
+      "EMPLOYEE": "Funcionário(a)",
+      "ADVISOR": "Consultor(a)",
+      "CORPORATE": "Pessoa Jurídica"
+    },
+    "status": {
+      "ACTIVE": "Ativo",
+      "INACTIVE": "Inativo",
+      "PENDING": "Pendente"
+    },
+    "kyc": {
+      "verified": "Verificado",
+      "pending": "Pendente",
+      "na": "N/A"
+    },
+    "wizard": {
+      "title": "Novo Acionista",
+      "step1": "Identidade",
+      "step2": "Contato",
+      "step3": "Compliance",
+      "next": "Próximo",
+      "back": "Voltar",
+      "save": "Salvar",
+      "cancel": "Cancelar"
+    },
+    "form": {
+      "shareholderType": "Tipo de Acionista",
+      "legalName": "Nome Legal",
+      "cpf": "CPF",
+      "cnpj": "CNPJ",
+      "email": "Email",
+      "phone": "Telefone",
+      "address": "Endereço",
+      "street": "Rua",
+      "city": "Cidade",
+      "state": "Estado",
+      "country": "País",
+      "postalCode": "CEP",
+      "nationality": "Nacionalidade",
+      "taxResidency": "Residência Fiscal",
+      "rdeIedNumber": "Nº RDE-IED",
+      "rdeIedDate": "Data RDE-IED",
+      "foreignWarning": "Este acionista será marcado como estrangeiro. O registro RDE-IED é obrigatório."
+    },
+    "beneficialOwners": {
+      "title": "Beneficiários Finais",
+      "add": "Adicionar Beneficiário",
+      "name": "Nome",
+      "cpf": "CPF",
+      "percentage": "% Propriedade",
+      "remove": "Remover",
+      "sumError": "Soma dos percentuais não pode exceder 100%",
+      "minError": "Ao menos um beneficiário deve ter ≥ 25%"
+    },
+    "detail": {
+      "overview": "Visão Geral",
+      "holdings": "Participações",
+      "transactions": "Transações",
+      "compliance": "Compliance",
+      "personalInfo": "Informações Pessoais",
+      "contactInfo": "Contato",
+      "totalShares": "Total de Ações",
+      "ownershipPercentage": "% Propriedade",
+      "votingPower": "Poder de Voto",
+      "shareClass": "Classe",
+      "quantity": "Quantidade",
+      "percentOfClass": "% da Classe",
+      "costBasis": "Custo Base",
+      "acquisitionDate": "Data de Aquisição"
+    },
+    "exportDialog": {
+      "title": "Exportar Lista de Acionistas",
+      "format": "Formato",
+      "include": "Incluir",
+      "activeOnly": "Somente ativos",
+      "all": "Todos",
+      "fields": "Campos",
+      "exportButton": "Exportar"
+    },
+    "success": {
+      "created": "Acionista adicionado com sucesso",
+      "updated": "Acionista atualizado com sucesso",
+      "deleted": "Acionista removido com sucesso"
+    },
+    "confirm": {
+      "delete": "Tem certeza que deseja remover este acionista?",
+      "deleteDescription": "Somente acionistas sem ações e sem histórico de transações podem ser removidos.",
+      "setInactive": "Definir como Inativo"
+    }
+  },
+  "myInvestments": {
+    "title": "Minhas Participações",
+    "description": "Suas participações societárias",
+    "totalShares": "Total de Ações",
+    "ownership": "Propriedade",
+    "viewDetails": "Ver Detalhes",
+    "empty": "Nenhuma participação encontrada",
+    "emptyDescription": "Você ainda não possui participações em nenhuma empresa."
+  }
+}
+```
+
+Add equivalent English keys to `messages/en.json`:
+
+```json
+{
+  "shareholders": {
+    "title": "Shareholders",
+    "description": "Company shareholder registry",
+    "create": "New Shareholder",
+    "edit": "Edit Shareholder",
+    "export": "Export",
+    "table": {
+      "name": "Name",
+      "cpfCnpj": "CPF/CNPJ",
+      "type": "Type",
+      "ownership": "Ownership %",
+      "totalShares": "Total Shares",
+      "votingPower": "Voting Power",
+      "kyc": "KYC",
+      "status": "Status",
+      "actions": "Actions",
+      "empty": "No shareholders registered",
+      "emptyDescription": "Add the first shareholder to start building the cap table.",
+      "foreign": "Foreign"
+    },
+    "type": {
+      "FOUNDER": "Founder",
+      "INVESTOR": "Investor",
+      "EMPLOYEE": "Employee",
+      "ADVISOR": "Advisor",
+      "CORPORATE": "Corporate"
+    },
+    "status": {
+      "ACTIVE": "Active",
+      "INACTIVE": "Inactive",
+      "PENDING": "Pending"
+    },
+    "kyc": {
+      "verified": "Verified",
+      "pending": "Pending",
+      "na": "N/A"
+    },
+    "wizard": {
+      "title": "New Shareholder",
+      "step1": "Identity",
+      "step2": "Contact",
+      "step3": "Compliance",
+      "next": "Next",
+      "back": "Back",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "form": {
+      "shareholderType": "Shareholder Type",
+      "legalName": "Legal Name",
+      "cpf": "CPF",
+      "cnpj": "CNPJ",
+      "email": "Email",
+      "phone": "Phone",
+      "address": "Address",
+      "street": "Street",
+      "city": "City",
+      "state": "State",
+      "country": "Country",
+      "postalCode": "Postal Code",
+      "nationality": "Nationality",
+      "taxResidency": "Tax Residency",
+      "rdeIedNumber": "RDE-IED Number",
+      "rdeIedDate": "RDE-IED Date",
+      "foreignWarning": "This shareholder will be flagged as foreign. RDE-IED registration is required."
+    },
+    "beneficialOwners": {
+      "title": "Beneficial Owners",
+      "add": "Add Beneficial Owner",
+      "name": "Name",
+      "cpf": "CPF",
+      "percentage": "Ownership %",
+      "remove": "Remove",
+      "sumError": "Ownership percentages cannot exceed 100%",
+      "minError": "At least one beneficial owner must have >= 25%"
+    },
+    "detail": {
+      "overview": "Overview",
+      "holdings": "Holdings",
+      "transactions": "Transactions",
+      "compliance": "Compliance",
+      "personalInfo": "Personal Information",
+      "contactInfo": "Contact",
+      "totalShares": "Total Shares",
+      "ownershipPercentage": "Ownership %",
+      "votingPower": "Voting Power",
+      "shareClass": "Share Class",
+      "quantity": "Quantity",
+      "percentOfClass": "% of Class",
+      "costBasis": "Cost Basis",
+      "acquisitionDate": "Acquisition Date"
+    },
+    "exportDialog": {
+      "title": "Export Shareholder List",
+      "format": "Format",
+      "include": "Include",
+      "activeOnly": "Active only",
+      "all": "All",
+      "fields": "Fields",
+      "exportButton": "Export"
+    },
+    "success": {
+      "created": "Shareholder added successfully",
+      "updated": "Shareholder updated successfully",
+      "deleted": "Shareholder removed successfully"
+    },
+    "confirm": {
+      "delete": "Are you sure you want to remove this shareholder?",
+      "deleteDescription": "Only shareholders with no shares and no transaction history can be removed.",
+      "setInactive": "Set as Inactive"
+    }
+  },
+  "myInvestments": {
+    "title": "My Investments",
+    "description": "Your equity holdings",
+    "totalShares": "Total Shares",
+    "ownership": "Ownership",
+    "viewDetails": "View Details",
+    "empty": "No holdings found",
+    "emptyDescription": "You don't have equity holdings in any company yet."
+  }
+}
+```
 
 ---
 

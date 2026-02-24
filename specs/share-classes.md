@@ -285,6 +285,408 @@ The `className` must be unique within a company (enforced by the `@@unique([comp
 
 ---
 
+## Frontend Implementation
+
+### Routes
+
+| Route | Page | Access |
+|-------|------|--------|
+| `/companies/[companyId]/share-classes` | Share class list | ADMIN, FINANCE, LEGAL, INVESTOR |
+| `/companies/[companyId]/share-classes/new` | Create share class form | ADMIN |
+| `/companies/[companyId]/share-classes/[id]` | Share class detail | ADMIN, FINANCE, LEGAL, INVESTOR |
+| `/companies/[companyId]/share-classes/[id]/edit` | Edit share class form | ADMIN |
+
+All routes are nested under `app/(dashboard)/companies/[companyId]/share-classes/`.
+
+### List Page
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  h1: Classes de Ações              [+ Nova Classe] (ADMIN only) │
+│  body-sm: Gerencie as classes de ações da empresa               │
+├─────────────────────────────────────────────────────────────────┤
+│  Filters: [Type ▼] [Search...]                    [Sort ▼]     │
+├─────────────────────────────────────────────────────────────────┤
+│  Nome         │ Tipo        │ Autorizadas │ Emitidas  │ Ações  │
+│───────────────┼─────────────┼─────────────┼───────────┼────────│
+│  Quotas Ord.  │ QUOTA       │ 500.000     │ 250.000   │ ⋯     │
+│  Ações ON     │ COMMON      │ 300.000     │ 100.000   │ ⋯     │
+│  Ações PN-A   │ PREFERRED   │ 200.000     │ 0         │ ⋯     │
+├─────────────────────────────────────────────────────────────────┤
+│  Mostrando 1-3 de 3                                            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Table Columns:**
+
+| Column | Field | Format | Alignment |
+|--------|-------|--------|-----------|
+| Nome | `className` | Text, link to detail page | Left |
+| Tipo | `type` | Badge (see below) | Left |
+| Votos/Ação | `votesPerShare` | Integer | Right |
+| Autorizadas | `totalAuthorized` | `Intl.NumberFormat('pt-BR')` | Right |
+| Emitidas | `totalIssued` | `Intl.NumberFormat('pt-BR')` | Right |
+| % Emitido | `totalIssued / totalAuthorized * 100` | `XX,X%` | Right |
+| Lock-up | `lockUpPeriodMonths` | `X meses` or `—` | Right |
+| Ações | Action menu (View, Edit, Delete) | Icon buttons | Right |
+
+**Type Badge Colors:**
+
+| Type | Label (PT-BR) | Background | Text |
+|------|---------------|------------|------|
+| `QUOTA` | Quota | `blue-50` | `blue-600` |
+| `COMMON_SHARES` | Ordinária | `green-100` | `green-700` |
+| `PREFERRED_SHARES` | Preferencial | `cream-100` | `cream-700` |
+
+**Empty State:** Centered illustration + "Nenhuma classe de ações cadastrada" + "Crie a primeira classe de ações para começar a emitir participações." + Primary CTA button "Criar Classe de Ações".
+
+### Create Form Page
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  ← Voltar    h2: Nova Classe de Ações                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Tipo de Classe *                                               │
+│  ┌──────────┐ ┌───────────────┐ ┌──────────────────┐          │
+│  │  Quota   │ │ Ação Ordinária│ │ Ação Preferencial │          │
+│  └──────────┘ └───────────────┘ └──────────────────┘          │
+│  (Card selection — one active with blue-600 border)            │
+│                                                                 │
+│  Nome da Classe *         [________________________]            │
+│  Total Autorizado *       [________________________]            │
+│                                                                 │
+│  ── Direitos de Voto ──────────────────────────────            │
+│  Votos por Ação *         [___1___]                            │
+│  (disabled if type=PREFERRED_SHARES, value forced to 0)        │
+│                                                                 │
+│  ── Preferências de Liquidação ────────────────────            │
+│  (visible only if type=PREFERRED_SHARES)                       │
+│  Múltiplo de Preferência  [___1.0___]                          │
+│  Participação nos Lucros  [ ] (checkbox)                       │
+│                                                                 │
+│  ── Restrições de Transferência ───────────────────            │
+│  Direito de Preferência   [x] (checkbox, default checked)      │
+│  Período de Lock-up       [______] meses (optional)            │
+│  Tag-along                [______] % (optional)                │
+│                                                                 │
+│  ┌────────────┐  ┌─────────────────┐                          │
+│  │  Cancelar  │  │  Criar Classe   │                          │
+│  └────────────┘  └─────────────────┘                          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Conditional Form Logic:**
+
+| Condition | Effect |
+|-----------|--------|
+| Company type is `LTDA` | Only `QUOTA` type available; hide type selector |
+| Company type is `SA` | Show `COMMON_SHARES` and `PREFERRED_SHARES` options |
+| Type = `PREFERRED_SHARES` | Show liquidation preference fields; `votesPerShare` defaults to 0 |
+| Type = `COMMON_SHARES` | Hide liquidation preference; `votesPerShare` min = 1 |
+| Type = `QUOTA` | Hide liquidation preference; `votesPerShare` defaults to 1 |
+
+### Detail Page
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  ← Voltar    h2: Ações Preferenciais Classe A                  │
+│              Badge: PREFERRED_SHARES                [Editar]    │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐           │
+│  │ Autorizadas  │ │ Emitidas     │ │ Disponíveis  │           │
+│  │ 100.000      │ │ 75.000       │ │ 25.000       │           │
+│  └──────────────┘ └──────────────┘ └──────────────┘           │
+│                                                                 │
+│  ── Detalhes ──────────────────────────────────────            │
+│  Tipo:                Ação Preferencial                        │
+│  Votos por Ação:      0 (Sem voto)                             │
+│  Pref. Liquidação:    1,5x                                     │
+│  Participação:        Sim                                      │
+│  Dir. Preferência:    Sim                                      │
+│  Lock-up:             12 meses                                 │
+│  Tag-along:           100%                                     │
+│                                                                 │
+│  ── Blockchain ────────────────────────────────────            │
+│  Token ID:            0x1a2b...3c4d (link to explorer)         │
+│  (or "Não implantado" if blockchainTokenId is null)            │
+│                                                                 │
+│  ── Acionistas com esta Classe ────────────────────            │
+│  (Table of shareholders holding this share class,              │
+│   linked from cap table data. Read-only.)                      │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Edit Page (Preference Editor)
+
+Only mutable fields are editable. Immutable fields are shown as read-only with a lock icon and tooltip explaining why they are locked.
+
+**Mutable fields** (always editable): `totalAuthorized`, `lockUpPeriodMonths`, `tagAlongPercentage`, `rightOfFirstRefusal`.
+
+**Immutable fields after issuance** (`totalIssued > 0`): `className`, `type`, `votesPerShare`, `liquidationPreferenceMultiple`, `participatingRights`. These are rendered as disabled inputs with a lock icon and tooltip: "Este campo não pode ser alterado após a emissão de ações."
+
+**Validation on `totalAuthorized`**: Cannot be reduced below `totalIssued`. Show error: "Total autorizado não pode ser menor que o total emitido ({totalIssued})."
+
+### Form Validation (Zod Schema)
+
+```typescript
+import { z } from 'zod';
+
+export const createShareClassSchema = z.object({
+  className: z.string().min(1).max(100),
+  type: z.enum(['QUOTA', 'COMMON_SHARES', 'PREFERRED_SHARES']),
+  totalAuthorized: z.string().regex(/^\d+(\.\d+)?$/).refine(v => parseFloat(v) >= 0),
+  votesPerShare: z.number().int().min(0).max(100),
+  liquidationPreferenceMultiple: z.string().regex(/^\d+(\.\d+)?$/).optional(),
+  participatingRights: z.boolean().optional(),
+  rightOfFirstRefusal: z.boolean(),
+  lockUpPeriodMonths: z.number().int().min(0).max(120).nullable().optional(),
+  tagAlongPercentage: z.string().regex(/^\d+(\.\d+)?$/).nullable().optional(),
+});
+
+export const updateShareClassSchema = z.object({
+  totalAuthorized: z.string().regex(/^\d+(\.\d+)?$/).optional(),
+  lockUpPeriodMonths: z.number().int().min(0).max(120).nullable().optional(),
+  tagAlongPercentage: z.string().regex(/^\d+(\.\d+)?$/).nullable().optional(),
+  rightOfFirstRefusal: z.boolean().optional(),
+});
+```
+
+### TanStack Query Hooks
+
+```typescript
+// hooks/use-share-classes.ts
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api-client';
+
+export function useShareClasses(companyId: string, params?: {
+  page?: number; limit?: number; type?: string; sort?: string;
+}) {
+  return useQuery({
+    queryKey: ['share-classes', companyId, params],
+    queryFn: () => api.getList<ShareClass>(
+      `/api/v1/companies/${companyId}/share-classes`,
+      params,
+    ),
+  });
+}
+
+export function useShareClass(companyId: string, id: string) {
+  return useQuery({
+    queryKey: ['share-classes', companyId, id],
+    queryFn: () => api.get<ShareClass>(
+      `/api/v1/companies/${companyId}/share-classes/${id}`,
+    ),
+    enabled: !!id,
+  });
+}
+
+export function useCreateShareClass(companyId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateShareClassInput) =>
+      api.post<ShareClass>(
+        `/api/v1/companies/${companyId}/share-classes`,
+        data,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['share-classes', companyId] });
+    },
+  });
+}
+
+export function useUpdateShareClass(companyId: string, id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: UpdateShareClassInput) =>
+      api.put<ShareClass>(
+        `/api/v1/companies/${companyId}/share-classes/${id}`,
+        data,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['share-classes', companyId] });
+    },
+  });
+}
+
+export function useDeleteShareClass(companyId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      api.delete(`/api/v1/companies/${companyId}/share-classes/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['share-classes', companyId] });
+    },
+  });
+}
+```
+
+### Component Hierarchy
+
+```
+share-classes/
+├── page.tsx                          # List page
+│   ├── ShareClassFilters             # Type filter dropdown + search
+│   ├── ShareClassTable               # Data table with columns above
+│   │   ├── ShareClassTypeBadge       # Color-coded type badge
+│   │   └── ShareClassRowActions      # View/Edit/Delete dropdown
+│   ├── Pagination                    # Shared pagination component
+│   └── EmptyState                    # When no share classes exist
+├── new/
+│   └── page.tsx                      # Create form
+│       └── ShareClassForm            # Reusable form component
+│           ├── TypeSelector          # Card-based type selection
+│           ├── VotingRightsSection   # Conditional voting fields
+│           ├── LiquidationSection    # Conditional pref fields
+│           └── TransferRestrictions  # Lock-up, tag-along, ROFR
+├── [id]/
+│   ├── page.tsx                      # Detail page
+│   │   ├── ShareClassStatCards       # Authorized/Issued/Available
+│   │   ├── ShareClassDetails         # Key-value details section
+│   │   ├── BlockchainStatus          # Token ID or "not deployed"
+│   │   └── ShareClassHolders         # Table of shareholders
+│   └── edit/
+│       └── page.tsx                  # Edit page (preference editor)
+│           └── ShareClassForm        # Reused form, mutable fields only
+```
+
+### i18n Keys
+
+Add to `messages/pt-BR.json`:
+
+```json
+{
+  "shareClasses": {
+    "title": "Classes de Ações",
+    "description": "Gerencie as classes de ações da empresa",
+    "create": "Nova Classe de Ações",
+    "edit": "Editar Classe",
+    "delete": "Excluir Classe",
+    "table": {
+      "name": "Nome",
+      "type": "Tipo",
+      "votesPerShare": "Votos/Ação",
+      "totalAuthorized": "Autorizadas",
+      "totalIssued": "Emitidas",
+      "percentIssued": "% Emitido",
+      "lockUp": "Lock-up",
+      "actions": "Ações",
+      "empty": "Nenhuma classe de ações cadastrada",
+      "emptyDescription": "Crie a primeira classe de ações para começar a emitir participações."
+    },
+    "form": {
+      "type": "Tipo de Classe",
+      "className": "Nome da Classe",
+      "totalAuthorized": "Total Autorizado",
+      "votesPerShare": "Votos por Ação",
+      "liquidationPreference": "Múltiplo de Preferência de Liquidação",
+      "participatingRights": "Participação nos Lucros",
+      "rightOfFirstRefusal": "Direito de Preferência",
+      "lockUpPeriodMonths": "Período de Lock-up (meses)",
+      "tagAlongPercentage": "Tag-along (%)",
+      "submit": "Criar Classe",
+      "update": "Salvar Alterações",
+      "cancel": "Cancelar"
+    },
+    "type": {
+      "QUOTA": "Quota",
+      "COMMON_SHARES": "Ação Ordinária",
+      "PREFERRED_SHARES": "Ação Preferencial"
+    },
+    "detail": {
+      "authorized": "Autorizadas",
+      "issued": "Emitidas",
+      "available": "Disponíveis",
+      "details": "Detalhes",
+      "voting": "Sem voto",
+      "blockchain": "Blockchain",
+      "tokenId": "Token ID",
+      "notDeployed": "Não implantado",
+      "holders": "Acionistas com esta Classe",
+      "lockedField": "Este campo não pode ser alterado após a emissão de ações."
+    },
+    "success": {
+      "created": "Classe de ações criada com sucesso",
+      "updated": "Classe de ações atualizada com sucesso",
+      "deleted": "Classe de ações excluída com sucesso"
+    },
+    "confirm": {
+      "delete": "Tem certeza que deseja excluir esta classe de ações?",
+      "deleteDescription": "Esta ação não pode ser desfeita. Somente classes sem ações emitidas podem ser excluídas."
+    }
+  }
+}
+```
+
+Add equivalent English keys to `messages/en.json`:
+
+```json
+{
+  "shareClasses": {
+    "title": "Share Classes",
+    "description": "Manage company share classes",
+    "create": "New Share Class",
+    "edit": "Edit Class",
+    "delete": "Delete Class",
+    "table": {
+      "name": "Name",
+      "type": "Type",
+      "votesPerShare": "Votes/Share",
+      "totalAuthorized": "Authorized",
+      "totalIssued": "Issued",
+      "percentIssued": "% Issued",
+      "lockUp": "Lock-up",
+      "actions": "Actions",
+      "empty": "No share classes registered",
+      "emptyDescription": "Create the first share class to start issuing equity."
+    },
+    "form": {
+      "type": "Class Type",
+      "className": "Class Name",
+      "totalAuthorized": "Total Authorized",
+      "votesPerShare": "Votes per Share",
+      "liquidationPreference": "Liquidation Preference Multiple",
+      "participatingRights": "Participating Rights",
+      "rightOfFirstRefusal": "Right of First Refusal",
+      "lockUpPeriodMonths": "Lock-up Period (months)",
+      "tagAlongPercentage": "Tag-along (%)",
+      "submit": "Create Class",
+      "update": "Save Changes",
+      "cancel": "Cancel"
+    },
+    "type": {
+      "QUOTA": "Quota",
+      "COMMON_SHARES": "Common Shares",
+      "PREFERRED_SHARES": "Preferred Shares"
+    },
+    "detail": {
+      "authorized": "Authorized",
+      "issued": "Issued",
+      "available": "Available",
+      "details": "Details",
+      "voting": "Non-voting",
+      "blockchain": "Blockchain",
+      "tokenId": "Token ID",
+      "notDeployed": "Not deployed",
+      "holders": "Shareholders in this Class",
+      "lockedField": "This field cannot be changed after shares have been issued."
+    },
+    "success": {
+      "created": "Share class created successfully",
+      "updated": "Share class updated successfully",
+      "deleted": "Share class deleted successfully"
+    },
+    "confirm": {
+      "delete": "Are you sure you want to delete this share class?",
+      "deleteDescription": "This action cannot be undone. Only classes with no issued shares can be deleted."
+    }
+  }
+}
+```
+
+---
+
 ## Error Codes
 
 Error codes for share class operations, per the platform error handling specification.

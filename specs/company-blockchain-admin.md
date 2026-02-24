@@ -36,11 +36,15 @@ This wallet is the sole authority for minting/issuing shares on the OCP smart co
 2. [Architecture](#architecture)
 3. [Contract Deployment Flow](#contract-deployment-flow)
 4. [Admin Transfer Flow](#admin-transfer-flow)
-5. [Business Rules](#business-rules)
-6. [Edge Cases & Error Handling](#edge-cases--error-handling)
-7. [Security Considerations](#security-considerations)
-8. [Technical Implementation](#technical-implementation)
-9. [Success Criteria](#success-criteria)
+5. [API Endpoints](#api-endpoints)
+6. [Error Codes](#error-codes)
+7. [Permission Matrix](#permission-matrix)
+8. [Business Rules](#business-rules)
+9. [Edge Cases & Error Handling](#edge-cases--error-handling)
+10. [Security Considerations](#security-considerations)
+11. [Technical Implementation](#technical-implementation)
+12. [Success Criteria](#success-criteria)
+13. [Frontend Specification](#frontend-specification)
 
 ---
 
@@ -148,6 +152,311 @@ POSTCONDITION: User B's wallet is the new on-chain owner. User B has ADMIN role.
 **If User A refuses to sign**: The platform role change is blocked. User A must sign the on-chain transfer before the role change can complete.
 
 **If User A is being removed**: The system prompts User A to sign the on-chain transfer before removal completes. If User A is uncooperative, this requires manual platform admin intervention.
+
+---
+
+## API Endpoints
+
+### Get Blockchain Admin Status
+
+```
+GET /api/v1/companies/:companyId/blockchain/admin
+```
+
+Returns the blockchain admin status for a company, including the contract owner wallet and deployment status.
+
+**Response** (200 OK):
+
+```json
+{
+  "success": true,
+  "data": {
+    "contractAddress": "0xabc123...",
+    "contractDeployed": true,
+    "adminWalletAddress": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb",
+    "adminUserId": "user-uuid",
+    "adminName": "Joao Founder",
+    "deployedAt": "2026-01-15T10:30:00.000Z",
+    "network": "base",
+    "chainId": 8453,
+    "explorerContractUrl": "https://basescan.org/address/0xabc123...",
+    "explorerWalletUrl": "https://basescan.org/address/0x742d35...",
+    "transferInProgress": false
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `contractAddress` | string \| null | OCP contract address (null if not yet deployed) |
+| `contractDeployed` | boolean | Whether the smart contract has been deployed |
+| `adminWalletAddress` | string | Creator's Privy embedded wallet address |
+| `adminUserId` | string | User ID of the contract admin (company creator) |
+| `adminName` | string | Display name of the contract admin |
+| `deployedAt` | ISO 8601 \| null | When the contract was deployed |
+| `network` | string | "base" |
+| `chainId` | number | 8453 (Base mainnet) |
+| `explorerContractUrl` | string \| null | Basescan URL for the contract |
+| `explorerWalletUrl` | string | Basescan URL for the admin wallet |
+| `transferInProgress` | boolean | Whether an admin transfer is currently pending |
+
+**Error Response** (404 — company not found):
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "COMPANY_NOT_FOUND",
+    "message": "Empresa nao encontrada",
+    "messageKey": "errors.company.notFound"
+  }
+}
+```
+
+---
+
+### Initiate Admin Transfer
+
+```
+POST /api/v1/companies/:companyId/blockchain/admin/transfer
+```
+
+Initiates the on-chain ownership transfer process. The current admin must sign the `transferOwnership()` transaction on the frontend via Privy.
+
+**Request Body**:
+
+```json
+{
+  "newAdminUserId": "uuid"
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `newAdminUserId` | UUID | Yes | User ID of the new admin (must be a company member with a wallet) |
+
+**Response** (200 OK):
+
+```json
+{
+  "success": true,
+  "data": {
+    "transferId": "uuid",
+    "contractAddress": "0xabc123...",
+    "currentOwner": "0x742d35...",
+    "newOwner": "0xdef456...",
+    "status": "PENDING_SIGNATURE",
+    "typedData": {
+      "domain": {
+        "name": "NaviaOCPAdmin",
+        "version": "1",
+        "chainId": 8453,
+        "verifyingContract": "0xabc123..."
+      },
+      "types": {
+        "TransferOwnership": [
+          { "name": "newOwner", "type": "address" },
+          { "name": "nonce", "type": "uint256" },
+          { "name": "deadline", "type": "uint256" }
+        ]
+      },
+      "value": {
+        "newOwner": "0xdef456...",
+        "nonce": 1,
+        "deadline": 1706400000
+      }
+    }
+  }
+}
+```
+
+The frontend uses the `typedData` to prompt the current admin to sign via Privy, then submits the signature via the next endpoint.
+
+**Error Response** (422 — new admin has no wallet):
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "CHAIN_NEW_ADMIN_NO_WALLET",
+    "message": "O novo administrador nao possui carteira vinculada",
+    "messageKey": "errors.chain.newAdminNoWallet"
+  }
+}
+```
+
+**Error Response** (422 — transfer already in progress):
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "CHAIN_TRANSFER_IN_PROGRESS",
+    "message": "Transferencia de propriedade ja esta em andamento",
+    "messageKey": "errors.chain.transferInProgress"
+  }
+}
+```
+
+**Error Response** (422 — no contract deployed):
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "CHAIN_CONTRACT_NOT_DEPLOYED",
+    "message": "Contrato ainda nao foi implantado para esta empresa",
+    "messageKey": "errors.chain.contractNotDeployed"
+  }
+}
+```
+
+---
+
+### Submit Signed Admin Transfer
+
+```
+POST /api/v1/companies/:companyId/blockchain/admin/transfer/:transferId/sign
+```
+
+Submits the EIP-712 signature from the current admin to execute the on-chain ownership transfer.
+
+**Request Body**:
+
+```json
+{
+  "signature": "0x1234567890abcdef..."
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `signature` | string | Yes | Hex-encoded EIP-712 signature from the current admin |
+
+**Response** (200 OK):
+
+```json
+{
+  "success": true,
+  "data": {
+    "transferId": "uuid",
+    "status": "SUBMITTED",
+    "txHash": "0xabc123...",
+    "message": "Transferencia enviada para a blockchain"
+  }
+}
+```
+
+**Error Response** (422 — invalid signature):
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "CHAIN_TRANSFER_SIGNATURE_INVALID",
+    "message": "Assinatura de transferencia invalida",
+    "messageKey": "errors.chain.transferSignatureInvalid"
+  }
+}
+```
+
+---
+
+### Get Admin Transfer Status
+
+```
+GET /api/v1/companies/:companyId/blockchain/admin/transfer/:transferId
+```
+
+Returns the current status of an admin transfer.
+
+**Response** (200 OK):
+
+```json
+{
+  "success": true,
+  "data": {
+    "transferId": "uuid",
+    "currentOwner": "0x742d35...",
+    "newOwner": "0xdef456...",
+    "newAdminName": "Maria Co-founder",
+    "status": "CONFIRMED",
+    "txHash": "0xabc123...",
+    "submittedAt": "2026-01-20T14:30:00.000Z",
+    "confirmedAt": "2026-01-20T14:30:30.000Z"
+  }
+}
+```
+
+| Status Value | Description |
+|-------------|-------------|
+| `PENDING_SIGNATURE` | Waiting for current admin to sign |
+| `SUBMITTED` | Transaction sent to Base Network |
+| `CONFIRMED` | Ownership transferred on-chain |
+| `FAILED` | On-chain transaction failed |
+| `CANCELLED` | Transfer was cancelled |
+
+---
+
+### Retry Failed Admin Transfer
+
+```
+POST /api/v1/companies/:companyId/blockchain/admin/transfer/:transferId/retry
+```
+
+Retries a failed admin transfer transaction.
+
+**Response** (200 OK):
+
+```json
+{
+  "success": true,
+  "data": {
+    "transferId": "uuid",
+    "status": "PENDING_SIGNATURE",
+    "message": "Transferencia reiniciada, aguardando assinatura"
+  }
+}
+```
+
+**Error Response** (422 — transfer not in failed state):
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "CHAIN_TRANSFER_NOT_FAILED",
+    "message": "Transferencia nao esta em estado de falha",
+    "messageKey": "errors.chain.transferNotFailed"
+  }
+}
+```
+
+---
+
+## Error Codes
+
+| Code | HTTP Status | messageKey | Description |
+|------|-------------|-----------|-------------|
+| `CHAIN_CONTRACT_NOT_DEPLOYED` | 422 | `errors.chain.contractNotDeployed` | Company has no deployed OCP smart contract |
+| `CHAIN_NEW_ADMIN_NO_WALLET` | 422 | `errors.chain.newAdminNoWallet` | New admin user has no Privy embedded wallet |
+| `CHAIN_TRANSFER_IN_PROGRESS` | 422 | `errors.chain.transferInProgress` | An ownership transfer is already pending |
+| `CHAIN_TRANSFER_SIGNATURE_INVALID` | 422 | `errors.chain.transferSignatureInvalid` | EIP-712 signature verification failed |
+| `CHAIN_TRANSFER_NOT_FAILED` | 422 | `errors.chain.transferNotFailed` | Cannot retry a transfer that is not in FAILED state |
+| `CHAIN_TRANSFER_FAILED` | 422 | `errors.chain.transferFailed` | On-chain ownership transfer reverted |
+| `AUTH_NO_WALLET` | 422 | `errors.auth.noWallet` | User has no Privy embedded wallet (blocks company creation) |
+
+---
+
+## Permission Matrix
+
+| Action | ADMIN (creator) | ADMIN (non-creator) | FINANCE | LEGAL | INVESTOR | EMPLOYEE |
+|--------|----------------|---------------------|---------|-------|----------|----------|
+| View admin status | Yes | Yes | Yes | Yes | No | No |
+| Initiate admin transfer | Yes (only creator can initiate) | No | No | No | No | No |
+| Sign admin transfer | Yes (only current on-chain owner) | No | No | No | No | No |
+| View transfer status | Yes | Yes | No | No | No | No |
+| Retry failed transfer | Yes (only creator) | No | No | No | No | No |
 
 ---
 
@@ -356,6 +665,454 @@ async transferOnChainOwnership(
 
 ---
 
+# Frontend Specification
+
+---
+
+## Table of Contents (Frontend)
+
+1. [Frontend Architecture (Blockchain Admin)](#frontend-architecture-blockchain-admin)
+2. [Page Routes (Blockchain Admin)](#page-routes-blockchain-admin)
+3. [Component Hierarchy (Blockchain Admin)](#component-hierarchy-blockchain-admin)
+4. [Component Specifications (Blockchain Admin)](#component-specifications-blockchain-admin)
+5. [Frontend User Flows (Blockchain Admin)](#frontend-user-flows-blockchain-admin)
+6. [UI States and Error Handling (Blockchain Admin)](#ui-states-and-error-handling-blockchain-admin)
+7. [TanStack Query Integration (Blockchain Admin)](#tanstack-query-integration-blockchain-admin)
+8. [i18n Keys (Blockchain Admin)](#i18n-keys-blockchain-admin)
+9. [Frontend Success Criteria (Blockchain Admin)](#frontend-success-criteria-blockchain-admin)
+
+---
+
+## Frontend Architecture (Blockchain Admin)
+
+### MVP Scope
+
+The blockchain admin frontend lives inside the Company Settings page as a dedicated tab: **"Blockchain"**. It shows:
+
+1. **Contract deployment status** — Whether the OCP smart contract is deployed, and its address.
+2. **Admin wallet display** — Which wallet controls the contract (company creator).
+3. **Admin transfer flow** — A guided modal for transferring on-chain ownership when the ADMIN role changes.
+
+The blockchain admin tab is only visible to users with ADMIN or LEGAL roles.
+
+### State Management
+
+Uses TanStack Query for all data fetching. The admin transfer flow uses a multi-step modal with local component state (`useState`) for the current step.
+
+---
+
+## Page Routes (Blockchain Admin)
+
+| Route | Layout | Auth | Description |
+|-------|--------|------|-------------|
+| `/dashboard/settings` (Blockchain tab) | Dashboard shell | Yes + ADMIN or LEGAL | Blockchain admin info as a settings tab |
+
+The blockchain admin info is rendered when the user selects the "Blockchain" tab in the settings page.
+
+---
+
+## Component Hierarchy (Blockchain Admin)
+
+```
+app/(dashboard)/settings/page.tsx ─→ CompanySettingsPage
+  ├─ SettingsTabs (vertical tab navigation)
+  │    ├─ CompanyInfoForm (tab: "Informacoes")
+  │    ├─ MembersTabLink (tab: "Membros")
+  │    ├─ BlockchainAdminTab (tab: "Blockchain")    ← NEW
+  │    ├─ NotificationsTab (tab: "Notificacoes")
+  │    └─ DangerZone (tab: "Zona de Perigo")
+  │
+  └─ BlockchainAdminTab
+       ├─ ContractStatusCard
+       ├─ AdminWalletCard
+       └─ AdminTransferSection
+            └─ (click "Transferir Propriedade") → AdminTransferModal
+                 ├─ Step 1: SelectNewAdminStep
+                 ├─ Step 2: SignTransferStep
+                 └─ Step 3: TransferConfirmationStep
+```
+
+### Component Registry
+
+| Component | File | Description |
+|-----------|------|-------------|
+| `BlockchainAdminTab` | `components/settings/blockchain-admin-tab.tsx` | Main blockchain admin settings tab content |
+| `ContractStatusCard` | `components/settings/contract-status-card.tsx` | Contract deployment status display |
+| `AdminWalletCard` | `components/settings/admin-wallet-card.tsx` | Admin wallet info display |
+| `AdminTransferSection` | `components/settings/admin-transfer-section.tsx` | Transfer initiation area (ADMIN only) |
+| `AdminTransferModal` | `components/settings/admin-transfer-modal.tsx` | Multi-step ownership transfer modal |
+
+---
+
+## Component Specifications (Blockchain Admin)
+
+### 1. BlockchainAdminTab
+
+**File**: `components/settings/blockchain-admin-tab.tsx`
+
+**Props**:
+```typescript
+interface BlockchainAdminTabProps {
+  companyId: string;
+}
+```
+
+**Visual Structure**:
+```
++--------------------------------------------------+
+|                                                  |
+|  Blockchain                                      |  ← h2, navy-900
+|  Informacoes do contrato inteligente e           |  ← body-sm, gray-500
+|  administrador on-chain                          |
+|                                                  |
+|  +--------------------------------------------+ |
+|  |  Contrato Inteligente                       | |  ← ContractStatusCard
+|  |                                             | |
+|  |  Status     ● Implantado                    | |  ← green badge
+|  |  Endereco   0xabc123...def456  [Copiar] [↗] | |
+|  |  Rede       Base (Chain ID: 8453)           | |
+|  |  Implantado 15/01/2026 10:30                | |
+|  +--------------------------------------------+ |
+|                                                  |
+|  +--------------------------------------------+ |
+|  |  Administrador On-Chain                     | |  ← AdminWalletCard
+|  |                                             | |
+|  |  Nome        Joao Founder                   | |
+|  |  Carteira    0x742d35...f0bEb  [Copiar] [↗] | |
+|  |                                             | |
+|  |  ℹ️ O administrador on-chain e o criador   | |  ← info callout, blue-50 bg
+|  |    da empresa. Somente esta carteira pode   | |
+|  |    emitir acoes no contrato inteligente.    | |
+|  +--------------------------------------------+ |
+|                                                  |
+|  +--------------------------------------------+ |
+|  |  Transferir Propriedade                     | |  ← AdminTransferSection (ADMIN only)
+|  |                                             | |
+|  |  Transfira o controle do contrato           | |
+|  |  inteligente para outro administrador.      | |
+|  |                                             | |
+|  |  [Transferir Propriedade]                   | |  ← Destructive button variant
+|  +--------------------------------------------+ |
+|                                                  |
++--------------------------------------------------+
+```
+
+**Behavior**:
+1. On mount: fetches `GET /api/v1/companies/:companyId/blockchain/admin`.
+2. If `contractDeployed` is false: ContractStatusCard shows "Pendente" with yellow badge and message "O contrato sera implantado automaticamente apos a validacao do CNPJ."
+3. AdminTransferSection is only visible if the current user is the company creator (on-chain owner).
+
+---
+
+### 2. AdminTransferModal
+
+**File**: `components/settings/admin-transfer-modal.tsx`
+
+**Props**:
+```typescript
+interface AdminTransferModalProps {
+  companyId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onTransferComplete: () => void;
+}
+```
+
+**3-Step Flow** (uses shadcn/ui Dialog with step indicator):
+
+**Step 1 — Select New Admin**:
+```
++--------------------------------------------------+
+|  Transferir Propriedade              Step 1/3 [X] |
++--------------------------------------------------+
+|                                                  |
+|  Selecione o novo administrador on-chain         |
+|                                                  |
+|  +--------------------------------------------+ |
+|  | Selecionar membro...                    [v] | |  ← Select dropdown
+|  +--------------------------------------------+ |
+|                                                  |
+|  Members list shows name + role + wallet status  |
+|  Members without wallets are disabled with       |
+|  tooltip "Membro nao possui carteira"            |
+|                                                  |
+|  ⚠ Esta acao transferira o controle do contrato | |  ← Warning callout, cream-100 bg
+|    inteligente. Voce perdera a capacidade de     |
+|    emitir acoes diretamente on-chain.            |
+|                                                  |
++--------------------------------------------------+
+|  [Cancelar]                          [Continuar]  |
++--------------------------------------------------+
+```
+
+**Step 2 — Sign Transfer** (abstracted UX):
+```
++--------------------------------------------------+
+|  Transferir Propriedade              Step 2/3 [X] |
++--------------------------------------------------+
+|                                                  |
+|  Confirme a transferencia                        |
+|                                                  |
+|  De:    Joao Founder (0x742d...f0bEb)            |
+|  Para:  Maria Co-founder (0xdef4...5678)         |
+|                                                  |
+|  Para confirmar, assine a transferencia com      |
+|  sua carteira digital.                           |
+|                                                  |
+|  +--------------------------------------------+ |
+|  |       [🔒 Assinar Transferencia]            | |  ← Primary button, lock icon
+|  +--------------------------------------------+ |
+|                                                  |
+|  (Signing state: spinner + "Aguardando          |
+|   assinatura...")                                |
+|                                                  |
++--------------------------------------------------+
+|  [Voltar]                                        |
++--------------------------------------------------+
+```
+
+**Step 3 — Confirmation**:
+```
++--------------------------------------------------+
+|  Transferir Propriedade              Step 3/3     |
++--------------------------------------------------+
+|                                                  |
+|  ✓ Transferencia confirmada!                     |  ← green check icon
+|                                                  |
+|  A propriedade do contrato inteligente foi       |
+|  transferida para Maria Co-founder.              |
+|                                                  |
+|  Hash: 0xabc123...  [Ver no Basescan ↗]         |
+|                                                  |
++--------------------------------------------------+
+|                                         [Fechar]  |
++--------------------------------------------------+
+```
+
+**Behavior**:
+1. **Step 1**: Fetches company members. Dropdown shows members with ADMIN role and a valid `walletAddress`. Members without wallets are disabled.
+2. On "Continuar": calls `POST /api/v1/companies/:companyId/blockchain/admin/transfer` with `newAdminUserId`. Receives `typedData` for signing.
+3. **Step 2**: On "Assinar Transferencia": uses Privy SDK `signTypedData()` to prompt the user's wallet signature. The UX is abstracted — user sees "Assinar Transferencia" not "Sign EIP-712 typed data".
+4. After signing: calls `POST .../transfer/:transferId/sign` with the signature.
+5. On success (200): advances to Step 3, polls transfer status.
+6. **Step 3**: Shows confirmation with tx hash and Basescan link. "Fechar" dismisses modal and refreshes admin status.
+7. On any error: shows inline error message in the modal, allows retry.
+
+---
+
+## Frontend User Flows (Blockchain Admin)
+
+### Flow: View Blockchain Admin Info
+
+```
+ADMIN navigates to Settings → Blockchain tab
+  │
+  ├─ [contract deployed] ─→ Shows ContractStatusCard (green "Implantado" badge)
+  │     │
+  │     └─ Shows AdminWalletCard with creator info
+  │
+  ├─ [contract not deployed] ─→ Shows "Pendente" with info message
+  │
+  └─ [user is creator] ─→ Shows AdminTransferSection with transfer button
+```
+
+### Flow: Transfer On-Chain Ownership
+
+```
+ADMIN (creator) clicks "Transferir Propriedade"
+  │
+  ├─ Step 1: Select new admin from dropdown
+  │     │
+  │     ├─ [member has wallet] ─→ Selectable
+  │     └─ [member has no wallet] ─→ Disabled with tooltip
+  │
+  ├─ "Continuar" ─→ POST /transfer (initiate)
+  │     │
+  │     ├─ [422 no wallet] ─→ Inline error
+  │     ├─ [422 transfer in progress] ─→ Inline error
+  │     └─ [200 success] ─→ Receives typedData, advance to Step 2
+  │
+  ├─ Step 2: "Assinar Transferencia" ─→ Privy signTypedData()
+  │     │
+  │     ├─ [user signs] ─→ POST /transfer/:id/sign
+  │     │     │
+  │     │     ├─ [200 success] ─→ Advance to Step 3
+  │     │     └─ [422 invalid sig] ─→ Inline error, allow retry
+  │     │
+  │     └─ [user cancels/rejects] ─→ Inline message "Assinatura cancelada"
+  │
+  └─ Step 3: Confirmation shown with tx hash
+        │
+        └─ "Fechar" ─→ Modal closes, admin status refetched
+```
+
+---
+
+## UI States and Error Handling (Blockchain Admin)
+
+### BlockchainAdminTab States
+
+| State | Visual |
+|-------|--------|
+| Loading | Skeleton cards for contract and admin sections |
+| Contract deployed | Green badge "Implantado", full details shown |
+| Contract not deployed | Yellow badge "Pendente", info callout about CNPJ validation |
+| No access (not ADMIN/LEGAL) | Tab not visible in settings sidebar |
+
+### AdminTransferModal Error States
+
+| Error | Handling |
+|-------|----------|
+| New admin has no wallet | Inline error below select, prevent proceeding |
+| Transfer already in progress | Inline error, modal shows current transfer status |
+| Privy signature rejected | Inline message "Assinatura cancelada pelo usuario" |
+| Invalid signature (422) | Inline error, "Tentar novamente" button |
+| On-chain tx failed | Step shows error with "Tentar novamente" button |
+| Network error | Error toast, allow retry |
+
+---
+
+## TanStack Query Integration (Blockchain Admin)
+
+### Query Key Factory
+
+```typescript
+export const blockchainAdminKeys = {
+  all: ['blockchainAdmin'] as const,
+  status: (companyId: string) =>
+    [...blockchainAdminKeys.all, 'status', companyId] as const,
+  transfer: (companyId: string, transferId: string) =>
+    [...blockchainAdminKeys.all, 'transfer', companyId, transferId] as const,
+};
+```
+
+### Hooks
+
+```typescript
+export function useBlockchainAdminStatus(companyId: string) {
+  return useQuery({
+    queryKey: blockchainAdminKeys.status(companyId),
+    queryFn: () => api.get(`/api/v1/companies/${companyId}/blockchain/admin`),
+  });
+}
+
+export function useInitiateAdminTransfer(companyId: string) {
+  return useMutation({
+    mutationFn: (newAdminUserId: string) =>
+      api.post(`/api/v1/companies/${companyId}/blockchain/admin/transfer`, {
+        newAdminUserId,
+      }),
+  });
+}
+
+export function useSubmitTransferSignature(
+  companyId: string,
+  transferId: string,
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (signature: string) =>
+      api.post(
+        `/api/v1/companies/${companyId}/blockchain/admin/transfer/${transferId}/sign`,
+        { signature },
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: blockchainAdminKeys.status(companyId),
+      });
+    },
+  });
+}
+
+export function useAdminTransferStatus(
+  companyId: string,
+  transferId: string,
+  options?: { enabled?: boolean },
+) {
+  return useQuery({
+    queryKey: blockchainAdminKeys.transfer(companyId, transferId),
+    queryFn: () =>
+      api.get(
+        `/api/v1/companies/${companyId}/blockchain/admin/transfer/${transferId}`,
+      ),
+    enabled: options?.enabled ?? true,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      if (status === 'SUBMITTED') return 5_000;
+      return false;
+    },
+  });
+}
+```
+
+---
+
+## i18n Keys (Blockchain Admin)
+
+| Key | PT-BR | EN |
+|-----|-------|----|
+| `settings.blockchain.title` | `Blockchain` | `Blockchain` |
+| `settings.blockchain.description` | `Informacoes do contrato inteligente e administrador on-chain` | `Smart contract and on-chain admin information` |
+| `settings.blockchain.contract.title` | `Contrato Inteligente` | `Smart Contract` |
+| `settings.blockchain.contract.status` | `Status` | `Status` |
+| `settings.blockchain.contract.deployed` | `Implantado` | `Deployed` |
+| `settings.blockchain.contract.pending` | `Pendente` | `Pending` |
+| `settings.blockchain.contract.pendingInfo` | `O contrato sera implantado automaticamente apos a validacao do CNPJ.` | `The contract will be deployed automatically after CNPJ validation.` |
+| `settings.blockchain.contract.address` | `Endereco` | `Address` |
+| `settings.blockchain.contract.network` | `Rede` | `Network` |
+| `settings.blockchain.contract.deployedAt` | `Implantado em` | `Deployed at` |
+| `settings.blockchain.admin.title` | `Administrador On-Chain` | `On-Chain Admin` |
+| `settings.blockchain.admin.name` | `Nome` | `Name` |
+| `settings.blockchain.admin.wallet` | `Carteira` | `Wallet` |
+| `settings.blockchain.admin.info` | `O administrador on-chain e o criador da empresa. Somente esta carteira pode emitir acoes no contrato inteligente.` | `The on-chain admin is the company creator. Only this wallet can issue shares on the smart contract.` |
+| `settings.blockchain.transfer.title` | `Transferir Propriedade` | `Transfer Ownership` |
+| `settings.blockchain.transfer.description` | `Transfira o controle do contrato inteligente para outro administrador.` | `Transfer smart contract control to another admin.` |
+| `settings.blockchain.transfer.button` | `Transferir Propriedade` | `Transfer Ownership` |
+| `settings.blockchain.transfer.selectAdmin` | `Selecione o novo administrador on-chain` | `Select the new on-chain admin` |
+| `settings.blockchain.transfer.selectPlaceholder` | `Selecionar membro...` | `Select member...` |
+| `settings.blockchain.transfer.noWallet` | `Membro nao possui carteira` | `Member has no wallet` |
+| `settings.blockchain.transfer.warning` | `Esta acao transferira o controle do contrato inteligente. Voce perdera a capacidade de emitir acoes diretamente on-chain.` | `This action will transfer smart contract control. You will lose the ability to issue shares directly on-chain.` |
+| `settings.blockchain.transfer.confirm` | `Confirme a transferencia` | `Confirm the transfer` |
+| `settings.blockchain.transfer.from` | `De` | `From` |
+| `settings.blockchain.transfer.to` | `Para` | `To` |
+| `settings.blockchain.transfer.signPrompt` | `Para confirmar, assine a transferencia com sua carteira digital.` | `To confirm, sign the transfer with your digital wallet.` |
+| `settings.blockchain.transfer.signButton` | `Assinar Transferencia` | `Sign Transfer` |
+| `settings.blockchain.transfer.signing` | `Aguardando assinatura...` | `Waiting for signature...` |
+| `settings.blockchain.transfer.success` | `Transferencia confirmada!` | `Transfer confirmed!` |
+| `settings.blockchain.transfer.successDetail` | `A propriedade do contrato inteligente foi transferida para {name}.` | `Smart contract ownership has been transferred to {name}.` |
+| `settings.blockchain.transfer.cancelled` | `Assinatura cancelada pelo usuario` | `Signature cancelled by user` |
+
+---
+
+## Frontend Success Criteria (Blockchain Admin)
+
+- [ ] BlockchainAdminTab renders as a tab in Company Settings
+- [ ] Tab only visible to ADMIN and LEGAL roles
+- [ ] ContractStatusCard shows correct deployed/pending state
+- [ ] AdminWalletCard displays creator name and truncated wallet address
+- [ ] Copy-to-clipboard works for contract and wallet addresses
+- [ ] Basescan links open correct URLs in new tabs
+- [ ] AdminTransferSection visible only to company creator
+- [ ] AdminTransferModal implements 3-step flow (select → sign → confirm)
+- [ ] Select dropdown correctly disables members without wallets
+- [ ] Privy signTypedData() is called with abstracted UX ("Assinar Transferencia")
+- [ ] Transfer status polls every 5s while SUBMITTED
+- [ ] All error states handled with inline messages (no full-page errors)
+- [ ] All user-facing strings use i18n keys
+- [ ] Date/number formatting uses Brazilian format
+- [ ] Components follow design-system.md conventions
+
+---
+
 ## Related Specifications
 
-*Cross-references to be completed in Phase 5 of the spec alignment project.*
+| Specification | Relationship |
+|---------------|-------------|
+| [blockchain-integration.md](./blockchain-integration.md) | OCP smart contract interface, transaction processing, sync status |
+| [company-management.md](./company-management.md) | Company entity with `createdById`, `contractAddress`, `adminWalletAddress` |
+| [company-membership.md](./company-membership.md) | ADMIN role changes that trigger on-chain ownership transfer |
+| [authentication.md](./authentication.md) | User entity with `walletAddress` (Privy embedded wallet) |
+| [api-standards.md](../.claude/rules/api-standards.md) | API response envelope, error format, URL conventions |
+| [error-handling.md](../.claude/rules/error-handling.md) | Error codes: CHAIN_*, AUTH_NO_WALLET |
+| [audit-logging.md](../.claude/rules/audit-logging.md) | Audit events: BLOCKCHAIN_TX_SUBMITTED, BLOCKCHAIN_TX_CONFIRMED |
+| [design-system.md](../.claude/rules/design-system.md) | Component styling, colors, typography, spacing |

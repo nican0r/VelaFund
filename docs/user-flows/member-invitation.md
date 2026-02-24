@@ -504,4 +504,314 @@ Note: Non-members receive 404 (not 403) to prevent company enumeration per secur
 **Depends on**: [Authentication](./authentication.md) -- user must be logged in to accept invitations and manage members
 **Depends on**: [Company Management](./company-management.md) -- company must exist and not be DISSOLVED
 **Feeds into**: Shareholder Management -- members with appropriate roles can manage shareholders
-**Triggers**: (TODO) Email notification via AWS SES when invitation is created or resent
+**Triggers**: Email notification via AWS SES when invitation is created or resent
+
+---
+
+## Frontend-Specific Flows
+
+The following flows document the frontend component behavior, UI state transitions, and user interactions for the member invitation and management features. These complement the backend flows above with UI-level detail.
+
+### Frontend Flow: Invite Member (Complete UI Flow)
+
+```
+PRECONDITION: User is ADMIN of company, on /dashboard/members page
+ACTOR: ADMIN
+TRIGGER: Clicks "Convidar Membro" primary button in page header
+
+1.  [UI] MembersPage renders with PageHeader + MembersTable
+2.  [UI] ADMIN clicks "Convidar Membro" button (top-right, primary variant)
+3.  [UI] InviteMemberModal opens (animation: fade in overlay 200ms + slide up content 250ms)
+    - Overlay: navy-900 at 50% opacity
+    - Modal: 560px max-width, white bg, radius-lg, shadow-xl
+4.  [UI] Modal renders form:
+    - Email input (empty, focused on open)
+    - Role dropdown (default: EMPLOYEE, shows role descriptions in options)
+    - Message textarea (optional, max 500 chars)
+    - Footer: "Cancelar" secondary + "Enviar Convite" primary
+5.  [UI] Admin types email address
+6.  [UI] Admin selects role from dropdown (each option shows label + description)
+7.  [UI] Admin optionally types personal message
+8.  [UI] Admin clicks "Enviar Convite"
+9.  [Frontend] Client-side validation runs:
+    -> IF email empty: field error "E-mail e obrigatorio"
+    -> IF email invalid format: field error "Formato de e-mail invalido"
+    -> IF role empty: field error "Selecione um papel"
+    -> IF message > 500 chars: field error "Mensagem muito longa"
+    -> IF any invalid: STOP, show field-level errors (caption 12px, #DC2626)
+10. [Frontend] Button enters loading state (spinner replaces text, fields disabled)
+11. [Frontend] POST /api/v1/companies/:companyId/members/invite with { email, role, message }
+12. [Backend] Validates and processes (see backend flow steps 7-15)
+    -> IF 409 COMPANY_MEMBER_EXISTS:
+       [UI] Inline error on email field: "Este e-mail ja e membro da empresa"
+       [UI] Button returns to idle state, fields re-enabled
+    -> IF 409 COMPANY_INVITATION_PENDING:
+       [UI] Inline error on email field: "Ja existe um convite pendente para este e-mail"
+       [UI] Button returns to idle state, fields re-enabled
+    -> IF 400 VAL_INVALID_INPUT:
+       [UI] Map validationErrors array to field-level errors via applyServerErrors()
+       [UI] Button returns to idle state, fields re-enabled
+    -> IF 500:
+       [UI] Error toast appears (top-right, red left border accent, persistent)
+       [UI] Button returns to idle state, fields re-enabled
+13. [Backend] Returns 201 with member data
+14. [UI] Modal closes (animation: reverse of open)
+15. [UI] Success toast: "Convite enviado para {email}" (top-right, green left border, 5s auto-dismiss)
+16. [Frontend] queryClient.invalidateQueries(['members', companyId])
+17. [UI] MembersTable refetches and shows new PENDING row with email, role badge, "Pendente" status
+
+POSTCONDITION: PENDING member visible in table, invitation email sent
+SIDE EFFECTS: Audit log (COMPANY_MEMBER_INVITED), invitation email via AWS SES
+```
+
+### Frontend Flow: Accept Invitation -- New User (Complete UI Flow)
+
+```
+PRECONDITION: User has no Navia account, received invitation email
+ACTOR: Invited user (new)
+TRIGGER: Clicks invitation link in email
+
+1.  [UI] Browser navigates to /invitations/:token (public route, auth layout)
+2.  [UI] InvitationAcceptPage mounts, shows centered card with loading spinner
+3.  [Frontend] GET /api/v1/invitations/:token
+    -> IF 404 INVITATION_NOT_FOUND: go to step E1
+    -> IF 410 INVITATION_EXPIRED: go to step E1
+4.  [Backend] Returns { companyName, companyLogoUrl, role, invitedByName, email, hasExistingAccount: false }
+5.  [UI] Card renders (max-w 480px, white bg, shadow-lg, radius-xl, 32px padding):
+    - Company logo (48px centered, or initial circle on blue-600 bg if no logo)
+    - Company name (h2, navy-900, centered)
+    - RoleBadge (centered, pill with role-specific colors)
+    - "Convidado por {invitedByName}" (body-sm, gray-500, centered)
+    - Divider (1px gray-200, margin-y 24px)
+    - "Criar Conta" primary button (full width, lg size, 48px height)
+    - "Ja tenho conta" ghost link (centered below button)
+6.  [UI] User clicks "Criar Conta"
+7.  [Frontend] Opens Privy signup modal
+8.  [UI] User completes Privy signup (email + verification code, or Google/Apple)
+    -> IF Privy fails: Privy handles error display, user remains on page
+9.  [Frontend] POST /api/v1/auth/login to sync Privy user with backend
+10. [Backend] Creates new user, returns { user, isNew: true }
+11. [UI] Card content transitions to PersonalInfoForm (inline, replaces buttons):
+    - Company info remains at top (logo, name, badge)
+    - Divider
+    - firstName input (required, label "Nome")
+    - lastName input (required, label "Sobrenome")
+    - email input (pre-filled from Privy/invitation, label "E-mail")
+    - "Continuar" primary button (full width)
+12. [UI] User fills in firstName and lastName
+13. [UI] User clicks "Continuar"
+14. [Frontend] Client-side validation:
+    -> IF firstName empty: field error
+    -> IF lastName empty: field error
+15. [Frontend] PUT /api/v1/users/me with { firstName, lastName, email }
+    -> IF validation error: show field errors, STOP
+16. [Backend] Updates user profile
+17. [Frontend] Automatically calls POST /api/v1/invitations/:token/accept
+18. [Backend] Updates CompanyMember to ACTIVE, links userId, marks token used
+19. [Backend] Returns { companyId, companyName, role, status: 'ACTIVE' }
+20. [Frontend] AuthContext updates: user profile set, hasCompany=true, companyId set
+21. [UI] router.push('/dashboard')
+22. [UI] Welcome toast: "Bem-vindo a {companyName}!" (green accent, 5s auto-dismiss)
+
+ERROR STATES:
+E1. [UI] InvitationExpiredPage renders in card:
+    - Warning icon (48px, gray-400, centered)
+    - "Convite Expirado" (h2, navy-900)
+    - "Este convite expirou ou e invalido" (body, gray-500)
+    - "Solicite um novo convite ao administrador da empresa" (body-sm, gray-500)
+
+POSTCONDITION: User has account + active membership + redirected to dashboard
+SIDE EFFECTS: Audit logs (AUTH_LOGIN_SUCCESS, COMPANY_MEMBER_ACCEPTED)
+```
+
+### Frontend Flow: Accept Invitation -- Existing User, Logged In
+
+```
+PRECONDITION: User has Navia account, currently logged in, clicks invitation link
+ACTOR: Existing authenticated user
+TRIGGER: Clicks invitation link in email
+
+1.  [UI] Browser navigates to /invitations/:token
+2.  [UI] InvitationAcceptPage mounts, loading spinner
+3.  [Frontend] GET /api/v1/invitations/:token
+    -> IF 404/410: InvitationExpiredPage
+4.  [Backend] Returns invitation details (hasExistingAccount: true)
+5.  [UI] Card renders with company info + RoleBadge + inviter name
+6.  [Frontend] Detects user is already authenticated (auth context has user)
+7.  [UI] Shows "Aceitar Convite" primary button (full width, lg)
+8.  [UI] User clicks "Aceitar Convite"
+9.  [UI] Button enters loading state (spinner)
+10. [Frontend] POST /api/v1/invitations/:token/accept
+    -> IF 409 COMPANY_MEMBER_EXISTS:
+       [UI] Shows "Voce ja e membro desta empresa" message + "Ir para o Dashboard" link
+    -> IF 422 COMPANY_MEMBER_LIMIT_REACHED:
+       [UI] Error toast: "Limite de empresas atingido"
+11. [Backend] Returns { companyId, companyName, role }
+12. [Frontend] AuthContext updates
+13. [UI] router.push('/dashboard')
+14. [UI] Toast: "Voce agora e membro de {companyName}!"
+
+POSTCONDITION: User is ACTIVE member, redirected to dashboard
+SIDE EFFECTS: Audit log (COMPANY_MEMBER_ACCEPTED)
+```
+
+### Frontend Flow: Accept Invitation -- Existing User, Not Logged In
+
+```
+PRECONDITION: User has Navia account, not currently logged in
+ACTOR: Existing user (not authenticated)
+TRIGGER: Clicks invitation link in email
+
+1-4. Same as new user flow (page loads, token validated)
+5.  [UI] Card renders with company info
+6.  [UI] Since hasExistingAccount: true and user not logged in:
+    - "Entrar" primary button (full width, lg)
+    - "Criar Conta" ghost link (for edge case where they want a new account)
+7.  [UI] User clicks "Entrar"
+8.  [Frontend] Opens Privy login modal
+9.  [UI] User logs in via Privy
+10. [Frontend] POST /api/v1/auth/login -> returns { user, isNew: false }
+11. [UI] Card updates to show "Aceitar Convite" button (same as logged-in flow)
+12-14. Same as logged-in flow steps 8-14
+
+POSTCONDITION: User authenticated + ACTIVE member
+SIDE EFFECTS: Audit logs (AUTH_LOGIN_SUCCESS, COMPANY_MEMBER_ACCEPTED)
+```
+
+### Frontend Flow: Change Member Role
+
+```
+PRECONDITION: User is ADMIN viewing /dashboard/members, table has ACTIVE members
+ACTOR: ADMIN
+TRIGGER: Clicks RoleBadge of another member in the table
+
+1.  [UI] MembersTable renders with RoleBadge in each row
+2.  [UI] For other members' rows (not self): RoleBadge has cursor:pointer visual cue
+3.  [UI] ADMIN clicks a RoleBadge -> RoleChangeDropdown opens
+    - Dropdown: white bg, shadow-lg, radius-md
+    - Options: 5 roles, each with label + description
+    - Current role is highlighted (blue-50 bg)
+4.  [UI] Admin selects new role from dropdown
+5.  [UI] Dropdown closes, confirmation dialog opens:
+    - Title: "Alterar Papel" (h3)
+    - Message: "Alterar o papel de {name} de {oldRole} para {newRole}?"
+    - Buttons: "Cancelar" (secondary) + "Confirmar" (primary)
+6.  [UI] Admin clicks "Confirmar"
+7.  [UI] Dialog shows loading state
+8.  [Frontend] PUT /api/v1/companies/:companyId/members/:memberId with { role }
+    -> IF 422 COMPANY_LAST_ADMIN:
+       [UI] Error toast: "Nao e possivel alterar o papel do ultimo administrador"
+       [UI] Dialog closes
+9.  [Backend] Returns 200 with updated member
+10. [UI] Confirmation dialog closes
+11. [UI] Success toast: "Papel alterado com sucesso" (5s auto-dismiss)
+12. [Frontend] queryClient.invalidateQueries(['members', companyId])
+13. [UI] Table refetches, row shows updated RoleBadge
+
+Note: Current user's own row shows a static RoleBadge (no dropdown trigger)
+SIDE EFFECTS: Audit log (COMPANY_ROLE_CHANGED)
+```
+
+### Frontend Flow: Remove Member
+
+```
+PRECONDITION: User is ADMIN, viewing /dashboard/members
+ACTOR: ADMIN
+TRIGGER: Clicks trash icon in actions column of another member's row
+
+1.  [UI] Trash icon button (ghost variant) visible in actions column for other members
+2.  [UI] ADMIN clicks trash icon
+3.  [UI] MemberRemoveConfirmation dialog opens:
+    - Small modal (400px max-width)
+    - Destructive icon (red)
+    - Title: "Remover Membro" (h3)
+    - Message: "Remover {name} da empresa? Esta acao nao pode ser desfeita." (body, gray-600)
+    - Buttons: "Cancelar" (secondary) + "Remover" (destructive red)
+4.  [UI] ADMIN clicks "Remover"
+5.  [UI] Button shows loading spinner
+6.  [Frontend] DELETE /api/v1/companies/:companyId/members/:memberId
+    -> IF 422 COMPANY_LAST_ADMIN:
+       [UI] Error toast: "Nao e possivel remover o ultimo administrador"
+       [UI] Dialog closes
+7.  [Backend] Returns 200 (member status set to REMOVED)
+8.  [UI] Dialog closes
+9.  [UI] Success toast: "Membro removido" (5s auto-dismiss)
+10. [Frontend] queryClient.invalidateQueries(['members', companyId])
+11. [UI] Table refetches, member row either shows REMOVED badge or is filtered out
+
+Note: Trash icon is not rendered for current user's own row
+SIDE EFFECTS: Audit log (COMPANY_MEMBER_REMOVED)
+```
+
+### Frontend Flow: Resend Invitation
+
+```
+PRECONDITION: Member has PENDING status, user is ADMIN
+ACTOR: ADMIN
+TRIGGER: Clicks "Reenviar convite" ghost button on PENDING member row
+
+1.  [UI] PENDING member rows show "Reenviar convite" ghost button in actions column
+2.  [UI] ADMIN clicks "Reenviar convite"
+3.  [UI] Button shows spinner (text replaced with loading indicator)
+4.  [Frontend] POST /api/v1/companies/:companyId/members/:memberId/resend-invitation
+5.  [Backend] Generates new token, sends email, returns 200
+6.  [UI] Success toast: "Convite reenviado" (5s auto-dismiss)
+7.  [UI] Button enters 60-second cooldown (disabled state)
+8.  [UI] After 60 seconds: button re-enables
+
+SIDE EFFECTS: Old token invalidated, new invitation email sent
+```
+
+---
+
+## Frontend Component States Summary
+
+### MembersPage
+
+| State | Visual | Trigger |
+|-------|--------|---------|
+| Loading | Page header (h1 + button) + skeleton table rows | Initial load / refetch |
+| Data | Header + populated MembersTable + pagination | Data loaded |
+| Empty | Header + empty state illustration + CTA | No members returned |
+| Error | Header + error message + retry button | API error |
+
+### InviteMemberModal
+
+| State | Visual | Trigger |
+|-------|--------|---------|
+| Idle | Form with defaults | Modal opens |
+| Submitting | Button spinner, fields disabled | Submit |
+| Success | Modal closing, toast | 201 |
+| Duplicate Error | Inline error on email | 409 |
+| Validation Error | Field-level errors | 400 |
+| Server Error | Error toast, form re-enabled | 500 |
+
+### InvitationAcceptPage
+
+| State | Visual | Trigger |
+|-------|--------|---------|
+| Loading | Centered spinner | Token fetch in progress |
+| Valid (Not Logged In) | Company card + auth buttons | Valid token, no session |
+| Valid (Logged In) | Company card + accept button | Valid token, session exists |
+| Personal Info | Inline form | New user post-signup |
+| Accepting | Button spinner | Accept in flight |
+| Expired | Warning icon + message | 404/410 |
+| Email Mismatch | Info message + sign-out CTA | 403 |
+| Already Member | Message + dashboard link | 409 |
+
+---
+
+## Frontend Decision Points
+
+| Step | Decision Point | Condition | Path | UI Outcome |
+|------|---------------|-----------|------|------------|
+| Modal 9 | Client validation | Invalid email/role | Error | Field-level red error text |
+| Modal 12 | Server: email exists | 409 COMPANY_MEMBER_EXISTS | Error | Inline error on email field |
+| Modal 12 | Server: pending exists | 409 COMPANY_INVITATION_PENDING | Error | Inline error on email field |
+| Invite 3 | Token validity | 404 or 410 | Error | InvitationExpiredPage |
+| Invite 6 | Auth state | User not logged in | Alt | Show signup/login buttons |
+| Invite 6 | Auth state | User logged in | Happy | Show accept button |
+| Invite 10 | New user check | isNew: true | Alt | Show PersonalInfoForm |
+| Invite 17 | Accept result | 409 already member | Error | "Already member" + link |
+| Role 8 | Last admin check | 422 COMPANY_LAST_ADMIN | Error | Toast error message |
+| Remove 6 | Last admin check | 422 COMPANY_LAST_ADMIN | Error | Toast error message |
