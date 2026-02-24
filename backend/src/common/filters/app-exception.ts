@@ -82,6 +82,54 @@ const MESSAGES: Record<string, Record<string, string>> = {
     'pt-BR': 'Transação não encontrada',
     en: 'Transaction not found',
   },
+  'errors.txn.companyNotActive': {
+    'pt-BR': 'A empresa deve estar ativa para criar transações',
+    en: 'Company must be active to create transactions',
+  },
+  'errors.txn.invalidQuantity': {
+    'pt-BR': 'Quantidade de ações deve ser maior que zero',
+    en: 'Share quantity must be greater than zero',
+  },
+  'errors.txn.insufficientShares': {
+    'pt-BR': 'Ações insuficientes para completar a transferência',
+    en: 'Insufficient shares to complete the transfer',
+  },
+  'errors.txn.exceedsAuthorized': {
+    'pt-BR': 'Emissão excede o total autorizado da classe de ações',
+    en: 'Issuance exceeds the authorized total of the share class',
+  },
+  'errors.txn.toShareholderRequired': {
+    'pt-BR': 'Acionista de destino é obrigatório para este tipo de transação',
+    en: 'Destination shareholder is required for this transaction type',
+  },
+  'errors.txn.fromShareholderRequired': {
+    'pt-BR': 'Acionista de origem é obrigatório para este tipo de transação',
+    en: 'Source shareholder is required for this transaction type',
+  },
+  'errors.txn.sameShareholder': {
+    'pt-BR': 'Acionista de origem e destino não podem ser o mesmo',
+    en: 'Source and destination shareholder cannot be the same',
+  },
+  'errors.txn.invalidStatusTransition': {
+    'pt-BR': 'Transição de status inválida para esta transação',
+    en: 'Invalid status transition for this transaction',
+  },
+  'errors.txn.cannotCancelConfirmed': {
+    'pt-BR': 'Transação confirmada não pode ser cancelada',
+    en: 'Confirmed transaction cannot be cancelled',
+  },
+  'errors.txn.alreadyCancelled': {
+    'pt-BR': 'Transação já foi cancelada',
+    en: 'Transaction has already been cancelled',
+  },
+  'errors.txn.toShareClassRequired': {
+    'pt-BR': 'Classe de ações de destino é obrigatória para conversão',
+    en: 'Target share class is required for conversion',
+  },
+  'errors.txn.splitRatioRequired': {
+    'pt-BR': 'Proporção de desdobramento é obrigatória para split',
+    en: 'Split ratio is required for split transactions',
+  },
   'errors.document.notFound': {
     'pt-BR': 'Documento não encontrado',
     en: 'Document not found',

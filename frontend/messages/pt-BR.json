@@ -28,6 +28,20 @@
       "internalError": "Erro interno do servidor",
       "rateLimited": "Limite de requisições excedido. Tente novamente em alguns segundos."
     },
+    "txn": {
+      "alreadyCancelled": "Transação já foi cancelada",
+      "cannotCancelConfirmed": "Transação confirmada não pode ser cancelada",
+      "companyNotActive": "A empresa deve estar ativa para criar transações",
+      "exceedsAuthorized": "Emissão excede o total autorizado da classe de ações",
+      "fromShareholderRequired": "Acionista de origem é obrigatório para este tipo de transação",
+      "insufficientShares": "Ações insuficientes para completar a transferência",
+      "invalidQuantity": "Quantidade de ações deve ser maior que zero",
+      "invalidStatusTransition": "Transição de status inválida para esta transação",
+      "sameShareholder": "Acionista de origem e destino não podem ser o mesmo",
+      "splitRatioRequired": "Proporção de desdobramento é obrigatória para split",
+      "toShareClassRequired": "Classe de ações de destino é obrigatória para conversão",
+      "toShareholderRequired": "Acionista de destino é obrigatório para este tipo de transação"
+    },
     "val": {
       "invalidInput": "Dados de entrada inválidos"
     }

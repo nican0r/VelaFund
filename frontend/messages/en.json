@@ -28,6 +28,20 @@
       "internalError": "Internal server error",
       "rateLimited": "Rate limit exceeded. Please try again in a few seconds."
     },
+    "txn": {
+      "alreadyCancelled": "Transaction has already been cancelled",
+      "cannotCancelConfirmed": "Confirmed transaction cannot be cancelled",
+      "companyNotActive": "Company must be active to create transactions",
+      "exceedsAuthorized": "Issuance exceeds the authorized total of the share class",
+      "fromShareholderRequired": "Source shareholder is required for this transaction type",
+      "insufficientShares": "Insufficient shares to complete the transfer",
+      "invalidQuantity": "Share quantity must be greater than zero",
+      "invalidStatusTransition": "Invalid status transition for this transaction",
+      "sameShareholder": "Source and destination shareholder cannot be the same",
+      "splitRatioRequired": "Split ratio is required for split transactions",
+      "toShareClassRequired": "Target share class is required for conversion",
+      "toShareholderRequired": "Destination shareholder is required for this transaction type"
+    },
     "val": {
       "invalidInput": "Invalid input data"
     }
