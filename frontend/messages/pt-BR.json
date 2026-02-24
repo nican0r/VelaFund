@@ -23,6 +23,20 @@
       "cnpjDuplicate": "CNPJ já cadastrado",
       "notFound": "Empresa não encontrada"
     },
+    "opt": {
+      "cliffExceedsVesting": "Período de cliff não pode exceder o período total de vesting",
+      "companyNotActive": "A empresa deve estar ativa para gerenciar planos de opções",
+      "grantAlreadyCancelled": "A outorga de opções já foi cancelada",
+      "grantTerminated": "A outorga de opções foi finalizada",
+      "invalidExpiration": "Data de expiração deve ser posterior à data de outorga",
+      "invalidPoolSize": "O tamanho do pool deve ser maior que zero",
+      "invalidQuantity": "Quantidade de opções deve ser maior que zero",
+      "invalidStrikePrice": "Preço de exercício deve ser maior que zero",
+      "planAlreadyClosed": "O plano de opções já está encerrado",
+      "planClosed": "O plano de opções está encerrado",
+      "planExhausted": "Plano de opções não possui opções disponíveis suficientes",
+      "poolCannotShrink": "O pool não pode ser reduzido abaixo do total já outorgado"
+    },
     "sys": {
       "httpError": "Erro HTTP",
       "internalError": "Erro interno do servidor",

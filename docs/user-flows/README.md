@@ -15,6 +15,7 @@ Each document follows the template defined in `.claude/rules/user-flow-documenta
 | [Cap Table Management](./cap-table-management.md) | ADMIN/FINANCE (full access + write/export), LEGAL (read-only) | Backend complete |
 | [Transactions](./transactions.md) | ADMIN (full lifecycle + approve/confirm), FINANCE (create/submit/cancel), LEGAL (read-only) | Backend complete |
 | [Funding Rounds](./funding-rounds.md) | ADMIN (full lifecycle + commitments), FINANCE (read + payment updates), LEGAL (read-only) | Backend complete |
+| [Option Plans & Grants](./option-plans.md) | ADMIN (full CRUD + close/cancel), FINANCE/LEGAL (read-only) | Backend complete |
 
 ## Cross-References
 

@@ -376,6 +376,62 @@ const MESSAGES: Record<string, Record<string, string>> = {
     'pt-BR': 'Compromisso não encontrado',
     en: 'Commitment not found',
   },
+  'errors.optionPlan.notFound': {
+    'pt-BR': 'Plano de opções não encontrado',
+    en: 'Option plan not found',
+  },
+  'errors.opt.companyNotActive': {
+    'pt-BR': 'A empresa deve estar ativa para gerenciar planos de opções',
+    en: 'Company must be active to manage option plans',
+  },
+  'errors.opt.invalidPoolSize': {
+    'pt-BR': 'O tamanho do pool deve ser maior que zero',
+    en: 'Pool size must be greater than zero',
+  },
+  'errors.opt.planClosed': {
+    'pt-BR': 'O plano de opções está encerrado — não é possível modificar',
+    en: 'Option plan is closed — cannot modify',
+  },
+  'errors.opt.planAlreadyClosed': {
+    'pt-BR': 'O plano de opções já está encerrado',
+    en: 'Option plan is already closed',
+  },
+  'errors.opt.poolCannotShrink': {
+    'pt-BR': 'O pool não pode ser reduzido abaixo do total já outorgado',
+    en: 'Pool size cannot be reduced below total granted amount',
+  },
+  'errors.opt.planExhausted': {
+    'pt-BR': 'Plano de opções não possui opções disponíveis suficientes',
+    en: 'Option plan does not have enough available options',
+  },
+  'errors.opt.invalidQuantity': {
+    'pt-BR': 'Quantidade de opções deve ser maior que zero',
+    en: 'Option quantity must be greater than zero',
+  },
+  'errors.opt.invalidStrikePrice': {
+    'pt-BR': 'Preço de exercício deve ser maior que zero',
+    en: 'Strike price must be greater than zero',
+  },
+  'errors.opt.cliffExceedsVesting': {
+    'pt-BR': 'Período de cliff não pode exceder o período total de vesting',
+    en: 'Cliff period cannot exceed total vesting duration',
+  },
+  'errors.opt.invalidExpiration': {
+    'pt-BR': 'Data de expiração deve ser posterior à data de outorga',
+    en: 'Expiration date must be after grant date',
+  },
+  'errors.opt.grantAlreadyCancelled': {
+    'pt-BR': 'A outorga de opções já foi cancelada',
+    en: 'Option grant has already been cancelled',
+  },
+  'errors.opt.grantTerminated': {
+    'pt-BR': 'A outorga de opções foi finalizada — não é possível modificar',
+    en: 'Option grant has been terminated — cannot modify',
+  },
+  'errors.optionGrant.notFound': {
+    'pt-BR': 'Outorga de opções não encontrada',
+    en: 'Option grant not found',
+  },
 };
 
 export class AppException extends Error {

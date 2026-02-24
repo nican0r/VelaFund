@@ -2,9 +2,9 @@
 
 **Job to be Done**: Help Brazilian companies manage their cap table with on-chain record-keeping and regulatory compliance.
 
-**Status**: Phase 5 (Investment Features) in progress. Monorepo scaffolded, backend and frontend foundations built. Phase 0 spec issues are applied in implementation code but **all 69 P0 issues remain unfixed in the spec files themselves**.
+**Status**: Phase 6 (Employee Equity) in progress. Monorepo scaffolded, backend and frontend foundations built. Phase 0 spec issues are applied in implementation code but **all 69 P0 issues remain unfixed in the spec files themselves**.
 
-**Last Updated**: 2026-02-24 (v15.0 - Funding Round backend module: 12 endpoints (round CRUD + open/close/cancel + pro-forma + commitment CRUD + payment status), round lifecycle state machine (DRAFT→OPEN→CLOSING→CLOSED), commitment payment workflow (PENDING→RECEIVED→CONFIRMED), atomic round closing with share issuance, pro-forma cap table with dilution modeling, hard cap enforcement. Prisma schema updated: added RoundType enum, targetCloseDate, hasSideLetter fields. 76 new tests, 453 tests passing total.)
+**Last Updated**: 2026-02-24 (v16.0 - Option Plan backend module: 10 endpoints (plan CRUD + close + grant CRUD + vesting schedule + cancel grant), vesting calculation engine (cliff + post-cliff linear vesting with MONTHLY/QUARTERLY/ANNUALLY frequencies), pool size enforcement, grant lifecycle management (ACTIVE→EXERCISED/CANCELLED/EXPIRED), full vesting schedule generation, cliff percentage auto-calculation. 15 new i18n error messages (PT-BR + EN). 65 new tests, 518 tests passing total.)
 
 ---
 
@@ -39,8 +39,8 @@ A comprehensive spec audit (v8.0) uncovered systemic issues that affect nearly a
 | `.env.example` files | **MISSING** | Neither backend nor frontend has one |
 | README.md | **STALE** | Contains only "# VelaFund" |
 | ARCHITECTURE.md | **STALE** | "VelaFund" branding, references removed entities (AdminWallet, CapTableEntry) |
-| User flow docs | **7 of ~15** | `docs/user-flows/authentication.md`, `docs/user-flows/company-management.md`, `docs/user-flows/member-invitation.md`, `docs/user-flows/share-class-management.md`, `docs/user-flows/shareholder-management.md`, `docs/user-flows/cap-table-management.md`, `docs/user-flows/transactions.md` |
-| Git tag | `v0.0.10` | Transaction backend module |
+| User flow docs | **9 of ~15** | `docs/user-flows/authentication.md`, `docs/user-flows/company-management.md`, `docs/user-flows/member-invitation.md`, `docs/user-flows/share-class-management.md`, `docs/user-flows/shareholder-management.md`, `docs/user-flows/cap-table-management.md`, `docs/user-flows/transactions.md`, `docs/user-flows/funding-rounds.md`, `docs/user-flows/option-plans.md` |
+| Git tag | `v0.0.12` | Option Plan backend module |
 
 ### Critical Bugs Found (v10.0 + v11.0 Audit)
 
@@ -1509,12 +1509,12 @@ FINAL REVIEW:
 
 ### 6.1 Option Plans
 
-- [ ] OptionPlan entity + Prisma model (per option-plans.md)
-- [ ] OptionGrant entity + Prisma model
-- [ ] VestingSchedule entity + Prisma model
-- [ ] Option plan CRUD API (including plan close endpoint per H2.7)
-- [ ] Option grant CRUD API (including termination/forfeiture endpoint per H2.8)
-- [ ] Vesting calculation service
+- [x] OptionPlan entity + Prisma model (per option-plans.md) — **v0.0.12**: Already defined in Prisma schema with all fields
+- [x] OptionGrant entity + Prisma model — **v0.0.12**: Already defined with vesting fields (cliffMonths, vestingDurationMonths, vestingFrequency, cliffPercentage, accelerationOnCoc)
+- [x] VestingSchedule calculation (not separate model — computed from OptionGrant fields) — **v0.0.12**: calculateVesting() + generateVestingSchedule() with cliff + post-cliff linear vesting
+- [x] Option plan CRUD API (including plan close endpoint per H2.7) — **v0.0.12**: 5 plan endpoints (create, list, get, update, close)
+- [x] Option grant CRUD API (including termination/forfeiture endpoint per H2.8) — **v0.0.12**: 5 grant endpoints (create, list, get, vesting schedule, cancel/terminate)
+- [x] Vesting calculation service — **v0.0.12**: Cliff vesting, post-cliff linear vesting (MONTHLY/QUARTERLY/ANNUALLY), full schedule generation, next vesting date/amount
 - [ ] Frontend: Option plan management
 - [ ] Frontend: Grant creation form
 - [ ] Frontend: Employee grant dashboard
@@ -2104,6 +2104,7 @@ Before moving to next phase:
 
 | Date | Version | Author | Changes |
 |------|---------|--------|---------|
+| 2026-02-24 | 16.0 | Claude | **Option Plan backend module** (Phase 6.1). 10 endpoints: plan CRUD (create/list/get/update) + close plan + grant CRUD (create/list/get) + vesting schedule + cancel grant. Vesting calculation engine: cliff vesting (lump sum at cliff date) + post-cliff linear vesting (MONTHLY/QUARTERLY/ANNUALLY frequencies). Full vesting schedule generation with cliff + period entries. Pool size enforcement (grants cannot exceed pool, pool cannot shrink below granted). Grant lifecycle management (ACTIVE→CANCELLED with unexercised options returned to pool). Auto-calculated cliff percentage. 15 new i18n error messages (PT-BR + EN). 65 new tests (45 service + 20 controller), 518 tests passing total. |
 | 2026-02-24 | 15.0 | Claude | **Funding Round backend module** (Phase 5.1). 12 endpoints: round CRUD (create/list/get/update) + lifecycle actions (open/close/cancel) + pro-forma cap table + commitment CRUD (add/list/update payment/cancel). Round lifecycle state machine (DRAFT→OPEN→CLOSING→CLOSED with CANCELLED). Commitment payment workflow (PENDING→RECEIVED→CONFIRMED). Atomic round closing: validates all payments CONFIRMED, checks minimum close amount, verifies authorized shares capacity, issues shares via Transaction/Shareholding records in $transaction. Pro-forma cap table with before/after dilution modeling. Prisma schema: added RoundType enum, targetCloseDate, hasSideLetter fields. 19 i18n error messages (PT-BR + EN). 76 new tests (45 service + 26 controller + 5 misc), 453 tests passing total. |
 | 2026-02-23 | 11.0 | Claude | **Deep audit with 12 parallel subagents**. Found 8 new auth bugs: BUG-8 (race condition in user creation), BUG-9 (@RequireAuth double guard), BUG-10 (email sync conflict), BUG-11 (extractName null for email users), BUG-12 (redactEmail crash), BUG-13 (unbounded lockout Map), BUG-14 (logout unreachable when expired), BUG-15 (hardcoded English logout). Expanded BUG-7 from 3 to 5 broken Prisma relations (+OptionPlan.shareClassId, +ConvertibleInstrument.targetShareClassId). Found missing ExportJob model, missing indexes on 5+ models, missing DocumentSigner unique constraint. Frontend: no auth protection on any route (no middleware.ts), border radius scale systematically wrong, missing CSP/HSTS headers, missing Brazilian formatting helpers, shadcn/ui CLI never run, nav items duplicated, missing aria-current on active links. Added 9 spec compliance gaps (user-permissions CompanyScopeGuard undefined, notifications missing real-time mechanism, reports missing ExportJob/error codes, kyc CAPTCHA not in endpoints, litigation risk rules ambiguous). Added Priority 1b section for non-critical bugs. |
 | 2026-02-23 | 10.0 | Claude | **Comprehensive code-vs-spec audit** with 8 parallel subagents. Audited all 34 backend source files, 14 frontend source files, 1183-line Prisma schema, and all 26 spec files. Key findings: 7 critical/high bugs in existing code (BUG-1: Privy token in 7-day cookie, BUG-2: no RolesGuard, BUG-3: ThrottlerGuard not global, BUG-4: ValidationPipe errors unstructured, BUG-5: Accept-Language not normalized, BUG-6: Apple OAuth not handled, BUG-7: Prisma broken relations). All 69 P0 spec issues confirmed still pending in spec files but code has correct patterns. Frontend: Privy SDK not installed, next-intl not installed, shadcn/ui not initialized, 0 tests, login is static stub. Restructured Quick Reference into 4 priority tiers. Updated all phase sections with accurate status annotations. |

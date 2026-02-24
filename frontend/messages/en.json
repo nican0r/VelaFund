@@ -23,6 +23,20 @@
       "cnpjDuplicate": "CNPJ already registered",
       "notFound": "Company not found"
     },
+    "opt": {
+      "cliffExceedsVesting": "Cliff period cannot exceed total vesting duration",
+      "companyNotActive": "Company must be active to manage option plans",
+      "grantAlreadyCancelled": "Option grant has already been cancelled",
+      "grantTerminated": "Option grant has been terminated",
+      "invalidExpiration": "Expiration date must be after grant date",
+      "invalidPoolSize": "Pool size must be greater than zero",
+      "invalidQuantity": "Option quantity must be greater than zero",
+      "invalidStrikePrice": "Strike price must be greater than zero",
+      "planAlreadyClosed": "Option plan is already closed",
+      "planClosed": "Option plan is closed",
+      "planExhausted": "Option plan does not have enough available options",
+      "poolCannotShrink": "Pool size cannot be reduced below total granted amount"
+    },
     "sys": {
       "httpError": "HTTP Error",
       "internalError": "Internal server error",
