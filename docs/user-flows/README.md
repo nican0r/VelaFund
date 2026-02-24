@@ -12,6 +12,7 @@ Each document follows the template defined in `.claude/rules/user-flow-documenta
 | [Member Invitation](./member-invitation.md) | ADMIN member, any company member, authenticated user, unauthenticated user | Backend complete |
 | [Share Class Management](./share-class-management.md) | ADMIN (full CRUD), FINANCE/LEGAL/INVESTOR (read-only) | Backend complete |
 | [Shareholder Management](./shareholder-management.md) | ADMIN (full CRUD + UBO), FINANCE/LEGAL (read-only), ADMIN/LEGAL (foreign view) | Backend complete |
+| [Cap Table Management](./cap-table-management.md) | ADMIN/FINANCE (full access + write/export), LEGAL (read-only) | Backend complete |
 
 ## Cross-References
 

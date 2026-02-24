@@ -150,6 +150,18 @@ const MESSAGES: Record<string, Record<string, string>> = {
     'pt-BR': 'Ações insuficientes para completar a operação',
     en: 'Insufficient shares to complete the operation',
   },
+  'errors.cap.futureSnapshotDate': {
+    'pt-BR': 'Não é possível criar snapshot para data futura',
+    en: 'Cannot create snapshot for a future date',
+  },
+  'errors.cap.noDataForDate': {
+    'pt-BR': 'Nenhum dado disponível para a data solicitada',
+    en: 'No cap table data available for the requested date',
+  },
+  'errors.capTableSnapshot.notFound': {
+    'pt-BR': 'Snapshot da tabela de capitalização não encontrado',
+    en: 'Cap table snapshot not found',
+  },
   'errors.cap.shareClassDuplicate': {
     'pt-BR': 'Já existe uma classe de ações com este nome nesta empresa',
     en: 'A share class with this name already exists in this company',

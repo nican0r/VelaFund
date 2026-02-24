@@ -4,7 +4,7 @@
 
 **Status**: Phase 2 (Core Cap Table) in progress. Monorepo scaffolded, backend and frontend foundations built. Phase 0 spec issues are applied in implementation code but **all 69 P0 issues remain unfixed in the spec files themselves**.
 
-**Last Updated**: 2026-02-24 (v12.5 - Shareholder Registry backend module: 7 endpoints, CPF/CNPJ Módulo 11 validation, blind index uniqueness, beneficial owners with AML rules, foreign shareholder tracking. 55 new tests, 265 tests passing total.)
+**Last Updated**: 2026-02-24 (v13.0 - Cap Table Management backend module: 6 endpoints, ownership percentage calculation, voting power, fully-diluted with options, OCT export, point-in-time snapshots with SHA-256 state hash, recalculate ownership batch operation. 55 new tests, 320 tests passing total.)
 
 ---
 
@@ -28,7 +28,7 @@ A comprehensive spec audit (v8.0) uncovered systemic issues that affect nearly a
 | Aspect | Status | Notes |
 |--------|--------|-------|
 | `/frontend` directory | **SCAFFOLDED** | 14 source files, 0 tests. Layouts built. Privy SDK NOT installed. next-intl NOT installed. shadcn/ui CLI never run (no `components/ui/`, no `components.json`). **No auth protection on any route** — no `middleware.ts`, no protected route wrapper. Login page is static stub. Dashboard is visual prototype with hardcoded data. Missing CSP and HSTS security headers. Missing Brazilian formatting helpers. |
-| `/backend` directory | **SCAFFOLDED** | 72 source files, 265 tests. Auth module complete (14 of 15 bugs fixed — BUG-1 remains, requires Redis). Common infrastructure solid. **Company Management module complete** (CRUD endpoints, CNPJ Módulo 11 validation, company status state machine, 42 tests). **Company Membership module complete** (invite, accept, remove, role change, resend invitation, permission overrides, invitation acceptance, 52 tests). **Share Class module complete** (5 CRUD endpoints, entity type compatibility Ltda→QUOTA / S.A.→COMMON/PREFERRED, preferred share 2/3 limit per Art. 15 §2, immutability after issuance, 34 tests). **Shareholder module complete** (7 endpoints, CPF/CNPJ Módulo 11 validation, blind index uniqueness, beneficial owners with AML rules, foreign shareholder tracking, 55 tests). |
+| `/backend` directory | **SCAFFOLDED** | 82 source files, 320 tests. Auth module complete (14 of 15 bugs fixed — BUG-1 remains, requires Redis). Common infrastructure solid. **Company Management module complete** (CRUD endpoints, CNPJ Módulo 11 validation, company status state machine, 42 tests). **Company Membership module complete** (invite, accept, remove, role change, resend invitation, permission overrides, invitation acceptance, 52 tests). **Share Class module complete** (5 CRUD endpoints, entity type compatibility Ltda→QUOTA / S.A.→COMMON/PREFERRED, preferred share 2/3 limit per Art. 15 §2, immutability after issuance, 34 tests). **Shareholder module complete** (7 endpoints, CPF/CNPJ Módulo 11 validation, blind index uniqueness, beneficial owners with AML rules, foreign shareholder tracking, 55 tests). **Cap Table module complete** (6 endpoints, ownership % calculation, voting power, fully-diluted with options, OCT export, snapshots with SHA-256 state hash, recalculate batch, 55 tests). |
 | `/contracts` directory | EXISTS (empty) | No Solidity files |
 | `package.json` | **CREATED** | pnpm workspaces + Turborepo configured |
 | Prisma schema | **NEAR-COMPLETE** | 32 models, 35 enums. All relations, unique constraints, and indexes complete. Missing entities: DataroomFolder, DataroomDocument, ExitScenario, WaterfallResult, ExportJob, LitigationVerification (inlined into CompanyProfile). Migration pending. |
@@ -39,8 +39,8 @@ A comprehensive spec audit (v8.0) uncovered systemic issues that affect nearly a
 | `.env.example` files | **MISSING** | Neither backend nor frontend has one |
 | README.md | **STALE** | Contains only "# VelaFund" |
 | ARCHITECTURE.md | **STALE** | "VelaFund" branding, references removed entities (AdminWallet, CapTableEntry) |
-| User flow docs | **5 of ~15** | `docs/user-flows/authentication.md`, `docs/user-flows/company-management.md`, `docs/user-flows/member-invitation.md`, `docs/user-flows/share-class-management.md`, `docs/user-flows/shareholder-management.md` |
-| Git tag | `v0.0.8` | Shareholder Registry backend module |
+| User flow docs | **6 of ~15** | `docs/user-flows/authentication.md`, `docs/user-flows/company-management.md`, `docs/user-flows/member-invitation.md`, `docs/user-flows/share-class-management.md`, `docs/user-flows/shareholder-management.md`, `docs/user-flows/cap-table-management.md` |
+| Git tag | `v0.0.9` | Cap Table Management backend module |
 
 ### Critical Bugs Found (v10.0 + v11.0 Audit)
 
@@ -1316,14 +1316,16 @@ FINAL REVIEW:
 
 ### 2.4 Cap Table Management
 
-- [ ] Cap table backend (per cap-table-management.md)
+- [x] Cap table backend (per cap-table-management.md) ✅ **v0.0.9 — 55 tests**
   - Shareholding entity + Prisma model (canonical name `Shareholding`, NOT `CapTableEntry`)
   - CapTableSnapshot entity + Prisma model
-  - Cap table calculation service
-  - Fully-diluted calculation
-  - Cap table API endpoints
-  - Snapshot service
-  - OCT format export service
+  - Cap table calculation service (ownership %, voting power with weighted votesPerShare)
+  - Fully-diluted calculation (includes ACTIVE OptionGrant data, vested/unvested)
+  - Cap table API endpoints (6 endpoints: current, fully-diluted, snapshot, history, export OCT, create snapshot)
+  - Snapshot service (point-in-time snapshots with SHA-256 state hash, paginated history)
+  - OCT format export service (maps QUOTA→COMMON, PREFERRED_SHARES→PREFERRED, masked tax IDs)
+  - Ownership recalculation batch operation (updates all Shareholding percentages, validates ~100% total)
+  - Roles: ADMIN/FINANCE/LEGAL for reads, ADMIN/FINANCE for writes/exports
 
 - [ ] Cap table frontend
   - Cap table visualization (table view per design-system.md)
