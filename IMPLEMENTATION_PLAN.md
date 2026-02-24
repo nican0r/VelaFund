@@ -2,9 +2,9 @@
 
 **Job to be Done**: Help Brazilian companies manage their cap table with on-chain record-keeping and regulatory compliance.
 
-**Status**: Phase 2 (Core Cap Table) in progress. Monorepo scaffolded, backend and frontend foundations built. Phase 0 spec issues are applied in implementation code but **all 69 P0 issues remain unfixed in the spec files themselves**.
+**Status**: Phase 5 (Investment Features) in progress. Monorepo scaffolded, backend and frontend foundations built. Phase 0 spec issues are applied in implementation code but **all 69 P0 issues remain unfixed in the spec files themselves**.
 
-**Last Updated**: 2026-02-24 (v14.0 - Transaction backend module: 7 endpoints (CRUD + submit + approve + confirm + cancel), 5 transaction types (ISSUANCE, TRANSFER, CONVERSION, CANCELLATION, SPLIT), status state machine, cap table mutations on confirmation, share balance validation, authorized shares enforcement. 57 new tests, 377 tests passing total.)
+**Last Updated**: 2026-02-24 (v15.0 - Funding Round backend module: 12 endpoints (round CRUD + open/close/cancel + pro-forma + commitment CRUD + payment status), round lifecycle state machine (DRAFT→OPEN→CLOSING→CLOSED), commitment payment workflow (PENDING→RECEIVED→CONFIRMED), atomic round closing with share issuance, pro-forma cap table with dilution modeling, hard cap enforcement. Prisma schema updated: added RoundType enum, targetCloseDate, hasSideLetter fields. 76 new tests, 453 tests passing total.)
 
 ---
 
@@ -1464,14 +1464,14 @@ FINAL REVIEW:
 
 ### 5.1 Funding Rounds
 
-- [ ] FundingRound entity + Prisma model (per funding-rounds.md)
-- [ ] RoundCommitment entity + Prisma model
-- [ ] RoundClose entity + Prisma model (fully defined per M4.1)
-- [ ] Round CRUD API endpoints (including cancellation endpoint per H2.2)
-- [ ] Commitment CRUD API endpoints (including payment status update per H2.3)
-- [ ] Pro-forma cap table calculation
-- [ ] Multi-close mechanics
-- [ ] Payment confirmation workflow
+- [x] FundingRound entity + Prisma model (per funding-rounds.md) — **v0.0.11**: Added RoundType enum (SEED, SERIES_A, SERIES_B, SERIES_C, BRIDGE), targetCloseDate field
+- [x] RoundCommitment entity + Prisma model — **v0.0.11**: Added hasSideLetter field
+- [x] RoundClose entity + Prisma model (fully defined per M4.1)
+- [x] Round CRUD API endpoints (including cancellation endpoint per H2.2) — **v0.0.11**: 8 round endpoints (create, list, get, update, open, close, cancel, proforma)
+- [x] Commitment CRUD API endpoints (including payment status update per H2.3) — **v0.0.11**: 4 commitment endpoints (add, list, update payment, cancel)
+- [x] Pro-forma cap table calculation — **v0.0.11**: Before/after cap table with dilution percentages per shareholder
+- [x] Multi-close mechanics — **v0.0.11**: CLOSING status supports multi-close via RoundClose records
+- [x] Payment confirmation workflow — **v0.0.11**: PENDING→RECEIVED→CONFIRMED state machine with paymentConfirmedAt timestamp
 - [ ] Frontend: Round creation wizard
 - [ ] Frontend: Commitment tracking
 - [ ] Frontend: Pro-forma preview
@@ -2104,6 +2104,7 @@ Before moving to next phase:
 
 | Date | Version | Author | Changes |
 |------|---------|--------|---------|
+| 2026-02-24 | 15.0 | Claude | **Funding Round backend module** (Phase 5.1). 12 endpoints: round CRUD (create/list/get/update) + lifecycle actions (open/close/cancel) + pro-forma cap table + commitment CRUD (add/list/update payment/cancel). Round lifecycle state machine (DRAFT→OPEN→CLOSING→CLOSED with CANCELLED). Commitment payment workflow (PENDING→RECEIVED→CONFIRMED). Atomic round closing: validates all payments CONFIRMED, checks minimum close amount, verifies authorized shares capacity, issues shares via Transaction/Shareholding records in $transaction. Pro-forma cap table with before/after dilution modeling. Prisma schema: added RoundType enum, targetCloseDate, hasSideLetter fields. 19 i18n error messages (PT-BR + EN). 76 new tests (45 service + 26 controller + 5 misc), 453 tests passing total. |
 | 2026-02-23 | 11.0 | Claude | **Deep audit with 12 parallel subagents**. Found 8 new auth bugs: BUG-8 (race condition in user creation), BUG-9 (@RequireAuth double guard), BUG-10 (email sync conflict), BUG-11 (extractName null for email users), BUG-12 (redactEmail crash), BUG-13 (unbounded lockout Map), BUG-14 (logout unreachable when expired), BUG-15 (hardcoded English logout). Expanded BUG-7 from 3 to 5 broken Prisma relations (+OptionPlan.shareClassId, +ConvertibleInstrument.targetShareClassId). Found missing ExportJob model, missing indexes on 5+ models, missing DocumentSigner unique constraint. Frontend: no auth protection on any route (no middleware.ts), border radius scale systematically wrong, missing CSP/HSTS headers, missing Brazilian formatting helpers, shadcn/ui CLI never run, nav items duplicated, missing aria-current on active links. Added 9 spec compliance gaps (user-permissions CompanyScopeGuard undefined, notifications missing real-time mechanism, reports missing ExportJob/error codes, kyc CAPTCHA not in endpoints, litigation risk rules ambiguous). Added Priority 1b section for non-critical bugs. |
 | 2026-02-23 | 10.0 | Claude | **Comprehensive code-vs-spec audit** with 8 parallel subagents. Audited all 34 backend source files, 14 frontend source files, 1183-line Prisma schema, and all 26 spec files. Key findings: 7 critical/high bugs in existing code (BUG-1: Privy token in 7-day cookie, BUG-2: no RolesGuard, BUG-3: ThrottlerGuard not global, BUG-4: ValidationPipe errors unstructured, BUG-5: Accept-Language not normalized, BUG-6: Apple OAuth not handled, BUG-7: Prisma broken relations). All 69 P0 spec issues confirmed still pending in spec files but code has correct patterns. Frontend: Privy SDK not installed, next-intl not installed, shadcn/ui not initialized, 0 tests, login is static stub. Restructured Quick Reference into 4 priority tiers. Updated all phase sections with accurate status annotations. |
 | 2026-02-23 | 8.0 | Claude | **Comprehensive spec audit**. Found 55+ new issues beyond the original 8. Restructured Phase 0 into priority tiers (CRITICAL/HIGH/MEDIUM/LOW). Key systemic findings: snake_case in 13 TypeScript interfaces, response envelope non-compliance in 6+ files, X-Company-Id vs :companyId conflict, KYCStatus 4-vs-6-value mismatch, convertible-instruments lowercase enums, 10 missing API endpoints, 3 permission matrix conflicts, AdminWallet entity contradiction, BlockchainTransaction 1:1 constraint, PARTIALLY_SIGNED missing from Document enum, 3 missing error codes, 3 missing audit events, 14 unresolved open questions. Total P0 remaining: 57 items (was 14). Updated all phase descriptions to reference spec fixes. |

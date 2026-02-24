@@ -13,7 +13,8 @@ Each document follows the template defined in `.claude/rules/user-flow-documenta
 | [Share Class Management](./share-class-management.md) | ADMIN (full CRUD), FINANCE/LEGAL/INVESTOR (read-only) | Backend complete |
 | [Shareholder Management](./shareholder-management.md) | ADMIN (full CRUD + UBO), FINANCE/LEGAL (read-only), ADMIN/LEGAL (foreign view) | Backend complete |
 | [Cap Table Management](./cap-table-management.md) | ADMIN/FINANCE (full access + write/export), LEGAL (read-only) | Backend complete |
-| [Transactions](./transactions.md) | ADMIN (full lifecycle + approve/confirm), FINANCE (create/submit/cancel), LEGAL (read-only) | Documented |
+| [Transactions](./transactions.md) | ADMIN (full lifecycle + approve/confirm), FINANCE (create/submit/cancel), LEGAL (read-only) | Backend complete |
+| [Funding Rounds](./funding-rounds.md) | ADMIN (full lifecycle + commitments), FINANCE (read + payment updates), LEGAL (read-only) | Backend complete |
 
 ## Cross-References
 

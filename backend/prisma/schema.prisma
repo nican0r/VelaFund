@@ -658,23 +658,25 @@ enum BlockchainTransactionStatus {
 // =============================================================================
 
 model FundingRound {
-  id                    String           @id @default(uuid())
-  companyId             String           @map("company_id")
+  id                    String             @id @default(uuid())
+  companyId             String             @map("company_id")
   name                  String
-  shareClassId          String           @map("share_class_id")
-  targetAmount          Decimal          @map("target_amount") @db.Decimal(30, 10)
-  minimumCloseAmount    Decimal?         @map("minimum_close_amount") @db.Decimal(30, 10)
-  hardCap               Decimal?         @map("hard_cap") @db.Decimal(30, 10)
-  preMoneyValuation     Decimal          @map("pre_money_valuation") @db.Decimal(30, 10)
-  pricePerShare         Decimal          @map("price_per_share") @db.Decimal(30, 10)
+  roundType             RoundType          @map("round_type")
+  shareClassId          String             @map("share_class_id")
+  targetAmount          Decimal            @map("target_amount") @db.Decimal(30, 10)
+  minimumCloseAmount    Decimal?           @map("minimum_close_amount") @db.Decimal(30, 10)
+  hardCap               Decimal?           @map("hard_cap") @db.Decimal(30, 10)
+  preMoneyValuation     Decimal            @map("pre_money_valuation") @db.Decimal(30, 10)
+  pricePerShare         Decimal            @map("price_per_share") @db.Decimal(30, 10)
   status                FundingRoundStatus @default(DRAFT)
   notes                 String?
-  openedAt              DateTime?        @map("opened_at")
-  closedAt              DateTime?        @map("closed_at")
-  cancelledAt           DateTime?        @map("cancelled_at")
-  createdBy             String           @map("created_by")
-  createdAt             DateTime         @default(now()) @map("created_at")
-  updatedAt             DateTime         @updatedAt @map("updated_at")
+  targetCloseDate       DateTime?          @map("target_close_date") @db.Date
+  openedAt              DateTime?          @map("opened_at")
+  closedAt              DateTime?          @map("closed_at")
+  cancelledAt           DateTime?          @map("cancelled_at")
+  createdBy             String             @map("created_by")
+  createdAt             DateTime           @default(now()) @map("created_at")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
 
   // Relations
   company     Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -684,6 +686,16 @@ model FundingRound {
 
   @@index([companyId, status])
   @@map("funding_rounds")
+}
+
+enum RoundType {
+  SEED
+  SERIES_A
+  SERIES_B
+  SERIES_C
+  BRIDGE
+
+  @@map("round_type")
 }
 
 enum FundingRoundStatus {
@@ -697,16 +709,17 @@ enum FundingRoundStatus {
 }
 
 model RoundCommitment {
-  id              String                  @id @default(uuid())
-  roundId         String                  @map("round_id")
-  shareholderId   String                  @map("shareholder_id")
-  amount          Decimal                 @db.Decimal(30, 10)
-  sharesAllocated Decimal?                @map("shares_allocated") @db.Decimal(30, 10)
-  paymentStatus   CommitmentPaymentStatus @default(PENDING) @map("payment_status")
-  paymentConfirmedAt DateTime?            @map("payment_confirmed_at")
-  notes           String?
-  createdAt       DateTime                @default(now()) @map("created_at")
-  updatedAt       DateTime                @updatedAt @map("updated_at")
+  id                 String                  @id @default(uuid())
+  roundId            String                  @map("round_id")
+  shareholderId      String                  @map("shareholder_id")
+  amount             Decimal                 @db.Decimal(30, 10)
+  sharesAllocated    Decimal?                @map("shares_allocated") @db.Decimal(30, 10)
+  paymentStatus      CommitmentPaymentStatus @default(PENDING) @map("payment_status")
+  paymentConfirmedAt DateTime?               @map("payment_confirmed_at")
+  hasSideLetter      Boolean                 @default(false) @map("has_side_letter")
+  notes              String?
+  createdAt          DateTime                @default(now()) @map("created_at")
+  updatedAt          DateTime                @updatedAt @map("updated_at")
 
   // Relations
   round       FundingRound @relation(fields: [roundId], references: [id], onDelete: Cascade)

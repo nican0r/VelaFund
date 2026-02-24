@@ -11,6 +11,7 @@ import { ShareClassModule } from './share-class/share-class.module';
 import { ShareholderModule } from './shareholder/shareholder.module';
 import { CapTableModule } from './cap-table/cap-table.module';
 import { TransactionModule } from './transaction/transaction.module';
+import { FundingRoundModule } from './funding-round/funding-round.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { TransactionModule } from './transaction/transaction.module';
     ShareholderModule,
     CapTableModule,
     TransactionModule,
+    FundingRoundModule,
   ],
   providers: [
     // BUG-3 fix: Register ThrottlerGuard globally — rate limits apply to all endpoints.

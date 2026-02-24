@@ -304,6 +304,78 @@ const MESSAGES: Record<string, Record<string, string>> = {
     'pt-BR': 'Convite não encontrado',
     en: 'Invitation not found',
   },
+  'errors.round.notFound': {
+    'pt-BR': 'Rodada de investimento não encontrada',
+    en: 'Funding round not found',
+  },
+  'errors.round.companyNotActive': {
+    'pt-BR': 'A empresa deve estar ativa para criar rodadas de investimento',
+    en: 'Company must be active to create funding rounds',
+  },
+  'errors.round.invalidAmount': {
+    'pt-BR': 'Valor inválido — deve ser maior que zero',
+    en: 'Invalid amount — must be greater than zero',
+  },
+  'errors.round.minimumExceedsTarget': {
+    'pt-BR': 'O valor mínimo de fechamento não pode exceder o valor alvo',
+    en: 'Minimum close amount cannot exceed target amount',
+  },
+  'errors.round.hardCapBelowTarget': {
+    'pt-BR': 'O teto máximo não pode ser menor que o valor alvo',
+    en: 'Hard cap cannot be less than target amount',
+  },
+  'errors.round.notOpen': {
+    'pt-BR': 'A rodada não está aberta para modificações ou compromissos',
+    en: 'Round is not open for modifications or commitments',
+  },
+  'errors.round.invalidStatusTransition': {
+    'pt-BR': 'Transição de status inválida para esta rodada',
+    en: 'Invalid status transition for this funding round',
+  },
+  'errors.round.alreadyClosed': {
+    'pt-BR': 'A rodada já foi encerrada',
+    en: 'Funding round has already been closed',
+  },
+  'errors.round.noCommitments': {
+    'pt-BR': 'Não é possível fechar a rodada sem compromissos ativos',
+    en: 'Cannot close round without active commitments',
+  },
+  'errors.round.unconfirmedPayments': {
+    'pt-BR': 'Existem pagamentos não confirmados — confirme todos antes de fechar',
+    en: 'There are unconfirmed payments — confirm all before closing',
+  },
+  'errors.round.minimumNotMet': {
+    'pt-BR': 'Valor mínimo da rodada não foi atingido',
+    en: 'Round minimum close amount not met',
+  },
+  'errors.round.exceedsAuthorized': {
+    'pt-BR': 'Emissão excede o total autorizado da classe de ações',
+    en: 'Issuance would exceed the authorized total of the share class',
+  },
+  'errors.round.hardCapReached': {
+    'pt-BR': 'O compromisso excede o teto máximo da rodada',
+    en: 'Commitment would exceed the round hard cap',
+  },
+  'errors.round.commitmentExists': {
+    'pt-BR': 'Já existe um compromisso ativo para este acionista nesta rodada',
+    en: 'An active commitment already exists for this shareholder in this round',
+  },
+  'errors.round.commitmentCancelled': {
+    'pt-BR': 'O compromisso já foi cancelado',
+    en: 'Commitment has already been cancelled',
+  },
+  'errors.round.commitmentAlreadyConfirmed': {
+    'pt-BR': 'O pagamento do compromisso já foi confirmado',
+    en: 'Commitment payment has already been confirmed',
+  },
+  'errors.round.invalidPaymentTransition': {
+    'pt-BR': 'Transição de status de pagamento inválida',
+    en: 'Invalid payment status transition',
+  },
+  'errors.commitment.notFound': {
+    'pt-BR': 'Compromisso não encontrado',
+    en: 'Commitment not found',
+  },
 };
 
 export class AppException extends Error {
