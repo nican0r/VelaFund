@@ -110,6 +110,62 @@ const MESSAGES: Record<string, Record<string, string>> = {
     'pt-BR': 'Sessão encerrada com sucesso',
     en: 'Session ended successfully',
   },
+  'errors.company.dissolved': {
+    'pt-BR': 'Empresa dissolvida não aceita novos membros',
+    en: 'Dissolved company cannot accept new members',
+  },
+  'errors.member.notFound': {
+    'pt-BR': 'Membro não encontrado',
+    en: 'Member not found',
+  },
+  'errors.member.alreadyExists': {
+    'pt-BR': 'Usuário já é membro ativo desta empresa',
+    en: 'User is already an active member of this company',
+  },
+  'errors.member.invitationPending': {
+    'pt-BR': 'Já existe um convite pendente para este e-mail',
+    en: 'A pending invitation already exists for this email',
+  },
+  'errors.member.invitationRateLimit': {
+    'pt-BR': 'Limite diário de convites atingido',
+    en: 'Daily invitation limit reached',
+  },
+  'errors.member.notActive': {
+    'pt-BR': 'Membro não está ativo',
+    en: 'Member is not active',
+  },
+  'errors.member.lastAdmin': {
+    'pt-BR': 'Não é possível remover ou rebaixar o último administrador',
+    en: 'Cannot remove or demote the last admin',
+  },
+  'errors.member.permissionProtected': {
+    'pt-BR': 'Esta permissão não pode ser atribuída a este cargo',
+    en: 'This permission cannot be assigned to this role',
+  },
+  'errors.member.alreadyRemoved': {
+    'pt-BR': 'Membro já foi removido',
+    en: 'Member has already been removed',
+  },
+  'errors.member.notPending': {
+    'pt-BR': 'Membro não está com status pendente',
+    en: 'Member is not in pending status',
+  },
+  'errors.member.invitationExpired': {
+    'pt-BR': 'O convite expirou',
+    en: 'Invitation has expired',
+  },
+  'errors.member.invitationAlreadyAccepted': {
+    'pt-BR': 'O convite já foi aceito',
+    en: 'Invitation has already been accepted',
+  },
+  'errors.member.companyLimitReached': {
+    'pt-BR': 'Limite máximo de empresas atingido (máximo 20)',
+    en: 'Maximum company membership limit reached (maximum 20)',
+  },
+  'errors.invitation.notFound': {
+    'pt-BR': 'Convite não encontrado',
+    en: 'Invitation not found',
+  },
 };
 
 export class AppException extends Error {
@@ -168,5 +224,11 @@ export class UnauthorizedException extends AppException {
 export class ForbiddenException extends AppException {
   constructor(messageKey = 'errors.auth.unauthorized') {
     super('AUTH_FORBIDDEN', messageKey, HttpStatus.FORBIDDEN);
+  }
+}
+
+export class GoneException extends AppException {
+  constructor(code: string, messageKey: string, details?: Record<string, unknown>) {
+    super(code, messageKey, HttpStatus.GONE, details);
   }
 }

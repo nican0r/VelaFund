@@ -9,6 +9,7 @@ Each document follows the template defined in `.claude/rules/user-flow-documenta
 |------|--------|--------|
 | [Authentication](./authentication.md) | Unauthenticated user, Authenticated user | Backend complete |
 | [Company Management](./company-management.md) | Authenticated user, ADMIN member | Backend complete |
+| [Member Invitation](./member-invitation.md) | ADMIN member, any company member, authenticated user, unauthenticated user | Backend complete |
 
 ## Cross-References
 

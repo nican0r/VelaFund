@@ -6,6 +6,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
 import { CompanyModule } from './company/company.module';
+import { MemberModule } from './member/member.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { CompanyModule } from './company/company.module';
     HealthModule,
     AuthModule,
     CompanyModule,
+    MemberModule,
   ],
   providers: [
     // BUG-3 fix: Register ThrottlerGuard globally — rate limits apply to all endpoints.

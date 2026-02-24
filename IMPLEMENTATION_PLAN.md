@@ -4,7 +4,7 @@
 
 **Status**: Phase 1 (Foundation and Infrastructure) in progress. Monorepo scaffolded, backend and frontend foundations built. Phase 0 spec issues are applied in implementation code but **all 69 P0 issues remain unfixed in the spec files themselves**.
 
-**Last Updated**: 2026-02-23 (v12.2 - Company Management backend module: CRUD endpoints, service with CNPJ Módulo 11 validation, DTOs, 42 tests. 109 tests passing total.)
+**Last Updated**: 2026-02-23 (v12.3 - Company Membership CRUD module: invite, accept, remove, role change, resend invitation, permission overrides. 52 new tests, 161 tests passing total.)
 
 ---
 
@@ -28,7 +28,7 @@ A comprehensive spec audit (v8.0) uncovered systemic issues that affect nearly a
 | Aspect | Status | Notes |
 |--------|--------|-------|
 | `/frontend` directory | **SCAFFOLDED** | 14 source files, 0 tests. Layouts built. Privy SDK NOT installed. next-intl NOT installed. shadcn/ui CLI never run (no `components/ui/`, no `components.json`). **No auth protection on any route** — no `middleware.ts`, no protected route wrapper. Login page is static stub. Dashboard is visual prototype with hardcoded data. Missing CSP and HSTS security headers. Missing Brazilian formatting helpers. |
-| `/backend` directory | **SCAFFOLDED** | 42 source files, 109 tests. Auth module complete (14 of 15 bugs fixed — BUG-1 remains, requires Redis). Common infrastructure solid. **Company Management module complete** (CRUD endpoints, CNPJ Módulo 11 validation, company status state machine, 42 tests). |
+| `/backend` directory | **SCAFFOLDED** | 52 source files, 161 tests. Auth module complete (14 of 15 bugs fixed — BUG-1 remains, requires Redis). Common infrastructure solid. **Company Management module complete** (CRUD endpoints, CNPJ Módulo 11 validation, company status state machine, 42 tests). **Company Membership module complete** (invite, accept, remove, role change, resend invitation, permission overrides, invitation acceptance, 52 tests). |
 | `/contracts` directory | EXISTS (empty) | No Solidity files |
 | `package.json` | **CREATED** | pnpm workspaces + Turborepo configured |
 | Prisma schema | **NEAR-COMPLETE** | 32 models, 35 enums. All relations, unique constraints, and indexes complete. Missing entities: DataroomFolder, DataroomDocument, ExitScenario, WaterfallResult, ExportJob, LitigationVerification (inlined into CompanyProfile). Migration pending. |
@@ -40,7 +40,7 @@ A comprehensive spec audit (v8.0) uncovered systemic issues that affect nearly a
 | README.md | **STALE** | Contains only "# VelaFund" |
 | ARCHITECTURE.md | **STALE** | "VelaFund" branding, references removed entities (AdminWallet, CapTableEntry) |
 | User flow docs | **2 of ~15** | `docs/user-flows/authentication.md`, `docs/user-flows/company-management.md` |
-| Git tag | `v0.0.5` | Company Management backend module |
+| Git tag | `v0.0.6` | Company Membership CRUD backend module |
 
 ### Critical Bugs Found (v10.0 + v11.0 Audit)
 
@@ -1180,7 +1180,35 @@ FINAL REVIEW:
   - 10 new error message translations (PT-BR + EN) in GlobalExceptionFilter
   - 42 tests (24 service + 18 controller) — all passing
   - Routes: `POST /api/v1/companies`, `GET /api/v1/companies`, `GET /api/v1/companies/:companyId`, `PUT /api/v1/companies/:companyId`, `PATCH /api/v1/companies/:companyId/status`, `DELETE /api/v1/companies/:companyId`
-  - **NOT YET**: Company CNPJ async validation via Verifik (DRAFT → ACTIVE transition), company membership CRUD (separate module)
+  - **NOT YET**: Company CNPJ async validation via Verifik (DRAFT → ACTIVE transition)
+
+### 1.5b Company Membership Management
+
+- [x] Backend Member module (**DONE** - v0.0.6)
+  - MemberController: 5 endpoints
+    - `POST /api/v1/companies/:companyId/members` — invite member (email + role + optional message)
+    - `GET /api/v1/companies/:companyId/members` — list members (pagination, status/role/search filtering, sorting)
+    - `PUT /api/v1/companies/:companyId/members/:memberId` — update role and/or permission overrides
+    - `DELETE /api/v1/companies/:companyId/members/:memberId` — remove member
+    - `POST /api/v1/companies/:companyId/members/:memberId/resend-invitation` — resend invitation email
+  - InvitationController: 2 endpoints (public)
+    - `GET /api/v1/invitations/:token` — get invitation details (public, no auth required)
+    - `POST /api/v1/invitations/:token/accept` — accept invitation (requires auth)
+  - MemberService: full business logic
+    - Invite flow: creates CompanyMember with PENDING status + InvitationToken (7-day expiry)
+    - Accept flow: validates token, checks expiry, transitions PENDING → ACTIVE
+    - Re-invite REMOVED members (updates existing record due to @@unique constraint)
+    - Last-admin protection: cannot remove or demote the only ADMIN
+    - Protected permissions: `usersManage` only allowed for ADMIN role
+    - 20-company limit per user (MAX_COMPANIES_PER_USER)
+    - 50 invitation limit per day per company (MAX_INVITATIONS_PER_DAY)
+    - Permission overrides: 10 boolean flags (viewCapTable, manageCapTable, viewTransactions, manageTransactions, viewDocuments, manageDocuments, viewReports, manageReports, viewAuditLogs, usersManage)
+    - Token upsert on resend (1:1 schema constraint)
+  - DTOs: InviteMemberDto (MemberRoleDto enum + email/role/message), UpdateMemberDto (PermissionOverridesDto with 10 boolean flags), ListMembersQueryDto (extends PaginationQueryDto)
+  - GoneException class added to AppException hierarchy (HTTP 410 for expired invitations)
+  - 13 new i18n error messages (PT-BR + EN) for membership operations
+  - 52 tests (30 service + 11 controller) — all passing
+  - **NOT YET**: Email sending on invite/accept (requires SES integration), frontend member management page
 
 ### 1.6 KYC Verification (Verifik Integration)
 
@@ -1210,15 +1238,15 @@ FINAL REVIEW:
 
 ### 2.1 Company Management
 
-- [ ] Company backend (per company-management.md + company-membership.md)
-  - Company entity + Prisma model
-  - CompanyMember entity + Prisma model
-  - Company CRUD API endpoints
-  - Company membership system (invitation flow, 7-day token expiry)
-  - Company settings API
-  - Role management (ADMIN, FINANCE, LEGAL, INVESTOR, EMPLOYEE)
-  - Permission guards per user-permissions.md matrix
-  - Company row-level security via Prisma middleware (using `:companyId` path param, NOT `X-Company-Id` header)
+- [x] Company backend (per company-management.md + company-membership.md) — **DONE v0.0.5 + v0.0.6**
+  - ~~Company entity + Prisma model~~ (done in schema)
+  - ~~CompanyMember entity + Prisma model~~ (done in schema)
+  - ~~Company CRUD API endpoints~~ (done v0.0.5)
+  - ~~Company membership system (invitation flow, 7-day token expiry)~~ (done v0.0.6)
+  - ~~Role management (ADMIN, FINANCE, LEGAL, INVESTOR, EMPLOYEE)~~ (done v0.0.6)
+  - [ ] Company settings API (not yet implemented)
+  - [ ] Permission guards per user-permissions.md matrix (RolesGuard exists, fine-grained permission checks pending)
+  - [ ] Company row-level security via Prisma middleware (using `:companyId` path param, NOT `X-Company-Id` header)
 
 - [ ] Company CNPJ validation (per company-cnpj-validation.md)
   - Async CNPJ validation via Verifik (Bull job)
@@ -1616,7 +1644,9 @@ PHASE 1: FOUNDATION & INFRASTRUCTURE
     |-- 1.2: Next.js frontend scaffold + design system
     |-- 1.3: NestJS backend scaffold + Prisma + security + audit infra
     |-- 1.4: Privy authentication
-    |-- 1.5: Verifik KYC
+    |-- 1.5: Company Management (DONE v0.0.5)
+    |-- 1.5b: Company Membership CRUD (DONE v0.0.6)
+    |-- 1.6: Verifik KYC
     |
     v
 PHASE 2: CORE CAP TABLE
@@ -1827,7 +1857,10 @@ BACKEND — Auth Fixes:
 [ ] Write tests for untested paths: @CurrentUser, @Roles, lockout expiry, Apple OAuth
 
 BACKEND — Company Management (next steps):
-[ ] Company membership CRUD module (invite, accept, remove, role change)
+[x] Company membership CRUD module (invite, accept, remove, role change) — **DONE v0.0.6**
+    - MemberController (5 endpoints) + InvitationController (2 endpoints)
+    - MemberService: invite, accept, update role/perms, remove, resend invitation
+    - 52 tests (30 service + 11 controller), 161 total tests passing
 [ ] Async CNPJ validation via Verifik (triggers DRAFT → ACTIVE transition)
 
 FRONTEND — Security (v11.0 findings):
