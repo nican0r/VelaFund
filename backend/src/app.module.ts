@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { BullModule } from '@nestjs/bull';
 import { APP_GUARD } from '@nestjs/core';
 import { PrismaModule } from './prisma/prisma.module';
+import { RedisModule } from './redis/redis.module';
 import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
 import { CompanyModule } from './company/company.module';
@@ -28,6 +30,23 @@ import { ConvertibleModule } from './convertible/convertible.module';
       { name: 'upload', ttl: 60000, limit: 10 },
       { name: 'blockchain', ttl: 60000, limit: 10 },
     ]),
+    BullModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        redis: configService.get<string>(
+          'REDIS_URL',
+          'redis://localhost:6379',
+        ),
+        defaultJobOptions: {
+          attempts: 3,
+          backoff: { type: 'exponential' as const, delay: 1000 },
+          removeOnComplete: true,
+          removeOnFail: false,
+        },
+      }),
+    }),
+    RedisModule,
     PrismaModule,
     HealthModule,
     AuthModule,
@@ -42,7 +61,7 @@ import { ConvertibleModule } from './convertible/convertible.module';
     ConvertibleModule,
   ],
   providers: [
-    // BUG-3 fix: Register ThrottlerGuard globally — rate limits apply to all endpoints.
+    // Register ThrottlerGuard globally — rate limits apply to all endpoints.
     // Use @Throttle() to override per-endpoint, @SkipThrottle() to opt out.
     {
       provide: APP_GUARD,

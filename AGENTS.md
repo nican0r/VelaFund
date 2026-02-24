@@ -30,7 +30,7 @@ pnpm format:check                  # Check formatting without writing
 cd backend
 pnpm dev                           # Start NestJS in watch mode
 pnpm build                         # Build NestJS to dist/
-pnpm test                          # Run unit tests (Jest)
+pnpm test                          # Run unit tests (Jest); use `npx jest` for pattern matching
 pnpm test:cov                      # Run unit tests with coverage
 pnpm test:e2e                      # Run E2E tests
 pnpm type-check                    # TypeScript type-check
@@ -39,6 +39,11 @@ pnpm prisma:generate               # Generate Prisma client from schema
 pnpm prisma:migrate:dev            # Create and apply dev migration
 pnpm prisma:migrate:deploy         # Apply migrations in production
 pnpm prisma:studio                 # Open Prisma Studio GUI
+
+# Redis (via Bull queues)
+# BullModule configured in app.module.ts with REDIS_URL env var
+# Falls back to localhost:6379 if REDIS_URL is not set
+# Health check at GET /api/v1/health includes Redis status
 ```
 
 ### Frontend (@navia/frontend)
@@ -71,6 +76,8 @@ pnpm --filter @navia/backend prisma:generate
 | File | Purpose |
 |------|---------|
 | `backend/prisma/schema.prisma` | Database schema (all entities) |
+| `backend/src/app.module.ts` | Root module — includes BullModule.forRootAsync for Redis/Bull queues |
+| `backend/src/redis/redis.module.ts` | Global RedisModule — provides REDIS_CLIENT injection token |
 | `backend/src/main.ts` | NestJS bootstrap (middleware, pipes, filters) |
 | `backend/src/auth/auth.service.ts` | Privy auth: token verify, login, user find/create |
 | `backend/src/auth/auth.controller.ts` | Auth endpoints: login, logout, me |

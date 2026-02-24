@@ -1,6 +1,6 @@
 # Navia MVP — Implementation Plan v21.0
 
-> **Generated**: 2026-02-24 | **Tests**: 628 passing | **Backend modules**: 12 of 23 built
+> **Generated**: 2026-02-24 | **Tests**: 640 passing | **Backend modules**: 12 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -15,7 +15,7 @@
 
 **Frontend**: Scaffolding only (layout shell, static mock pages, typed API client with hardcoded `Accept-Language: 'pt-BR'`). No Privy SDK, no next-intl, no shadcn/ui components, no functional pages, no tests (0 `.test.tsx` files).
 
-**Infrastructure**: No Redis/Bull (`@nestjs/bull`, `bull`, `ioredis` not in package.json), no AWS SDK (`@aws-sdk/*` not in package.json), no `@sentry/nestjs`, no EncryptionService, no CSRF middleware, no `redactPii()` utility, no body size limits, no email sending.
+**Infrastructure**: Redis/Bull configured (`@nestjs/bull`, `bull`, `ioredis` installed; BullModule.forRootAsync in AppModule). No AWS SDK (`@aws-sdk/*` not in package.json), no `@sentry/nestjs`, no EncryptionService, no CSRF middleware, no `redactPii()` utility, no body size limits, no email sending.
 
 **Prisma schema**: 32 models, 36 enums. Models already present: AuditHashChain, ConsentRecord. Models missing: WaterfallScenario, ExportJob, ProfileDocumentDownload. User.locale field exists.
 
@@ -23,12 +23,8 @@
 
 ## P0 — Bug Fixes (immediate)
 
-- [ ] **BUG-1 (CRITICAL)**: Raw Privy token (1-6h expiry) stored in 7-day cookie → 401 after token expiry. Need `/auth/refresh` endpoint or Redis-backed session store. **Blocked on Redis infra (see P1).**
-- [x] **BUG-2**: ~~Option exercise creation requires `@Roles('ADMIN')`~~ FIXED (v0.0.15): Changed to `@Roles('ADMIN', 'EMPLOYEE')` on createExercise and cancelExercise endpoints. Added `validateGranteeOrAdmin()` service-layer check that verifies the user is either the grant beneficiary (via Shareholder.userId linkage) or an ADMIN member. cancelExercise now accepts userId parameter. 1 new test added.
-- [x] **BUG-3**: ~~Typo `zeroPremoneeyShares`~~ FIXED (v0.0.15): Renamed to `zeroPremoneyShares` in convertible.service.ts (2 locations) and app-exception.ts (1 location).
-- [x] **BUG-4**: ~~accruedInterest from DB always 0~~ FIXED (v0.0.15): Extracted `calculateAccruedInterest()` private helper and used it in `getConversionScenarios()` and `convert()` instead of reading stale DB field. Same calculation logic as `getInterestBreakdown()`. Daily accrual job still deferred until Redis.
-- [x] **BUG-5**: ~~ConvertibleController local AuthenticatedUser~~ FIXED (v0.0.15): Removed local interface, importing from `auth/decorators/current-user.decorator.ts`.
-- [x] **BUG-6**: ~~RoundType enum missing values~~ FIXED (v0.0.15): Added `PRE_SEED` and `OTHER` to both Prisma `RoundType` enum and `RoundTypeDto`. Prisma client regenerated. Migration pending (no database connection in dev env).
+- [ ] **BUG-1 (CRITICAL)**: Raw Privy token (1-6h expiry) stored in 7-day cookie → 401 after token expiry. Need `/auth/refresh` endpoint or Redis-backed session store. **Redis infra now available (v0.0.16) — unblocked.**
+- [x] **BUG-2 through BUG-6**: All FIXED in v0.0.15. BUG-2: exercise roles `@Roles('ADMIN', 'EMPLOYEE')` + `validateGranteeOrAdmin()`. BUG-3: typo `zeroPremoneeyShares` → `zeroPremoneyShares`. BUG-4: on-the-fly `calculateAccruedInterest()` instead of stale DB field. BUG-5: removed local `AuthenticatedUser` interface. BUG-6: added `PRE_SEED`/`OTHER` to `RoundType` enum.
 
 ---
 
@@ -36,11 +32,11 @@
 
 These are prerequisites for many downstream features.
 
-- [ ] **Redis + Bull queue setup**
-  - [ ] Add `@nestjs/bull`, `bull`, `ioredis` dependencies (none currently in package.json)
-  - [ ] Configure BullModule.forRoot with Redis connection (Railway Redis URL)
-  - [ ] REDIS_URL already in `.env.example` — add to backend ConfigModule validation
-  - [ ] Create Bull health check in HealthController
+- [x] **Redis + Bull queue setup** — DONE (v0.0.16): Added `@nestjs/bull`, `bull`, `ioredis` dependencies. BullModule.forRootAsync configured in AppModule with REDIS_URL from ConfigService and default job options (3 retries, exponential backoff). Global `RedisModule` provides shared `REDIS_CLIENT` injection token with connection lifecycle management. Redis health check added to HealthController (reports `up`/`down`/`unconfigured`). 8 new tests (640 total passing).
+  - [x] Add `@nestjs/bull`, `bull`, `ioredis` dependencies
+  - [x] Configure BullModule.forRoot with Redis connection (Railway Redis URL)
+  - [x] REDIS_URL added to backend ConfigModule validation
+  - [x] Create Bull health check in HealthController
   - _Unlocks_: audit logging, notifications, email sending, daily interest accrual, async CNPJ validation, export jobs, session store
 
 - [ ] **AWS SDK integration**
@@ -646,7 +642,7 @@ P4.1 Frontend Foundation ───→ All P4.x pages
 
 ## Recommended Implementation Order
 
-**Sprint 1**: P0 bugs (BUG-2, BUG-3, BUG-4 on-the-fly fix, BUG-5, BUG-6; BUG-1 deferred), P1 Redis+Bull, P1 AWS SDK
+**Sprint 1**: P0 bugs (BUG-2–6 DONE v0.0.15; BUG-1 deferred to Redis session store), P1 Redis+Bull (DONE v0.0.16), P1 AWS SDK
 **Sprint 2**: P1 remaining (CSRF, redactPii, Sentry, Email, EncryptionService, body limits, helmet gap, test infra deps), P2 Auth gaps
 **Sprint 3**: P3.1 Notifications, P3.2 Audit Logging
 **Sprint 4**: P3.3 KYC, P3.14 CNPJ Validation, P2 Company gaps
