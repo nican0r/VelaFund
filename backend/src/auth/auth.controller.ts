@@ -12,6 +12,7 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
+import { SessionService } from './session.service';
 import { LoginDto } from './dto/login.dto';
 import { Public } from './decorators/public.decorator';
 import { RequireAuth } from './decorators/require-auth.decorator';
@@ -23,7 +24,10 @@ import {
 @ApiTags('Auth')
 @Controller('api/v1/auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly sessionService: SessionService,
+  ) {}
 
   @Post('login')
   @Public()
@@ -44,10 +48,20 @@ export class AuthController {
       ipAddress,
     );
 
-    // Set auth token as HTTP-only cookie for subsequent requests
-    // The Privy access token is short-lived, so we store it for the session
+    // BUG-1 fix: Create a Redis-backed session instead of storing the raw Privy token.
+    // Privy tokens expire in 1-6 hours, but our session needs to last 7 days.
+    // The session ID in the cookie references a Redis entry with the userId,
+    // so we no longer depend on Privy token validity for ongoing requests.
+    const sessionId = await this.sessionService.createSession(user.id, {
+      ipAddress,
+      userAgent: req.headers['user-agent'] || '',
+    });
+
+    // If Redis is unavailable, fall back to storing the Privy token (legacy behavior)
+    const cookieValue = sessionId || dto.privyAccessToken;
+
     const isProduction = process.env.NODE_ENV === 'production';
-    res.cookie('navia-auth-token', dto.privyAccessToken, {
+    res.cookie('navia-auth-token', cookieValue, {
       httpOnly: true,
       secure: isProduction,
       sameSite: 'strict',
@@ -69,7 +83,16 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Logout and invalidate session' })
   @ApiResponse({ status: 200, description: 'Logout successful' })
-  async logout(@Res({ passthrough: true }) res: Response) {
+  async logout(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    // Destroy the Redis session if one exists
+    const sessionId = req.cookies?.['navia-auth-token'];
+    if (sessionId) {
+      await this.sessionService.destroySession(sessionId);
+    }
+
     res.clearCookie('navia-auth-token', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',

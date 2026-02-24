@@ -13,7 +13,12 @@
   },
   "errors": {
     "auth": {
+      "accountLocked": "Account locked due to too many attempts. Try again in 15 minutes.",
+      "duplicateEmail": "This email is already associated with another account.",
       "invalidToken": "Invalid authentication token",
+      "loggedOut": "You have been logged out successfully.",
+      "privyUnavailable": "Authentication service unavailable. Please try again.",
+      "sessionExpired": "Your session has expired. Please log in again.",
       "unauthorized": "Unauthorized"
     },
     "cap": {

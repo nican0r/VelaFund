@@ -1,6 +1,6 @@
 # Navia MVP — Implementation Plan v21.0
 
-> **Generated**: 2026-02-24 | **Tests**: 640 passing | **Backend modules**: 12 of 23 built
+> **Generated**: 2026-02-24 | **Tests**: 677 passing | **Backend modules**: 12 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -9,13 +9,13 @@
 
 ## Current State
 
-**Built backend modules** (12): auth, company, member, share-class, shareholder, cap-table, transaction, funding-round, option-plan (with exercises), convertible
+**Built backend modules** (12): auth (with Redis sessions), company, member, share-class, shareholder, cap-table, transaction, funding-round, option-plan (with exercises), convertible
 
 **Entirely missing backend modules** (13): kyc, notification, document-generation, document-signatures, audit-logging, blockchain-integration, company-profile, company-dataroom, company-litigation, company-blockchain-admin, cap-table-reconciliation, reports-analytics, exit-waterfall
 
 **Frontend**: Scaffolding only (layout shell, static mock pages, typed API client with hardcoded `Accept-Language: 'pt-BR'`). No Privy SDK, no next-intl, no shadcn/ui components, no functional pages, no tests (0 `.test.tsx` files).
 
-**Infrastructure**: Redis/Bull configured (`@nestjs/bull`, `bull`, `ioredis` installed; BullModule.forRootAsync in AppModule). No AWS SDK (`@aws-sdk/*` not in package.json), no `@sentry/nestjs`, no EncryptionService, no CSRF middleware, no `redactPii()` utility, no body size limits, no email sending.
+**Infrastructure**: Redis/Bull configured (`@nestjs/bull`, `bull`, `ioredis` installed; BullModule.forRootAsync in AppModule). SessionService for Redis-backed auth sessions (7-day absolute, 2-hour inactivity timeouts). No AWS SDK (`@aws-sdk/*` not in package.json), no `@sentry/nestjs`, no EncryptionService, no CSRF middleware, no `redactPii()` utility, no body size limits, no email sending.
 
 **Prisma schema**: 32 models, 36 enums. Models already present: AuditHashChain, ConsentRecord. Models missing: WaterfallScenario, ExportJob, ProfileDocumentDownload. User.locale field exists.
 
@@ -23,7 +23,7 @@
 
 ## P0 — Bug Fixes (immediate)
 
-- [ ] **BUG-1 (CRITICAL)**: Raw Privy token (1-6h expiry) stored in 7-day cookie → 401 after token expiry. Need `/auth/refresh` endpoint or Redis-backed session store. **Redis infra now available (v0.0.16) — unblocked.**
+- [x] **BUG-1 (CRITICAL)**: FIXED in v0.0.17. Raw Privy token replaced with Redis-backed session store. SessionService creates 64-char hex session ID stored in cookie, backed by Redis with 7-day absolute timeout (Redis TTL) and 2-hour inactivity timeout. AuthGuard uses session→Redis→DB lookup for cookie auth, with Privy token fallback for Bearer header and Redis-unavailable mode. Graceful degradation: if Redis is down, falls back to Privy token verification.
 - [x] **BUG-2 through BUG-6**: All FIXED in v0.0.15. BUG-2: exercise roles `@Roles('ADMIN', 'EMPLOYEE')` + `validateGranteeOrAdmin()`. BUG-3: typo `zeroPremoneeyShares` → `zeroPremoneyShares`. BUG-4: on-the-fly `calculateAccruedInterest()` instead of stale DB field. BUG-5: removed local `AuthenticatedUser` interface. BUG-6: added `PRE_SEED`/`OTHER` to `RoundType` enum.
 
 ---
@@ -38,6 +38,7 @@ These are prerequisites for many downstream features.
   - [x] REDIS_URL already in `.env.example` — add to backend ConfigModule validation — DONE: RedisModule reads REDIS_URL via ConfigService, defaults gracefully to null when unconfigured
   - [x] Create Bull health check in HealthController — DONE: Health endpoint now reports database + Redis status (up/down/unconfigured)
   - _Unlocks_: audit logging, notifications, email sending, daily interest accrual, async CNPJ validation, export jobs, session store
+  - _Session store_: SessionService (v0.0.17) uses REDIS_CLIENT for auth sessions (7-day absolute, 2-hour inactivity)
 
 - [ ] **AWS SDK integration**
   - [ ] Add `@aws-sdk/client-s3`, `@aws-sdk/client-ses`, `@aws-sdk/client-kms`, `@aws-sdk/s3-request-presigner` (none currently in package.json)
@@ -104,9 +105,9 @@ Gaps in the 12 built modules, ordered by module.
 
 ### Auth Module
 
-- [ ] `/auth/refresh` endpoint — refresh Privy token or create Redis-backed session (depends on P1 Redis)
-- [ ] Inactivity timeout (2h) — track last activity timestamp, invalidate stale sessions
-- [ ] Move failed-attempt lockout from in-memory Map to Redis (current 10K cap is fragile)
+- [x] ~~`/auth/refresh` endpoint~~ — REPLACED by Redis session store (v0.0.17). Sessions are managed server-side; no token refresh needed.
+- [x] ~~Inactivity timeout (2h)~~ — DONE in v0.0.17. SessionService.isInactive() checks lastActivityAt; AuthGuard destroys inactive sessions and returns 401 with `errors.auth.sessionExpired`.
+- [ ] Move failed-attempt lockout from in-memory Map to Redis (current 10K cap is fragile) — Redis infrastructure now available
 - [ ] Duplicate wallet check — prevent two users from linking the same wallet address
 - [ ] Privy API retry with exponential backoff (currently no retry on verify failure)
 - [ ] Audit logging events: AUTH_LOGIN_SUCCESS, AUTH_LOGIN_FAILED, AUTH_LOGOUT (depends on P3 Audit module)
@@ -619,7 +620,7 @@ P1 Redis+Bull (DONE v0.0.16) ┬──→ P3.1 Notifications
                               ├──→ P3.13 Reports (+ P1 AWS)
                               ├──→ P3.14 CNPJ Validation (+ P3.3)
                               ├──→ P2 Convertible daily accrual job
-                              └──→ P0 BUG-1 session fix
+                              └──→ P0 BUG-1 session fix (DONE v0.0.17)
 
 P1 AWS SDK ─────────────────┬──→ P1 Email (SES)
                             ├──→ P1 EncryptionService (KMS)
@@ -642,7 +643,7 @@ P4.1 Frontend Foundation ───→ All P4.x pages
 
 ## Recommended Implementation Order
 
-**Sprint 1**: P0 bugs (BUG-2–6 DONE v0.0.15; BUG-1 deferred to Redis session store), P1 Redis+Bull (DONE v0.0.16), P1 AWS SDK
+**Sprint 1**: P0 bugs (BUG-1 DONE v0.0.17; BUG-2–6 DONE v0.0.15), P1 Redis+Bull (DONE v0.0.16), P1 AWS SDK
 **Sprint 2**: P1 remaining (CSRF, redactPii, Sentry, Email, EncryptionService, body limits, helmet gap, test infra deps), P2 Auth gaps
 **Sprint 3**: P3.1 Notifications, P3.2 Audit Logging
 **Sprint 4**: P3.3 KYC, P3.14 CNPJ Validation, P2 Company gaps

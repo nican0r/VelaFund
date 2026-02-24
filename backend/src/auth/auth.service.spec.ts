@@ -377,6 +377,47 @@ describe('AuthService', () => {
     });
   });
 
+  describe('getUserById', () => {
+    it('should return authenticated user by database ID', async () => {
+      prisma.user.findUnique.mockResolvedValue(mockDbUser);
+
+      const result = await service.getUserById('user-uuid-1');
+
+      expect(result).toEqual({
+        id: 'user-uuid-1',
+        privyUserId: 'did:privy:abc123',
+        email: 'test@example.com',
+        walletAddress: '0x1234567890abcdef',
+        firstName: 'Test',
+        lastName: 'User',
+        kycStatus: 'NOT_STARTED',
+        locale: 'pt-BR',
+      });
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { id: 'user-uuid-1' },
+      });
+    });
+
+    it('should throw UnauthorizedException when user not found', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(service.getUserById('nonexistent')).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
+
+    it('should throw UnauthorizedException when user is soft-deleted', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        ...mockDbUser,
+        deletedAt: new Date(),
+      });
+
+      await expect(service.getUserById('user-uuid-1')).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
+  });
+
   describe('getProfile', () => {
     it('should return user profile', async () => {
       prisma.user.findUnique.mockResolvedValue({

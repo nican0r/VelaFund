@@ -228,6 +228,26 @@ export class AuthService {
   }
 
   /**
+   * Look up a user by database ID and return the AuthenticatedUser object.
+   * Used by session-based auth (AuthGuard) to load the user from a Redis session's userId.
+   */
+  async getUserById(userId: string): Promise<AuthenticatedUser> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('errors.auth.invalidToken');
+    }
+
+    if (user.deletedAt) {
+      throw new UnauthorizedException('errors.auth.invalidToken');
+    }
+
+    return this.toAuthenticatedUser(user);
+  }
+
+  /**
    * Get the current user's full profile.
    */
   async getProfile(userId: string) {

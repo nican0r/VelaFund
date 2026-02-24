@@ -13,7 +13,12 @@
   },
   "errors": {
     "auth": {
+      "accountLocked": "Conta bloqueada por excesso de tentativas. Tente novamente em 15 minutos.",
+      "duplicateEmail": "Este e-mail já está associado a outra conta.",
       "invalidToken": "Token de autenticação inválido",
+      "loggedOut": "Você foi desconectado com sucesso.",
+      "privyUnavailable": "Serviço de autenticação indisponível. Tente novamente.",
+      "sessionExpired": "Sua sessão expirou. Faça login novamente.",
       "unauthorized": "Não autorizado"
     },
     "cap": {

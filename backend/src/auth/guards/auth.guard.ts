@@ -8,6 +8,7 @@ import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { AuthService } from '../auth.service';
+import { SessionService } from '../session.service';
 import { UnauthorizedException } from '../../common/filters/app-exception';
 
 @Injectable()
@@ -17,6 +18,7 @@ export class AuthGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly authService: AuthService,
+    private readonly sessionService: SessionService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -28,38 +30,57 @@ export class AuthGuard implements CanActivate {
     if (isPublic) return true;
 
     const request = context.switchToHttp().getRequest<Request>();
-    const token = this.extractToken(request);
 
-    if (!token) {
-      throw new UnauthorizedException('errors.auth.invalidToken');
-    }
-
-    try {
-      const user = await this.authService.verifyTokenAndGetUser(token);
-      (request as any).user = user;
-      return true;
-    } catch (error) {
-      if (error instanceof UnauthorizedException) {
-        throw error;
+    // Path 1: Session-based auth from cookie (primary when Redis available)
+    const cookieValue = request.cookies?.['navia-auth-token'];
+    if (cookieValue && this.sessionService.isAvailable()) {
+      const session = await this.sessionService.getSession(cookieValue);
+      if (session) {
+        // Valid session found — check inactivity timeout (2 hours)
+        if (this.sessionService.isInactive(session)) {
+          await this.sessionService.destroySession(cookieValue);
+          throw new UnauthorizedException('errors.auth.sessionExpired');
+        }
+        // Update last activity (throttled to reduce Redis writes)
+        await this.sessionService.touchSession(cookieValue, session);
+        // Load user from database by session's userId
+        const user = await this.authService.getUserById(session.userId);
+        (request as any).user = user;
+        return true;
       }
-      this.logger.warn(`Auth verification failed: ${error instanceof Error ? error.message : 'Unknown'}`);
-      throw new UnauthorizedException('errors.auth.invalidToken');
+      // Session not found in Redis. This could mean:
+      // 1. Session expired (normal) → user needs to re-login
+      // 2. Old Privy token cookie from before session migration
+      // Fall through to Path 2 to handle both cases gracefully
     }
+
+    // Path 2: Privy token verification (Bearer header preferred, cookie fallback)
+    // Handles: Bearer header for API clients, old cookies with Privy tokens, Redis-unavailable mode
+    const token = this.extractBearerToken(request) || cookieValue;
+    if (token) {
+      try {
+        const user = await this.authService.verifyTokenAndGetUser(token);
+        (request as any).user = user;
+        return true;
+      } catch (error) {
+        if (error instanceof UnauthorizedException) {
+          throw error;
+        }
+        this.logger.warn(
+          `Auth verification failed: ${error instanceof Error ? error.message : 'Unknown'}`,
+        );
+        throw new UnauthorizedException('errors.auth.invalidToken');
+      }
+    }
+
+    throw new UnauthorizedException('errors.auth.invalidToken');
   }
 
-  private extractToken(request: Request): string | null {
-    // Try Authorization header first
+  private extractBearerToken(request: Request): string | null {
     const authHeader = request.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       return authHeader.slice(7);
     }
-
-    // Fall back to HTTP-only cookie
-    const cookieToken = request.cookies?.['navia-auth-token'];
-    if (cookieToken) {
-      return cookieToken;
-    }
-
     return null;
   }
 }

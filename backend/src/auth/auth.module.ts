@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthService } from './auth.service';
+import { SessionService } from './session.service';
 import { AuthController } from './auth.controller';
 import { AuthGuard } from './guards/auth.guard';
 import { RolesGuard } from './guards/roles.guard';
@@ -9,6 +10,7 @@ import { RolesGuard } from './guards/roles.guard';
   controllers: [AuthController],
   providers: [
     AuthService,
+    SessionService,
     // Register AuthGuard globally — all routes require auth by default.
     // Use @Public() to opt out for specific routes.
     {
@@ -22,6 +24,6 @@ import { RolesGuard } from './guards/roles.guard';
       useClass: RolesGuard,
     },
   ],
-  exports: [AuthService],
+  exports: [AuthService, SessionService],
 })
 export class AuthModule {}
