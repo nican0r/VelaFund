@@ -1,6 +1,6 @@
-# Navia MVP — Implementation Plan v34.0
+# Navia MVP — Implementation Plan v35.0
 
-> **Generated**: 2026-02-25 | **Tests**: 1766 passing (1704 backend + 62 frontend) | **Backend modules**: 22 of 23 built
+> **Generated**: 2026-02-25 | **Tests**: 1789 passing (1704 backend + 85 frontend) | **Backend modules**: 22 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -500,13 +500,13 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 - [x] 21 component tests
 - [ ] Company switcher in topbar (user may belong to multiple companies — context exists, UI pending)
 
-### 4.5 Shareholders Page (no page exists)
+### 4.5 Shareholders Page
 
-- [ ] Shareholder list table with search, filter (type, status), sort, pagination
+- [x] Shareholder list table with search, filter (type, status), sort, pagination
 - [ ] Create shareholder form (modal or page) with CPF/CNPJ validation
 - [ ] Shareholder detail page: profile card, holdings table, transaction history, documents tab
 - [ ] Beneficial owners management (for CORPORATE type)
-- [ ] Foreign shareholder indicator
+- [x] Foreign shareholder indicator
 
 ### 4.6 Share Classes Page (no page exists)
 

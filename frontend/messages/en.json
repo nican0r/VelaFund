@@ -451,5 +451,70 @@
         "limit": "Maximum number of scenarios reached"
       }
     }
+  },
+  "shareholders": {
+    "actions": "Actions",
+    "confirm": {
+      "delete": "Are you sure you want to remove this shareholder?",
+      "deleteDescription": "If the shareholder has shares or transaction history, they will be set to inactive instead of removed.",
+      "deleteTitle": "Remove Shareholder"
+    },
+    "create": "Add Shareholder",
+    "description": "Manage company shareholders, their holdings, and compliance information.",
+    "empty": "No shareholders found. Add the first shareholder to get started.",
+    "filter": {
+      "allStatuses": "All statuses",
+      "allTypes": "All types",
+      "foreignOnly": "Foreign only",
+      "searchPlaceholder": "Search by name or email..."
+    },
+    "foreign": "Foreign",
+    "kyc": {
+      "approved": "Verified",
+      "na": "N/A",
+      "pending": "Pending"
+    },
+    "pagination": {
+      "next": "Next",
+      "of": "of",
+      "page": "Page",
+      "previous": "Previous",
+      "showing": "Showing {from} to {to} of {total}"
+    },
+    "stats": {
+      "active": "Active",
+      "corporate": "Corporate",
+      "foreign": "Foreign",
+      "total": "Total Shareholders"
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "pending": "Pending"
+    },
+    "success": {
+      "created": "Shareholder added successfully",
+      "deleted": "Shareholder removed successfully",
+      "inactivated": "Shareholder set to inactive",
+      "updated": "Shareholder updated successfully"
+    },
+    "table": {
+      "cpfCnpj": "CPF/CNPJ",
+      "email": "Email",
+      "kyc": "KYC",
+      "name": "Name",
+      "ownership": "Ownership (%)",
+      "status": "Status",
+      "totalShares": "Total Shares",
+      "type": "Type"
+    },
+    "title": "Shareholders",
+    "type": {
+      "advisor": "Advisor",
+      "corporate": "Corporate",
+      "employee": "Employee",
+      "founder": "Founder",
+      "investor": "Investor"
+    }
   }
 }

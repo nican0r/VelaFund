@@ -451,5 +451,70 @@
         "limit": "Limite máximo de cenários atingido"
       }
     }
+  },
+  "shareholders": {
+    "actions": "Ações",
+    "confirm": {
+      "delete": "Tem certeza que deseja remover este acionista?",
+      "deleteDescription": "Se o acionista possuir ações ou histórico de transações, será inativado ao invés de removido.",
+      "deleteTitle": "Remover Acionista"
+    },
+    "create": "Adicionar Acionista",
+    "description": "Gerencie os acionistas da empresa, suas participações e informações de compliance.",
+    "empty": "Nenhum acionista cadastrado. Adicione o primeiro acionista para começar.",
+    "filter": {
+      "allStatuses": "Todos os status",
+      "allTypes": "Todos os tipos",
+      "foreignOnly": "Apenas estrangeiros",
+      "searchPlaceholder": "Buscar por nome ou e-mail..."
+    },
+    "foreign": "Estrangeiro",
+    "kyc": {
+      "approved": "Verificado",
+      "na": "N/A",
+      "pending": "Pendente"
+    },
+    "pagination": {
+      "next": "Próxima",
+      "of": "de",
+      "page": "Página",
+      "previous": "Anterior",
+      "showing": "Mostrando {from} a {to} de {total}"
+    },
+    "stats": {
+      "active": "Ativos",
+      "corporate": "Pessoa Jurídica",
+      "foreign": "Estrangeiros",
+      "total": "Total de Acionistas"
+    },
+    "status": {
+      "active": "Ativo",
+      "inactive": "Inativo",
+      "pending": "Pendente"
+    },
+    "success": {
+      "created": "Acionista adicionado com sucesso",
+      "deleted": "Acionista removido com sucesso",
+      "inactivated": "Acionista inativado com sucesso",
+      "updated": "Acionista atualizado com sucesso"
+    },
+    "table": {
+      "cpfCnpj": "CPF/CNPJ",
+      "email": "E-mail",
+      "kyc": "KYC",
+      "name": "Nome",
+      "ownership": "Participação (%)",
+      "status": "Status",
+      "totalShares": "Total de Ações",
+      "type": "Tipo"
+    },
+    "title": "Acionistas",
+    "type": {
+      "advisor": "Consultor(a)",
+      "corporate": "Pessoa Jurídica",
+      "employee": "Funcionário(a)",
+      "founder": "Fundador(a)",
+      "investor": "Investidor(a)"
+    }
   }
 }

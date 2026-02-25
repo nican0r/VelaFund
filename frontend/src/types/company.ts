@@ -86,6 +86,72 @@ export interface ShareClassSummary {
   type: string;
 }
 
+// Shareholder types returned by GET /api/v1/companies/:id/shareholders
+export type ShareholderType = 'FOUNDER' | 'INVESTOR' | 'EMPLOYEE' | 'ADVISOR' | 'CORPORATE';
+export type ShareholderStatus = 'ACTIVE' | 'INACTIVE' | 'PENDING';
+
+export interface Shareholder {
+  id: string;
+  companyId: string;
+  userId: string | null;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  type: ShareholderType;
+  status: ShareholderStatus;
+  cpfCnpj: string | null;
+  walletAddress: string | null;
+  nationality: string;
+  taxResidency: string;
+  isForeign: boolean;
+  address: {
+    street?: string;
+    city?: string;
+    state?: string;
+    country?: string;
+    postalCode?: string;
+  } | null;
+  rdeIedNumber: string | null;
+  rdeIedDate: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ShareholderHolding {
+  id: string;
+  shareClassId: string;
+  quantity: string;
+  ownershipPct: string;
+  votingPowerPct: string;
+  shareClass: {
+    id: string;
+    className: string;
+    type: string;
+    votesPerShare: string;
+  };
+}
+
+export interface BeneficialOwner {
+  id: string;
+  shareholderId: string;
+  name: string;
+  cpf: string | null;
+  ownershipPct: string;
+}
+
+export interface ShareholderDetail extends Shareholder {
+  shareholdings: ShareholderHolding[];
+  beneficialOwners: BeneficialOwner[];
+}
+
+export interface ForeignShareholdersSummary {
+  shareholders: (Shareholder & { shareholdings: { quantity: string; ownershipPct: string }[] })[];
+  summary: {
+    totalForeignShareholders: number;
+    totalForeignOwnershipPercentage: string;
+  };
+}
+
 // Transaction types returned by GET /api/v1/companies/:id/transactions
 export interface TransactionShareholder {
   id: string;
