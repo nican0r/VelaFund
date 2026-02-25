@@ -118,6 +118,13 @@
     "val": {
       "invalidInput": "Dados de entrada inválidos"
     },
+    "report": {
+      "exportExpired": "Link de download expirado. Gere uma nova exportação.",
+      "exportFailed": "Falha na geração da exportação",
+      "exportNotFound": "Exportação não encontrada",
+      "formatUnsupported": "Formato de exportação não suportado",
+      "generationFailed": "Falha na geração do relatório"
+    },
     "waterfall": {
       "scenarioNotFound": "Cenário de waterfall não encontrado",
       "scenarioLimit": "Limite máximo de cenários salvos atingido (máximo: 50)"
@@ -252,7 +259,55 @@
     },
     "viewAll": "Ver todas as notificações"
   },
+  "portfolio": {
+    "companies": "Empresas",
+    "currentValue": "Valor Atual",
+    "description": "Visão consolidada das suas participações em todas as empresas",
+    "emptyState": "Você ainda não possui participações em nenhuma empresa",
+    "ownership": "Participação",
+    "shares": "Ações",
+    "title": "Meu Portfólio",
+    "totalInvested": "Total Investido",
+    "totalValue": "Valor Total"
+  },
   "reports": {
+    "dilution": {
+      "concentration": "Concentração",
+      "description": "Análise de diluição ao longo do tempo com métricas detalhadas",
+      "foreignOwnership": "Participação estrangeira",
+      "giniCoefficient": "Índice de Gini",
+      "period": "Período",
+      "title": "Análise de Diluição"
+    },
+    "dueDiligence": {
+      "dateRange": "Intervalo de datas",
+      "description": "Gere um pacote ZIP com relatórios detalhados para due diligence",
+      "generating": "Gerando pacote de due diligence...",
+      "title": "Pacote Due Diligence"
+    },
+    "export": {
+      "csv": "CSV",
+      "description": "Exporte o cap table em diferentes formatos",
+      "downloading": "Preparando download...",
+      "expired": "Link expirado — gere novamente",
+      "format": "Formato",
+      "oct": "OCT JSON",
+      "pdf": "PDF",
+      "queued": "Exportação em fila. Você receberá um e-mail quando estiver pronto.",
+      "title": "Exportar Cap Table",
+      "xlsx": "Excel"
+    },
+    "ownership": {
+      "description": "Distribuição de participação, poder de voto e pool de opções",
+      "filterByClass": "Filtrar por classe",
+      "includeOptions": "Incluir opções vestidas",
+      "optionPool": "Pool de Opções",
+      "ownershipPct": "Participação (%)",
+      "shareholder": "Acionista",
+      "shares": "Ações",
+      "title": "Relatório de Participação",
+      "votingPower": "Poder de Voto"
+    },
     "waterfall": {
       "title": "Waterfall de Saída",
       "description": "Modele cenários de saída e veja como os rendimentos seriam distribuídos entre os acionistas",

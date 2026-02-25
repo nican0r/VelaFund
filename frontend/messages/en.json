@@ -118,6 +118,13 @@
     "val": {
       "invalidInput": "Invalid input data"
     },
+    "report": {
+      "exportExpired": "Download link expired. Generate a new export.",
+      "exportFailed": "Export generation failed",
+      "exportNotFound": "Export not found",
+      "formatUnsupported": "Unsupported export format",
+      "generationFailed": "Report generation failed"
+    },
     "waterfall": {
       "scenarioNotFound": "Waterfall scenario not found",
       "scenarioLimit": "Maximum number of saved scenarios reached (limit: 50)"
@@ -252,7 +259,55 @@
     },
     "viewAll": "View all notifications"
   },
+  "portfolio": {
+    "companies": "Companies",
+    "currentValue": "Current Value",
+    "description": "Consolidated view of your holdings across all companies",
+    "emptyState": "You don't have holdings in any company yet",
+    "ownership": "Ownership",
+    "shares": "Shares",
+    "title": "My Portfolio",
+    "totalInvested": "Total Invested",
+    "totalValue": "Total Value"
+  },
   "reports": {
+    "dilution": {
+      "concentration": "Concentration",
+      "description": "Dilution analysis over time with detailed metrics",
+      "foreignOwnership": "Foreign ownership",
+      "giniCoefficient": "Gini Coefficient",
+      "period": "Period",
+      "title": "Dilution Analysis"
+    },
+    "dueDiligence": {
+      "dateRange": "Date range",
+      "description": "Generate a ZIP package with detailed reports for due diligence",
+      "generating": "Generating due diligence package...",
+      "title": "Due Diligence Package"
+    },
+    "export": {
+      "csv": "CSV",
+      "description": "Export the cap table in different formats",
+      "downloading": "Preparing download...",
+      "expired": "Link expired — generate again",
+      "format": "Format",
+      "oct": "OCT JSON",
+      "pdf": "PDF",
+      "queued": "Export queued. You will receive an email when it is ready.",
+      "title": "Export Cap Table",
+      "xlsx": "Excel"
+    },
+    "ownership": {
+      "description": "Ownership distribution, voting power, and option pool",
+      "filterByClass": "Filter by class",
+      "includeOptions": "Include vested options",
+      "optionPool": "Option Pool",
+      "ownershipPct": "Ownership (%)",
+      "shareholder": "Shareholder",
+      "shares": "Shares",
+      "title": "Ownership Report",
+      "votingPower": "Voting Power"
+    },
     "waterfall": {
       "title": "Exit Waterfall",
       "description": "Model exit scenarios and see how proceeds would be distributed among shareholders",

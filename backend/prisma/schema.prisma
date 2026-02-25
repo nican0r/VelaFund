@@ -40,6 +40,7 @@ model User {
   notificationPreferences   UserNotificationPreferences?
   profileDocuments          ProfileDocument[]  @relation("ProfileDocumentUploader")
   waterfallScenarios        WaterfallScenario[]
+  exportJobs                ExportJob[]
 
   @@index([cpfBlindIndex])
   @@index([privyUserId])
@@ -137,6 +138,7 @@ model Company {
   capTableSnapshots CapTableSnapshot[]
   waterfallScenarios WaterfallScenario[]
   profile           CompanyProfile?
+  exportJobs        ExportJob[]
 
   @@index([cnpj])
   @@index([status])
@@ -1266,4 +1268,45 @@ model WaterfallScenario {
 
   @@index([companyId, createdAt])
   @@map("waterfall_scenarios")
+}
+
+// =============================================================================
+// REPORT EXPORTS
+// =============================================================================
+
+model ExportJob {
+  id          String          @id @default(uuid())
+  companyId   String?         @map("company_id")
+  userId      String          @map("user_id")
+  type        ExportJobType   @map("type")
+  format      String?         // pdf, xlsx, csv, oct, zip
+  status      ExportJobStatus @default(QUEUED)
+  s3Key       String?         @map("s3_key")
+  downloadUrl String?         @map("download_url")
+  expiresAt   DateTime?       @map("expires_at")
+  errorCode   String?         @map("error_code")
+  parameters  Json?
+  createdAt   DateTime        @default(now()) @map("created_at")
+  completedAt DateTime?       @map("completed_at")
+
+  // Relations
+  company Company? @relation(fields: [companyId], references: [id])
+  user    User     @relation(fields: [userId], references: [id])
+
+  @@index([companyId, createdAt])
+  @@index([userId, createdAt])
+  @@index([status])
+  @@map("export_jobs")
+}
+
+enum ExportJobType {
+  CAP_TABLE_EXPORT
+  DUE_DILIGENCE
+}
+
+enum ExportJobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
 }

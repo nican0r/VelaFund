@@ -1,6 +1,6 @@
-# Navia MVP — Implementation Plan v30.0
+# Navia MVP — Implementation Plan v31.0
 
-> **Generated**: 2026-02-25 | **Tests**: 1617 passing | **Backend modules**: 21 of 23 built
+> **Generated**: 2026-02-25 | **Tests**: 1704 passing | **Backend modules**: 22 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -9,15 +9,15 @@
 
 ## Current State
 
-**Built backend modules** (21): auth (with Redis sessions + Redis-backed failed-attempt lockout), company, member, share-class, shareholder, cap-table, transaction, funding-round, option-plan (with exercises), convertible, notification, audit-log, email, kyc, document, company-profile, company-dataroom, company-litigation, exit-waterfall
+**Built backend modules** (22): auth (with Redis sessions + Redis-backed failed-attempt lockout), company, member, share-class, shareholder, cap-table, transaction, funding-round, option-plan (with exercises), convertible, notification, audit-log, email, kyc, document, company-profile, company-dataroom, company-litigation, exit-waterfall, reports-analytics
 
-**Entirely missing backend modules** (5): document-signatures, blockchain-integration, company-blockchain-admin, cap-table-reconciliation, reports-analytics
+**Entirely missing backend modules** (4): document-signatures, blockchain-integration, company-blockchain-admin, cap-table-reconciliation
 
 **Frontend**: Scaffolding only (layout shell, static mock pages, typed API client with hardcoded `Accept-Language: 'pt-BR'`). No Privy SDK, no next-intl, no shadcn/ui components, no functional pages, no tests (0 `.test.tsx` files).
 
 **Infrastructure**: Redis/Bull configured (`@nestjs/bull`, `bull`, `ioredis` installed; BullModule.forRootAsync in AppModule). SessionService for Redis-backed auth sessions (7-day absolute, 2-hour inactivity timeouts). AWS SDK configured (`@aws-sdk/client-s3`, `@aws-sdk/client-ses`, `@aws-sdk/client-kms`, `@aws-sdk/s3-request-presigner` installed; AwsModule @Global with S3Service, SesService, KmsService). CSRF middleware implemented (double-submit cookie pattern, `navia-csrf` cookie, `X-CSRF-Token` header validation). Helmet fully configured (including `permittedCrossDomainPolicies: false`). `redactPii()` utility implemented (`common/utils/redact-pii.ts`: maskCpf, maskCnpj, maskEmail, maskWallet, maskIp + redactPiiFromString; integrated with GlobalExceptionFilter for PII-safe logging; AuthService refactored to use centralized utility). Body size limits configured (1MB JSON, 1MB URL-encoded in main.ts). EncryptionModule implemented (@Global) with EncryptionService wrapping KmsService: encrypt/decrypt via KMS and HMAC-SHA256 blind indexes via BLIND_INDEX_KEY env var; graceful degradation with SHA-256 fallback when BLIND_INDEX_KEY is not set and plaintext fallback when KMS is unavailable. AuditLogModule implemented (@Global export via AuditLogService) with Bull queue async processing, @Auditable() decorator, AuditInterceptor (registered as APP_INTERCEPTOR globally), hash chain verification, PII masking at write time. @Auditable() wired into 53 state-changing endpoints across 12 controllers (company, member, invitation, share-class, shareholder, cap-table, transaction, funding-round, convertible, option-plan, kyc, document). EmailModule implemented (@Global export via EmailService) with MJML template compilation, variable interpolation with HTML escaping, locale fallback (pt-BR default), plain-text auto-generation from HTML; 4 base email templates (invitation, exercise-notification, export-ready, password-reset) in PT-BR and EN; MemberService wired to send invitation emails via SES (fire-and-forget with graceful degradation). KycModule implemented with KycController (5 endpoints), KycService (6 methods), VerifikService (4 API methods with native fetch + AbortController timeout), KycProcessor (Bull queue for async AML screening), CPF Modulo 11 validation, Levenshtein fuzzy name matching, image magic bytes validation, S3 KYC bucket with KMS encryption, EncryptionService for CPF encryption + blind index, @Auditable() on all state-changing endpoints, 18 i18n error messages, 192 tests. No `@sentry/nestjs`. **0 TODOs remaining in the backend** (previously 2 in member.service.ts, now replaced with EmailService calls).
 
-**Prisma schema**: 33 models, 36 enums. Models already present: AuditHashChain, ConsentRecord, WaterfallScenario. Models missing: ExportJob, ProfileDocumentDownload. User.locale field exists.
+**Prisma schema**: 34 models, 38 enums. Models already present: AuditHashChain, ConsentRecord, WaterfallScenario, ExportJob. Models missing: ProfileDocumentDownload. User.locale field exists.
 
 ---
 
@@ -146,7 +146,7 @@ Gaps in the 12 built modules, ordered by module.
 ### Cap Table Module
 
 - [ ] Auto-snapshot creation after every confirmed transaction (currently manual only)
-- [ ] PDF/XLSX/CSV export endpoints per `reports-analytics.md` (depends on P3 Reports module or can be standalone)
+- [x] PDF/XLSX/CSV/OCT export endpoints — DONE via Reports module (v0.0.34)
 - [ ] Authorized/public view — filtered view for INVESTOR/EMPLOYEE roles (currently full data for all roles with access)
 - [ ] OCT export: fix snake_case field names per OCF 1.0.0 spec (currently uses camelCase in some places)
 - [ ] Point-in-time comparison: endpoint to diff two snapshots
@@ -395,19 +395,21 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 - [x] i18n: 2 backend error messages, ~33 frontend translation keys (errors.waterfall + reports.waterfall namespaces)
 - [x] @Roles('ADMIN') on all endpoints, @Throttle decorators (write: 30/min, read: 100/min)
 
-### 3.13 Reports & Analytics Module (spec: `reports-analytics.md`)
+### 3.13 Reports & Analytics Module (spec: `reports-analytics.md`) — DONE (v0.0.34)
 
-- [ ] Create `backend/src/reports/` module
-- [ ] Prisma model: ExportJob (**missing from schema** — needs migration with ExportFormat + ExportStatus enums)
-- [ ] ReportsService: generateCapTableReport, generateDilutionReport, generatePortfolioReport, dueDiligencePackage
-- [ ] ReportsController: multiple report endpoints per spec
-- [ ] Export formats: PDF (Puppeteer), XLSX (exceljs), CSV (csv-writer), ZIP (archiver) — add deps
-- [ ] Async export via Bull for large datasets (>1000 rows → 202 Accepted + email notification)
-- [ ] Ownership reports, dilution analysis, investor portfolio, vesting summary
-- [ ] Due diligence ZIP package (cap table + shareholder registry + transaction history + documents + audit trail)
-- [ ] Tests: service + controller specs
-- [ ] User flow doc: `docs/user-flows/reports-analytics.md`
-- _Depends on_: P1 AWS SDK (S3 + SES), P1 Redis+Bull
+- [x] Create `backend/src/reports/` module (ReportsModule with ReportsService, ReportsController, PortfolioController, ReportExportProcessor, 4 DTOs)
+- [x] Prisma model: ExportJob + ExportJobType + ExportJobStatus enums added to schema
+- [x] ReportsService: getOwnershipReport, getDilutionReport, getPortfolio, exportCapTable, generateDueDiligence, getExportJobStatus
+- [x] ReportsController (6 endpoints): ownership, dilution, cap-table/export, cap-table/export/:jobId, due-diligence, due-diligence/:jobId
+- [x] PortfolioController (1 endpoint): GET /api/v1/users/me/reports/portfolio
+- [x] Export formats: PDF (Puppeteer), XLSX (exceljs), CSV (BOM + semicolons), OCT JSON (OCF 1.0.0), ZIP (archiver) — deps installed
+- [x] Async export via Bull queue ('report-export') with deduplication (5-min window), S3 upload, presigned URLs (1h expiry), email notification
+- [x] Due diligence ZIP: 6 CSVs + cap table PDF + metadata.json
+- [x] Dilution analysis: Gini coefficient, foreign ownership %, time-series from snapshots
+- [x] @Auditable on export + due-diligence endpoints, @Roles ADMIN/FINANCE/LEGAL (ADMIN/LEGAL-only for due-diligence)
+- [x] i18n: 6 backend error messages, ~30 frontend translation keys (errors.report, reports.ownership/dilution/export/dueDiligence, portfolio namespaces)
+- [x] Tests: 87 tests (50 service + 15 controller + 22 processor)
+- [x] User flow doc: `docs/user-flows/reports-analytics.md`
 
 ### 3.14 Company CNPJ Async Validation (spec: `company-cnpj-validation.md`)
 
@@ -572,7 +574,7 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 Models/enums that exist in specs but are missing from the schema:
 
 - [x] `WaterfallScenario` model — for exit waterfall scenarios (exit-waterfall.md) — DONE (v0.0.33)
-- [ ] `ExportJob` model + `ExportFormat` enum + `ExportStatus` enum — for async report exports (reports-analytics.md)
+- [x] `ExportJob` model + `ExportJobType` + `ExportJobStatus` enums — DONE (v0.0.34)
 - [ ] `ProfileDocumentDownload` model — for dataroom access tracking (company-dataroom.md)
 - [ ] Add `lastBlockchainSyncAt` and `lastBlockchainHash` fields to Company model (cap-table-reconciliation.md)
 - [ ] Add `PRE_SEED` and `OTHER` values to `RoundType` enum (funding-rounds.md)
@@ -596,7 +598,7 @@ Models/enums that exist in specs but are missing from the schema:
 - [ ] `docs/user-flows/company-blockchain-admin.md`
 - [ ] `docs/user-flows/cap-table-reconciliation.md`
 - [x] `docs/user-flows/exit-waterfall.md` — DONE (v0.0.33)
-- [ ] `docs/user-flows/reports-analytics.md`
+- [x] `docs/user-flows/reports-analytics.md` — DONE (v0.0.34)
 - [ ] `docs/user-flows/notifications.md`
 - [ ] `docs/user-flows/blockchain-integration.md`
 - [x] `docs/user-flows/document-generation.md` — DONE (v0.0.29)

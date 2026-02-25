@@ -755,6 +755,31 @@ const MESSAGES: Record<string, Record<string, string>> = {
     'pt-BR': 'Limite máximo de cenários salvos atingido (máximo: 50)',
     en: 'Maximum number of saved scenarios reached (limit: 50)',
   },
+  // ─── REPORTS & ANALYTICS MESSAGES ─────────────────────────────────────
+  'errors.report.generationFailed': {
+    'pt-BR': 'Falha na geração do relatório',
+    en: 'Report generation failed',
+  },
+  'errors.report.exportFailed': {
+    'pt-BR': 'Falha na geração da exportação',
+    en: 'Export generation failed',
+  },
+  'errors.report.exportNotFound': {
+    'pt-BR': 'Exportação não encontrada',
+    en: 'Export not found',
+  },
+  'errors.report.exportExpired': {
+    'pt-BR': 'Link de download expirado. Gere uma nova exportação.',
+    en: 'Download link expired. Generate a new export.',
+  },
+  'errors.report.formatUnsupported': {
+    'pt-BR': 'Formato de exportação não suportado',
+    en: 'Unsupported export format',
+  },
+  'errors.exportjob.notFound': {
+    'pt-BR': 'Job de exportação não encontrado',
+    en: 'Export job not found',
+  },
 };
 
 export class AppException extends Error {

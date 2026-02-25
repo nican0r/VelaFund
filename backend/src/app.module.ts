@@ -26,6 +26,7 @@ import { KycModule } from './kyc/kyc.module';
 import { DocumentModule } from './document/document.module';
 import { CompanyProfileModule } from './company-profile/company-profile.module';
 import { ExitWaterfallModule } from './exit-waterfall/exit-waterfall.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { ExitWaterfallModule } from './exit-waterfall/exit-waterfall.module';
     DocumentModule,
     CompanyProfileModule,
     ExitWaterfallModule,
+    ReportsModule,
   ],
   providers: [
     // Register ThrottlerGuard globally — rate limits apply to all endpoints.
