@@ -13,6 +13,6 @@ import { VerifikService } from './verifik/verifik.service';
   ],
   controllers: [KycController],
   providers: [KycService, KycProcessor, VerifikService],
-  exports: [KycService],
+  exports: [KycService, VerifikService],
 })
 export class KycModule {}

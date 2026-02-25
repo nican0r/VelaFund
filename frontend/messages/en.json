@@ -27,6 +27,9 @@
     },
     "company": {
       "cnpjDuplicate": "CNPJ already registered",
+      "cnpjImmutable": "CNPJ cannot be changed after the company is activated",
+      "cnpjNotFailed": "CNPJ validation is not in a failed state",
+      "notDraft": "Company is not in draft mode",
       "notFound": "Company not found"
     },
     "kyc": {

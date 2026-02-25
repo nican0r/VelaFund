@@ -30,6 +30,28 @@ export interface VerifikAmlResponse {
   details: Record<string, unknown>;
 }
 
+export interface VerifikCnpjResponse {
+  razaoSocial: string;
+  nomeFantasia: string | null;
+  situacaoCadastral: string;
+  dataAbertura: string;
+  naturezaJuridica: string;
+  atividadePrincipal: {
+    codigo: string;
+    descricao: string;
+  };
+  endereco: {
+    logradouro: string;
+    numero: string;
+    complemento: string | null;
+    bairro: string;
+    municipio: string;
+    uf: string;
+    cep: string;
+  };
+  capitalSocial: number;
+}
+
 export interface VerifikWebhookPayload {
   session_id: string;
   event_type: string;

@@ -1,4 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCompanyDto } from './dto/create-company.dto';
@@ -10,6 +12,7 @@ import {
   ConflictException,
   BusinessRuleException,
 } from '../common/filters/app-exception';
+import { CnpjValidationPayload } from './processors/cnpj-validation.processor';
 
 /** Maximum number of companies a user can be a member of. */
 const MAX_COMPANIES_PER_USER = 20;
@@ -45,7 +48,10 @@ function isValidCnpjChecksum(cnpj: string): boolean {
 export class CompanyService {
   private readonly logger = new Logger(CompanyService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @InjectQueue('company-setup') private readonly companySetupQueue: Queue,
+  ) {}
 
   /**
    * Create a new company and assign the creator as ADMIN.
@@ -116,6 +122,9 @@ export class CompanyService {
               timezone: dto.timezone ?? 'America/Sao_Paulo',
               locale: dto.locale ?? 'pt-BR',
               createdById: userId,
+              cnpjData: {
+                validationStatus: 'PENDING',
+              } as unknown as Prisma.InputJsonValue,
             },
           });
 
@@ -144,6 +153,9 @@ export class CompanyService {
       this.logger.log(
         `Company ${company.id} created by user ${userId} (CNPJ: ${dto.cnpj})`,
       );
+
+      // Dispatch async CNPJ validation job
+      await this.dispatchCnpjValidation(company.id, dto.cnpj, userId, dto.name);
 
       return company;
     } catch (error) {
@@ -291,6 +303,29 @@ export class CompanyService {
     if (dto.timezone !== undefined) data.timezone = dto.timezone;
     if (dto.locale !== undefined) data.locale = dto.locale;
 
+    // Allow CNPJ update only while company is in DRAFT
+    if (dto.cnpj !== undefined) {
+      if (existing.status !== 'DRAFT') {
+        throw new BusinessRuleException(
+          'COMPANY_CNPJ_IMMUTABLE',
+          'errors.company.cnpjImmutable',
+          { companyId },
+        );
+      }
+      if (!isValidCnpjChecksum(dto.cnpj)) {
+        throw new BusinessRuleException(
+          'COMPANY_INVALID_CNPJ',
+          'errors.company.invalidCnpj',
+          { cnpj: dto.cnpj },
+        );
+      }
+      data.cnpj = dto.cnpj;
+      data.cnpjData = {
+        validationStatus: 'PENDING',
+      } as unknown as Prisma.InputJsonValue;
+      data.cnpjValidatedAt = null;
+    }
+
     const updated = await this.prisma.company.update({
       where: { id: companyId },
       data,
@@ -410,5 +445,123 @@ export class CompanyService {
     );
 
     return updated;
+  }
+
+  /**
+   * Dispatch a CNPJ validation job to the Bull queue.
+   */
+  async dispatchCnpjValidation(
+    companyId: string,
+    cnpj: string,
+    creatorUserId: string,
+    companyName: string,
+  ): Promise<void> {
+    const payload: CnpjValidationPayload = {
+      companyId,
+      cnpj,
+      creatorUserId,
+      companyName,
+    };
+
+    await this.companySetupQueue.add('validate-cnpj', payload, {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 5000 },
+      removeOnComplete: true,
+      removeOnFail: false,
+    });
+
+    this.logger.debug(
+      `Dispatched CNPJ validation job for company ${companyId}`,
+    );
+  }
+
+  /**
+   * Returns the setup status of a company, including CNPJ validation state.
+   * Used by the frontend for polling during company creation.
+   */
+  async getSetupStatus(companyId: string) {
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: {
+        id: true,
+        status: true,
+        cnpjData: true,
+        cnpjValidatedAt: true,
+      },
+    });
+
+    if (!company) {
+      throw new NotFoundException('company', companyId);
+    }
+
+    const cnpjData = (company.cnpjData as Record<string, unknown>) ?? {};
+    const validationStatus =
+      (cnpjData.validationStatus as string) ?? 'UNKNOWN';
+
+    return {
+      companyId: company.id,
+      companyStatus: company.status,
+      cnpjValidation: {
+        status: validationStatus,
+        validatedAt: company.cnpjValidatedAt,
+        error:
+          validationStatus === 'FAILED'
+            ? (cnpjData.error as Record<string, unknown>) ?? null
+            : null,
+      },
+    };
+  }
+
+  /**
+   * Retry CNPJ validation for a DRAFT company.
+   *
+   * Business rules:
+   * - Company must be in DRAFT status
+   * - Previous validation must have FAILED
+   * - Rate limited to prevent abuse (max 3 retries per hour, enforced at controller level)
+   */
+  async retryCnpjValidation(companyId: string, userId: string): Promise<void> {
+    const company = await this.findById(companyId);
+
+    if (company.status !== 'DRAFT') {
+      throw new BusinessRuleException(
+        'COMPANY_NOT_DRAFT',
+        'errors.company.notDraft',
+        { companyId, status: company.status },
+      );
+    }
+
+    const cnpjData = (company.cnpjData as Record<string, unknown>) ?? {};
+    const validationStatus = cnpjData.validationStatus as string;
+
+    if (validationStatus !== 'FAILED') {
+      throw new BusinessRuleException(
+        'COMPANY_CNPJ_NOT_FAILED',
+        'errors.company.cnpjNotFailed',
+        { companyId, validationStatus },
+      );
+    }
+
+    // Reset cnpjData to PENDING
+    await this.prisma.company.update({
+      where: { id: companyId },
+      data: {
+        cnpjData: {
+          validationStatus: 'PENDING',
+        } as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    // Dispatch a new validation job
+    await this.dispatchCnpjValidation(
+      companyId,
+      company.cnpj,
+      userId,
+      company.name,
+    );
+
+    this.logger.log(
+      `CNPJ validation retry dispatched for company ${companyId} by user ${userId}`,
+    );
   }
 }

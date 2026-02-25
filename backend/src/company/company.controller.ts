@@ -156,6 +156,49 @@ export class CompanyController {
   }
 
   /**
+   * Get company setup status (CNPJ validation progress).
+   *
+   * Used by the frontend to poll during company creation.
+   * Any member can check setup status.
+   */
+  @Get(':companyId/setup-status')
+  @Roles('ADMIN', 'FINANCE', 'LEGAL', 'INVESTOR', 'EMPLOYEE')
+  @Throttle({ read: { ttl: 60000, limit: 100 } })
+  @ApiOperation({ summary: 'Get company setup status' })
+  @ApiParam({ name: 'companyId', description: 'Company UUID' })
+  @ApiResponse({ status: 200, description: 'Setup status' })
+  @ApiResponse({ status: 404, description: 'Company not found' })
+  async getSetupStatus(@Param('companyId') companyId: string) {
+    return this.companyService.getSetupStatus(companyId);
+  }
+
+  /**
+   * Retry CNPJ validation for a DRAFT company.
+   *
+   * Only ADMIN can retry. Company must be in DRAFT with FAILED validation.
+   * Rate limited to 3 retries per minute.
+   */
+  @Post(':companyId/retry-validation')
+  @Roles('ADMIN')
+  @Throttle({ write: { ttl: 60000, limit: 3 } })
+  @Auditable({
+    action: 'COMPANY_CNPJ_VALIDATED',
+    resourceType: 'Company',
+    resourceIdParam: 'companyId',
+  })
+  @ApiOperation({ summary: 'Retry CNPJ validation' })
+  @ApiParam({ name: 'companyId', description: 'Company UUID' })
+  @ApiResponse({ status: 200, description: 'Validation retry dispatched' })
+  @ApiResponse({ status: 422, description: 'Company not in DRAFT or validation not failed' })
+  async retryValidation(
+    @Param('companyId') companyId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    await this.companyService.retryCnpjValidation(companyId, userId);
+    return { message: 'CNPJ validation retry dispatched' };
+  }
+
+  /**
    * Dissolve (archive) a company.
    *
    * Permanent, irreversible action. Only ADMIN can dissolve.

@@ -1,0 +1,48 @@
+<!-- subject: {{companyName}} activated on Navia -->
+<mjml>
+  <mj-head>
+    <mj-attributes>
+      <mj-all font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" />
+      <mj-text font-size="14px" color="#4B5563" line-height="1.5" />
+      <mj-button background-color="#1B6B93" color="#FFFFFF" border-radius="8px" font-size="14px" font-weight="600" inner-padding="12px 24px" />
+    </mj-attributes>
+    <mj-style>
+      .footer-text { font-size: 12px; color: #9CA3AF; }
+    </mj-style>
+  </mj-head>
+  <mj-body background-color="#F9FAFB">
+    <mj-section padding="40px 0 20px">
+      <mj-column>
+        <mj-text align="center" font-size="24px" font-weight="700" color="#0A2342">
+          Navia
+        </mj-text>
+      </mj-column>
+    </mj-section>
+    <mj-section background-color="#FFFFFF" border-radius="12px" padding="32px">
+      <mj-column>
+        <mj-text font-size="20px" font-weight="600" color="#0A2342" padding-bottom="16px">
+          Company activated successfully!
+        </mj-text>
+        <mj-text padding-bottom="16px">
+          The CNPJ validation for <strong>{{companyName}}</strong> has been completed successfully.
+        </mj-text>
+        <mj-text padding-bottom="16px">
+          Confirmed legal name: <strong>{{razaoSocial}}</strong>
+        </mj-text>
+        <mj-text padding-bottom="24px">
+          Your company is now active on the Navia platform. You can start managing the cap table, adding shareholders, and recording transactions.
+        </mj-text>
+        <mj-button href="{{frontendUrl}}" align="left">
+          Go to platform
+        </mj-button>
+      </mj-column>
+    </mj-section>
+    <mj-section padding="20px 0">
+      <mj-column>
+        <mj-text align="center" css-class="footer-text">
+          &copy; {{year}} Navia. All rights reserved.
+        </mj-text>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

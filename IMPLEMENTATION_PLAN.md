@@ -1,6 +1,6 @@
-# Navia MVP — Implementation Plan v25.0
+# Navia MVP — Implementation Plan v26.0
 
-> **Generated**: 2026-02-25 | **Tests**: 1205 passing | **Backend modules**: 16 of 23 built
+> **Generated**: 2026-02-25 | **Tests**: 1244 passing | **Backend modules**: 16 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -115,8 +115,8 @@ Gaps in the 12 built modules, ordered by module.
 
 ### Company Module
 
-- [ ] Async CNPJ validation via Verifik + Bull queue per `company-cnpj-validation.md` (depends on P1 Redis+Bull, P3 KYC infra)
-- [ ] `GET /companies/:id/setup-status` endpoint for polling CNPJ validation progress
+- [x] Async CNPJ validation via Verifik + Bull queue per `company-cnpj-validation.md` (DONE v0.0.28)
+- [x] `GET /companies/:id/setup-status` endpoint for polling CNPJ validation progress (DONE v0.0.28)
 - [ ] KYC gate — require user KYC before creating company (depends on P3 KYC module)
 - [ ] Blockchain contract deployment trigger on ACTIVE status (depends on P3 Blockchain module)
 - [ ] Company dissolution — archive related data, prevent new operations
@@ -395,13 +395,13 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 
 ### 3.14 Company CNPJ Async Validation (spec: `company-cnpj-validation.md`)
 
-- [ ] Bull job in company module: async CNPJ validation via Verifik after company creation
-- [ ] `GET /companies/:id/setup-status` polling endpoint
-- [ ] On success: transition company DRAFT → ACTIVE, trigger blockchain deployment
-- [ ] On failure: company stays DRAFT, user notified to retry
-- [ ] Rate limiting on retry attempts
-- [ ] Tests: job processor + endpoint specs
-- [ ] User flow doc: `docs/user-flows/company-cnpj-validation.md`
+- [x] Bull job in company module: async CNPJ validation via Verifik after company creation (DONE v0.0.28)
+- [x] `GET /companies/:id/setup-status` polling endpoint (DONE v0.0.28)
+- [x] On success: transition company DRAFT → ACTIVE (blockchain deployment deferred to P3.8)
+- [x] On failure: company stays DRAFT, user notified to retry (DONE v0.0.28)
+- [x] Rate limiting on retry attempts (DONE v0.0.28 — 3/min via @Throttle)
+- [x] Tests: job processor + endpoint specs (39 new tests — 1244 total)
+- [x] User flow doc: `docs/user-flows/company-cnpj-validation.md` (DONE v0.0.28)
 - _Depends on_: P1 Redis+Bull (DONE), P3.3 KYC (DONE — Verifik client available)
 
 ---
@@ -650,7 +650,7 @@ P4.1 Frontend Foundation ───→ All P4.x pages
 **Sprint 1**: P0 bugs (BUG-1 DONE v0.0.17; BUG-2–6 DONE v0.0.15), P1 Redis+Bull (DONE v0.0.16), P1 AWS SDK (DONE v0.0.18)
 **Sprint 2**: P1 remaining (~~CSRF~~ DONE, ~~redactPii~~ DONE, Sentry, ~~Email~~ DONE, ~~EncryptionService~~ DONE, ~~body limits~~ DONE, ~~helmet gap~~ DONE, test infra deps), P2 Auth gaps (~~Redis lockout~~ DONE)
 **Sprint 3**: P3.1 Notifications (module built, WebSocket + cross-module integration pending), P3.2 Audit Logging (core module built — @Auditable decorator, AuditInterceptor, AuditService, Bull queue processor, controller with list/detail/verify; remaining: ClsModule before-state, daily hash chain job, DLQ monitoring, DB immutability trigger, partitioning, cross-module integration of all 50+ events, export)
-**Sprint 4**: ~~P3.3 KYC~~ DONE, P3.14 CNPJ Validation, P2 Company gaps
+**Sprint 4**: ~~P3.3 KYC~~ DONE, ~~P3.14 CNPJ Validation~~ DONE, P2 Company gaps
 **Sprint 5**: P3.4 Document Generation, P3.7 Dataroom
 **Sprint 6**: P3.6 Company Profile, P3.10 Litigation
 **Sprint 7**: P3.8 Blockchain, P3.9 Blockchain Admin

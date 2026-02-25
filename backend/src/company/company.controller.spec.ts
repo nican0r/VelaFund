@@ -55,6 +55,8 @@ describe('CompanyController', () => {
       update: jest.fn(),
       dissolve: jest.fn(),
       updateStatus: jest.fn(),
+      getSetupStatus: jest.fn(),
+      retryCnpjValidation: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -228,6 +230,80 @@ describe('CompanyController', () => {
 
       expect(result.status).toBe('INACTIVE');
       expect(service.updateStatus).toHaveBeenCalledWith('comp-1', 'INACTIVE');
+    });
+  });
+
+  // ─── GET SETUP STATUS ────────────────────────────────────────────
+
+  describe('getSetupStatus', () => {
+    it('should return setup status', async () => {
+      const setupStatus = {
+        companyId: 'comp-1',
+        companyStatus: 'DRAFT',
+        cnpjValidation: {
+          status: 'PENDING',
+          validatedAt: null,
+          error: null,
+        },
+      };
+      service.getSetupStatus.mockResolvedValue(setupStatus as any);
+
+      const result = await controller.getSetupStatus('comp-1');
+
+      expect(result).toEqual(setupStatus);
+      expect(service.getSetupStatus).toHaveBeenCalledWith('comp-1');
+    });
+
+    it('should propagate NotFoundException', async () => {
+      service.getSetupStatus.mockRejectedValue(
+        new NotFoundException('company', 'comp-1'),
+      );
+
+      await expect(controller.getSetupStatus('comp-1')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  // ─── RETRY VALIDATION ────────────────────────────────────────────
+
+  describe('retryValidation', () => {
+    it('should dispatch retry and return message', async () => {
+      service.retryCnpjValidation.mockResolvedValue(undefined);
+
+      const result = await controller.retryValidation('comp-1', 'user-1');
+
+      expect(result).toEqual({ message: 'CNPJ validation retry dispatched' });
+      expect(service.retryCnpjValidation).toHaveBeenCalledWith(
+        'comp-1',
+        'user-1',
+      );
+    });
+
+    it('should propagate BusinessRuleException for non-DRAFT company', async () => {
+      service.retryCnpjValidation.mockRejectedValue(
+        new BusinessRuleException(
+          'COMPANY_NOT_DRAFT',
+          'errors.company.notDraft',
+        ),
+      );
+
+      await expect(
+        controller.retryValidation('comp-1', 'user-1'),
+      ).rejects.toThrow(BusinessRuleException);
+    });
+
+    it('should propagate BusinessRuleException when validation is not failed', async () => {
+      service.retryCnpjValidation.mockRejectedValue(
+        new BusinessRuleException(
+          'COMPANY_CNPJ_NOT_FAILED',
+          'errors.company.cnpjNotFailed',
+        ),
+      );
+
+      await expect(
+        controller.retryValidation('comp-1', 'user-1'),
+      ).rejects.toThrow(BusinessRuleException);
     });
   });
 

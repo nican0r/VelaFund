@@ -27,6 +27,9 @@
     },
     "company": {
       "cnpjDuplicate": "CNPJ já cadastrado",
+      "cnpjImmutable": "CNPJ não pode ser alterado após a empresa ser ativada",
+      "cnpjNotFailed": "Validação de CNPJ não está em estado de falha",
+      "notDraft": "Empresa não está em modo rascunho",
       "notFound": "Empresa não encontrada"
     },
     "kyc": {

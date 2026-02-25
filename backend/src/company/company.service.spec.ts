@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { getQueueToken } from '@nestjs/bull';
 import { CompanyService } from './company.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -14,6 +15,8 @@ import { Prisma } from '@prisma/client';
 
 // Valid CNPJ for tests (passes Módulo 11 checksum)
 const VALID_CNPJ = '11.222.333/0001-81';
+// Another valid CNPJ
+const VALID_CNPJ_2 = '11.444.777/0001-61';
 // Invalid CNPJ checksum
 const INVALID_CNPJ = '11.222.333/0001-99';
 
@@ -47,6 +50,7 @@ const mockCompany = {
 describe('CompanyService', () => {
   let service: CompanyService;
   let prisma: any;
+  let mockQueue: any;
 
   beforeEach(async () => {
     prisma = {
@@ -79,10 +83,15 @@ describe('CompanyService', () => {
         ),
     };
 
+    mockQueue = {
+      add: jest.fn().mockResolvedValue({ id: 'job-1' }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CompanyService,
         { provide: PrismaService, useValue: prisma },
+        { provide: getQueueToken('company-setup'), useValue: mockQueue },
       ],
     }).compile();
 
@@ -121,6 +130,7 @@ describe('CompanyService', () => {
           fiscalYearEnd: '12-31',
           timezone: 'America/Sao_Paulo',
           locale: 'pt-BR',
+          cnpjData: expect.objectContaining({ validationStatus: 'PENDING' }),
         }),
       });
       // Verify ADMIN membership created
@@ -130,6 +140,44 @@ describe('CompanyService', () => {
           email: mockUser.email,
           role: 'ADMIN',
           status: 'ACTIVE',
+        }),
+      });
+    });
+
+    it('should dispatch CNPJ validation job after creation', async () => {
+      prisma.companyMember.count.mockResolvedValue(0);
+      prisma.user.findUniqueOrThrow.mockResolvedValue(mockUser);
+      prisma.company.create.mockResolvedValue(mockCompany);
+      prisma.companyMember.create.mockResolvedValue({});
+
+      await service.create(createDto, mockUser.id);
+
+      expect(mockQueue.add).toHaveBeenCalledWith(
+        'validate-cnpj',
+        {
+          companyId: 'comp-1',
+          cnpj: VALID_CNPJ,
+          creatorUserId: 'user-1',
+          companyName: 'Test Company',
+        },
+        expect.objectContaining({
+          attempts: 3,
+          backoff: expect.objectContaining({ type: 'exponential' }),
+        }),
+      );
+    });
+
+    it('should set initial cnpjData with PENDING status', async () => {
+      prisma.companyMember.count.mockResolvedValue(0);
+      prisma.user.findUniqueOrThrow.mockResolvedValue(mockUser);
+      prisma.company.create.mockResolvedValue(mockCompany);
+      prisma.companyMember.create.mockResolvedValue({});
+
+      await service.create(createDto, mockUser.id);
+
+      expect(prisma.company.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          cnpjData: { validationStatus: 'PENDING' },
         }),
       });
     });
@@ -407,6 +455,50 @@ describe('CompanyService', () => {
         service.update('non-existent', { name: 'Foo' }),
       ).rejects.toThrow(NotFoundException);
     });
+
+    it('should allow CNPJ update when company is in DRAFT', async () => {
+      prisma.company.findUnique.mockResolvedValue(mockCompany); // status: DRAFT
+      prisma.company.update.mockResolvedValue({
+        ...mockCompany,
+        cnpj: VALID_CNPJ_2,
+      });
+
+      await service.update('comp-1', { cnpj: VALID_CNPJ_2 });
+
+      expect(prisma.company.update).toHaveBeenCalledWith({
+        where: { id: 'comp-1' },
+        data: expect.objectContaining({
+          cnpj: VALID_CNPJ_2,
+          cnpjData: { validationStatus: 'PENDING' },
+          cnpjValidatedAt: null,
+        }),
+      });
+    });
+
+    it('should reject CNPJ update when company is ACTIVE', async () => {
+      prisma.company.findUnique.mockResolvedValue({
+        ...mockCompany,
+        status: 'ACTIVE',
+      });
+
+      await expect(
+        service.update('comp-1', { cnpj: VALID_CNPJ_2 }),
+      ).rejects.toThrow(BusinessRuleException);
+      await expect(
+        service.update('comp-1', { cnpj: VALID_CNPJ_2 }),
+      ).rejects.toThrow('errors.company.cnpjImmutable');
+    });
+
+    it('should reject CNPJ update with invalid checksum', async () => {
+      prisma.company.findUnique.mockResolvedValue(mockCompany); // status: DRAFT
+
+      await expect(
+        service.update('comp-1', { cnpj: INVALID_CNPJ }),
+      ).rejects.toThrow(BusinessRuleException);
+      await expect(
+        service.update('comp-1', { cnpj: INVALID_CNPJ }),
+      ).rejects.toThrow('errors.company.invalidCnpj');
+    });
   });
 
   // ─── DISSOLVE ────────────────────────────────────────────────────
@@ -554,6 +646,212 @@ describe('CompanyService', () => {
       await expect(
         service.updateStatus('comp-1', 'ACTIVE'),
       ).rejects.toThrow(BusinessRuleException);
+    });
+  });
+
+  // ─── GET SETUP STATUS ────────────────────────────────────────────
+
+  describe('getSetupStatus', () => {
+    it('should return setup status with PENDING validation', async () => {
+      prisma.company.findUnique.mockResolvedValue({
+        id: 'comp-1',
+        status: 'DRAFT',
+        cnpjData: { validationStatus: 'PENDING' },
+        cnpjValidatedAt: null,
+      });
+
+      const result = await service.getSetupStatus('comp-1');
+
+      expect(result).toEqual({
+        companyId: 'comp-1',
+        companyStatus: 'DRAFT',
+        cnpjValidation: {
+          status: 'PENDING',
+          validatedAt: null,
+          error: null,
+        },
+      });
+    });
+
+    it('should return setup status with COMPLETED validation', async () => {
+      const validatedAt = new Date('2026-02-25T12:00:00Z');
+      prisma.company.findUnique.mockResolvedValue({
+        id: 'comp-1',
+        status: 'ACTIVE',
+        cnpjData: { validationStatus: 'COMPLETED', razaoSocial: 'ACME LTDA' },
+        cnpjValidatedAt: validatedAt,
+      });
+
+      const result = await service.getSetupStatus('comp-1');
+
+      expect(result).toEqual({
+        companyId: 'comp-1',
+        companyStatus: 'ACTIVE',
+        cnpjValidation: {
+          status: 'COMPLETED',
+          validatedAt,
+          error: null,
+        },
+      });
+    });
+
+    it('should return setup status with FAILED validation and error', async () => {
+      prisma.company.findUnique.mockResolvedValue({
+        id: 'comp-1',
+        status: 'DRAFT',
+        cnpjData: {
+          validationStatus: 'FAILED',
+          error: { code: 'COMPANY_CNPJ_INACTIVE', message: 'CNPJ is BAIXADA' },
+        },
+        cnpjValidatedAt: null,
+      });
+
+      const result = await service.getSetupStatus('comp-1');
+
+      expect(result).toEqual({
+        companyId: 'comp-1',
+        companyStatus: 'DRAFT',
+        cnpjValidation: {
+          status: 'FAILED',
+          validatedAt: null,
+          error: { code: 'COMPANY_CNPJ_INACTIVE', message: 'CNPJ is BAIXADA' },
+        },
+      });
+    });
+
+    it('should handle null cnpjData gracefully', async () => {
+      prisma.company.findUnique.mockResolvedValue({
+        id: 'comp-1',
+        status: 'DRAFT',
+        cnpjData: null,
+        cnpjValidatedAt: null,
+      });
+
+      const result = await service.getSetupStatus('comp-1');
+
+      expect(result.cnpjValidation.status).toBe('UNKNOWN');
+    });
+
+    it('should throw NotFoundException for unknown company', async () => {
+      prisma.company.findUnique.mockResolvedValue(null);
+
+      await expect(service.getSetupStatus('non-existent')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  // ─── RETRY CNPJ VALIDATION ───────────────────────────────────────
+
+  describe('retryCnpjValidation', () => {
+    it('should dispatch a new validation job for DRAFT company with FAILED validation', async () => {
+      prisma.company.findUnique.mockResolvedValue({
+        ...mockCompany,
+        cnpjData: { validationStatus: 'FAILED' },
+      });
+      prisma.company.update.mockResolvedValue({});
+
+      await service.retryCnpjValidation('comp-1', 'user-1');
+
+      // Should reset cnpjData to PENDING
+      expect(prisma.company.update).toHaveBeenCalledWith({
+        where: { id: 'comp-1' },
+        data: {
+          cnpjData: { validationStatus: 'PENDING' },
+        },
+      });
+
+      // Should dispatch new validation job
+      expect(mockQueue.add).toHaveBeenCalledWith(
+        'validate-cnpj',
+        expect.objectContaining({
+          companyId: 'comp-1',
+          cnpj: VALID_CNPJ,
+          creatorUserId: 'user-1',
+          companyName: 'Test Company',
+        }),
+        expect.any(Object),
+      );
+    });
+
+    it('should reject retry when company is not in DRAFT', async () => {
+      prisma.company.findUnique.mockResolvedValue({
+        ...mockCompany,
+        status: 'ACTIVE',
+        cnpjData: { validationStatus: 'FAILED' },
+      });
+
+      await expect(
+        service.retryCnpjValidation('comp-1', 'user-1'),
+      ).rejects.toThrow(BusinessRuleException);
+      await expect(
+        service.retryCnpjValidation('comp-1', 'user-1'),
+      ).rejects.toThrow('errors.company.notDraft');
+    });
+
+    it('should reject retry when validation is not FAILED', async () => {
+      prisma.company.findUnique.mockResolvedValue({
+        ...mockCompany,
+        cnpjData: { validationStatus: 'PENDING' },
+      });
+
+      await expect(
+        service.retryCnpjValidation('comp-1', 'user-1'),
+      ).rejects.toThrow(BusinessRuleException);
+      await expect(
+        service.retryCnpjValidation('comp-1', 'user-1'),
+      ).rejects.toThrow('errors.company.cnpjNotFailed');
+    });
+
+    it('should reject retry when validation is COMPLETED', async () => {
+      prisma.company.findUnique.mockResolvedValue({
+        ...mockCompany,
+        cnpjData: { validationStatus: 'COMPLETED' },
+      });
+
+      await expect(
+        service.retryCnpjValidation('comp-1', 'user-1'),
+      ).rejects.toThrow(BusinessRuleException);
+    });
+
+    it('should handle null cnpjData as not failed', async () => {
+      prisma.company.findUnique.mockResolvedValue({
+        ...mockCompany,
+        cnpjData: null,
+      });
+
+      await expect(
+        service.retryCnpjValidation('comp-1', 'user-1'),
+      ).rejects.toThrow(BusinessRuleException);
+    });
+  });
+
+  // ─── DISPATCH CNPJ VALIDATION ────────────────────────────────────
+
+  describe('dispatchCnpjValidation', () => {
+    it('should add job to queue with correct payload', async () => {
+      await service.dispatchCnpjValidation(
+        'comp-1',
+        VALID_CNPJ,
+        'user-1',
+        'Acme Ltda.',
+      );
+
+      expect(mockQueue.add).toHaveBeenCalledWith(
+        'validate-cnpj',
+        {
+          companyId: 'comp-1',
+          cnpj: VALID_CNPJ,
+          creatorUserId: 'user-1',
+          companyName: 'Acme Ltda.',
+        },
+        expect.objectContaining({
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 5000 },
+          removeOnComplete: true,
+          removeOnFail: false,
+        }),
+      );
     });
   });
 });

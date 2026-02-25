@@ -21,6 +21,7 @@ Each document follows the template defined in `.claude/rules/user-flow-documenta
 | [User Permissions](./user-permissions.md) | All roles (ADMIN, FINANCE, LEGAL, INVESTOR, EMPLOYEE) | Frontend spec complete |
 | [Notifications](./notifications.md) | All authenticated users (any role) | Backend complete |
 | [Audit Logging](./audit-logging.md) | ADMIN (full access), LEGAL (full access), System (event capture + hash chain) | Backend complete |
+| [Company CNPJ Validation](./company-cnpj-validation.md) | ADMIN (creator), System (Bull queue, Verifik API) | Backend complete |
 
 ## Cross-References
 

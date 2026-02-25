@@ -8,6 +8,9 @@ import {
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
+// Brazilian CNPJ format: XX.XXX.XXX/XXXX-XX
+const CNPJ_REGEX = /^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/;
+
 export class UpdateCompanyDto {
   @ApiPropertyOptional({ description: 'Company legal name', minLength: 2, maxLength: 200 })
   @IsOptional()
@@ -15,6 +18,15 @@ export class UpdateCompanyDto {
   @MinLength(2)
   @MaxLength(200)
   name?: string;
+
+  @ApiPropertyOptional({
+    description: 'Company CNPJ (only editable in DRAFT status)',
+    example: '12.345.678/0001-90',
+  })
+  @IsOptional()
+  @IsString()
+  @Matches(CNPJ_REGEX, { message: 'CNPJ must be in XX.XXX.XXX/XXXX-XX format' })
+  cnpj?: string;
 
   @ApiPropertyOptional({ description: 'Company description', maxLength: 2000 })
   @IsOptional()

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { AppException } from '../../common/filters/app-exception';
 import {
   VerifikCpfResponse,
+  VerifikCnpjResponse,
   VerifikDocumentResponse,
   VerifikFaceMatchResponse,
   VerifikAmlResponse,
@@ -120,6 +121,38 @@ interface RawVerifikFaceMatchApiResponse {
   pontuacaoVivacidade?: number;
 }
 
+interface RawVerifikCnpjApiResponse {
+  razaoSocial?: string;
+  razao_social?: string;
+  nomeFantasia?: string;
+  nome_fantasia?: string;
+  situacaoCadastral?: string;
+  situacao_cadastral?: string;
+  dataAbertura?: string;
+  data_abertura?: string;
+  naturezaJuridica?: string;
+  natureza_juridica?: string;
+  atividadePrincipal?: {
+    codigo?: string;
+    descricao?: string;
+  };
+  atividade_principal?: {
+    codigo?: string;
+    descricao?: string;
+  };
+  endereco?: {
+    logradouro?: string;
+    numero?: string;
+    complemento?: string;
+    bairro?: string;
+    municipio?: string;
+    uf?: string;
+    cep?: string;
+  };
+  capitalSocial?: number;
+  capital_social?: number;
+}
+
 interface RawVerifikAmlApiResponse {
   riskScore?: string;
   pontuacaoRisco?: string;
@@ -221,6 +254,69 @@ export class VerifikService {
 
     this.logger.debug(
       `[verifyCpf] Success — cpfStatus=${cpfStatus} name="${fullName}"`,
+    );
+
+    return response;
+  }
+
+  // ─── CNPJ Validation ─────────────────────────────────────────────────────
+
+  /**
+   * Validates a Brazilian CNPJ against the Receita Federal registry via Verifik.
+   * Returns the full company data including razão social, situação cadastral,
+   * address, CNAE, and registered capital.
+   *
+   * @param cnpj CNPJ in any format (digits or formatted XX.XXX.XXX/XXXX-XX)
+   * @returns Normalised VerifikCnpjResponse
+   * @throws VerifikUnavailableException — service not configured or network failure
+   */
+  async validateCnpj(cnpj: string): Promise<VerifikCnpjResponse> {
+    this.ensureAvailable();
+
+    const cnpjDigits = cnpj.replace(/\D/g, '');
+
+    const url = `${this.baseUrl}/br/cnpj?cnpj=${encodeURIComponent(cnpjDigits)}`;
+
+    this.logger.debug(
+      `[validateCnpj] GET ${this.baseUrl}/br/cnpj cnpj=***${cnpjDigits.slice(-4)}`,
+    );
+
+    const raw = await this.request<RawVerifikCnpjApiResponse>('GET', url);
+
+    // Normalise field names — Verifik may return camelCase or snake_case
+    const razaoSocial = raw.razaoSocial ?? raw.razao_social ?? '';
+    const nomeFantasia = raw.nomeFantasia ?? raw.nome_fantasia ?? null;
+    const situacaoCadastral = raw.situacaoCadastral ?? raw.situacao_cadastral ?? '';
+    const dataAbertura = raw.dataAbertura ?? raw.data_abertura ?? '';
+    const naturezaJuridica = raw.naturezaJuridica ?? raw.natureza_juridica ?? '';
+    const rawAtividade = raw.atividadePrincipal ?? raw.atividade_principal;
+    const rawEndereco = raw.endereco;
+    const capitalSocial = raw.capitalSocial ?? raw.capital_social ?? 0;
+
+    const response: VerifikCnpjResponse = {
+      razaoSocial,
+      nomeFantasia,
+      situacaoCadastral,
+      dataAbertura,
+      naturezaJuridica,
+      atividadePrincipal: {
+        codigo: rawAtividade?.codigo ?? '',
+        descricao: rawAtividade?.descricao ?? '',
+      },
+      endereco: {
+        logradouro: rawEndereco?.logradouro ?? '',
+        numero: rawEndereco?.numero ?? '',
+        complemento: rawEndereco?.complemento ?? null,
+        bairro: rawEndereco?.bairro ?? '',
+        municipio: rawEndereco?.municipio ?? '',
+        uf: rawEndereco?.uf ?? '',
+        cep: rawEndereco?.cep ?? '',
+      },
+      capitalSocial,
+    };
+
+    this.logger.debug(
+      `[validateCnpj] Success — situacaoCadastral=${situacaoCadastral} razaoSocial="${razaoSocial}"`,
     );
 
     return response;
