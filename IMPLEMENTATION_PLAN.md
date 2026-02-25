@@ -1,6 +1,6 @@
 # Navia MVP — Implementation Plan v28.0
 
-> **Generated**: 2026-02-25 | **Tests**: 1454 passing | **Backend modules**: 18 of 23 built
+> **Generated**: 2026-02-25 | **Tests**: 1515 passing | **Backend modules**: 19 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -300,19 +300,22 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 - [x] User flow doc: `docs/user-flows/company-profile.md` — DONE
 - _Implementation details_: 5 DTOs (CreateProfileDto, UpdateProfileDto, UpdateMetricsDto, UpdateTeamDto, UpdateSlugDto), 12 i18n error messages (PT-BR + EN), @Auditable on 8 state-changing endpoints, @Roles permission matrix (ADMIN create/publish/unpublish/archive/slug, ADMIN+FINANCE update/metrics/team/photo/analytics, all roles read), S3 team photo upload with presigned URLs, manual slug generation (NFD normalization), bcryptjs for PASSWORD access type hashing, profile lifecycle DRAFT -> PUBLISHED -> ARCHIVED
 
-### 3.7 Company Dataroom Module (spec: `company-dataroom.md`)
+### 3.7 Company Dataroom Module (spec: `company-dataroom.md`) ✅ DONE
 
-- [ ] Create `backend/src/dataroom/` module (or extend company-profile)
-- [ ] Prisma models: ProfileDocument (already in schema), ProfileDocumentDownload (**missing from schema** — needs migration)
-- [ ] DataroomService: upload, categorize, list, generatePresignedUrl, delete
-- [ ] DataroomController: CRUD + download tracking
-- [ ] Document categories per spec (PITCH_DECK, FINANCIALS, LEGAL, PRODUCT, TEAM, OTHER — enum already exists)
-- [ ] PDF thumbnail generation and page count extraction via Bull job
-- [ ] Pre-signed URL access with 15-min expiry
-- [ ] Access logging for download tracking (ProfileDocumentDownload records)
-- [ ] Tests: service + controller specs
-- [ ] User flow doc: `docs/user-flows/company-dataroom.md`
-- _Depends on_: P1 AWS SDK (S3), P1 Redis+Bull
+- [x] Extended company-profile module (not separate dataroom module)
+- [x] Prisma models: ProfileDocument (added createdAt/updatedAt/uploadedBy relation), ProfileDocumentDownload (new model)
+- [x] ProfileDocumentService: upload, findAll, delete, reorder, getDownloadUrl, getPublicDownloadUrl, getStorageUsage
+- [x] ProfileDocumentController (5 endpoints) + PublicDocumentController (1 public download endpoint)
+- [x] Document categories per spec (PITCH_DECK, FINANCIALS, LEGAL, PRODUCT, TEAM, OTHER — enum already exists)
+- [x] PDF page count extraction (regex-based, no Bull job needed)
+- [x] Pre-signed URL access with 15-min expiry
+- [x] Access logging for download tracking (ProfileDocumentDownload records, fire-and-forget)
+- [x] File type validation via MIME type + magic bytes (PDF, JPEG, PNG, XLSX, PPTX, DOCX)
+- [x] Storage limits: 25 MB per file, 500 MB per profile
+- [x] @Auditable on upload and delete endpoints
+- [x] Tests: 45 service + 16 controller = 61 tests (1515 total)
+- [x] User flow doc: `docs/user-flows/company-dataroom.md`
+- _Depends on_: P1 AWS SDK (S3) ✅, P1 Redis+Bull ✅
 
 ### 3.8 Blockchain Integration Module (spec: `blockchain-integration.md`)
 

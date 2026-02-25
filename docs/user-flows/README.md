@@ -24,6 +24,7 @@ Each document follows the template defined in `.claude/rules/user-flow-documenta
 | [Company CNPJ Validation](./company-cnpj-validation.md) | ADMIN (creator), System (Bull queue, Verifik API) | Backend complete |
 | [Document Generation](./document-generation.md) | ADMIN (full CRUD + generate + delete), LEGAL (create + generate), FINANCE (read-only) | Backend complete |
 | [Company Profile](./company-profile.md) | ADMIN (full lifecycle + publish/archive + analytics), FINANCE (update + analytics), all members (read), public visitors (view via slug) | Backend complete |
+| [Company Dataroom](./company-dataroom.md) | ADMIN/FINANCE (upload/delete/reorder), all members (read/download), public visitors (download via slug) | Backend complete |
 
 ## Cross-References
 

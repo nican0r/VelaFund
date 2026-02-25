@@ -38,6 +38,7 @@ model User {
   consentRecords            ConsentRecord[]
   notifications             Notification[]
   notificationPreferences   UserNotificationPreferences?
+  profileDocuments          ProfileDocument[]  @relation("ProfileDocumentUploader")
 
   @@index([cpfBlindIndex])
   @@index([privyUserId])
@@ -367,11 +368,30 @@ model ProfileDocument {
   order        Int      @default(0)
   uploadedById String   @map("uploaded_by_id")
   uploadedAt   DateTime @default(now()) @map("uploaded_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
-  profile CompanyProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profile    CompanyProfile           @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  uploadedBy User                     @relation("ProfileDocumentUploader", fields: [uploadedById], references: [id])
+  downloads  ProfileDocumentDownload[]
 
-  @@index([profileId])
+  @@index([profileId, category, order])
   @@map("profile_documents")
+}
+
+model ProfileDocumentDownload {
+  id           String   @id @default(uuid())
+  documentId   String   @map("document_id")
+  profileId    String   @map("profile_id")
+  viewerEmail  String?  @map("viewer_email")
+  viewerIp     String   @map("viewer_ip")
+  downloadedAt DateTime @default(now()) @map("downloaded_at")
+
+  document ProfileDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@index([profileId, downloadedAt])
+  @@map("profile_document_downloads")
 }
 
 enum DocumentCategory {

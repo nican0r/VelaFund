@@ -713,6 +713,30 @@ const MESSAGES: Record<string, Record<string, string>> = {
     'pt-BR': 'Perfil da empresa não encontrado',
     en: 'Company profile not found',
   },
+  'errors.profile.storageLimit': {
+    'pt-BR': 'Limite de armazenamento de 500 MB excedido',
+    en: '500 MB storage limit exceeded',
+  },
+  'errors.profile.docTooLarge': {
+    'pt-BR': 'Arquivo excede o limite de 25 MB',
+    en: 'File exceeds the 25 MB limit',
+  },
+  'errors.profile.docInvalidType': {
+    'pt-BR': 'Tipo de arquivo não suportado. Use PDF, PNG, JPG, XLSX, PPTX ou DOCX',
+    en: 'Unsupported file type. Use PDF, PNG, JPG, XLSX, PPTX or DOCX',
+  },
+  'errors.profile.docFileRequired': {
+    'pt-BR': 'Arquivo é obrigatório',
+    en: 'File is required',
+  },
+  'errors.profiledocument.notFound': {
+    'pt-BR': 'Documento não encontrado',
+    en: 'Document not found',
+  },
+  'errors.sys.s3Unavailable': {
+    'pt-BR': 'Serviço de armazenamento indisponível',
+    en: 'Storage service unavailable',
+  },
 };
 
 export class AppException extends Error {
