@@ -341,7 +341,11 @@
       "toShareholderRequired": "Destination shareholder is required for this transaction type"
     },
     "val": {
-      "invalidInput": "Invalid input data"
+      "invalidInput": "Invalid input data",
+      "maxLength": "Exceeds maximum allowed length",
+      "maxValue": "Exceeds maximum allowed value",
+      "mustBePositive": "Must be a valid number greater than or equal to zero",
+      "required": "This field is required"
     },
     "report": {
       "exportExpired": "Download link expired. Generate a new export.",
@@ -688,10 +692,40 @@
       "deleteTitle": "Delete Share Class"
     },
     "create": "New Class",
+    "createTitle": "Create Share Class",
+    "createDescription": "Define the type, name, and rights of the new share class.",
     "description": "Manage the company's share classes, their rights, and issuance limits.",
     "empty": "No share classes found. Create the first class to get started.",
     "filter": {
       "allTypes": "All types"
+    },
+    "form": {
+      "className": "Class Name",
+      "classNamePlaceholder": "E.g., Common Shares",
+      "liquidationMultiple": "Liquidation Preference Multiple",
+      "liquidationMultiplePlaceholder": "E.g., 1.5",
+      "lockUpMonths": "Lock-up Period (months)",
+      "lockUpMonthsPlaceholder": "E.g., 12",
+      "participatingRights": "Participating Rights",
+      "participatingRightsDescription": "Participates in distribution of remaining profits after liquidation preference",
+      "preferredNote": "Preferred shares do not have voting rights.",
+      "rightOfFirstRefusal": "Right of First Refusal",
+      "rightOfFirstRefusalDescription": "Shareholders have priority in acquiring shares in case of transfer",
+      "sectionBasicInfo": "Basic Information",
+      "sectionPreferences": "Liquidation Preferences",
+      "sectionRestrictions": "Transfer Restrictions",
+      "sectionType": "Class Type",
+      "sectionVoting": "Voting Rights",
+      "tagAlong": "Tag-along (%)",
+      "tagAlongPlaceholder": "E.g., 80",
+      "totalAuthorized": "Total Authorized",
+      "totalAuthorizedPlaceholder": "E.g., 1000000",
+      "typeCommonDescription": "Shares with mandatory voting rights. Minimum 1 vote per share.",
+      "typeLtdaNote": "Ltda. companies can only have Quota share classes.",
+      "typePreferredDescription": "Shares with liquidation preference. No voting rights.",
+      "typeQuotaDescription": "Ownership quotas for limited liability companies.",
+      "votesPerShare": "Votes per Share",
+      "votesPerSharePlaceholder": "E.g., 1"
     },
     "pagination": {
       "next": "Next",

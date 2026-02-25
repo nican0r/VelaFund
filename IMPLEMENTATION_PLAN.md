@@ -1,6 +1,6 @@
-# Navia MVP — Implementation Plan v40.0
+# Navia MVP — Implementation Plan v41.0
 
-> **Generated**: 2026-02-25 | **Tests**: 1938 passing (1704 backend + 234 frontend) | **Backend modules**: 22 of 23 built
+> **Generated**: 2026-02-25 | **Tests**: 1973 passing (1704 backend + 269 frontend) | **Backend modules**: 22 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -515,7 +515,16 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 - [x] shareClasses i18n namespace (~50 keys, PT-BR + EN)
 - [x] Sidebar nav item with Layers icon
 - [x] 22 component tests (all passing)
-- [ ] Create share class form with entity type compatibility checks
+- [x] Create share class form with entity type compatibility checks
+  - [x] Type selection cards filtered by company entityType (LTDA→QUOTA, S.A.→COMMON/PREFERRED)
+  - [x] Form sections: basic info, voting rights, liquidation preferences (PREFERRED only), transfer restrictions
+  - [x] PREFERRED_SHARES forced to 0 votesPerShare (disabled input)
+  - [x] Client-side validation (required, maxLength, positive numbers)
+  - [x] useCreateShareClass mutation hook with query invalidation
+  - [x] Success toast + navigation, error toast via useErrorToast
+  - [x] Label component (shadcn/ui pattern with @radix-ui/react-label)
+  - [x] shareClasses.form.* i18n namespace (25+ keys PT-BR + EN)
+  - [x] 35 component tests (rendering, type selection, validation, submission, conditional sections)
 - [ ] Share class detail: stats, holders list, rights summary
 
 ### 4.7 Transactions Page

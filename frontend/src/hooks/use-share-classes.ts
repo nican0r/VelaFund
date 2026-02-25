@@ -51,6 +51,35 @@ export function useShareClass(
   });
 }
 
+// --- Create share class ---
+
+export interface CreateShareClassData {
+  className: string;
+  type: 'QUOTA' | 'COMMON_SHARES' | 'PREFERRED_SHARES';
+  totalAuthorized: string;
+  votesPerShare: number;
+  liquidationPreferenceMultiple?: number | null;
+  participatingRights?: boolean;
+  rightOfFirstRefusal?: boolean;
+  lockUpPeriodMonths?: number | null;
+  tagAlongPercentage?: number | null;
+}
+
+export function useCreateShareClass(companyId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: CreateShareClassData) =>
+      api.post<ShareClass>(
+        `/api/v1/companies/${companyId}/share-classes`,
+        data,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shareClasses', companyId] });
+    },
+  });
+}
+
 // --- Delete share class ---
 
 export function useDeleteShareClass(companyId: string | undefined) {

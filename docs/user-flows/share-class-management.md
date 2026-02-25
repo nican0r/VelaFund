@@ -4,7 +4,7 @@
 **Actors**: ADMIN (full CRUD), FINANCE/LEGAL/INVESTOR (read-only)
 **Preconditions**: User is authenticated, user is an ACTIVE member of the company
 **Related Flows**: [Company Management](./company-management.md) (company must be ACTIVE), [Authentication](./authentication.md) (user must be logged in)
-**Implementation Status**: Backend complete, Frontend list page complete (P4.6)
+**Implementation Status**: Backend complete, Frontend list page + create form complete (P4.6)
 
 ---
 
@@ -77,43 +77,55 @@ ADMIN clicks "Delete Share Class"
 
 ## Flows
 
-### Happy Path: Create Share Class
+### Happy Path: Create Share Class (Frontend implemented)
 
 ```
 PRECONDITION: Company is ACTIVE, user has ADMIN role
 ACTOR: ADMIN member
-TRIGGER: User clicks "Create Share Class" button
+TRIGGER: User clicks "New Class" link button on share classes list page
 
-1. [UI] User navigates to /companies/:companyId/share-classes
-2. [UI] User clicks "Create Share Class" button
-3. [UI] Modal/form opens with fields: className, type, totalAuthorized, votesPerShare, optional fields
-4. [UI] Type dropdown shows only compatible types for company entity type:
-   - Ltda: QUOTA only
-   - S.A.: COMMON_SHARES, PREFERRED_SHARES
-5. [UI] User fills in required fields and clicks "Save"
-6. [Frontend] Validates input client-side
-   → IF invalid: show field-level errors, STOP
-7. [Frontend] Sends POST /api/v1/companies/:companyId/share-classes
-8. [Backend] Validates authentication (AuthGuard)
-   → IF unauthenticated: return 401, frontend redirects to login
-9. [Backend] Validates authorization (RolesGuard: ADMIN)
-   → IF not member or wrong role: return 404
-10. [Backend] Validates request body (ValidationPipe)
+1. [UI] User navigates to /dashboard/share-classes
+2. [UI] User clicks "New Class" link in page header
+3. [UI] Browser navigates to /dashboard/share-classes/new
+4. [UI] Create form renders with three sections:
+   a. Type Selection: clickable type cards filtered by company entityType
+      - LTDA companies: QUOTA card only
+      - S.A. companies: COMMON_SHARES and PREFERRED_SHARES cards
+   b. Basic Info: className (text, required, max 100 chars), totalAuthorized (number, required, positive)
+   c. Voting Rights: votesPerShare (number, required)
+      → IF PREFERRED_SHARES selected: votesPerShare forced to 0 and input disabled
+   d. Liquidation Preferences (PREFERRED_SHARES only): liquidationPreferenceMultiple, participatingRights checkbox
+   e. Transfer Restrictions: rightOfFirstRefusal checkbox, lockUpPeriodMonths, tagAlongPercentage
+5. [UI] User selects share class type by clicking a type card
+6. [UI] User fills in required fields
+7. [UI] User clicks "Create Share Class" submit button
+8. [Frontend] Validates input client-side:
+   → IF className empty: show "This field is required" error, STOP
+   → IF totalAuthorized empty: show "This field is required" error, STOP
+   → IF className > 100 chars: show max length error, STOP
+   → IF totalAuthorized ≤ 0: show "Must be greater than zero" error, STOP
+9. [Frontend] Sends POST /api/v1/companies/:companyId/share-classes via useCreateShareClass mutation
+10. [Backend] Validates authentication (AuthGuard)
+    → IF unauthenticated: return 401, frontend redirects to login
+11. [Backend] Validates authorization (RolesGuard: ADMIN)
+    → IF not member or wrong role: return 404
+12. [Backend] Validates request body (ValidationPipe)
     → IF invalid: return 400 with validationErrors
-11. [Backend] Validates company is ACTIVE
+13. [Backend] Validates company is ACTIVE
     → IF not ACTIVE: return 422 CAP_COMPANY_NOT_ACTIVE
-12. [Backend] Validates share class type compatible with company entity type
+14. [Backend] Validates share class type compatible with company entity type
     → IF incompatible: return 422 CAP_INVALID_SHARE_CLASS_TYPE
-13. [Backend] For PREFERRED_SHARES: validates 2/3 limit (Art. 15 §2)
+15. [Backend] For PREFERRED_SHARES: validates 2/3 limit (Art. 15 §2)
     → IF exceeds: return 422 CAP_PREFERRED_SHARE_LIMIT_EXCEEDED
-14. [Backend] Creates share class record
+16. [Backend] Creates share class record
     → IF duplicate className: return 409 CAP_SHARE_CLASS_DUPLICATE
-15. [Backend] Returns 201 with created share class
-16. [UI] Shows success toast
-17. [UI] Share class list refreshes showing new entry
+17. [Backend] Returns 201 with created share class
+18. [Frontend] useCreateShareClass onSuccess invalidates shareClasses query cache
+19. [UI] Shows success toast via sonner
+20. [UI] Router navigates back to /dashboard/share-classes (list refreshes with new entry)
 
 POSTCONDITION: New share class exists with totalIssued = 0
-SIDE EFFECTS: Audit log (future: SHARE_CLASS_CREATED)
+SIDE EFFECTS: Audit log (SHARE_CLASS_CREATED), TanStack Query cache invalidation
 ```
 
 ### Happy Path: List Share Classes (Frontend implemented)
