@@ -298,6 +298,9 @@ export interface OptionPlan {
     className: string;
     type: string;
   };
+  // Computed fields from detail endpoint (findPlanById)
+  optionsAvailable?: string;
+  activeGrantCount?: number;
 }
 
 export interface OptionGrant {

@@ -763,6 +763,28 @@
       "previous": "Previous",
       "showing": "Showing {from} to {to} of {total}"
     },
+    "planDetail": {
+      "back": "Back to Option Plans",
+      "boardApprovalDate": "Board Approval Date",
+      "closePlan": "Close Plan",
+      "createdAt": "Created on",
+      "emptyGrants": "No grants in this plan.",
+      "emptyGrantsAction": "Create the first grant for this plan.",
+      "error": "Error loading option plan.",
+      "exerciseWindow": "Exercise Window",
+      "exerciseWindowDays": "{days} days",
+      "name": "Plan Name",
+      "newGrant": "New Grant",
+      "notes": "Notes",
+      "notFound": "Option plan not found.",
+      "planInformation": "Plan Information",
+      "planTerms": "Plan Terms",
+      "shareClass": "Share Class",
+      "status": "Status",
+      "tabDetails": "Details",
+      "tabGrants": "Grants",
+      "terminationPolicy": "Termination Policy"
+    },
     "planStatus": {
       "active": "Active",
       "closed": "Closed"

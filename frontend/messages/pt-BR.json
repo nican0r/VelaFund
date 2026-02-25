@@ -763,6 +763,28 @@
       "previous": "Anterior",
       "showing": "Mostrando {from} a {to} de {total}"
     },
+    "planDetail": {
+      "back": "Voltar para Planos de Opções",
+      "boardApprovalDate": "Data de Aprovação do Conselho",
+      "closePlan": "Encerrar Plano",
+      "createdAt": "Criado em",
+      "emptyGrants": "Nenhuma outorga neste plano.",
+      "emptyGrantsAction": "Criar a primeira outorga para este plano.",
+      "error": "Erro ao carregar plano de opções.",
+      "exerciseWindow": "Janela de Exercício",
+      "exerciseWindowDays": "{days} dias",
+      "name": "Nome do Plano",
+      "newGrant": "Nova Outorga",
+      "notes": "Observações",
+      "notFound": "Plano de opções não encontrado.",
+      "planInformation": "Informações do Plano",
+      "planTerms": "Termos do Plano",
+      "shareClass": "Classe de Ações",
+      "status": "Status",
+      "tabDetails": "Detalhes",
+      "tabGrants": "Outorgas",
+      "terminationPolicy": "Política de Término"
+    },
     "planStatus": {
       "active": "Ativo",
       "closed": "Encerrado"

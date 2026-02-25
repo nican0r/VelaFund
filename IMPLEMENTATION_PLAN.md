@@ -1,4 +1,4 @@
-# Navia MVP — Implementation Plan v50.0
+# Navia MVP — Implementation Plan v51.0
 
 > **Generated**: 2026-02-25 | **Tests**: 2388 passing (1704 backend + 684 frontend) | **Backend modules**: 22 of 23 built
 >
@@ -462,7 +462,7 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 
 - [x] Global error boundary with fallback UI (`src/components/error-boundary.tsx`)
 
-**Tests**: 27 frontend tests (11 api-client + 4 error-boundary + 10 button + 2 remaining)
+**Tests**: 718 frontend tests (11 api-client + 4 error-boundary + 10 button + 2 remaining + 691 page/component tests)
 
 ### 4.2 Auth Pages
 
@@ -597,7 +597,7 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 - [x] i18n keys for optionPlans namespace (~80 keys PT-BR + EN)
 - [x] 53 component tests
 - [x] Create plan form (2-step wizard Details→Review, 3 termination policy cards Forfeiture/Acceleration/Pro-rata, share class dropdown, exercise window configuration, useCreateOptionPlan hook, optionPlans.form.* i18n namespace ~30 keys PT-BR+EN, 42 tests)
-- [ ] Plan detail: grants table, pool stats
+- [x] Plan detail: grants table, pool stats — DONE: 4 stat cards (Total Pool, Granted, Available, Exercised) with ocean-600 highlight, pool utilization progress bar with percentage, 2-tab layout (Grants/Details), Grants tab: status filter dropdown, 8-column data table (Employee, Grant Date, Quantity, Strike Price, Vesting, Exercised, Status, Actions) with cancel grant dialog + view link, pagination, empty state with CTA. Details tab: Plan Information card (name, share class, status, board approval date, created at) + Plan Terms card (termination policy, exercise window, total pool, notes). Close plan confirmation dialog for ACTIVE plans. New Grant button with planId query param. Uses useOptionPlan+useOptionGrants+useClosePlan+useCancelGrant hooks. optionPlans.planDetail.* i18n namespace ~20 keys PT-BR+EN. 34 component tests
 - [x] Create grant form (2-step wizard Details→Review, 3-section layout Employee/GrantTerms/Vesting, plan dropdown with available options display, shareholder linking, total value calculation, vesting frequency MONTHLY/QUARTERLY/ANNUALLY, acceleration on CoC checkbox, client-side validation quantity≤available/cliff≤vesting/expirationDate>grantDate, useCreateOptionGrant mutation hook, optionPlans.grantForm.* i18n namespace ~55 keys PT-BR+EN, 49 tests)
 - [ ] Grant detail: vesting schedule timeline/table, exercise history
 - [ ] Exercise request form (employee view)
