@@ -403,6 +403,57 @@ export interface ConvertibleInstrument {
   } | null;
 }
 
+// Convertible interest breakdown returned by GET /api/v1/companies/:id/convertibles/:id/interest
+export interface InterestPeriod {
+  period: string;
+  days: number;
+  interestAccrued: string;
+}
+
+export interface InterestBreakdown {
+  convertibleId: string;
+  principalAmount: string;
+  interestRate: string;
+  interestType: string;
+  issueDate: string;
+  calculationDate: string;
+  daysElapsed: number;
+  accruedInterest: string;
+  totalValue: string;
+  interestBreakdown: InterestPeriod[];
+}
+
+// Convertible conversion scenarios returned by GET /api/v1/companies/:id/convertibles/:id/scenarios
+export interface ConversionMethod {
+  conversionPrice: string;
+  sharesIssued: string;
+  ownershipPercentage: string;
+}
+
+export interface ConversionScenario {
+  hypotheticalValuation: string;
+  preMoneyShares: number;
+  roundPricePerShare: string;
+  discountMethod: ConversionMethod | null;
+  capMethod: ConversionMethod | null;
+  bestMethod: 'DISCOUNT' | 'CAP' | 'ROUND_PRICE';
+  finalConversionPrice: string;
+  finalSharesIssued: string;
+  finalOwnershipPercentage: string;
+  dilutionToExisting: string;
+}
+
+export interface ConversionScenarios {
+  convertibleId: string;
+  currentConversionAmount: string;
+  summary: {
+    valuationCap: string | null;
+    discountRate: string | null;
+    capTriggersAbove: string | null;
+  };
+  scenarios: ConversionScenario[];
+}
+
 // Company member types returned by GET /api/v1/companies/:id/members
 export type MemberRole = 'ADMIN' | 'FINANCE' | 'LEGAL' | 'INVESTOR' | 'EMPLOYEE';
 export type MemberStatus = 'PENDING' | 'ACTIVE' | 'REMOVED';

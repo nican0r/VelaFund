@@ -2,7 +2,11 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
-import type { ConvertibleInstrument } from '@/types/company';
+import type {
+  ConvertibleInstrument,
+  InterestBreakdown,
+  ConversionScenarios,
+} from '@/types/company';
 
 export interface ConvertibleSummary {
   totalOutstanding: number;
@@ -97,6 +101,88 @@ export function useCancelConvertible(companyId: string | undefined) {
       api.post(
         `/api/v1/companies/${companyId}/convertibles/${convertibleId}/cancel`,
         {},
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['convertibles', companyId] });
+    },
+  });
+}
+
+export function useConvertibleInterest(
+  companyId: string | undefined,
+  convertibleId: string | undefined,
+) {
+  return useQuery({
+    queryKey: ['convertibles', companyId, convertibleId, 'interest'],
+    queryFn: () =>
+      api.get<InterestBreakdown>(
+        `/api/v1/companies/${companyId}/convertibles/${convertibleId}/interest`,
+      ),
+    enabled: !!companyId && !!convertibleId,
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useConvertibleScenarios(
+  companyId: string | undefined,
+  convertibleId: string | undefined,
+  valuations?: string,
+) {
+  const query = new URLSearchParams();
+  if (valuations) query.set('valuations', valuations);
+  const qs = query.toString();
+
+  return useQuery({
+    queryKey: ['convertibles', companyId, convertibleId, 'scenarios', valuations],
+    queryFn: () =>
+      api.get<ConversionScenarios>(
+        `/api/v1/companies/${companyId}/convertibles/${convertibleId}/scenarios${qs ? `?${qs}` : ''}`,
+      ),
+    enabled: !!companyId && !!convertibleId,
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useRedeemConvertible(companyId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      convertibleId,
+      data,
+    }: {
+      convertibleId: string;
+      data: { redemptionAmount: string; paymentReference?: string; notes?: string };
+    }) =>
+      api.post<ConvertibleInstrument>(
+        `/api/v1/companies/${companyId}/convertibles/${convertibleId}/redeem`,
+        data,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['convertibles', companyId] });
+    },
+  });
+}
+
+export function useConvertConvertible(companyId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      convertibleId,
+      data,
+    }: {
+      convertibleId: string;
+      data: {
+        fundingRoundId: string;
+        roundValuation: string;
+        shareClassId: string;
+        notes?: string;
+      };
+    }) =>
+      api.post<ConvertibleInstrument>(
+        `/api/v1/companies/${companyId}/convertibles/${convertibleId}/convert`,
+        data,
       ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['convertibles', companyId] });
