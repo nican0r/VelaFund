@@ -1,14 +1,59 @@
 'use client';
 
-import { Bell, Search, Menu, ChevronDown } from 'lucide-react';
+import { Bell, Search, Menu, ChevronDown, LogOut } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/auth';
 
 interface TopbarProps {
   onMenuClick: () => void;
   sidebarCollapsed: boolean;
 }
 
+function getUserInitials(firstName: string | null, lastName: string | null, email: string | null): string {
+  if (firstName && lastName) {
+    return `${firstName[0]}${lastName[0]}`.toUpperCase();
+  }
+  if (firstName) {
+    return firstName.slice(0, 2).toUpperCase();
+  }
+  if (email) {
+    return email[0].toUpperCase();
+  }
+  return '?';
+}
+
+function getUserDisplayName(firstName: string | null, lastName: string | null, email: string | null): string {
+  if (firstName && lastName) {
+    return `${firstName} ${lastName}`;
+  }
+  if (firstName) {
+    return firstName;
+  }
+  return email || '';
+}
+
 export function Topbar({ onMenuClick, sidebarCollapsed }: TopbarProps) {
+  const { user, logout } = useAuth();
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const initials = getUserInitials(user?.firstName ?? null, user?.lastName ?? null, user?.email ?? null);
+  const displayName = getUserDisplayName(user?.firstName ?? null, user?.lastName ?? null, user?.email ?? null);
+
+  // Close menu on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    }
+    if (userMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [userMenuOpen]);
+
   return (
     <header
       className={cn(
@@ -50,7 +95,7 @@ export function Topbar({ onMenuClick, sidebarCollapsed }: TopbarProps) {
           aria-label="Notifications"
         >
           <Bell className="h-5 w-5" />
-          {/* Unread badge */}
+          {/* Unread badge — will be wired to real notification count later */}
           <span className="absolute right-1.5 top-1.5 flex h-2 w-2">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
@@ -61,18 +106,45 @@ export function Topbar({ onMenuClick, sidebarCollapsed }: TopbarProps) {
         <div className="mx-1 h-6 w-px bg-gray-200" />
 
         {/* User menu */}
-        <button
-          className="flex items-center gap-x-2 rounded-lg px-2 py-1.5 transition-colors duration-150 hover:bg-gray-100"
-          aria-label="User menu"
-        >
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ocean-600 text-xs font-medium text-white">
-            NP
-          </div>
-          <span className="hidden text-sm font-medium text-gray-700 md:inline-block">
-            Nelson Pereira
-          </span>
-          <ChevronDown className="hidden h-4 w-4 text-gray-400 md:block" />
-        </button>
+        <div className="relative" ref={menuRef}>
+          <button
+            onClick={() => setUserMenuOpen(!userMenuOpen)}
+            className="flex items-center gap-x-2 rounded-lg px-2 py-1.5 transition-colors duration-150 hover:bg-gray-100"
+            aria-label="User menu"
+            aria-expanded={userMenuOpen}
+          >
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ocean-600 text-xs font-medium text-white">
+              {initials}
+            </div>
+            <span className="hidden text-sm font-medium text-gray-700 md:inline-block">
+              {displayName}
+            </span>
+            <ChevronDown className={cn(
+              'hidden h-4 w-4 text-gray-400 transition-transform duration-150 md:block',
+              userMenuOpen && 'rotate-180',
+            )} />
+          </button>
+
+          {/* Dropdown menu */}
+          {userMenuOpen && (
+            <div className="absolute right-0 top-full mt-1 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+              <div className="border-b border-gray-100 px-3 py-2">
+                <p className="truncate text-sm font-medium text-gray-700">{displayName}</p>
+                <p className="truncate text-xs text-gray-500">{user?.email || ''}</p>
+              </div>
+              <button
+                onClick={() => {
+                  setUserMenuOpen(false);
+                  logout();
+                }}
+                className="flex w-full items-center gap-x-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+              >
+                <LogOut className="h-4 w-4" />
+                <span>Log out</span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

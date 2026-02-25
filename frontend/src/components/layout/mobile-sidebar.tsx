@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect } from 'react';
+import { useAuth } from '@/lib/auth';
 
 interface NavItem {
   label: string;
@@ -44,8 +45,35 @@ interface MobileSidebarProps {
   onClose: () => void;
 }
 
+function getUserInitials(firstName: string | null, lastName: string | null, email: string | null): string {
+  if (firstName && lastName) {
+    return `${firstName[0]}${lastName[0]}`.toUpperCase();
+  }
+  if (firstName) {
+    return firstName.slice(0, 2).toUpperCase();
+  }
+  if (email) {
+    return email[0].toUpperCase();
+  }
+  return '?';
+}
+
+function getUserDisplayName(firstName: string | null, lastName: string | null, email: string | null): string {
+  if (firstName && lastName) {
+    return `${firstName} ${lastName}`;
+  }
+  if (firstName) {
+    return firstName;
+  }
+  return email || '';
+}
+
 export function MobileSidebar({ open, onClose }: MobileSidebarProps) {
   const pathname = usePathname();
+  const { user, logout } = useAuth();
+
+  const initials = getUserInitials(user?.firstName ?? null, user?.lastName ?? null, user?.email ?? null);
+  const displayName = getUserDisplayName(user?.firstName ?? null, user?.lastName ?? null, user?.email ?? null);
 
   // Close on route change
   useEffect(() => {
@@ -157,18 +185,19 @@ export function MobileSidebar({ open, onClose }: MobileSidebarProps) {
         <div className="border-t border-white/10 p-4">
           <div className="flex items-center gap-x-3">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ocean-600 text-xs font-medium text-white">
-              NP
+              {initials}
             </div>
             <div className="flex flex-1 flex-col overflow-hidden">
               <span className="truncate text-sm font-medium text-white">
-                Nelson Pereira
+                {displayName}
               </span>
               <span className="truncate text-xs text-white/60">
-                nelson@navia.com.br
+                {user?.email || ''}
               </span>
             </div>
           </div>
           <button
+            onClick={logout}
             className="mt-2 flex w-full items-center gap-x-2 rounded-lg px-3 py-2 text-sm text-white/60 transition-colors duration-150 hover:bg-navy-950 hover:text-white/90"
             aria-label="Log out"
           >

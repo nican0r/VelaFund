@@ -1,8 +1,11 @@
 'use client';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { PrivyProvider } from '@privy-io/react-auth';
 import { Toaster } from 'sonner';
 import { useState } from 'react';
+import { AuthProvider } from '@/lib/auth';
+import { ErrorBoundary } from '@/components/error-boundary';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -27,27 +30,48 @@ export function Providers({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <QueryClientProvider client={queryClient}>
-      {children}
-      <Toaster
-        position="top-right"
-        toastOptions={{
-          style: {
-            borderRadius: '12px',
-            padding: '16px',
-            fontSize: '14px',
+    <ErrorBoundary>
+      <PrivyProvider
+        appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID || ''}
+        config={{
+          loginMethods: ['email', 'google', 'apple'],
+          appearance: {
+            theme: 'light',
+            accentColor: '#1B6B93',
+            logo: undefined,
           },
-          classNames: {
-            success: 'border-l-[3px] border-l-celadon-700',
-            error: 'border-l-[3px] border-l-[#DC2626]',
-            warning: 'border-l-[3px] border-l-cream-700',
-            info: 'border-l-[3px] border-l-ocean-600',
+          embeddedWallets: {
+            ethereum: {
+              createOnLogin: 'users-without-wallets',
+            },
           },
         }}
-        richColors
-        closeButton
-        duration={5000}
-      />
-    </QueryClientProvider>
+      >
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            {children}
+          </AuthProvider>
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              style: {
+                borderRadius: '12px',
+                padding: '16px',
+                fontSize: '14px',
+              },
+              classNames: {
+                success: 'border-l-[3px] border-l-celadon-700',
+                error: 'border-l-[3px] border-l-[#DC2626]',
+                warning: 'border-l-[3px] border-l-cream-700',
+                info: 'border-l-[3px] border-l-ocean-600',
+              },
+            }}
+            richColors
+            closeButton
+            duration={5000}
+          />
+        </QueryClientProvider>
+      </PrivyProvider>
+    </ErrorBoundary>
   );
 }

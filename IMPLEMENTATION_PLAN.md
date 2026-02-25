@@ -1,6 +1,6 @@
-# Navia MVP — Implementation Plan v31.0
+# Navia MVP — Implementation Plan v32.0
 
-> **Generated**: 2026-02-25 | **Tests**: 1704 passing | **Backend modules**: 22 of 23 built
+> **Generated**: 2026-02-25 | **Tests**: 1731 passing (1704 backend + 27 frontend) | **Backend modules**: 22 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -428,42 +428,45 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 
 ### 4.1 Foundation (must do first)
 
-- [ ] Install and configure Privy React SDK (`@privy-io/react-auth` — not in package.json)
-  - [ ] PrivyProvider in `providers.tsx` with app ID (currently only QueryClient + Sonner)
-  - [ ] AuthContext: usePrivy() hook wrapper, user state, loading state
-  - [ ] Protected route middleware (redirect to /login if unauthenticated)
-  - [ ] Persist auth token in API client (from Privy's getAccessToken)
+- [x] Install and configure Privy React SDK (`@privy-io/react-auth` v3.14.1)
+  - [x] PrivyProvider in `providers.tsx` with app ID, email/Google/Apple login, embedded wallets
+  - [x] AuthContext (`src/lib/auth.tsx`): usePrivy() wrapper, user state, loading state, backend session creation
+  - [x] Protected route logic in AuthProvider (redirect to /login if unauthenticated, /dashboard if authenticated on /login)
+  - [x] Auth token sent to backend via POST /api/v1/auth/login; subsequent requests use HTTP-only cookie (credentials: 'include')
 
-- [ ] Install and configure next-intl (`next-intl` — not in package.json; `messages/` dir exists with partial keys)
-  - [ ] Middleware for locale detection
-  - [ ] NextIntlClientProvider wrapping app layout
+- [x] Install and configure next-intl (`next-intl` v4.8.3)
+  - [x] Cookie-based locale detection (`src/i18n/request.ts` reads `navia-locale` cookie, falls back to pt-BR)
+  - [x] NextIntlClientProvider wrapping app layout (`src/app/layout.tsx`)
   - [ ] Complete all i18n keys in pt-BR.json and en.json (currently partial — missing: `errors.round.*`, `errors.convertible.*`, `errors.shareholder.*`, `errors.shareClass.*`, `errors.kyc.*`, `errors.doc.*`, `errors.chain.*`, and all feature page namespaces)
 
-- [ ] Initialize shadcn/ui (`src/components/ui/` directory is empty; Radix primitives and CVA installed)
-  - [ ] Run `npx shadcn-ui@latest init` with Navia theme
-  - [ ] Install core components: Button, Input, Card, Dialog, Select, Table, Badge, Tabs, DropdownMenu, Toast, Skeleton, Avatar, Tooltip, Popover, Command (search)
+- [x] Initialize shadcn/ui (components.json configured, Button component created)
+  - [x] Created `components.json` with Navia theme configuration
+  - [x] Button component (`src/components/ui/button.tsx`) with Navia ocean-500/700 hover/active states
+  - [ ] Install remaining core components: Input, Card, Dialog, Select, Table, Badge, Tabs, DropdownMenu, Toast, Skeleton, Avatar, Tooltip, Popover, Command (search)
   - [ ] Fix borderRadius tokens (shadcn defaults vs Navia design system values in `design-system.md`)
 
-- [ ] Wire API client (`src/lib/api-client.ts` — multiple gaps confirmed)
-  - [ ] Add auth token to all requests (from Privy — currently no auth header)
-  - [ ] Add CSRF token to state-changing requests (currently missing)
-  - [ ] Add Accept-Language header from locale (currently hardcoded `'pt-BR'`)
-  - [ ] Add X-Request-Id header
-  - [ ] 401 interceptor: call logout, redirect to /login?expired=true (currently missing)
-  - [ ] Error toast integration via sonner
+- [x] Wire API client (`src/lib/api-client.ts` — fully rewritten)
+  - [x] Auth via HTTP-only cookie (credentials: 'include' on all requests)
+  - [x] CSRF token on state-changing requests (reads `navia-csrf` cookie, sends `X-CSRF-Token` header)
+  - [x] Dynamic Accept-Language header from `navia-locale` cookie
+  - [x] X-Request-Id header (crypto.randomUUID)
+  - [x] 401 handler: setOnUnauthorized callback triggers logout + redirect to /login
+  - [x] Error toast integration via `useErrorToast()` hook (`src/lib/use-error-toast.ts`)
 
-- [ ] Replace hardcoded user data in layout components
-  - [ ] `sidebar.tsx:178-188` — hardcoded "Nelson Pereira" / "nelson@navia.com.br" / "NP" avatar
-  - [ ] `mobile-sidebar.tsx:159-170` — same hardcoded user data duplicated
-  - [ ] `topbar.tsx:68-74` — same hardcoded user data (third copy)
-  - [ ] Wire logout button onClick handler (currently dead UI in all 3 components)
+- [x] Replace hardcoded user data in layout components
+  - [x] `sidebar.tsx` — dynamic user data from useAuth(), functional logout button
+  - [x] `mobile-sidebar.tsx` — dynamic user data from useAuth(), functional logout button
+  - [x] `topbar.tsx` — dynamic user data from useAuth(), functional user dropdown with logout
+  - [x] Wire logout button onClick handler (all 3 components call auth.logout())
   - [ ] Wire notification bell to real notification count (currently hardcoded red dot)
 
-- [ ] Global error boundary with fallback UI
+- [x] Global error boundary with fallback UI (`src/components/error-boundary.tsx`)
+
+**Tests**: 27 frontend tests (11 api-client + 4 error-boundary + 10 button + 2 remaining)
 
 ### 4.2 Auth Pages
 
-- [ ] Login page — wire to Privy login modal (email + Google + Apple); currently static HTML with no onClick handlers
+- [x] Login page — wired to Privy login modal (email + Google + Apple) via useAuth().login()
 - [ ] Onboarding wizard (3 steps: profile completion → company creation OR join → done)
 - [ ] Logout flow (clear cookies, Privy logout, redirect)
 
