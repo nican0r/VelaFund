@@ -25,6 +25,7 @@ Each document follows the template defined in `.claude/rules/user-flow-documenta
 | [Document Generation](./document-generation.md) | ADMIN (full CRUD + generate + delete), LEGAL (create + generate), FINANCE (read-only) | Backend complete |
 | [Company Profile](./company-profile.md) | ADMIN (full lifecycle + publish/archive + analytics), FINANCE (update + analytics), all members (read), public visitors (view via slug) | Backend complete |
 | [Company Dataroom](./company-dataroom.md) | ADMIN/FINANCE (upload/delete/reorder), all members (read/download), public visitors (download via slug) | Backend complete |
+| [Company Litigation](./company-litigation.md) | System (Bull queue, BigDataCorp API), ADMIN/FINANCE (view on profile), public visitors (view on public profile) | Backend complete |
 
 ## Cross-References
 

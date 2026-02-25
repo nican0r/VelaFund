@@ -69,6 +69,8 @@
       "notFound": "Perfil da empresa não encontrado",
       "passwordRequired": "Senha é obrigatória para acessar este perfil",
       "slugInvalid": "Slug inválido — use letras minúsculas, números e hifens (3-50 caracteres)",
+      "litigationCnpjNotFound": "CNPJ não encontrado na base de dados judicial",
+      "litigationUnavailable": "Serviço de verificação judicial temporariamente indisponível",
       "slugReserved": "Este slug é reservado",
       "slugTaken": "Este slug já está em uso"
     },
@@ -116,6 +118,63 @@
     "val": {
       "invalidInput": "Dados de entrada inválidos"
     }
+  },
+  "litigation": {
+    "caseType": {
+      "administrative": "Administrativo",
+      "civil": "Cível",
+      "criminal": "Criminal",
+      "labor": "Trabalhista",
+      "tax": "Tributário"
+    },
+    "details": {
+      "hide": "Ocultar detalhes",
+      "show": "Ver detalhes"
+    },
+    "failed": {
+      "message": "Não foi possível obter os dados judiciais. Tente novamente mais tarde.",
+      "title": "Verificação falhou"
+    },
+    "pending": {
+      "message": "A verificação judicial está em andamento. Os resultados aparecerão aqui em breve.",
+      "title": "Verificação em andamento"
+    },
+    "protestTable": {
+      "date": "Data",
+      "notaryOffice": "Cartório",
+      "status": "Status",
+      "value": "Valor"
+    },
+    "riskLevel": {
+      "high": "Alto",
+      "low": "Baixo",
+      "medium": "Médio"
+    },
+    "section": {
+      "lawsuits": "Processos Judiciais",
+      "protests": "Protestos"
+    },
+    "summary": {
+      "activeLawsuits": "Processos ativos",
+      "historicalLawsuits": "Processos encerrados",
+      "noLawsuits": "Nenhum processo judicial encontrado",
+      "noProtests": "Nenhum protesto encontrado",
+      "protests": "Protestos",
+      "valueInDispute": "Valor em disputa"
+    },
+    "systemManaged": "Dados judiciais são gerenciados automaticamente e não podem ser editados",
+    "table": {
+      "caseType": "Tipo",
+      "court": "Tribunal",
+      "filingDate": "Data de distribuição",
+      "plaintiff": "Autor",
+      "processId": "Nº Processo",
+      "status": "Situação",
+      "subject": "Assunto",
+      "value": "Valor da causa"
+    },
+    "title": "Verificação Judicial",
+    "verifiedAt": "Verificado em"
   },
   "notifications": {
     "clearFilters": "Limpar filtros",

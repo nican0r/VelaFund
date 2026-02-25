@@ -1,8 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
 import { randomBytes } from 'crypto';
 import * as bcrypt from 'bcryptjs';
-import { Prisma, ProfileAccessType, CompanyStatus, ProfileStatus } from '@prisma/client';
+import { Prisma, ProfileAccessType, CompanyStatus, ProfileStatus, VerificationStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../aws/s3.service';
 import { CreateProfileDto } from './dto/create-profile.dto';
@@ -15,6 +17,7 @@ import {
   BusinessRuleException,
   UnauthorizedException,
 } from '../common/filters/app-exception';
+import { LitigationCheckPayload, LitigationData } from './litigation-check.processor';
 
 /** Reserved slugs that cannot be used for profiles */
 const RESERVED_SLUGS = [
@@ -71,6 +74,8 @@ export class CompanyProfileService {
     private readonly prisma: PrismaService,
     private readonly s3Service: S3Service,
     private readonly configService: ConfigService,
+    @InjectQueue('profile-litigation')
+    private readonly litigationQueue: Queue<LitigationCheckPayload>,
   ) {}
 
   // ─── CREATE ──────────────────────────────────────────────────────────
@@ -83,7 +88,7 @@ export class CompanyProfileService {
     // Verify company exists and is ACTIVE
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },
-      select: { id: true, name: true, status: true, foundedDate: true },
+      select: { id: true, name: true, cnpj: true, status: true, foundedDate: true },
     });
 
     if (!company) {
@@ -151,12 +156,20 @@ export class CompanyProfileService {
         location: dto.location,
         accessType: dto.accessType ?? ProfileAccessType.PUBLIC,
         accessPasswordHash,
-        litigationStatus: null,
+        litigationStatus: VerificationStatus.PENDING,
       },
       include: {
         company: { select: { name: true, logoUrl: true } },
       },
     });
+
+    // Dispatch async litigation check via Bull queue (non-blocking)
+    this.dispatchLitigationCheck(profile.id, companyId, company.cnpj).catch(
+      (err) =>
+        this.logger.warn(
+          `Failed to dispatch litigation check for profile ${profile.id}: ${err.message}`,
+        ),
+    );
 
     this.logger.log(
       `Profile created for company ${companyId} with slug "${slug}"`,
@@ -188,6 +201,7 @@ export class CompanyProfileService {
       ...this.stripSensitiveFields(profile),
       viewCount: profile._count.views,
       shareUrl: `${frontendUrl}/p/${profile.slug}`,
+      litigation: this.formatLitigationResponse(profile),
     };
   }
 
@@ -615,6 +629,7 @@ export class CompanyProfileService {
       viewCount: profile._count.views,
       shareUrl: `${frontendUrl}/p/${profile.slug}`,
       publishedAt: profile.publishedAt,
+      litigation: this.formatLitigationResponse(profile),
     };
   }
 
@@ -694,6 +709,75 @@ export class CompanyProfileService {
       period,
       viewsByDay: dailySeries,
       recentViewers,
+    };
+  }
+
+  // ─── LITIGATION ────────────────────────────────────────────────────
+
+  /**
+   * Dispatch a litigation check Bull job for the given profile.
+   * Fire-and-forget: profile creation succeeds regardless of queue status.
+   */
+  private async dispatchLitigationCheck(
+    profileId: string,
+    companyId: string,
+    cnpj: string,
+  ): Promise<void> {
+    await this.litigationQueue.add(
+      'fetch-litigation',
+      { profileId, companyId, cnpj } satisfies LitigationCheckPayload,
+      {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 30_000 }, // 30s, 60s, 120s
+      },
+    );
+
+    this.logger.debug(
+      `Litigation check dispatched for profile ${profileId}`,
+    );
+  }
+
+  /**
+   * Format the litigation fields from a CompanyProfile into the API response shape.
+   *
+   * When COMPLETED: returns status, fetchedAt, summary, lawsuits, protestData.
+   * When PENDING: returns status with null summary.
+   * When FAILED: returns status with error message.
+   * When null (no litigation check triggered): returns null.
+   */
+  formatLitigationResponse(profile: {
+    litigationStatus: VerificationStatus | null;
+    litigationData: Prisma.JsonValue | null;
+    litigationFetchedAt: Date | null;
+    litigationError: string | null;
+  }): Record<string, unknown> | null {
+    if (!profile.litigationStatus) return null;
+
+    if (profile.litigationStatus === VerificationStatus.PENDING) {
+      return {
+        status: 'PENDING',
+        fetchedAt: null,
+        summary: null,
+      };
+    }
+
+    if (profile.litigationStatus === VerificationStatus.FAILED) {
+      return {
+        status: 'FAILED',
+        fetchedAt: null,
+        summary: null,
+        error: profile.litigationError ?? 'Verification service temporarily unavailable',
+      };
+    }
+
+    // COMPLETED
+    const data = profile.litigationData as unknown as LitigationData | null;
+    return {
+      status: 'COMPLETED',
+      fetchedAt: profile.litigationFetchedAt?.toISOString() ?? null,
+      summary: data?.summary ?? null,
+      lawsuits: data?.lawsuits ?? [],
+      protestData: data?.protestData ?? { totalProtests: 0, protests: [] },
     };
   }
 

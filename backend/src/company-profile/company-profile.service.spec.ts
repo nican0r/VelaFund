@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
+import { getQueueToken } from '@nestjs/bull';
 import { CompanyProfileService } from './company-profile.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../aws/s3.service';
@@ -160,6 +161,7 @@ describe('CompanyProfileService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: S3Service, useValue: s3Service },
         { provide: ConfigService, useValue: configService },
+        { provide: getQueueToken('profile-litigation'), useValue: { add: jest.fn().mockResolvedValue(undefined) } },
       ],
     }).compile();
 
@@ -204,7 +206,7 @@ describe('CompanyProfileService', () => {
 
       expect(prisma.company.findUnique).toHaveBeenCalledWith({
         where: { id: 'comp-1' },
-        select: { id: true, name: true, status: true, foundedDate: true },
+        select: { id: true, name: true, cnpj: true, status: true, foundedDate: true },
       });
       expect(prisma.companyProfile.create).toHaveBeenCalled();
       expect(result).not.toHaveProperty('accessPasswordHash');

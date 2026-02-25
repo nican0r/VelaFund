@@ -1,6 +1,6 @@
-# Navia MVP — Implementation Plan v28.0
+# Navia MVP — Implementation Plan v29.0
 
-> **Generated**: 2026-02-25 | **Tests**: 1515 passing | **Backend modules**: 19 of 23 built
+> **Generated**: 2026-02-25 | **Tests**: 1581 passing | **Backend modules**: 20 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -9,9 +9,9 @@
 
 ## Current State
 
-**Built backend modules** (18): auth (with Redis sessions + Redis-backed failed-attempt lockout), company, member, share-class, shareholder, cap-table, transaction, funding-round, option-plan (with exercises), convertible, notification, audit-log, email, kyc, document, company-profile
+**Built backend modules** (20): auth (with Redis sessions + Redis-backed failed-attempt lockout), company, member, share-class, shareholder, cap-table, transaction, funding-round, option-plan (with exercises), convertible, notification, audit-log, email, kyc, document, company-profile, company-dataroom, company-litigation
 
-**Entirely missing backend modules** (8): document-signatures, blockchain-integration, company-dataroom, company-litigation, company-blockchain-admin, cap-table-reconciliation, reports-analytics, exit-waterfall
+**Entirely missing backend modules** (6): document-signatures, blockchain-integration, company-blockchain-admin, cap-table-reconciliation, reports-analytics, exit-waterfall
 
 **Frontend**: Scaffolding only (layout shell, static mock pages, typed API client with hardcoded `Accept-Language: 'pt-BR'`). No Privy SDK, no next-intl, no shadcn/ui components, no functional pages, no tests (0 `.test.tsx` files).
 
@@ -346,19 +346,24 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 - [ ] User flow doc: `docs/user-flows/company-blockchain-admin.md`
 - _Depends on_: P3.8 Blockchain Integration
 
-### 3.10 Company Litigation Verification Module (spec: `company-litigation-verification.md`)
+### 3.10 Company Litigation Verification Module (spec: `company-litigation-verification.md`) ✅
 
-- [ ] Create `backend/src/litigation/` module
-- [ ] No separate Prisma model needed — litigation data stored as JSONB fields on CompanyProfile (litigationStatus, litigationData, litigationFetchedAt, litigationError — all already in schema)
-- [ ] BigDataCorp API integration: CNPJ-based lawsuit/protest lookup
-- [ ] LitigationService: verify, getReport, refresh
-- [ ] Bull queue for async BigDataCorp API calls
-- [ ] Immutable risk data storage (litigation fields on CompanyProfile not editable by any role)
-- [ ] PII masking for plaintiff names before storage
-- [ ] Risk level classification (LOW/MEDIUM/HIGH based on active lawsuit count + total value)
-- [ ] Tests: service specs
-- [ ] User flow doc: `docs/user-flows/company-litigation.md`
-- _Depends on_: P1 Redis+Bull, P3.6 Company Profile
+- [x] Integrated into `company-profile` module (no separate module needed — litigation data lives on CompanyProfile)
+- [x] No separate Prisma model needed — litigation data stored as JSONB fields on CompanyProfile (litigationStatus, litigationData, litigationFetchedAt, litigationError — all already in schema)
+- [x] BigDataCorpService: external API client with native fetch + 30s AbortController timeout + circuit breaker (5 failures → open, 60s half-open)
+- [x] LitigationCheckProcessor: Bull queue processor for async litigation fetching (3 attempts, exponential backoff 30s/60s/120s)
+- [x] Bull queue (`profile-litigation`) for async BigDataCorp API calls, dispatched fire-and-forget on profile creation
+- [x] Immutable risk data storage (litigation fields on CompanyProfile not editable by any role; PUT endpoint silently ignores litigation fields)
+- [x] PII masking for plaintiff names before storage (individual names masked, company names preserved via LTDA/S.A./EIRELI/etc. regex)
+- [x] Risk level classification (LOW/MEDIUM/HIGH based on active lawsuit count + total value in dispute)
+- [x] Portuguese/English response field normalization from BigDataCorp API
+- [x] CNPJ not found handled as valid result (COMPLETED with zero counts, LOW risk)
+- [x] formatLitigationResponse() in CompanyProfileService for API response shaping (PENDING/COMPLETED/FAILED)
+- [x] Audit logging: PROFILE_LITIGATION_FETCHED and PROFILE_LITIGATION_FAILED via programmatic AuditLogService.log()
+- [x] Error messages: 2 in app-exception.ts + 2 in frontend i18n (PT-BR + EN) + litigation.* namespace (31 keys)
+- [x] Tests: 66 tests (24 BigDataCorpService + 42 LitigationCheckProcessor) — circuit breaker, PII masking, risk computation, retry logic, CNPJ not found
+- [x] User flow doc: `docs/user-flows/company-litigation.md`
+- _Depends on_: P1 Redis+Bull ✅, P3.6 Company Profile ✅
 
 ### 3.11 Cap Table Reconciliation Module (spec: `cap-table-reconciliation.md`)
 

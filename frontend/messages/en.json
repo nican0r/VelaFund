@@ -69,6 +69,8 @@
       "notFound": "Company profile not found",
       "passwordRequired": "Password is required to access this profile",
       "slugInvalid": "Invalid slug — use lowercase letters, numbers, and hyphens (3-50 characters)",
+      "litigationCnpjNotFound": "CNPJ not found in litigation database",
+      "litigationUnavailable": "Litigation verification service temporarily unavailable",
       "slugReserved": "This slug is reserved",
       "slugTaken": "This slug is already taken"
     },
@@ -116,6 +118,63 @@
     "val": {
       "invalidInput": "Invalid input data"
     }
+  },
+  "litigation": {
+    "caseType": {
+      "administrative": "Administrative",
+      "civil": "Civil",
+      "criminal": "Criminal",
+      "labor": "Labor",
+      "tax": "Tax"
+    },
+    "details": {
+      "hide": "Hide details",
+      "show": "Show details"
+    },
+    "failed": {
+      "message": "Unable to retrieve litigation data. Please try again later.",
+      "title": "Verification failed"
+    },
+    "pending": {
+      "message": "Litigation verification is in progress. Results will appear here shortly.",
+      "title": "Verification in progress"
+    },
+    "protestTable": {
+      "date": "Date",
+      "notaryOffice": "Notary Office",
+      "status": "Status",
+      "value": "Amount"
+    },
+    "riskLevel": {
+      "high": "High",
+      "low": "Low",
+      "medium": "Medium"
+    },
+    "section": {
+      "lawsuits": "Lawsuits",
+      "protests": "Protests"
+    },
+    "summary": {
+      "activeLawsuits": "Active lawsuits",
+      "historicalLawsuits": "Historical lawsuits",
+      "noLawsuits": "No lawsuits found",
+      "noProtests": "No protests found",
+      "protests": "Protests",
+      "valueInDispute": "Total value in dispute"
+    },
+    "systemManaged": "Litigation data is system-managed and cannot be edited",
+    "table": {
+      "caseType": "Type",
+      "court": "Court",
+      "filingDate": "Filing date",
+      "plaintiff": "Plaintiff",
+      "processId": "Process ID",
+      "status": "Status",
+      "subject": "Subject",
+      "value": "Value in dispute"
+    },
+    "title": "Litigation Verification",
+    "verifiedAt": "Verified at"
   },
   "notifications": {
     "clearFilters": "Clear filters",

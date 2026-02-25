@@ -737,6 +737,15 @@ const MESSAGES: Record<string, Record<string, string>> = {
     'pt-BR': 'Serviço de armazenamento indisponível',
     en: 'Storage service unavailable',
   },
+  // ─── LITIGATION VERIFICATION MESSAGES ─────────────────────────────────
+  'errors.profile.litigationUnavailable': {
+    'pt-BR': 'Serviço de verificação judicial temporariamente indisponível',
+    en: 'Litigation verification service temporarily unavailable',
+  },
+  'errors.profile.litigationCnpjNotFound': {
+    'pt-BR': 'CNPJ não encontrado na base de dados judicial',
+    en: 'CNPJ not found in litigation database',
+  },
 };
 
 export class AppException extends Error {
