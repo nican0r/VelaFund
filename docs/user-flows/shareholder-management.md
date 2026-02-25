@@ -32,27 +32,49 @@ User navigates to Shareholders page
 
 ADMIN clicks "Add Shareholder"
   │
-  ├─ [valid form] ─→ POST /shareholders
-  │     │
-  │     ├─ [company ACTIVE + CPF/CNPJ valid + unique + type compatible] ─→ 201 Created (CPF encrypted via KMS)
-  │     │
-  │     ├─ [company not ACTIVE] ─→ 422 SHAREHOLDER_COMPANY_NOT_ACTIVE
-  │     │
-  │     ├─ [CPF/CNPJ format unrecognized] ─→ 422 SHAREHOLDER_INVALID_DOCUMENT
-  │     │
-  │     ├─ [CORPORATE type without CNPJ] ─→ 422 SHAREHOLDER_CORPORATE_NEEDS_CNPJ
-  │     │
-  │     ├─ [non-CORPORATE type without CPF] ─→ 422 SHAREHOLDER_INDIVIDUAL_NEEDS_CPF
-  │     │
-  │     ├─ [CPF check digits invalid] ─→ 422 SHAREHOLDER_INVALID_CPF
-  │     │
-  │     ├─ [CNPJ check digits invalid] ─→ 422 SHAREHOLDER_INVALID_CNPJ
-  │     │
-  │     ├─ [CPF/CNPJ already registered in company] ─→ 409 SHAREHOLDER_CPF_CNPJ_DUPLICATE
-  │     │
-  │     └─ [invalid RDE-IED date] ─→ 422 SHAREHOLDER_INVALID_RDE_DATE
+  ├─ [no selectedCompany] ─→ Empty state (Users icon + message), form not rendered
   │
-  └─ [invalid form] ─→ Client-side validation prevents submission
+  └─ [selectedCompany exists] ─→ Navigate to /dashboard/shareholders/new
+        │
+        ├─ User selects type (FOUNDER default, INVESTOR, EMPLOYEE, ADVISOR, CORPORATE)
+        │     │
+        │     ├─ [CORPORATE selected] ─→ CNPJ label + CNPJ format + corporate info note
+        │     └─ [Individual selected] ─→ CPF label + CPF format
+        │
+        ├─ User changes taxResidency
+        │     │
+        │     ├─ [taxResidency = BR] ─→ Standard form (no RDE-IED fields)
+        │     └─ [taxResidency != BR] ─→ Foreign warning + RDE-IED Number + RDE-IED Date fields
+        │
+        ├─ User expands address section
+        │     │
+        │     ├─ [any text field filled] ─→ street + city + state + country become required
+        │     └─ [no text fields filled] ─→ Address ignored in payload
+        │
+        └─ User clicks "Save"
+              │
+              ├─ [client validation fails] ─→ Field-level errors shown, form stays open
+              │
+              └─ [client validation passes] ─→ POST /shareholders (only non-empty fields)
+                    │
+                    ├─ [company ACTIVE + CPF/CNPJ valid + unique + type compatible] ─→ 201 Created
+                    │     └─ Toast "Shareholder added successfully" ─→ Navigate to /dashboard/shareholders
+                    │
+                    ├─ [company not ACTIVE] ─→ 422 SHAREHOLDER_COMPANY_NOT_ACTIVE ─→ Error toast
+                    │
+                    ├─ [CPF/CNPJ format unrecognized] ─→ 422 SHAREHOLDER_INVALID_DOCUMENT ─→ Error toast
+                    │
+                    ├─ [CORPORATE type without CNPJ] ─→ 422 SHAREHOLDER_CORPORATE_NEEDS_CNPJ ─→ Error toast
+                    │
+                    ├─ [non-CORPORATE type without CPF] ─→ 422 SHAREHOLDER_INDIVIDUAL_NEEDS_CPF ─→ Error toast
+                    │
+                    ├─ [CPF check digits invalid] ─→ 422 SHAREHOLDER_INVALID_CPF ─→ Error toast
+                    │
+                    ├─ [CNPJ check digits invalid] ─→ 422 SHAREHOLDER_INVALID_CNPJ ─→ Error toast
+                    │
+                    ├─ [CPF/CNPJ already registered in company] ─→ 409 SHAREHOLDER_CPF_CNPJ_DUPLICATE ─→ Error toast
+                    │
+                    └─ [invalid RDE-IED date] ─→ 422 SHAREHOLDER_INVALID_RDE_DATE ─→ Error toast
 
 
 ADMIN clicks "Edit Shareholder"
@@ -304,6 +326,140 @@ TRIGGER: User clicks "Foreign Shareholders" tab/link
 POSTCONDITION: User sees foreign shareholders and ownership summary
 ```
 
+### Happy Path: Create Shareholder (Frontend Form)
+
+```
+PRECONDITION: Company is ACTIVE, user has ADMIN role, selectedCompany is set in CompanyProvider
+ACTOR: ADMIN member
+TRIGGER: User clicks "Add Shareholder" button on the shareholders list page
+
+1. [UI] User navigates to /dashboard/shareholders
+2. [UI] User clicks "Add Shareholder" button
+3. [UI] Browser navigates to /dashboard/shareholders/new
+4. [UI] Form renders with 4 sections:
+   - Type Selection: 5 cards (FOUNDER selected by default, INVESTOR, EMPLOYEE, ADVISOR, CORPORATE)
+   - Identity: Name (required), CPF/CNPJ (optional with validation), Email (optional)
+   - Contact: Phone (optional, max 30 chars), Address (collapsible)
+   - Compliance: Nationality (default: BR), Tax Residency (default: BR)
+5. [UI] User clicks a type card to select shareholder type
+   - Type selection clears the CPF/CNPJ field (document format depends on type)
+   - CORPORATE type: CNPJ label shown (XX.XXX.XXX/XXXX-XX format)
+   - Individual types (FOUNDER, INVESTOR, EMPLOYEE, ADVISOR): CPF label shown (XXX.XXX.XXX-XX format)
+   - CORPORATE type: info note displayed about beneficial owners
+6. [UI] User fills in name (required, 2-300 chars)
+7. [UI] User optionally fills CPF/CNPJ
+   - Auto-formats as user types (digits extracted and reformatted on each keystroke)
+   - CPF: XXX.XXX.XXX-XX (max 11 digits)
+   - CNPJ: XX.XXX.XXX/XXXX-XX (max 14 digits)
+8. [UI] User optionally fills email (validated if provided)
+9. [UI] User optionally fills phone (max 30 chars)
+10. [UI] User optionally expands address section via collapsible toggle
+    - If any text field (street, city, state, postalCode) is filled, street + city + state + country become required
+    - Country defaults to BR via dropdown (addressCountry is always pre-filled, not counted as trigger)
+11. [UI] User optionally changes nationality and/or tax residency dropdowns (both default: BR)
+    → IF taxResidency != BR: foreign warning banner appears + RDE-IED Number and RDE-IED Date fields appear
+12. [UI] User clicks "Save" button
+13. [Frontend] Validates all fields client-side (validateForm)
+    → IF name empty or < 2 or > 300 chars: field error on name, STOP
+    → IF CPF/CNPJ provided and wrong digit count for type: field error on cpfCnpj, STOP
+    → IF CPF provided and Modulo 11 checksum fails: field error on cpfCnpj, STOP
+    → IF CNPJ provided and Modulo 11 checksum fails: field error on cpfCnpj, STOP
+    → IF email provided and format invalid: field error on email, STOP
+    → IF phone > 30 chars: field error on phone, STOP
+    → IF partial address (some text fields filled but street/city/state/country missing): field errors on missing address fields, STOP
+    → IF rdeIedDate provided and not a valid date: field error on rdeIedDate, STOP
+14. [Frontend] Builds payload with only non-empty fields (empty strings omitted via spread)
+15. [Frontend] Sends POST /api/v1/companies/:companyId/shareholders via useCreateShareholder mutation
+16. [Backend] Validates authentication (AuthGuard)
+    → IF unauthenticated: return 401, frontend redirects to login via onUnauthorized
+17. [Backend] Validates authorization (RolesGuard: ADMIN)
+    → IF not member or wrong role: return 404
+18. [Backend] Validates request body (ValidationPipe)
+    → IF invalid: return 400 with validationErrors
+19. [Backend] Validates company is ACTIVE
+    → IF not ACTIVE: return 422 SHAREHOLDER_COMPANY_NOT_ACTIVE
+20. [Backend] Validates CPF/CNPJ format, checksum, and type compatibility
+    → IF format invalid: return 422 SHAREHOLDER_INVALID_DOCUMENT
+    → IF CORPORATE without CNPJ: return 422 SHAREHOLDER_CORPORATE_NEEDS_CNPJ
+    → IF non-CORPORATE without CPF: return 422 SHAREHOLDER_INDIVIDUAL_NEEDS_CPF
+    → IF CPF checksum fails: return 422 SHAREHOLDER_INVALID_CPF
+    → IF CNPJ checksum fails: return 422 SHAREHOLDER_INVALID_CNPJ
+21. [Backend] Computes blind index (HMAC-SHA256) and checks uniqueness within the company
+    → IF duplicate: return 409 SHAREHOLDER_CPF_CNPJ_DUPLICATE
+22. [Backend] Auto-computes isForeign based on taxResidency (non-BR = true)
+23. [Backend] Creates shareholder record (CPF encrypted via KMS, CNPJ stored plaintext)
+24. [Backend] Returns 201 with created shareholder
+25. [UI] Shows success toast: "Shareholder added successfully" (via sonner toast.success)
+26. [UI] Navigates to /dashboard/shareholders (via router.push)
+
+POSTCONDITION: New shareholder exists with ACTIVE status, isForeign auto-computed,
+  CPF encrypted at rest or CNPJ stored in plaintext. Shareholders list shows new entry.
+SIDE EFFECTS: Audit log SHAREHOLDER_CREATED (via @Auditable on POST endpoint)
+```
+
+### Alternative Path: Create Shareholder — Foreign Shareholder
+
+```
+PRECONDITION: Same as Create Shareholder (Frontend Form)
+ACTOR: ADMIN member
+TRIGGER: User selects a non-BR tax residency during form fill
+
+1-10. [Same as Create Shareholder (Frontend Form) steps 1-10]
+11. [UI] User changes tax residency to a non-BR country (e.g., US)
+12. [UI] Foreign warning banner appears with AlertTriangle icon
+13. [UI] RDE-IED Number and RDE-IED Date input fields appear below the warning
+14. [UI] User optionally fills RDE-IED Number (max 50 chars) and RDE-IED Date
+15-26. [Same as Create Shareholder (Frontend Form) steps 12-26]
+
+POSTCONDITION: Shareholder created with isForeign = true, RDE-IED data stored if provided
+```
+
+### Alternative Path: Create Shareholder — No Company Selected
+
+```
+PRECONDITION: User has no selected company in CompanyProvider
+ACTOR: Authenticated user
+TRIGGER: User navigates directly to /dashboard/shareholders/new
+
+1. [UI] User navigates to /dashboard/shareholders/new
+2. [UI] CompanyProvider has no selectedCompany
+3. [UI] Empty state displayed: Users icon + "No shareholders found" message
+4. [UI] Form is not rendered, no action possible
+
+POSTCONDITION: No shareholder created, user must select a company first
+```
+
+### Error Path: Create Shareholder — Client-Side Validation Failure
+
+```
+ACTOR: ADMIN member
+TRIGGER: User submits the create shareholder form with invalid data
+
+1-12. [Same as Create Shareholder (Frontend Form) steps 1-12]
+13. [Frontend] User clicks "Save"
+14. [Frontend] validateForm runs and finds errors
+15. [UI] Field-level error messages displayed in red below the invalid fields
+16. [UI] Form remains open for correction
+17. [UI] On subsequent field edits, individual field errors clear as the user types
+
+POSTCONDITION: No API call made, no shareholder created
+```
+
+### Error Path: Create Shareholder — API Error
+
+```
+ACTOR: ADMIN member
+TRIGGER: Backend returns an error response to the create request
+
+1-15. [Same as Create Shareholder (Frontend Form) steps 1-15]
+16. [Backend] Returns an error (422, 409, 400, etc.)
+17. [Frontend] useCreateShareholder mutation catches the error
+18. [Frontend] showErrorToast(error) displays error toast with localized message from messageKey
+19. [UI] Form remains open with user's data preserved for correction
+
+POSTCONDITION: No shareholder created, user sees error toast
+```
+
 ### Error Path: CPF/CNPJ Validation Failure
 
 ```
@@ -328,6 +484,36 @@ POSTCONDITION: No shareholder created
 
 ## Decision Points
 
+### Create Shareholder (Frontend Form)
+
+| # | Decision Point | Condition | Path | Outcome |
+|---|---------------|-----------|------|---------|
+| 2 (UI) | Company selected | No selectedCompany in CompanyProvider | Block | Empty state rendered, form not shown |
+| 5 (UI) | Type selection | CORPORATE selected | UI change | CNPJ label, CNPJ format, corporate info note |
+| 5 (UI) | Type selection | Individual type selected | UI change | CPF label, CPF format |
+| 5 (UI) | Type change | User switches type | UI reset | CPF/CNPJ field cleared (format depends on type) |
+| 10 (UI) | Address completeness | Any text address field filled | Validation | street + city + state + country required |
+| 10 (UI) | Address completeness | No text address fields filled | Skip | Address omitted from payload |
+| 11 (UI) | Tax residency | taxResidency != BR | UI change | Foreign warning + RDE-IED fields appear |
+| 11 (UI) | Tax residency | taxResidency = BR | UI change | RDE-IED fields hidden |
+| 13 (client) | Name validation | Empty or < 2 or > 300 chars | Error | Field error on name, submission blocked |
+| 13 (client) | CPF digit count | Provided but != 11 digits (individual) | Error | Field error: individual needs CPF |
+| 13 (client) | CPF checksum | 11 digits but Modulo 11 fails | Error | Field error: invalid CPF |
+| 13 (client) | CNPJ digit count | Provided but != 14 digits (corporate) | Error | Field error: corporate needs CNPJ |
+| 13 (client) | CNPJ checksum | 14 digits but Modulo 11 fails | Error | Field error: invalid CNPJ |
+| 13 (client) | Email format | Provided but invalid format | Error | Field error on email |
+| 13 (client) | Phone length | > 30 characters | Error | Field error on phone |
+| 13 (client) | Address partial fill | Some required fields missing | Error | Field errors on missing address fields |
+| 13 (client) | RDE-IED date | Provided but invalid date | Error | Field error on rdeIedDate |
+| 16 (backend) | Auth check | No valid session | Error | 401, onUnauthorized redirects to login |
+| 17 (backend) | Role check | Not ADMIN | Error | 404 Not Found |
+| 19 (backend) | Company status | Company not ACTIVE | Error | 422, error toast via useErrorToast |
+| 20 (backend) | Document validation | CPF/CNPJ invalid | Error | 422, error toast via useErrorToast |
+| 21 (backend) | Uniqueness | CPF/CNPJ duplicate in company | Error | 409, error toast via useErrorToast |
+| 24 (backend) | API success | 201 Created | Happy | Success toast + navigate to /dashboard/shareholders |
+
+### General (Backend CRUD)
+
 | # | Decision Point | Condition | Path | Outcome |
 |---|---------------|-----------|------|---------|
 | 8 | Auth check | No valid token | Error | 401, redirect to login |
@@ -351,6 +537,23 @@ POSTCONDITION: No shareholder created
 ---
 
 ## State Transitions
+
+### Create Shareholder (Frontend Form)
+
+| Entity | Field | Before | After | Trigger |
+|--------|-------|--------|-------|---------|
+| Form (UI) | type | FOUNDER (default) | Selected type | User clicks type card |
+| Form (UI) | cpfCnpj | Any value | "" (cleared) | User changes type selection |
+| Form (UI) | showAddress | false | true/false | User clicks address toggle |
+| Form (UI) | errors | {} | Field-level errors | User clicks Save with invalid data |
+| Form (UI) | errors[field] | Error message | undefined | User edits the field after submission |
+| Shareholder (DB) | — | — | Created (ACTIVE) | Backend returns 201 |
+| Shareholder (DB) | isForeign | — | true | taxResidency != BR (auto-computed by backend) |
+| Shareholder (DB) | isForeign | — | false | taxResidency = BR (auto-computed by backend) |
+| Shareholder (DB) | cpfCnpjEncrypted | — | KMS ciphertext | CPF provided (encrypted at rest) |
+| Shareholder (DB) | cpfCnpj | — | Plaintext CNPJ | CNPJ provided (public registry data) |
+
+### General
 
 | Entity | Field | Before | After | Trigger |
 |--------|-------|--------|-------|---------|
