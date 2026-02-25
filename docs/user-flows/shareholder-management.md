@@ -34,7 +34,7 @@ ADMIN clicks "Add Shareholder"
   │
   ├─ [valid form] ─→ POST /shareholders
   │     │
-  │     ├─ [company ACTIVE + CPF/CNPJ valid + unique + type compatible] ─→ 201 Created
+  │     ├─ [company ACTIVE + CPF/CNPJ valid + unique + type compatible] ─→ 201 Created (CPF encrypted via KMS)
   │     │
   │     ├─ [company not ACTIVE] ─→ 422 SHAREHOLDER_COMPANY_NOT_ACTIVE
   │     │
@@ -133,15 +133,19 @@ TRIGGER: User clicks "Add Shareholder" button
     → IF non-CORPORATE without CPF: return 422 SHAREHOLDER_INDIVIDUAL_NEEDS_CPF
     → IF CPF checksum fails: return 422 SHAREHOLDER_INVALID_CPF
     → IF CNPJ checksum fails: return 422 SHAREHOLDER_INVALID_CNPJ
-13. [Backend] Computes blind index (SHA-256) and checks uniqueness
+13. [Backend] Computes blind index (HMAC-SHA256 with BLIND_INDEX_KEY) and checks uniqueness within the company
     → IF duplicate: return 409 SHAREHOLDER_CPF_CNPJ_DUPLICATE
 14. [Backend] Auto-computes isForeign based on taxResidency (non-BR = true)
 15. [Backend] Creates shareholder record
+    - If document is a CPF: encrypts the value via AWS KMS, stores ciphertext in cpfCnpjEncrypted,
+      and clears the plaintext cpfCnpj field. If KMS is unavailable, falls back to plaintext storage.
+    - If document is a CNPJ: stores in plaintext cpfCnpj (public registry data per security.md, not encrypted)
 16. [Backend] Returns 201 with created shareholder
 17. [UI] Shows success toast
 18. [UI] Shareholder list refreshes showing new entry
 
-POSTCONDITION: New shareholder exists with ACTIVE status, isForeign auto-computed
+POSTCONDITION: New shareholder exists with ACTIVE status, isForeign auto-computed,
+  CPF encrypted at rest (cpfCnpjEncrypted) with plaintext cleared, or CNPJ stored in plaintext
 SIDE EFFECTS: Audit log (future: SHAREHOLDER_CREATED)
 ```
 
@@ -174,6 +178,8 @@ TRIGGER: User clicks on a shareholder row
 1. [UI] User clicks on shareholder row in list
 2. [Frontend] Sends GET /api/v1/companies/:companyId/shareholders/:shareholderId
 3. [Backend] Returns shareholder with shareholdings (including shareClass) and beneficialOwners
+   - If the shareholder has an encrypted CPF (cpfCnpjEncrypted), it is transparently decrypted
+     via AWS KMS and returned in the cpfCnpj response field
 4. [UI] Displays shareholder profile: name, type badge, status badge, contact info
 5. [UI] Displays holdings table: share class, quantity, percentage
 6. [UI] For CORPORATE shareholders: displays beneficial owners section

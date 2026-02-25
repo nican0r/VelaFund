@@ -79,6 +79,7 @@ pnpm --filter @navia/backend prisma:generate
 | `backend/src/app.module.ts` | Root module — includes BullModule.forRootAsync for Redis/Bull queues |
 | `backend/src/redis/redis.module.ts` | Global RedisModule — provides REDIS_CLIENT injection token |
 | `backend/src/aws/aws.module.ts` | Global AwsModule — S3Service, SesService, KmsService |
+| `backend/src/encryption/encryption.service.ts` | EncryptionService — KMS encrypt/decrypt + HMAC-SHA256 blind index |
 | `backend/src/main.ts` | NestJS bootstrap (middleware, pipes, filters) |
 | `backend/src/auth/auth.service.ts` | Privy auth: token verify, login, user find/create |
 | `backend/src/auth/auth.controller.ts` | Auth endpoints: login, logout, me |

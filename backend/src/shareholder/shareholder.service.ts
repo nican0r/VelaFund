@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { EncryptionService } from '../encryption/encryption.service';
 import { CreateShareholderDto } from './dto/create-shareholder.dto';
 import { UpdateShareholderDto } from './dto/update-shareholder.dto';
 import { ListShareholdersQueryDto } from './dto/list-shareholders-query.dto';
@@ -70,15 +70,6 @@ export function isValidCnpjChecksum(cnpj: string): boolean {
 }
 
 /**
- * Compute a blind index (SHA-256 hash) for a CPF/CNPJ value.
- * Used for uniqueness checks without exposing the raw value.
- */
-function computeBlindIndex(value: string): string {
-  const normalized = value.replace(/\D/g, '');
-  return createHash('sha256').update(normalized).digest('hex').slice(0, 32);
-}
-
-/**
  * Determine if a CPF/CNPJ string is CPF (11 digits) or CNPJ (14 digits).
  */
 function getCpfCnpjType(value: string): 'CPF' | 'CNPJ' | null {
@@ -92,7 +83,10 @@ function getCpfCnpjType(value: string): 'CPF' | 'CNPJ' | null {
 export class ShareholderService {
   private readonly logger = new Logger(ShareholderService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly encryptionService: EncryptionService,
+  ) {}
 
   /**
    * Create a new shareholder for a company.
@@ -123,9 +117,8 @@ export class ShareholderService {
 
     // Validate CPF/CNPJ if provided
     let cpfCnpjBlindIndex: string | null = null;
+    const docType = dto.cpfCnpj ? getCpfCnpjType(dto.cpfCnpj) : null;
     if (dto.cpfCnpj) {
-      const docType = getCpfCnpjType(dto.cpfCnpj);
-
       if (!docType) {
         throw new BusinessRuleException(
           'SHAREHOLDER_INVALID_DOCUMENT',
@@ -167,7 +160,7 @@ export class ShareholderService {
         );
       }
 
-      cpfCnpjBlindIndex = computeBlindIndex(dto.cpfCnpj);
+      cpfCnpjBlindIndex = this.encryptionService.createBlindIndex(dto.cpfCnpj);
     }
 
     // BR-4: Auto-compute isForeign from taxResidency
@@ -186,6 +179,24 @@ export class ShareholderService {
       }
     }
 
+    // Encrypt CPF at application level when KMS is available (LGPD compliance).
+    // CNPJ is public registry data and does not require app-level encryption per security.md.
+    let cpfCnpjEncrypted: Buffer | null = null;
+    let cpfCnpjPlaintext: string | null = dto.cpfCnpj ?? null;
+
+    if (dto.cpfCnpj && docType === 'CPF' && this.encryptionService.isEncryptionAvailable()) {
+      try {
+        cpfCnpjEncrypted = await this.encryptionService.encrypt(dto.cpfCnpj);
+        cpfCnpjPlaintext = null; // Clear plaintext — ciphertext + blind index are sufficient
+        this.logger.debug('CPF encrypted via KMS for new shareholder');
+      } catch (error) {
+        // Graceful degradation: if encryption fails, store plaintext with warning
+        this.logger.warn(
+          `CPF encryption failed, storing plaintext: ${(error as Error).message}`,
+        );
+      }
+    }
+
     try {
       const shareholder = await this.prisma.shareholder.create({
         data: {
@@ -194,7 +205,8 @@ export class ShareholderService {
           type: dto.type,
           email: dto.email ?? null,
           phone: dto.phone ?? null,
-          cpfCnpj: dto.cpfCnpj ?? null,
+          cpfCnpj: cpfCnpjPlaintext,
+          cpfCnpjEncrypted,
           cpfCnpjBlindIndex,
           nationality: dto.nationality ?? 'BR',
           taxResidency,
@@ -271,6 +283,7 @@ export class ShareholderService {
   /**
    * Get a single shareholder by ID within a company scope.
    * Includes ownership breakdown via shareholdings.
+   * Decrypts CPF if stored encrypted (LGPD-compliant storage).
    */
   async findById(companyId: string, shareholderId: string) {
     const shareholder = await this.prisma.shareholder.findFirst({
@@ -294,6 +307,21 @@ export class ShareholderService {
 
     if (!shareholder) {
       throw new NotFoundException('shareholder', shareholderId);
+    }
+
+    // Decrypt CPF if stored encrypted (cpfCnpj is null but cpfCnpjEncrypted exists)
+    if (!shareholder.cpfCnpj && shareholder.cpfCnpjEncrypted) {
+      try {
+        const decrypted = await this.encryptionService.decrypt(
+          Buffer.from(shareholder.cpfCnpjEncrypted),
+        );
+        return { ...shareholder, cpfCnpj: decrypted };
+      } catch (error) {
+        this.logger.warn(
+          `Failed to decrypt CPF for shareholder ${shareholderId}: ${(error as Error).message}`,
+        );
+        // Return without CPF rather than failing the entire request
+      }
     }
 
     return shareholder;

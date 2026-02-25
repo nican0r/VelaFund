@@ -17,6 +17,7 @@ import { FundingRoundModule } from './funding-round/funding-round.module';
 import { OptionPlanModule } from './option-plan/option-plan.module';
 import { ConvertibleModule } from './convertible/convertible.module';
 import { AwsModule } from './aws/aws.module';
+import { EncryptionModule } from './encryption/encryption.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { AwsModule } from './aws/aws.module';
     }),
     RedisModule,
     AwsModule,
+    EncryptionModule,
     PrismaModule,
     HealthModule,
     AuthModule,

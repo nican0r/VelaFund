@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ShareholderService, isValidCpfChecksum, isValidCnpjChecksum } from './shareholder.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { EncryptionService } from '../encryption/encryption.service';
 import {
   NotFoundException,
   ConflictException,
@@ -50,6 +51,7 @@ const mockCorporateShareholder = {
 describe('ShareholderService', () => {
   let service: ShareholderService;
   let prisma: any;
+  let encryptionService: any;
 
   beforeEach(async () => {
     prisma = {
@@ -77,10 +79,18 @@ describe('ShareholderService', () => {
       $transaction: jest.fn(),
     };
 
+    encryptionService = {
+      createBlindIndex: jest.fn().mockReturnValue('hmac-blind-index-1234567890ab'),
+      isEncryptionAvailable: jest.fn().mockReturnValue(false),
+      encrypt: jest.fn().mockResolvedValue(Buffer.from('encrypted-cpf')),
+      decrypt: jest.fn().mockResolvedValue('529.982.247-25'),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ShareholderService,
         { provide: PrismaService, useValue: prisma },
+        { provide: EncryptionService, useValue: encryptionService },
       ],
     }).compile();
 
@@ -146,6 +156,7 @@ describe('ShareholderService', () => {
       const result = await service.create('comp-1', createDto);
 
       expect(result).toEqual(mockShareholder);
+      expect(encryptionService.createBlindIndex).toHaveBeenCalledWith('529.982.247-25');
       expect(prisma.shareholder.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           companyId: 'comp-1',
@@ -153,7 +164,8 @@ describe('ShareholderService', () => {
           type: 'FOUNDER',
           email: 'joao@example.com',
           cpfCnpj: '529.982.247-25',
-          cpfCnpjBlindIndex: expect.any(String),
+          cpfCnpjBlindIndex: 'hmac-blind-index-1234567890ab',
+          cpfCnpjEncrypted: null,
           isForeign: false,
           nationality: 'BR',
           taxResidency: 'BR',
@@ -282,6 +294,65 @@ describe('ShareholderService', () => {
         service.create('comp-1', { ...createDto, cpfCnpj: '12345' }),
       ).rejects.toThrow(BusinessRuleException);
     });
+
+    it('should encrypt CPF when KMS is available', async () => {
+      encryptionService.isEncryptionAvailable.mockReturnValue(true);
+      prisma.company.findUnique.mockResolvedValue(mockCompany);
+      prisma.shareholder.create.mockResolvedValue({
+        ...mockShareholder,
+        cpfCnpj: null,
+        cpfCnpjEncrypted: Buffer.from('encrypted-cpf'),
+      });
+
+      await service.create('comp-1', createDto);
+
+      expect(encryptionService.encrypt).toHaveBeenCalledWith('529.982.247-25');
+      expect(prisma.shareholder.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          cpfCnpj: null, // Plaintext cleared
+          cpfCnpjEncrypted: Buffer.from('encrypted-cpf'),
+          cpfCnpjBlindIndex: 'hmac-blind-index-1234567890ab',
+        }),
+      });
+    });
+
+    it('should NOT encrypt CNPJ (public registry data)', async () => {
+      encryptionService.isEncryptionAvailable.mockReturnValue(true);
+      prisma.company.findUnique.mockResolvedValue(mockCompany);
+      prisma.shareholder.create.mockResolvedValue(mockCorporateShareholder);
+
+      await service.create('comp-1', {
+        name: 'Acme Holdings Ltda',
+        type: ShareholderTypeDto.CORPORATE,
+        cpfCnpj: '11.222.333/0001-81',
+      });
+
+      // CNPJ should NOT be encrypted per security.md
+      expect(encryptionService.encrypt).not.toHaveBeenCalled();
+      expect(prisma.shareholder.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          cpfCnpj: '11.222.333/0001-81', // Plaintext preserved
+          cpfCnpjEncrypted: null,
+        }),
+      });
+    });
+
+    it('should fall back to plaintext if CPF encryption fails', async () => {
+      encryptionService.isEncryptionAvailable.mockReturnValue(true);
+      encryptionService.encrypt.mockRejectedValue(new Error('KMS timeout'));
+      prisma.company.findUnique.mockResolvedValue(mockCompany);
+      prisma.shareholder.create.mockResolvedValue(mockShareholder);
+
+      await service.create('comp-1', createDto);
+
+      // Should still create with plaintext CPF as fallback
+      expect(prisma.shareholder.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          cpfCnpj: '529.982.247-25', // Plaintext fallback
+          cpfCnpjEncrypted: null,
+        }),
+      });
+    });
   });
 
   // ─── FIND ALL ────────────────────────────────────────────────────
@@ -392,6 +463,57 @@ describe('ShareholderService', () => {
       await expect(service.findById('comp-1', 'sh-999')).rejects.toThrow(
         NotFoundException,
       );
+    });
+
+    it('should decrypt CPF when stored encrypted', async () => {
+      const encryptedShareholder = {
+        ...mockShareholder,
+        cpfCnpj: null, // Plaintext cleared
+        cpfCnpjEncrypted: Buffer.from('encrypted-cpf-data'),
+        shareholdings: [],
+        beneficialOwners: [],
+      };
+      prisma.shareholder.findFirst.mockResolvedValue(encryptedShareholder);
+
+      const result = await service.findById('comp-1', 'sh-1');
+
+      expect(encryptionService.decrypt).toHaveBeenCalledWith(
+        Buffer.from('encrypted-cpf-data'),
+      );
+      expect(result.cpfCnpj).toBe('529.982.247-25');
+    });
+
+    it('should return shareholder without CPF if decryption fails', async () => {
+      const encryptedShareholder = {
+        ...mockShareholder,
+        cpfCnpj: null,
+        cpfCnpjEncrypted: Buffer.from('bad-encrypted-data'),
+        shareholdings: [],
+        beneficialOwners: [],
+      };
+      prisma.shareholder.findFirst.mockResolvedValue(encryptedShareholder);
+      encryptionService.decrypt.mockRejectedValue(new Error('KMS unavailable'));
+
+      const result = await service.findById('comp-1', 'sh-1');
+
+      // Should return without cpfCnpj rather than throwing
+      expect(result.cpfCnpj).toBeNull();
+    });
+
+    it('should not attempt decryption for plaintext CPF', async () => {
+      const plaintextShareholder = {
+        ...mockShareholder,
+        cpfCnpj: '529.982.247-25',
+        cpfCnpjEncrypted: null,
+        shareholdings: [],
+        beneficialOwners: [],
+      };
+      prisma.shareholder.findFirst.mockResolvedValue(plaintextShareholder);
+
+      const result = await service.findById('comp-1', 'sh-1');
+
+      expect(encryptionService.decrypt).not.toHaveBeenCalled();
+      expect(result.cpfCnpj).toBe('529.982.247-25');
     });
   });
 

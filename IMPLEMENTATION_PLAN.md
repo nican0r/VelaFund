@@ -1,6 +1,6 @@
 # Navia MVP — Implementation Plan v22.0
 
-> **Generated**: 2026-02-25 | **Tests**: 822 passing | **Backend modules**: 12 of 23 built
+> **Generated**: 2026-02-25 | **Tests**: 854 passing | **Backend modules**: 12 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -15,7 +15,7 @@
 
 **Frontend**: Scaffolding only (layout shell, static mock pages, typed API client with hardcoded `Accept-Language: 'pt-BR'`). No Privy SDK, no next-intl, no shadcn/ui components, no functional pages, no tests (0 `.test.tsx` files).
 
-**Infrastructure**: Redis/Bull configured (`@nestjs/bull`, `bull`, `ioredis` installed; BullModule.forRootAsync in AppModule). SessionService for Redis-backed auth sessions (7-day absolute, 2-hour inactivity timeouts). AWS SDK configured (`@aws-sdk/client-s3`, `@aws-sdk/client-ses`, `@aws-sdk/client-kms`, `@aws-sdk/s3-request-presigner` installed; AwsModule @Global with S3Service, SesService, KmsService). CSRF middleware implemented (double-submit cookie pattern, `navia-csrf` cookie, `X-CSRF-Token` header validation). Helmet fully configured (including `permittedCrossDomainPolicies: false`). `redactPii()` utility implemented (`common/utils/redact-pii.ts`: maskCpf, maskCnpj, maskEmail, maskWallet, maskIp + redactPiiFromString; integrated with GlobalExceptionFilter for PII-safe logging; AuthService refactored to use centralized utility). Body size limits configured (1MB JSON, 1MB URL-encoded in main.ts). No `@sentry/nestjs`, no EncryptionService, no email sending.
+**Infrastructure**: Redis/Bull configured (`@nestjs/bull`, `bull`, `ioredis` installed; BullModule.forRootAsync in AppModule). SessionService for Redis-backed auth sessions (7-day absolute, 2-hour inactivity timeouts). AWS SDK configured (`@aws-sdk/client-s3`, `@aws-sdk/client-ses`, `@aws-sdk/client-kms`, `@aws-sdk/s3-request-presigner` installed; AwsModule @Global with S3Service, SesService, KmsService). CSRF middleware implemented (double-submit cookie pattern, `navia-csrf` cookie, `X-CSRF-Token` header validation). Helmet fully configured (including `permittedCrossDomainPolicies: false`). `redactPii()` utility implemented (`common/utils/redact-pii.ts`: maskCpf, maskCnpj, maskEmail, maskWallet, maskIp + redactPiiFromString; integrated with GlobalExceptionFilter for PII-safe logging; AuthService refactored to use centralized utility). Body size limits configured (1MB JSON, 1MB URL-encoded in main.ts). EncryptionModule implemented (@Global) with EncryptionService wrapping KmsService: encrypt/decrypt via KMS and HMAC-SHA256 blind indexes via BLIND_INDEX_KEY env var; graceful degradation with SHA-256 fallback when BLIND_INDEX_KEY is not set and plaintext fallback when KMS is unavailable. No `@sentry/nestjs`, no email sending.
 
 **Prisma schema**: 32 models, 36 enums. Models already present: AuditHashChain, ConsentRecord. Models missing: WaterfallScenario, ExportJob, ProfileDocumentDownload. User.locale field exists.
 
@@ -49,11 +49,11 @@ These are prerequisites for many downstream features.
   - [x] KmsService: encrypt, decrypt (AES-256-GCM via KMS) — DONE: with custom key ARN override support
   - _Unlocks_: document storage, email sending, PII encryption, KYC document storage
 
-- [ ] **EncryptionService + Blind Index**
-  - [ ] Create `EncryptionModule` with encrypt/decrypt via KMS
-  - [ ] Implement `createBlindIndex(value, key)` using HMAC-SHA256
-  - [ ] BLIND_INDEX_KEY already in `.env.example`
-  - [ ] Migrate Shareholder CPF/CNPJ to encrypted storage with blind index (currently stored as SHA-256 hash only for uniqueness, but not actually encrypted via KMS)
+- [x] **EncryptionService + Blind Index** — DONE: Created `EncryptionModule` (@Global) with `EncryptionService` wrapping KmsService. Provides encrypt/decrypt via KMS and HMAC-SHA256 blind indexes via BLIND_INDEX_KEY env var. Graceful degradation: SHA-256 fallback when BLIND_INDEX_KEY is not set; plaintext fallback when KMS is unavailable. ShareholderService updated to use EncryptionService for blind indexes and optional CPF encryption (CNPJ stays plaintext per security.md — public registry data). findById decrypts CPF transparently. 26 EncryptionService tests + 6 new ShareholderService tests (854 total passing).
+  - [x] Create `EncryptionModule` with encrypt/decrypt via KMS — DONE: @Global module in backend/src/encryption/
+  - [x] Implement `createBlindIndex(value, key)` using HMAC-SHA256 — DONE: Uses BLIND_INDEX_KEY from env, falls back to SHA-256
+  - [x] BLIND_INDEX_KEY already in `.env.example` — DONE: EncryptionService reads via ConfigService
+  - [x] Migrate Shareholder CPF/CNPJ to encrypted storage with blind index — DONE: ShareholderService.create encrypts CPF via KMS when available, stores in cpfCnpjEncrypted, clears plaintext cpfCnpj; CNPJ stays plaintext; findById decrypts CPF transparently
   - _Unlocks_: LGPD compliance for PII fields
 
 - [x] **CSRF Middleware** — DONE: Created `common/middleware/csrf.middleware.ts` with double-submit cookie pattern. Sets `navia-csrf` cookie (non-HTTP-only, SameSite=Strict) on GET/HEAD/OPTIONS. Validates `X-CSRF-Token` header matches cookie on POST/PUT/PATCH/DELETE. Bearer token requests are exempt (not vulnerable to CSRF). i18n error responses (PT-BR/EN) with `AUTH_CSRF_INVALID` error code. Registered in `main.ts` after RequestIdMiddleware. `X-CSRF-Token` added to CORS allowedHeaders. 31 tests.
@@ -139,7 +139,7 @@ Gaps in the 12 built modules, ordered by module.
 
 - [ ] `GET /companies/:companyId/shareholders/:id/transactions` — transaction history for specific shareholder
 - [ ] `GET /users/me/investments` — investor portfolio view across companies
-- [ ] Application-level CPF encryption (currently only blind index hash, no actual KMS encryption) — depends on P1 EncryptionService
+- [x] Application-level CPF encryption — DONE via EncryptionService. CPF encrypted with KMS when available; CNPJ stays plaintext (public data). Blind index upgraded to HMAC-SHA256 with BLIND_INDEX_KEY.
 - [ ] Wallet address auto-link from Privy embedded wallet when shareholder accepts invite
 - [ ] Invite shareholder to platform endpoint — link external shareholder to User account
 
@@ -623,7 +623,7 @@ P1 Redis+Bull (DONE v0.0.16) ┬──→ P3.1 Notifications
                               └──→ P0 BUG-1 session fix (DONE v0.0.17)
 
 P1 AWS SDK (DONE v0.0.18) ──┬──→ P1 Email (SES)
-                            ├──→ P1 EncryptionService (KMS)
+                            ├──→ P1 EncryptionService (DONE)
                             ├──→ P3.3 KYC (S3+KMS)
                             ├──→ P3.4 Document Generation (S3)
                             └──→ P3.7 Dataroom (S3)
@@ -644,7 +644,7 @@ P4.1 Frontend Foundation ───→ All P4.x pages
 ## Recommended Implementation Order
 
 **Sprint 1**: P0 bugs (BUG-1 DONE v0.0.17; BUG-2–6 DONE v0.0.15), P1 Redis+Bull (DONE v0.0.16), P1 AWS SDK (DONE v0.0.18)
-**Sprint 2**: P1 remaining (~~CSRF~~ DONE, ~~redactPii~~ DONE, Sentry, Email, EncryptionService, ~~body limits~~ DONE, ~~helmet gap~~ DONE, test infra deps), P2 Auth gaps
+**Sprint 2**: P1 remaining (~~CSRF~~ DONE, ~~redactPii~~ DONE, Sentry, Email, ~~EncryptionService~~ DONE, ~~body limits~~ DONE, ~~helmet gap~~ DONE, test infra deps), P2 Auth gaps
 **Sprint 3**: P3.1 Notifications, P3.2 Audit Logging
 **Sprint 4**: P3.3 KYC, P3.14 CNPJ Validation, P2 Company gaps
 **Sprint 5**: P3.4 Document Generation, P3.7 Dataroom
