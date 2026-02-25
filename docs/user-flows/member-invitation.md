@@ -22,14 +22,22 @@ ADMIN member
   |     +-- [email was REMOVED member] --> Re-invite: reset record to PENDING, new token
   |     +-- [validation fails (email/role)] --> 400 VAL_INVALID_INPUT
   |     +-- [all valid, new email] --> CompanyMember created (PENDING) + InvitationToken created
-  |                                    --> 201 Created (email TODO)
+  |                                    --> 201 Created
+  |                                    --> [async] EmailService sends invitation email via SES (fire-and-forget)
+  |                                         |
+  |                                         +-- [SES available] --> Email delivered to invitee
+  |                                         +-- [SES unavailable] --> Gracefully degrades, no email sent (logged)
   |
   +-- "Resend Invitation" POST /api/v1/companies/:companyId/members/:memberId/resend-invitation
   |     |
   |     +-- [member not found] --> 404 MEMBER_NOT_FOUND
   |     +-- [member not PENDING] --> 422 MEMBER_NOT_PENDING
   |     +-- [member is PENDING] --> New token generated (7-day expiry), old token replaced
-  |                                 --> 200 OK (email TODO)
+  |                                 --> 200 OK
+  |                                 --> [async] EmailService sends invitation email via SES (fire-and-forget)
+  |                                      |
+  |                                      +-- [SES available] --> Email delivered to invitee
+  |                                      +-- [SES unavailable] --> Gracefully degrades, no email sent (logged)
   |
   +-- "Update Member" PUT /api/v1/companies/:companyId/members/:memberId
   |     |
@@ -109,12 +117,12 @@ TRIGGER: User clicks "Invite Member" and submits email + role
 13. [Backend] Generates 32-byte random invitation token (hex-encoded)
 14. [Backend] Opens $transaction: creates CompanyMember (PENDING) + InvitationToken atomically
 15. [Backend] Returns 201 with created member data
-16. [System] (TODO) Send invitation email via AWS SES with link: https://app.navia.com/invitations/{token}
+16. [Backend] Sends invitation email asynchronously via EmailService (MJML template → SES). Gracefully degrades if SES unavailable.
 17. [UI] Shows success toast: "Invitation sent to {email}"
 18. [UI] New PENDING member appears in the members list
 
 POSTCONDITION: CompanyMember exists with status PENDING. InvitationToken created with 7-day expiry.
-SIDE EFFECTS: None yet (audit logging and email planned)
+SIDE EFFECTS: Invitation email sent to invitee (async, non-blocking). Email includes: company name, inviter name, role name (translated to invitee's locale), invitation acceptance URL, 7-day expiry notice. Audit logging planned.
 ```
 
 ### Alternative Path: Re-invite Removed Member
@@ -134,7 +142,7 @@ TRIGGER: Invite flow (step 12) detects email has a REMOVED CompanyMember record
 16a-18a. Same as happy path steps 16-18
 
 POSTCONDITION: Previously REMOVED member reset to PENDING with new role and fresh invitation token.
-SIDE EFFECTS: None yet (audit logging and email planned)
+SIDE EFFECTS: Invitation email sent to invitee (async, non-blocking). Email includes: company name, inviter name, role name (translated to invitee's locale), invitation acceptance URL, 7-day expiry notice. Audit logging planned.
 ```
 
 ### Happy Path: View Invitation Details (Public)
@@ -340,11 +348,11 @@ TRIGGER: User clicks "Resend Invitation" on a pending member
 7. [Backend] Generates new 32-byte random token
 8. [Backend] Upserts InvitationToken: new token, new 7-day expiry, clears usedAt
 9. [Backend] Returns 200 with { id, email, status, newExpiresAt }
-10. [System] (TODO) Send invitation email via AWS SES with new token link
+10. [Backend] Sends invitation email asynchronously via EmailService (MJML template → SES). Gracefully degrades if SES unavailable.
 11. [UI] Shows success toast: "Invitation resent to {email}"
 
 POSTCONDITION: Old invitation token replaced with new token. New 7-day expiry window.
-SIDE EFFECTS: None yet (audit logging and email planned)
+SIDE EFFECTS: Invitation email sent to invitee (async, non-blocking). Email includes: company name, inviter name, role name (translated to invitee's locale), invitation acceptance URL, 7-day expiry notice. Audit logging planned.
 ```
 
 ### Error Path: Invitation Token Expired
@@ -497,7 +505,8 @@ Note: Non-members receive 404 (not 403) to prevent company enumeration per secur
 - **Invitation token**: 32-byte cryptographically random value, hex-encoded (64 characters). Stored in a separate `InvitationToken` table with 1:1 relationship to CompanyMember.
 - **Token expiry**: 7 days from creation. Resending generates a new token with a fresh 7-day window.
 - **Rate limiting**: Throttle decorators applied — write endpoints: 30/min, read endpoints: 100/min.
-- **Pending items**: Email sending via AWS SES, audit logging for all member events.
+- **Email sending**: Invitation emails are sent asynchronously via EmailService (MJML template rendered to HTML, delivered via AWS SES). Email sending is fire-and-forget and gracefully degrades if SES is unavailable -- the invitation is still created and the token is valid even if the email fails to send.
+- **Pending items**: Audit logging for all member events.
 
 ---
 

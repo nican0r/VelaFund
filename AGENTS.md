@@ -44,6 +44,10 @@ pnpm prisma:studio                 # Open Prisma Studio GUI
 # BullModule configured in app.module.ts with REDIS_URL env var
 # Falls back to localhost:6379 if REDIS_URL is not set
 # Health check at GET /api/v1/health includes Redis status
+
+# Email templates
+# MJML templates in backend/templates/email/{templateName}/{locale}.mjml
+# EmailService compiles MJML → HTML and sends via SES
 ```
 
 ### Frontend (@navia/frontend)
@@ -88,6 +92,8 @@ pnpm --filter @navia/backend prisma:generate
 | `backend/src/common/interceptors/response.interceptor.ts` | Success response envelope |
 | `frontend/src/app/globals.css` | shadcn/ui CSS variables (Navia theme) |
 | `frontend/tailwind.config.ts` | Design system tokens |
+| `backend/src/email/email.service.ts` | EmailService — MJML template compilation + SES email sending |
+| `backend/templates/email/` | MJML email templates (4 types × 2 locales) |
 | `frontend/messages/pt-BR.json` | Portuguese translations |
 | `frontend/messages/en.json` | English translations |
 

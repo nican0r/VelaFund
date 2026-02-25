@@ -20,6 +20,7 @@ import { NotificationModule } from './notification/notification.module';
 import { AuditLogModule } from './audit-log/audit-log.module';
 import { AwsModule } from './aws/aws.module';
 import { EncryptionModule } from './encryption/encryption.module';
+import { EmailModule } from './email/email.module';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { EncryptionModule } from './encryption/encryption.module';
     RedisModule,
     AwsModule,
     EncryptionModule,
+    EmailModule,
     PrismaModule,
     HealthModule,
     AuthModule,

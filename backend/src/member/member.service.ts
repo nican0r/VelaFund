@@ -1,7 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 import {
   NotFoundException,
   ConflictException,
@@ -18,11 +20,37 @@ const MAX_INVITATIONS_PER_DAY = 50;
 const INVITATION_EXPIRY_DAYS = 7;
 const PROTECTED_PERMISSIONS = ['usersManage'];
 
+const ROLE_NAMES_PT_BR: Record<string, string> = {
+  ADMIN: 'Administrador',
+  FINANCE: 'Financeiro',
+  LEGAL: 'Jurídico',
+  INVESTOR: 'Investidor',
+  EMPLOYEE: 'Colaborador',
+};
+
+const ROLE_NAMES_EN: Record<string, string> = {
+  ADMIN: 'Administrator',
+  FINANCE: 'Finance',
+  LEGAL: 'Legal',
+  INVESTOR: 'Investor',
+  EMPLOYEE: 'Employee',
+};
+
 @Injectable()
 export class MemberService {
   private readonly logger = new Logger(MemberService.name);
+  private readonly frontendUrl: string;
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private emailService: EmailService,
+    private configService: ConfigService,
+  ) {
+    this.frontendUrl = this.configService.get<string>(
+      'FRONTEND_URL',
+      'http://localhost:3000',
+    );
+  }
 
   /**
    * Invite a new member to a company.
@@ -96,7 +124,12 @@ export class MemberService {
       // REMOVED: re-invite by updating the existing record.
       // The @@unique([companyId, email]) constraint prevents creating a new record,
       // so we reuse the existing one. This is a deliberate design choice.
-      return this.reinviteRemovedMember(existingMember.id, dto, inviterId);
+      return this.reinviteRemovedMember(
+        existingMember.id,
+        dto,
+        inviterId,
+        company.name,
+      );
     }
 
     // Create new member + invitation token atomically
@@ -134,8 +167,10 @@ export class MemberService {
       `Invitation sent to ${dto.email} for company ${companyId} with role ${dto.role}`,
     );
 
-    // TODO: Send invitation email via AWS SES when infrastructure is ready.
-    // Email should contain: https://app.navia.com/invitations/{token}
+    // Send invitation email asynchronously — don't block the response on email delivery
+    this.sendInvitationEmail(dto.email, token, company.name, dto.role, inviterId).catch(
+      (err) => this.logger.warn(`Failed to send invitation email to ${dto.email}: ${err.message}`),
+    );
 
     return member;
   }
@@ -351,7 +386,20 @@ export class MemberService {
       `Invitation resent for member ${memberId} in company ${companyId}`,
     );
 
-    // TODO: Send invitation email via AWS SES
+    // Send invitation email asynchronously — look up company name for the email
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { name: true },
+    });
+    this.sendInvitationEmail(
+      member.email,
+      token,
+      company?.name || 'Unknown',
+      member.role,
+      member.invitedBy,
+    ).catch((err) =>
+      this.logger.warn(`Failed to resend invitation email to ${member.email}: ${err.message}`),
+    );
 
     return {
       id: memberId,
@@ -552,6 +600,7 @@ export class MemberService {
     existingId: string,
     dto: InviteMemberDto,
     inviterId: string,
+    companyName: string,
   ) {
     const token = randomBytes(32).toString('hex');
     const expiresAt = new Date(
@@ -596,7 +645,74 @@ export class MemberService {
       `Re-invitation sent for ${dto.email} (previously removed member)`,
     );
 
+    // Send invitation email asynchronously
+    this.sendInvitationEmail(dto.email, token, companyName, dto.role, inviterId).catch(
+      (err) => this.logger.warn(`Failed to send re-invitation email to ${dto.email}: ${err.message}`),
+    );
+
     return result;
+  }
+
+  /**
+   * Send an invitation email via the EmailService.
+   * Gracefully degrades: if SES is unavailable, logs a warning but does not throw.
+   */
+  private async sendInvitationEmail(
+    email: string,
+    token: string,
+    companyName: string,
+    role: string,
+    inviterId: string | null,
+  ): Promise<void> {
+    if (!this.emailService.isAvailable()) {
+      this.logger.warn(
+        `Email service unavailable — invitation email to ${email} not sent`,
+      );
+      return;
+    }
+
+    // Look up inviter name
+    let inviterName = 'A team member';
+    if (inviterId) {
+      const inviter = await this.prisma.user.findUnique({
+        where: { id: inviterId },
+        select: { firstName: true, lastName: true, locale: true },
+      });
+      if (inviter) {
+        inviterName =
+          [inviter.firstName, inviter.lastName].filter(Boolean).join(' ') ||
+          'A team member';
+      }
+    }
+
+    // Look up invitee locale preference (if they already have an account)
+    let locale = 'pt-BR';
+    const existingUser = await this.prisma.user.findFirst({
+      where: { email },
+      select: { locale: true },
+    });
+    if (existingUser?.locale) {
+      locale = existingUser.locale;
+    }
+
+    const invitationUrl = `${this.frontendUrl}/invitations/${token}`;
+    const roleNames = locale === 'en' ? ROLE_NAMES_EN : ROLE_NAMES_PT_BR;
+    const roleName = roleNames[role] || role;
+
+    await this.emailService.sendEmail({
+      to: email,
+      templateName: 'invitation',
+      locale,
+      variables: {
+        inviterName,
+        companyName,
+        roleName,
+        invitationUrl,
+        expiryDays: String(INVITATION_EXPIRY_DAYS),
+      },
+    });
+
+    this.logger.debug(`Invitation email sent to ${email}`);
   }
 
   /**

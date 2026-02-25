@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { MemberService } from './member.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { EmailService } from '../email/email.service';
 import {
   NotFoundException,
   ConflictException,
@@ -104,10 +106,24 @@ describe('MemberService', () => {
         ),
     };
 
+    const mockEmailService = {
+      isAvailable: jest.fn().mockReturnValue(false),
+      sendEmail: jest.fn().mockResolvedValue('mock-message-id'),
+    };
+
+    const mockConfigService = {
+      get: jest.fn((key: string, defaultValue?: string) => {
+        if (key === 'FRONTEND_URL') return 'https://app.navia.com.br';
+        return defaultValue;
+      }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MemberService,
         { provide: PrismaService, useValue: prisma },
+        { provide: EmailService, useValue: mockEmailService },
+        { provide: ConfigService, useValue: mockConfigService },
       ],
     }).compile();
 

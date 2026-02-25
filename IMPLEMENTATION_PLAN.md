@@ -1,6 +1,6 @@
 # Navia MVP — Implementation Plan v23.0
 
-> **Generated**: 2026-02-25 | **Tests**: 968 passing | **Backend modules**: 14 of 23 built
+> **Generated**: 2026-02-25 | **Tests**: 1013 passing | **Backend modules**: 15 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -9,13 +9,13 @@
 
 ## Current State
 
-**Built backend modules** (14): auth (with Redis sessions + Redis-backed failed-attempt lockout), company, member, share-class, shareholder, cap-table, transaction, funding-round, option-plan (with exercises), convertible, notification, audit-log
+**Built backend modules** (15): auth (with Redis sessions + Redis-backed failed-attempt lockout), company, member, share-class, shareholder, cap-table, transaction, funding-round, option-plan (with exercises), convertible, notification, audit-log, email
 
 **Entirely missing backend modules** (11): kyc, document-generation, document-signatures, blockchain-integration, company-profile, company-dataroom, company-litigation, company-blockchain-admin, cap-table-reconciliation, reports-analytics, exit-waterfall
 
 **Frontend**: Scaffolding only (layout shell, static mock pages, typed API client with hardcoded `Accept-Language: 'pt-BR'`). No Privy SDK, no next-intl, no shadcn/ui components, no functional pages, no tests (0 `.test.tsx` files).
 
-**Infrastructure**: Redis/Bull configured (`@nestjs/bull`, `bull`, `ioredis` installed; BullModule.forRootAsync in AppModule). SessionService for Redis-backed auth sessions (7-day absolute, 2-hour inactivity timeouts). AWS SDK configured (`@aws-sdk/client-s3`, `@aws-sdk/client-ses`, `@aws-sdk/client-kms`, `@aws-sdk/s3-request-presigner` installed; AwsModule @Global with S3Service, SesService, KmsService). CSRF middleware implemented (double-submit cookie pattern, `navia-csrf` cookie, `X-CSRF-Token` header validation). Helmet fully configured (including `permittedCrossDomainPolicies: false`). `redactPii()` utility implemented (`common/utils/redact-pii.ts`: maskCpf, maskCnpj, maskEmail, maskWallet, maskIp + redactPiiFromString; integrated with GlobalExceptionFilter for PII-safe logging; AuthService refactored to use centralized utility). Body size limits configured (1MB JSON, 1MB URL-encoded in main.ts). EncryptionModule implemented (@Global) with EncryptionService wrapping KmsService: encrypt/decrypt via KMS and HMAC-SHA256 blind indexes via BLIND_INDEX_KEY env var; graceful degradation with SHA-256 fallback when BLIND_INDEX_KEY is not set and plaintext fallback when KMS is unavailable. AuditLogModule implemented (@Global export via AuditLogService) with Bull queue async processing, @Auditable() decorator, AuditInterceptor, hash chain verification, PII masking at write time. No `@sentry/nestjs`, no email sending.
+**Infrastructure**: Redis/Bull configured (`@nestjs/bull`, `bull`, `ioredis` installed; BullModule.forRootAsync in AppModule). SessionService for Redis-backed auth sessions (7-day absolute, 2-hour inactivity timeouts). AWS SDK configured (`@aws-sdk/client-s3`, `@aws-sdk/client-ses`, `@aws-sdk/client-kms`, `@aws-sdk/s3-request-presigner` installed; AwsModule @Global with S3Service, SesService, KmsService). CSRF middleware implemented (double-submit cookie pattern, `navia-csrf` cookie, `X-CSRF-Token` header validation). Helmet fully configured (including `permittedCrossDomainPolicies: false`). `redactPii()` utility implemented (`common/utils/redact-pii.ts`: maskCpf, maskCnpj, maskEmail, maskWallet, maskIp + redactPiiFromString; integrated with GlobalExceptionFilter for PII-safe logging; AuthService refactored to use centralized utility). Body size limits configured (1MB JSON, 1MB URL-encoded in main.ts). EncryptionModule implemented (@Global) with EncryptionService wrapping KmsService: encrypt/decrypt via KMS and HMAC-SHA256 blind indexes via BLIND_INDEX_KEY env var; graceful degradation with SHA-256 fallback when BLIND_INDEX_KEY is not set and plaintext fallback when KMS is unavailable. AuditLogModule implemented (@Global export via AuditLogService) with Bull queue async processing, @Auditable() decorator, AuditInterceptor, hash chain verification, PII masking at write time. EmailModule implemented (@Global export via EmailService) with MJML template compilation, variable interpolation with HTML escaping, locale fallback (pt-BR default), plain-text auto-generation from HTML; 4 base email templates (invitation, exercise-notification, export-ready, password-reset) in PT-BR and EN; MemberService wired to send invitation emails via SES (fire-and-forget with graceful degradation). No `@sentry/nestjs`. **0 TODOs remaining in the backend** (previously 2 in member.service.ts, now replaced with EmailService calls).
 
 **Prisma schema**: 32 models, 36 enums. Models already present: AuditHashChain, ConsentRecord. Models missing: WaterfallScenario, ExportJob, ProfileDocumentDownload. User.locale field exists.
 
@@ -76,11 +76,11 @@ These are prerequisites for many downstream features.
   - [ ] Add `beforeSend` hook for PII redaction (requires redactPii)
   - [ ] Add Sentry to frontend (`@sentry/nextjs` — not currently in frontend package.json)
 
-- [ ] **Email sending (AWS SES)**
-  - [ ] Create email template system: `templates/email/{templateName}/{locale}.mjml`
-  - [ ] Implement MJML → HTML compilation
-  - [ ] Create base email templates: invitation, exercise-notification, export-ready, password-reset
-  - [ ] Wire SES into MemberService invite (replace the 2 TODO comments at `member.service.ts:137,354` — the only 2 TODOs in the entire backend)
+- [x] **Email sending (AWS SES)** — DONE
+  - [x] Create email template system: `templates/email/{templateName}/{locale}.mjml` — DONE: Created EmailModule (@Global) with EmailService. Templates in `backend/templates/email/` with MJML compilation, variable interpolation, locale fallback (pt-BR default), HTML escaping for XSS prevention, auto plain-text generation.
+  - [x] Implement MJML → HTML compilation — DONE: Added `mjml` dependency. EmailService.compileTemplate() loads MJML, interpolates variables, compiles to HTML, extracts subject from HTML comment, generates plain text.
+  - [x] Create base email templates: invitation, exercise-notification, export-ready, password-reset — DONE: 8 template files (4 types × 2 locales: pt-BR, en) in `backend/templates/email/`. Each template has responsive Navia-branded design, subject line in HTML comment, and {{variable}} placeholders.
+  - [x] Wire SES into MemberService invite — DONE: Replaced 2 TODO comments at member.service.ts. Email sent asynchronously (fire-and-forget) after member creation and resend. Graceful degradation: if SES unavailable, logs warning. Invitee locale detected from User.locale when account exists, defaults to pt-BR. Invitation URL uses FRONTEND_URL env var. Email also sent for re-invited (previously REMOVED) members.
 
 - [x] **Body size limits** — DONE: Added `json({ limit: '1mb' })` and `urlencoded({ extended: true, limit: '1mb' })` to `main.ts`. Per-route Multer limits and sharp for EXIF stripping still TODO (will be added when KYC/document modules are built).
   - [x] Add `app.use(json({ limit: '1mb' }))` to `main.ts` — DONE
@@ -123,7 +123,7 @@ Gaps in the 12 built modules, ordered by module.
 
 ### Member Module
 
-- [ ] Send invitation email via SES (2 TODO comments at `member.service.ts:137,354`) — depends on P1 Email
+- [x] Send invitation email via SES (2 TODO comments at `member.service.ts:137,354`) — DONE: EmailService integration with invitation template, locale detection, inviter name lookup, role name translation (PT-BR/EN), async fire-and-forget sending.
 - [ ] `GET /companies/:companyId/members/:memberId/permissions` endpoint — returns fully-resolved permissions per `user-permissions.md` (role defaults + overrides). Note: no single-member GET endpoint is defined in the spec; the IMPLEMENTATION_PLAN previously stated this incorrectly.
 - [ ] Audit logging events: COMPANY_MEMBER_INVITED, COMPANY_MEMBER_ACCEPTED, COMPANY_MEMBER_REMOVED, COMPANY_ROLE_CHANGED (depends on P3 Audit module)
 - [ ] Permission override management endpoints (spec defines fine-grained overrides, not fully exposed in API)
@@ -645,7 +645,7 @@ P4.1 Frontend Foundation ───→ All P4.x pages
 ## Recommended Implementation Order
 
 **Sprint 1**: P0 bugs (BUG-1 DONE v0.0.17; BUG-2–6 DONE v0.0.15), P1 Redis+Bull (DONE v0.0.16), P1 AWS SDK (DONE v0.0.18)
-**Sprint 2**: P1 remaining (~~CSRF~~ DONE, ~~redactPii~~ DONE, Sentry, Email, ~~EncryptionService~~ DONE, ~~body limits~~ DONE, ~~helmet gap~~ DONE, test infra deps), P2 Auth gaps (~~Redis lockout~~ DONE)
+**Sprint 2**: P1 remaining (~~CSRF~~ DONE, ~~redactPii~~ DONE, Sentry, ~~Email~~ DONE, ~~EncryptionService~~ DONE, ~~body limits~~ DONE, ~~helmet gap~~ DONE, test infra deps), P2 Auth gaps (~~Redis lockout~~ DONE)
 **Sprint 3**: P3.1 Notifications (module built, WebSocket + cross-module integration pending), P3.2 Audit Logging (core module built — @Auditable decorator, AuditInterceptor, AuditService, Bull queue processor, controller with list/detail/verify; remaining: ClsModule before-state, daily hash chain job, DLQ monitoring, DB immutability trigger, partitioning, cross-module integration of all 50+ events, export)
 **Sprint 4**: P3.3 KYC, P3.14 CNPJ Validation, P2 Company gaps
 **Sprint 5**: P3.4 Document Generation, P3.7 Dataroom
