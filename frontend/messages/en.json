@@ -8,6 +8,75 @@
     "save": "Save",
     "search": "Search"
   },
+  "capTable": {
+    "authorized": "Authorized",
+    "description": "View and manage your company's cap table.",
+    "empty": "No holdings recorded. Issue shares to get started.",
+    "export": {
+      "button": "Export",
+      "csv": "CSV",
+      "downloading": "Preparing download...",
+      "failed": "Export failed. Please try again.",
+      "oct": "OCT JSON",
+      "pdf": "PDF",
+      "success": "Export started. You will be notified when it is ready.",
+      "xlsx": "Excel"
+    },
+    "filter": {
+      "allClasses": "All classes",
+      "byClass": "Filter by class"
+    },
+    "fullyDiluted": {
+      "currentPercentage": "Current (%)",
+      "currentShares": "Current Shares",
+      "fullyDilutedPercentage": "Diluted (%)",
+      "fullyDilutedShares": "Diluted Shares",
+      "optionsUnvested": "Unvested",
+      "optionsVested": "Vested",
+      "title": "Fully Diluted"
+    },
+    "history": {
+      "createdAt": "Created at",
+      "empty": "No snapshots recorded",
+      "notes": "Notes",
+      "snapshotDate": "Date",
+      "title": "History",
+      "totalShareholders": "Shareholders",
+      "totalShares": "Total Shares",
+      "trigger": "Event"
+    },
+    "stats": {
+      "optionPool": "Option Pool",
+      "shareClasses": "Share Classes",
+      "shareholders": "Shareholders",
+      "totalShares": "Total Shares"
+    },
+    "summary": "Total",
+    "table": {
+      "ownership": "Ownership (%)",
+      "shareClass": "Class",
+      "shareholder": "Shareholder",
+      "shares": "Shares",
+      "votingPercentage": "Vote (%)",
+      "votingPower": "Voting Power"
+    },
+    "tabs": {
+      "current": "Current",
+      "fullyDiluted": "Fully Diluted",
+      "history": "History"
+    },
+    "title": "Cap Table",
+    "types": {
+      "advisor": "Advisor",
+      "commonShares": "Common Shares",
+      "corporate": "Corporate",
+      "employee": "Employee",
+      "founder": "Founder",
+      "investor": "Investor",
+      "preferredShares": "Preferred Shares",
+      "quota": "Quotas"
+    }
+  },
   "dashboard": {
     "description": "Overview of your company cap table and recent activity.",
     "noCompany": {

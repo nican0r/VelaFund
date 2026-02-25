@@ -8,6 +8,75 @@
     "save": "Salvar",
     "search": "Buscar"
   },
+  "capTable": {
+    "authorized": "Autorizado",
+    "description": "Visualize e gerencie a tabela de capitalização da sua empresa.",
+    "empty": "Nenhuma participação registrada. Emita ações para começar.",
+    "export": {
+      "button": "Exportar",
+      "csv": "CSV",
+      "downloading": "Preparando download...",
+      "failed": "Falha na exportação. Tente novamente.",
+      "oct": "OCT JSON",
+      "pdf": "PDF",
+      "success": "Exportação iniciada. Você será notificado quando estiver pronta.",
+      "xlsx": "Excel"
+    },
+    "filter": {
+      "allClasses": "Todas as classes",
+      "byClass": "Filtrar por classe"
+    },
+    "fullyDiluted": {
+      "currentPercentage": "Atual (%)",
+      "currentShares": "Ações Atuais",
+      "fullyDilutedPercentage": "Diluído (%)",
+      "fullyDilutedShares": "Ações Diluídas",
+      "optionsUnvested": "Não Vestidas",
+      "optionsVested": "Vestidas",
+      "title": "Totalmente Diluído"
+    },
+    "history": {
+      "createdAt": "Criado em",
+      "empty": "Nenhum snapshot registrado",
+      "notes": "Notas",
+      "snapshotDate": "Data",
+      "title": "Histórico",
+      "totalShareholders": "Acionistas",
+      "totalShares": "Total de Ações",
+      "trigger": "Evento"
+    },
+    "stats": {
+      "optionPool": "Pool de Opções",
+      "shareClasses": "Classes de Ações",
+      "shareholders": "Acionistas",
+      "totalShares": "Total de Ações"
+    },
+    "summary": "Total",
+    "table": {
+      "ownership": "Participação (%)",
+      "shareClass": "Classe",
+      "shareholder": "Acionista",
+      "shares": "Ações",
+      "votingPercentage": "Voto (%)",
+      "votingPower": "Poder de Voto"
+    },
+    "tabs": {
+      "current": "Atual",
+      "fullyDiluted": "Totalmente Diluído",
+      "history": "Histórico"
+    },
+    "title": "Cap Table",
+    "types": {
+      "advisor": "Consultor",
+      "commonShares": "Ações Ordinárias",
+      "corporate": "Pessoa Jurídica",
+      "employee": "Funcionário",
+      "founder": "Fundador",
+      "investor": "Investidor",
+      "preferredShares": "Ações Preferenciais",
+      "quota": "Quotas"
+    }
+  },
   "dashboard": {
     "description": "Visão geral da tabela de capitalização e atividade recente.",
     "noCompany": {

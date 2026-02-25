@@ -1,6 +1,6 @@
 # Cap Table Management — User Flows
 
-**Feature**: View current and fully-diluted cap table, manage point-in-time snapshots, export in OCT format
+**Feature**: View current and fully-diluted cap table, manage point-in-time snapshots, export in multiple formats
 **Actors**: ADMIN (full access + write), FINANCE (full access + write/export), LEGAL (read-only), INVESTOR (no access)
 **Preconditions**: User is authenticated, user is an ACTIVE member of the company
 **Related Flows**: [Shareholder Management](./shareholder-management.md) (shareholders populate cap table entries), [Share Class Management](./share-class-management.md) (share classes determine voting power and types), [Company Management](./company-management.md) (company must exist and be ACTIVE for snapshots)
@@ -330,3 +330,33 @@ SIDE EFFECTS: None
 | GET | /api/v1/companies/:companyId/cap-table/history | ADMIN, FINANCE, LEGAL | Paginated snapshot history |
 | GET | /api/v1/companies/:companyId/cap-table/export/oct | ADMIN, FINANCE | OCT/OCF JSON export |
 | POST | /api/v1/companies/:companyId/cap-table/snapshot | ADMIN, FINANCE | Create manual snapshot |
+| GET | /api/v1/companies/:companyId/reports/cap-table/export | ADMIN, FINANCE, LEGAL | Async export (PDF, XLSX, CSV) |
+| GET | /api/v1/companies/:companyId/reports/cap-table/export/:jobId | ADMIN, FINANCE, LEGAL | Poll export job status |
+
+---
+
+## Frontend Implementation
+
+### Page: `/dashboard/cap-table`
+
+**File**: `frontend/src/app/(dashboard)/dashboard/cap-table/page.tsx`
+
+**Components**:
+- Stat cards: Total Shares (active/highlighted), Shareholders, Share Classes, Option Pool
+- Three-tab view: Current | Fully Diluted | History
+- Current view: data table with shareholder name, type badge, share class (with type label), shares, ownership %, voting power, voting %, plus summary row
+- Fully Diluted view: table with current shares, current %, vested options, unvested options, diluted shares, diluted %
+- History view: paginated snapshot list (date, total shares, shareholders, trigger, notes, created at)
+- Export dropdown: PDF, Excel, CSV, OCT JSON (triggers async export via Reports API)
+- Share class filter dropdown (visible when 2+ classes)
+- Ownership donut chart (reuses OwnershipChart component)
+- Loading skeletons, empty states, no-company state
+
+**Hooks** (`frontend/src/hooks/use-cap-table-page.ts`):
+- `useCapTableCurrent(companyId, shareClassId?)` — 30s staleTime + refetchInterval
+- `useCapTableFullyDiluted(companyId, enabled)` — lazy loading, only fetches when FD tab active
+- `useCapTableHistory(companyId, { page, limit })` — paginated snapshot history
+- `useExportCapTable(companyId)` — useMutation for async export trigger
+- `useExportJobStatus(companyId, jobId)` — polls every 2s until COMPLETED/FAILED
+
+**i18n**: `capTable.*` namespace (50+ keys in PT-BR and EN)

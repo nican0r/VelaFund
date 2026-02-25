@@ -40,6 +40,52 @@ export interface CapTable {
   entries: CapTableEntry[];
 }
 
+// Fully-diluted cap table types returned by GET /api/v1/companies/:id/cap-table/fully-diluted
+export interface FullyDilutedEntry {
+  shareholderId: string;
+  shareholderName: string;
+  shareholderType: string;
+  currentShares: string;
+  currentPercentage: string;
+  optionsVested: string;
+  optionsUnvested: string;
+  fullyDilutedShares: string;
+  fullyDilutedPercentage: string;
+}
+
+export interface FullyDilutedCapTable {
+  company: {
+    id: string;
+    name: string;
+    entityType: string;
+  };
+  summary: {
+    totalSharesOutstanding: string;
+    totalOptionsOutstanding: string;
+    fullyDilutedShares: string;
+  };
+  entries: FullyDilutedEntry[];
+}
+
+// Cap table snapshot history types
+export interface CapTableHistoryItem {
+  id: string;
+  snapshotDate: string;
+  totalShares: string;
+  totalShareholders: number;
+  trigger: string;
+  notes: string | null;
+  stateHash: string | null;
+  createdAt: string;
+}
+
+// Share class summary for filtering
+export interface ShareClassSummary {
+  id: string;
+  className: string;
+  type: string;
+}
+
 // Transaction types returned by GET /api/v1/companies/:id/transactions
 export interface TransactionShareholder {
   id: string;

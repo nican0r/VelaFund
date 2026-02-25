@@ -1,6 +1,6 @@
-# Navia MVP — Implementation Plan v33.0
+# Navia MVP — Implementation Plan v34.0
 
-> **Generated**: 2026-02-25 | **Tests**: 1745 passing (1704 backend + 41 frontend) | **Backend modules**: 22 of 23 built
+> **Generated**: 2026-02-25 | **Tests**: 1766 passing (1704 backend + 62 frontend) | **Backend modules**: 22 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -483,14 +483,22 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 - [x] 13 component tests (8 dashboard page + 5 ownership chart)
 - [ ] Company switcher in topbar (user may belong to multiple companies — context exists, UI pending)
 
-### 4.4 Cap Table Page (no page exists — sidebar links to 404)
+### 4.4 Cap Table Page ✅
 
-- [ ] Full-width data table with share class columns
-- [ ] Summary row (totals, 100%)
-- [ ] Ownership/voting power/fully-diluted toggle tabs
-- [ ] Export button (PDF, Excel, CSV) — calls backend export endpoint
-- [ ] Snapshot selector (point-in-time view)
-- [ ] Dilution pie chart visualization
+- [x] Full-width data table with shareholder name, type badge, share class, shares, ownership %, voting power, voting %
+- [x] Summary row with totals (shares, 100% ownership, 100% voting)
+- [x] Three-tab view: Current / Fully Diluted / History
+- [x] Fully Diluted tab with current shares, vested/unvested options, diluted shares/percentage
+- [x] History tab with paginated snapshot list (date, shares, shareholders, trigger, notes)
+- [x] Export dropdown (PDF, Excel, CSV, OCT JSON) — calls backend async export endpoint via useMutation
+- [x] Share class filter dropdown (visible when multiple classes exist)
+- [x] Stat cards: Total Shares (active), Shareholders, Share Classes, Option Pool
+- [x] Ownership donut chart (reuses OwnershipChart component)
+- [x] Loading skeletons, empty states, no-company state
+- [x] TanStack Query hooks: useCapTableCurrent (30s polling), useCapTableFullyDiluted (lazy), useCapTableHistory (paginated), useExportCapTable (mutation), useExportJobStatus (2s polling)
+- [x] Full i18n (capTable.* namespace, 50+ keys in PT-BR and EN)
+- [x] 21 component tests
+- [ ] Company switcher in topbar (user may belong to multiple companies — context exists, UI pending)
 
 ### 4.5 Shareholders Page (no page exists)
 
