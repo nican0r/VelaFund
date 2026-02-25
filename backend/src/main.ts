@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import * as cookieParser from 'cookie-parser';
+import { json, urlencoded } from 'express';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
@@ -48,6 +49,10 @@ async function bootstrap() {
     credentials: true,
     maxAge: 3600,
   });
+
+  // Body size limits per security.md: 1MB for JSON, 1MB for URL-encoded
+  app.use(json({ limit: '1mb' }));
+  app.use(urlencoded({ extended: true, limit: '1mb' }));
 
   // Cookie parser (needed for HTTP-only auth cookies)
   app.use(cookieParser());

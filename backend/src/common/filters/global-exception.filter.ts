@@ -10,6 +10,7 @@ import {
 import { Response, Request } from 'express';
 import { AppException } from './app-exception';
 import { ValidationErrorDetail } from '../types/api-response.types';
+import { redactPiiFromString } from '../utils/redact-pii';
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
@@ -89,9 +90,10 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       });
     }
 
-    // Unhandled exception
+    // Unhandled exception — redact PII from error messages before logging
+    const rawMessage = exception instanceof Error ? exception.message : 'Unknown error';
     this.logger.error(
-      `Unhandled exception: ${exception instanceof Error ? exception.message : 'Unknown error'}`,
+      `Unhandled exception: ${redactPiiFromString(rawMessage)}`,
       exception instanceof Error ? exception.stack : undefined,
     );
 

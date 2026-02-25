@@ -8,6 +8,7 @@ import {
   AppException,
 } from '../common/filters/app-exception';
 import { AuthenticatedUser } from './decorators/current-user.decorator';
+import { maskEmail, maskIp } from '../common/utils/redact-pii';
 
 export class AccountLockedException extends AppException {
   constructor() {
@@ -118,7 +119,7 @@ export class AuthService {
     } catch (error) {
       this.recordFailedAttempt(ipAddress);
       this.logger.warn(
-        `Login failed - invalid Privy token from IP: ${this.redactIp(ipAddress)}`,
+        `Login failed - invalid Privy token from IP: ${maskIp(ipAddress)}`,
       );
       throw new UnauthorizedException('errors.auth.invalidToken');
     }
@@ -162,7 +163,7 @@ export class AuthService {
 
         if (existingByEmail) {
           this.logger.warn(
-            `Duplicate email detected: ${this.redactEmail(email)} already exists with different Privy ID`,
+            `Duplicate email detected: ${maskEmail(email)} already exists with different Privy ID`,
           );
           throw new AppException(
             'AUTH_DUPLICATE_EMAIL',
@@ -184,7 +185,7 @@ export class AuthService {
         });
         isNewUser = true;
         this.logger.log(
-          `New user created: ${dbUser.id} (${this.redactEmail(email)})`,
+          `New user created: ${dbUser.id} (${maskEmail(email)})`,
         );
       } else {
         // BUG-10 fix: Check if synced email conflicts with another user before updating
@@ -204,7 +205,7 @@ export class AuthService {
             emailUpdateData.email = email;
           } else {
             this.logger.warn(
-              `Cannot sync email ${this.redactEmail(email)} — already in use by another account`,
+              `Cannot sync email ${maskEmail(email)} — already in use by another account`,
             );
           }
         }
@@ -407,7 +408,7 @@ export class AuthService {
         Date.now() + AuthService.LOCKOUT_DURATION_MS,
       );
       this.logger.warn(
-        `IP ${this.redactIp(ipAddress)} locked out after ${attempt.count} failed attempts`,
+        `IP ${maskIp(ipAddress)} locked out after ${attempt.count} failed attempts`,
       );
     }
 
@@ -429,25 +430,4 @@ export class AuthService {
     this.failedAttempts.delete(ipAddress);
   }
 
-  private redactIp(ip: string): string {
-    if (!ip) return 'unknown';
-    const clean = ip.replace('::ffff:', '');
-    const parts = clean.split('.');
-    if (parts.length === 4) {
-      return `${parts[0]}.${parts[1]}.${parts[2]}.0/24`;
-    }
-    return ip;
-  }
-
-  /**
-   * BUG-12 fix: Guard against malformed emails without '@'.
-   */
-  private redactEmail(email: string): string {
-    if (!email) return 'unknown';
-    const atIndex = email.indexOf('@');
-    if (atIndex < 1) return '***@unknown';
-    const local = email.slice(0, atIndex);
-    const domain = email.slice(atIndex + 1);
-    return `${local[0]}***@${domain}`;
-  }
 }
