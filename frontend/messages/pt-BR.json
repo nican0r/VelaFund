@@ -353,6 +353,117 @@
     "title": "Verificação Judicial",
     "verifiedAt": "Verificado em"
   },
+  "optionPlans": {
+    "actions": "Ações",
+    "confirm": {
+      "cancel": "Cancelar Outorga",
+      "cancelDescription": "Tem certeza que deseja cancelar esta outorga? As opções não vestidas serão devolvidas ao pool. Esta ação não pode ser desfeita.",
+      "cancelTitle": "Cancelar Outorga",
+      "close": "Encerrar Plano",
+      "closeDescription": "Tem certeza que deseja encerrar este plano? Novas outorgas não serão permitidas. Outorgas existentes permanecem ativas.",
+      "closeTitle": "Encerrar Plano",
+      "cancelExercise": "Cancelar Exercício",
+      "cancelExerciseDescription": "Tem certeza que deseja cancelar esta solicitação de exercício?",
+      "cancelExerciseTitle": "Cancelar Exercício"
+    },
+    "create": "Novo Plano",
+    "createGrant": "Nova Outorga",
+    "description": "Gerencie planos de opções, outorgas e exercícios de colaboradores.",
+    "empty": "Nenhum plano de opções encontrado. Crie o primeiro plano para começar.",
+    "emptyExercises": "Nenhuma solicitação de exercício encontrada.",
+    "emptyGrants": "Nenhuma outorga de opções encontrada. Crie a primeira outorga para começar.",
+    "exerciseStatus": {
+      "cancelled": "Cancelado",
+      "completed": "Concluído",
+      "paymentConfirmed": "Pagamento Confirmado",
+      "pendingPayment": "Aguardando Pagamento",
+      "sharesIssued": "Ações Emitidas"
+    },
+    "filter": {
+      "allPlans": "Todos os planos",
+      "allStatuses": "Todos os status"
+    },
+    "frequency": {
+      "annually": "Anual",
+      "monthly": "Mensal",
+      "quarterly": "Trimestral"
+    },
+    "grantStatus": {
+      "active": "Ativa",
+      "cancelled": "Cancelada",
+      "exercised": "Exercida",
+      "expired": "Expirada"
+    },
+    "pagination": {
+      "next": "Próxima",
+      "of": "de",
+      "page": "Página",
+      "previous": "Anterior",
+      "showing": "Mostrando {from} a {to} de {total}"
+    },
+    "planStatus": {
+      "active": "Ativo",
+      "closed": "Encerrado"
+    },
+    "pool": {
+      "available": "Disponível",
+      "exercised": "Exercidas",
+      "granted": "Outorgadas",
+      "utilization": "Utilização do Pool"
+    },
+    "stats": {
+      "active": "Ativas",
+      "activeGrants": "Outorgas Ativas",
+      "cancelled": "Canceladas",
+      "closed": "Encerrados",
+      "completed": "Concluídos",
+      "exercised": "Exercidas",
+      "pending": "Pendentes",
+      "total": "Total de Planos",
+      "totalExercises": "Total de Exercícios",
+      "totalGrants": "Total de Outorgas",
+      "totalOptions": "Total de Opções"
+    },
+    "success": {
+      "cancelled": "Outorga cancelada com sucesso",
+      "cancelledExercise": "Exercício cancelado com sucesso",
+      "closed": "Plano encerrado com sucesso"
+    },
+    "table": {
+      "available": "Disponíveis",
+      "cliff": "Cliff",
+      "cliffMonths": "{months} meses",
+      "employee": "Colaborador",
+      "exercised": "Exercidas",
+      "expirationDate": "Expiração",
+      "grant": "Outorga",
+      "grantDate": "Data da Outorga",
+      "granted": "Outorgadas",
+      "name": "Nome",
+      "paymentRef": "Ref. Pagamento",
+      "plan": "Plano",
+      "quantity": "Quantidade",
+      "shareClass": "Classe",
+      "status": "Status",
+      "strikePrice": "Preço de Exercício",
+      "terminationPolicy": "Política de Término",
+      "totalCost": "Custo Total",
+      "totalPool": "Pool Total",
+      "utilization": "Utilização",
+      "vesting": "Vesting"
+    },
+    "tabs": {
+      "exercises": "Exercícios",
+      "grants": "Outorgas",
+      "plans": "Planos"
+    },
+    "terminationPolicy": {
+      "acceleration": "Aceleração",
+      "forfeiture": "Perda",
+      "proRata": "Pro-rata"
+    },
+    "title": "Planos de Opções"
+  },
   "notifications": {
     "clearFilters": "Limpar filtros",
     "description": "Veja e gerencie suas notificações",

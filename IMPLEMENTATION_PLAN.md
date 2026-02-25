@@ -1,6 +1,6 @@
-# Navia MVP — Implementation Plan v38.0
+# Navia MVP — Implementation Plan v39.0
 
-> **Generated**: 2026-02-25 | **Tests**: 1860 passing (1704 backend + 156 frontend) | **Backend modules**: 22 of 23 built
+> **Generated**: 2026-02-25 | **Tests**: 1913 passing (1704 backend + 209 frontend) | **Backend modules**: 22 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -549,9 +549,15 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 - [ ] Close round confirmation with dilution preview
 - [ ] Pro-forma cap table view
 
-### 4.9 Option Plans Page (no page exists)
+### 4.9 Option Plans Page
 
-- [ ] Plan list with pool utilization progress bar
+- [x] Plan list with pool utilization progress bar, stat cards, status filter, close action, pagination
+- [x] Grant list with employee info, vesting details, status badges, cancel action, pagination
+- [x] Exercise list with payment reference, total cost, status badges, cancel action, pagination
+- [x] Three-tab layout (Plans / Grants / Exercises) with shared page header
+- [x] TanStack Query hooks (useOptionPlans, useClosePlan, useOptionGrants, useCancelGrant, useOptionExercises, useCancelExercise)
+- [x] i18n keys for optionPlans namespace (~80 keys PT-BR + EN)
+- [x] 53 component tests
 - [ ] Create plan form
 - [ ] Plan detail: grants table, pool stats
 - [ ] Create grant form

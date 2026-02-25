@@ -222,6 +222,97 @@ export interface FundingRoundDetail extends FundingRound {
   };
 }
 
+// Option Plan types returned by GET /api/v1/companies/:id/option-plans
+export type OptionPlanStatus = 'ACTIVE' | 'CLOSED';
+export type TerminationPolicy = 'FORFEITURE' | 'ACCELERATION' | 'PRO_RATA';
+export type VestingFrequency = 'MONTHLY' | 'QUARTERLY' | 'ANNUALLY';
+export type OptionGrantStatus = 'ACTIVE' | 'EXERCISED' | 'CANCELLED' | 'EXPIRED';
+export type ExerciseRequestStatus =
+  | 'PENDING_PAYMENT'
+  | 'PAYMENT_CONFIRMED'
+  | 'SHARES_ISSUED'
+  | 'COMPLETED'
+  | 'CANCELLED';
+
+export interface OptionPlan {
+  id: string;
+  companyId: string;
+  name: string;
+  shareClassId: string;
+  totalPoolSize: string;
+  totalGranted: string;
+  totalExercised: string;
+  status: OptionPlanStatus;
+  boardApprovalDate: string | null;
+  terminationPolicy: TerminationPolicy;
+  exerciseWindowDays: number;
+  notes: string | null;
+  closedAt: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  shareClass?: {
+    id: string;
+    className: string;
+    type: string;
+  };
+}
+
+export interface OptionGrant {
+  id: string;
+  companyId: string;
+  planId: string;
+  shareholderId: string | null;
+  employeeName: string;
+  employeeEmail: string;
+  quantity: string;
+  strikePrice: string;
+  exercised: string;
+  status: OptionGrantStatus;
+  grantDate: string;
+  expirationDate: string;
+  cliffMonths: number;
+  vestingDurationMonths: number;
+  vestingFrequency: VestingFrequency;
+  cliffPercentage: string;
+  accelerationOnCoc: boolean;
+  terminatedAt: string | null;
+  notes: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  plan?: {
+    id: string;
+    name: string;
+  };
+}
+
+export interface OptionExerciseRequest {
+  id: string;
+  grantId: string;
+  quantity: string;
+  totalCost: string;
+  paymentReference: string;
+  status: ExerciseRequestStatus;
+  confirmedBy: string | null;
+  confirmedAt: string | null;
+  cancelledAt: string | null;
+  blockchainTxHash: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  grant?: {
+    id: string;
+    employeeName: string;
+    employeeEmail: string;
+    strikePrice: string;
+    plan?: {
+      id: string;
+      name: string;
+    };
+  };
+}
+
 export interface Transaction {
   id: string;
   companyId: string;

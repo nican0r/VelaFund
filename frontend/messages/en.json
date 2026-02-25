@@ -353,6 +353,117 @@
     "title": "Litigation Verification",
     "verifiedAt": "Verified at"
   },
+  "optionPlans": {
+    "actions": "Actions",
+    "confirm": {
+      "cancel": "Cancel Grant",
+      "cancelDescription": "Are you sure you want to cancel this grant? Unvested options will be returned to the pool. This action cannot be undone.",
+      "cancelTitle": "Cancel Grant",
+      "close": "Close Plan",
+      "closeDescription": "Are you sure you want to close this plan? New grants will not be allowed. Existing grants remain active.",
+      "closeTitle": "Close Plan",
+      "cancelExercise": "Cancel Exercise",
+      "cancelExerciseDescription": "Are you sure you want to cancel this exercise request?",
+      "cancelExerciseTitle": "Cancel Exercise"
+    },
+    "create": "New Plan",
+    "createGrant": "New Grant",
+    "description": "Manage option plans, grants, and employee exercises.",
+    "empty": "No option plans found. Create the first plan to get started.",
+    "emptyExercises": "No exercise requests found.",
+    "emptyGrants": "No option grants found. Create the first grant to get started.",
+    "exerciseStatus": {
+      "cancelled": "Cancelled",
+      "completed": "Completed",
+      "paymentConfirmed": "Payment Confirmed",
+      "pendingPayment": "Pending Payment",
+      "sharesIssued": "Shares Issued"
+    },
+    "filter": {
+      "allPlans": "All plans",
+      "allStatuses": "All statuses"
+    },
+    "frequency": {
+      "annually": "Annually",
+      "monthly": "Monthly",
+      "quarterly": "Quarterly"
+    },
+    "grantStatus": {
+      "active": "Active",
+      "cancelled": "Cancelled",
+      "exercised": "Exercised",
+      "expired": "Expired"
+    },
+    "pagination": {
+      "next": "Next",
+      "of": "of",
+      "page": "Page",
+      "previous": "Previous",
+      "showing": "Showing {from} to {to} of {total}"
+    },
+    "planStatus": {
+      "active": "Active",
+      "closed": "Closed"
+    },
+    "pool": {
+      "available": "Available",
+      "exercised": "Exercised",
+      "granted": "Granted",
+      "utilization": "Pool Utilization"
+    },
+    "stats": {
+      "active": "Active",
+      "activeGrants": "Active Grants",
+      "cancelled": "Cancelled",
+      "closed": "Closed",
+      "completed": "Completed",
+      "exercised": "Exercised",
+      "pending": "Pending",
+      "total": "Total Plans",
+      "totalExercises": "Total Exercises",
+      "totalGrants": "Total Grants",
+      "totalOptions": "Total Options"
+    },
+    "success": {
+      "cancelled": "Grant cancelled successfully",
+      "cancelledExercise": "Exercise cancelled successfully",
+      "closed": "Plan closed successfully"
+    },
+    "table": {
+      "available": "Available",
+      "cliff": "Cliff",
+      "cliffMonths": "{months} months",
+      "employee": "Employee",
+      "exercised": "Exercised",
+      "expirationDate": "Expiration",
+      "grant": "Grant",
+      "grantDate": "Grant Date",
+      "granted": "Granted",
+      "name": "Name",
+      "paymentRef": "Payment Ref.",
+      "plan": "Plan",
+      "quantity": "Quantity",
+      "shareClass": "Class",
+      "status": "Status",
+      "strikePrice": "Strike Price",
+      "terminationPolicy": "Termination Policy",
+      "totalCost": "Total Cost",
+      "totalPool": "Total Pool",
+      "utilization": "Utilization",
+      "vesting": "Vesting"
+    },
+    "tabs": {
+      "exercises": "Exercises",
+      "grants": "Grants",
+      "plans": "Plans"
+    },
+    "terminationPolicy": {
+      "acceleration": "Acceleration",
+      "forfeiture": "Forfeiture",
+      "proRata": "Pro-rata"
+    },
+    "title": "Option Plans"
+  },
   "notifications": {
     "clearFilters": "Clear filters",
     "description": "View and manage your notifications",
