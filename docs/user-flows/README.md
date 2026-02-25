@@ -8,6 +8,7 @@ Each document follows the template defined in `.claude/rules/user-flow-documenta
 | Flow | Actors | Status |
 |------|--------|--------|
 | [Authentication](./authentication.md) | Unauthenticated user, Authenticated user | Backend complete, Frontend spec complete |
+| [Onboarding](./onboarding.md) | Authenticated user (new or incomplete onboarding) | Frontend complete (2-step wizard: PersonalInfo → CompanyCreation, 22 tests) |
 | [Company Management](./company-management.md) | Authenticated user, ADMIN member | Backend complete, Frontend spec complete |
 | [Member Invitation](./member-invitation.md) | ADMIN member, any company member, authenticated user, unauthenticated user | Backend complete, Frontend invitation acceptance page complete |
 | [Share Class Management](./share-class-management.md) | ADMIN (full CRUD), FINANCE/LEGAL/INVESTOR (read-only) | Backend complete, Frontend list page + create form complete |

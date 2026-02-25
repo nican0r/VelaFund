@@ -13,6 +13,7 @@ describe('AuthController', () => {
   let authService: {
     login: jest.Mock;
     getProfile: jest.Mock;
+    updateProfile: jest.Mock;
   };
   let sessionService: {
     createSession: jest.Mock;
@@ -47,6 +48,7 @@ describe('AuthController', () => {
     authService = {
       login: jest.fn(),
       getProfile: jest.fn(),
+      updateProfile: jest.fn(),
     };
 
     sessionService = {
@@ -242,6 +244,68 @@ describe('AuthController', () => {
 
       expect(result).toEqual(mockProfile);
       expect(authService.getProfile).toHaveBeenCalledWith('user-uuid-1');
+    });
+  });
+
+  describe('updateMe', () => {
+    it('should update user profile with firstName and lastName', async () => {
+      const updatedProfile = {
+        ...mockProfile,
+        firstName: 'João',
+        lastName: 'Silva',
+      };
+      authService.updateProfile.mockResolvedValue(updatedProfile);
+
+      const result = await controller.updateMe(mockAuthenticatedUser, {
+        firstName: 'João',
+        lastName: 'Silva',
+      });
+
+      expect(result).toEqual(updatedProfile);
+      expect(authService.updateProfile).toHaveBeenCalledWith('user-uuid-1', {
+        firstName: 'João',
+        lastName: 'Silva',
+      });
+    });
+
+    it('should update email', async () => {
+      const updatedProfile = {
+        ...mockProfile,
+        email: 'new@example.com',
+      };
+      authService.updateProfile.mockResolvedValue(updatedProfile);
+
+      const result = await controller.updateMe(mockAuthenticatedUser, {
+        email: 'new@example.com',
+      });
+
+      expect(result).toEqual(updatedProfile);
+      expect(authService.updateProfile).toHaveBeenCalledWith('user-uuid-1', {
+        email: 'new@example.com',
+      });
+    });
+
+    it('should update all profile fields at once', async () => {
+      const updatedProfile = {
+        ...mockProfile,
+        firstName: 'Maria',
+        lastName: 'Santos',
+        email: 'maria@example.com',
+      };
+      authService.updateProfile.mockResolvedValue(updatedProfile);
+
+      const result = await controller.updateMe(mockAuthenticatedUser, {
+        firstName: 'Maria',
+        lastName: 'Santos',
+        email: 'maria@example.com',
+      });
+
+      expect(result).toEqual(updatedProfile);
+      expect(authService.updateProfile).toHaveBeenCalledWith('user-uuid-1', {
+        firstName: 'Maria',
+        lastName: 'Santos',
+        email: 'maria@example.com',
+      });
     });
   });
 });

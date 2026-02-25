@@ -26,6 +26,11 @@ if (!HTMLElement.prototype.releasePointerCapture) {
   HTMLElement.prototype.releasePointerCapture = () => {};
 }
 
+// Polyfill scrollIntoView for Radix Select
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {};
+}
+
 // Polyfill ResizeObserver for Radix UI
 if (typeof global.ResizeObserver === 'undefined') {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

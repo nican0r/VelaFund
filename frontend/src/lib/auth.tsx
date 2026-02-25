@@ -34,12 +34,18 @@ interface AuthContextValue {
   isLoggingIn: boolean;
   /** Current backend user profile */
   user: User | null;
+  /** Whether this user was just created (first login) */
+  isNewUser: boolean;
+  /** Whether the user needs to complete onboarding */
+  needsOnboarding: boolean;
   /** Trigger Privy login modal */
   login: () => void;
   /** Logout from backend + Privy */
   logout: () => Promise<void>;
   /** Refresh user profile from backend */
   refreshUser: () => Promise<void>;
+  /** Mark onboarding as complete (clears needsOnboarding) */
+  completeOnboarding: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -59,6 +65,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [hasBackendSession, setHasBackendSession] = useState(false);
+  const [isNewUser, setIsNewUser] = useState(false);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
   // When Privy authenticates, create a backend session.
   // Uses a ref guard instead of a cancelled flag to avoid the cleanup race condition
@@ -84,6 +92,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         setUser(result.user);
         setHasBackendSession(true);
+        setIsNewUser(result.isNewUser);
+
+        // Detect if onboarding is needed:
+        // - New user without firstName (needs personal info + company)
+        // - Existing user without firstName (incomplete onboarding)
+        if (result.isNewUser || !result.user.firstName) {
+          setNeedsOnboarding(true);
+        }
 
         // Set locale cookie for next-intl
         if (result.user.locale) {
@@ -114,6 +130,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!cancelled) {
           setUser(profile);
           setHasBackendSession(true);
+
+          // Check onboarding state on page refresh too
+          if (!profile.firstName) {
+            setNeedsOnboarding(true);
+          }
         }
       } catch {
         // Session invalid — will be handled on next request
@@ -130,18 +151,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [ready, authenticated, user, isLoggingIn, hasBackendSession]);
 
-  // Redirect unauthenticated users away from dashboard
+  // Redirect logic: auth pages, dashboard, and onboarding
   useEffect(() => {
     if (!ready) return;
     const isAuthPage = pathname.startsWith('/login');
     const isDashboardPage = pathname.startsWith('/dashboard');
+    const isOnboardingPage = pathname.startsWith('/onboarding');
 
-    if (!authenticated && isDashboardPage) {
+    if (!authenticated && (isDashboardPage || isOnboardingPage)) {
       router.replace('/login');
-    } else if (authenticated && hasBackendSession && isAuthPage) {
-      router.replace('/dashboard');
+    } else if (authenticated && hasBackendSession) {
+      if (needsOnboarding && !isOnboardingPage) {
+        router.replace('/onboarding');
+      } else if (!needsOnboarding && (isAuthPage || isOnboardingPage)) {
+        router.replace('/dashboard');
+      }
     }
-  }, [ready, authenticated, hasBackendSession, pathname, router]);
+  }, [ready, authenticated, hasBackendSession, needsOnboarding, pathname, router]);
 
   const logout = useCallback(async () => {
     try {
@@ -152,6 +178,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await privyLogout();
     setUser(null);
     setHasBackendSession(false);
+    setIsNewUser(false);
+    setNeedsOnboarding(false);
     router.replace('/login');
   }, [privyLogout, router]);
 
@@ -172,14 +200,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const completeOnboarding = useCallback(() => {
+    setNeedsOnboarding(false);
+    setIsNewUser(false);
+  }, []);
+
   const value: AuthContextValue = {
     isReady: ready,
     isAuthenticated: ready && authenticated && hasBackendSession,
     isLoggingIn,
     user,
+    isNewUser,
+    needsOnboarding,
     login: privyLogin,
     logout,
     refreshUser,
+    completeOnboarding,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

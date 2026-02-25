@@ -629,6 +629,115 @@ describe('AuthService', () => {
     });
   });
 
+  describe('updateProfile', () => {
+    it('should update firstName and lastName', async () => {
+      const updatedUser = {
+        ...mockDbUser,
+        firstName: 'João',
+        lastName: 'Silva',
+      };
+      prisma.user.update.mockResolvedValue(updatedUser);
+
+      const result = await service.updateProfile('user-uuid-1', {
+        firstName: 'João',
+        lastName: 'Silva',
+      });
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-uuid-1' },
+        data: { firstName: 'João', lastName: 'Silva' },
+        select: expect.objectContaining({
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+        }),
+      });
+      expect(result.firstName).toBe('João');
+      expect(result.lastName).toBe('Silva');
+    });
+
+    it('should update email when not duplicate', async () => {
+      prisma.user.findUnique.mockResolvedValue(null); // No existing user with this email
+      const updatedUser = {
+        ...mockDbUser,
+        email: 'new@example.com',
+      };
+      prisma.user.update.mockResolvedValue(updatedUser);
+
+      const result = await service.updateProfile('user-uuid-1', {
+        email: 'new@example.com',
+      });
+
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({
+        where: { email: 'new@example.com' },
+      });
+      expect(result.email).toBe('new@example.com');
+    });
+
+    it('should allow updating email to own email', async () => {
+      // User trying to update email to their own current email
+      prisma.user.findUnique.mockResolvedValue({
+        ...mockDbUser,
+        id: 'user-uuid-1', // Same user ID
+      });
+      prisma.user.update.mockResolvedValue(mockDbUser);
+
+      await expect(
+        service.updateProfile('user-uuid-1', { email: 'test@example.com' }),
+      ).resolves.toBeDefined();
+    });
+
+    it('should throw ConflictException for duplicate email', async () => {
+      prisma.user.findUnique.mockResolvedValue({
+        ...mockDbUser,
+        id: 'different-user-id', // Different user owns this email
+      });
+
+      await expect(
+        service.updateProfile('user-uuid-1', {
+          email: 'taken@example.com',
+        }),
+      ).rejects.toThrow(AppException);
+
+      await expect(
+        service.updateProfile('user-uuid-1', {
+          email: 'taken@example.com',
+        }),
+      ).rejects.toMatchObject({
+        code: 'AUTH_DUPLICATE_EMAIL',
+      });
+    });
+
+    it('should skip email uniqueness check when email not provided', async () => {
+      prisma.user.update.mockResolvedValue(mockDbUser);
+
+      await service.updateProfile('user-uuid-1', {
+        firstName: 'Updated',
+      });
+
+      // findUnique should not be called for email check
+      expect(prisma.user.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('should handle partial updates', async () => {
+      prisma.user.update.mockResolvedValue({
+        ...mockDbUser,
+        firstName: 'OnlyFirst',
+      });
+
+      await service.updateProfile('user-uuid-1', {
+        firstName: 'OnlyFirst',
+      });
+
+      expect(prisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { firstName: 'OnlyFirst' },
+        }),
+      );
+    });
+  });
+
   describe('AccountLockedException', () => {
     it('should have correct code and status', () => {
       const ex = new AccountLockedException();

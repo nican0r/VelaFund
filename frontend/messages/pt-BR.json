@@ -3,9 +3,11 @@
     "back": "Voltar",
     "cancel": "Cancelar",
     "confirm": "Confirmar",
+    "continue": "Continuar",
     "create": "Criar",
     "delete": "Excluir",
     "edit": "Editar",
+    "error": "Ocorreu um erro inesperado. Tente novamente.",
     "loading": "Carregando...",
     "next": "Próximo",
     "no": "Não",
@@ -1049,6 +1051,54 @@
       "proRata": "Pro-rata"
     },
     "title": "Planos de Opções"
+  },
+  "onboarding": {
+    "companyCreation": {
+      "cnpj": "CNPJ",
+      "cnpjDuplicate": "Este CNPJ já está cadastrado",
+      "cnpjInvalid": "CNPJ inválido",
+      "cnpjRequired": "CNPJ é obrigatório",
+      "description": "Configure sua empresa para gerenciar o cap table",
+      "entityType": "Tipo de empresa",
+      "entityTypePlaceholder": "Selecione o tipo de empresa",
+      "entityTypeRequired": "Tipo de empresa é obrigatório",
+      "entityTypes": {
+        "LTDA": "Ltda.",
+        "SA_CAPITAL_ABERTO": "S.A. Capital Aberto",
+        "SA_CAPITAL_FECHADO": "S.A. Capital Fechado"
+      },
+      "entityTypesDescription": {
+        "LTDA": "Sociedade Limitada",
+        "SA_CAPITAL_ABERTO": "Sociedade Anônima de capital aberto",
+        "SA_CAPITAL_FECHADO": "Sociedade Anônima de capital fechado"
+      },
+      "name": "Nome da empresa",
+      "namePlaceholder": "Ex: Acme Tecnologia Ltda.",
+      "nameRequired": "Nome da empresa é obrigatório",
+      "nameTooShort": "Nome da empresa deve ter pelo menos 2 caracteres",
+      "submit": "Criar Empresa",
+      "title": "Sua Empresa"
+    },
+    "personalInfo": {
+      "description": "Precisamos de alguns dados para começar",
+      "email": "E-mail",
+      "emailDuplicate": "Este e-mail já está em uso",
+      "emailInvalid": "Digite um endereço de e-mail válido",
+      "emailPlaceholder": "seu@email.com",
+      "emailRequired": "E-mail é obrigatório",
+      "firstName": "Nome",
+      "firstNamePlaceholder": "Ex: João",
+      "firstNameRequired": "Nome é obrigatório",
+      "lastName": "Sobrenome",
+      "lastNamePlaceholder": "Ex: Silva",
+      "lastNameRequired": "Sobrenome é obrigatório",
+      "title": "Suas Informações"
+    },
+    "stepper": {
+      "step1": "Suas Informações",
+      "step2": "Sua Empresa"
+    },
+    "welcome": "Bem-vindo ao Navia"
   },
   "notifications": {
     "clearFilters": "Limpar filtros",

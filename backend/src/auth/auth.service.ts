@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import {
   UnauthorizedException,
   AppException,
+  ConflictException,
 } from '../common/filters/app-exception';
 import { AuthenticatedUser } from './decorators/current-user.decorator';
 import { maskEmail, maskIp } from '../common/utils/redact-pii';
@@ -255,6 +256,53 @@ export class AuthService {
     }
 
     return this.toAuthenticatedUser(user);
+  }
+
+  /**
+   * Update the current user's profile (firstName, lastName, email).
+   * Used during onboarding Step 1.
+   */
+  async updateProfile(
+    userId: string,
+    data: { firstName?: string; lastName?: string; email?: string },
+  ) {
+    // If email is being changed, check for uniqueness
+    if (data.email) {
+      const existingWithEmail = await this.prisma.user.findUnique({
+        where: { email: data.email },
+      });
+      if (existingWithEmail && existingWithEmail.id !== userId) {
+        throw new ConflictException(
+          'AUTH_DUPLICATE_EMAIL',
+          'errors.auth.duplicateEmail',
+          { email: data.email },
+        );
+      }
+    }
+
+    const updateData: Record<string, unknown> = {};
+    if (data.firstName !== undefined) updateData.firstName = data.firstName;
+    if (data.lastName !== undefined) updateData.lastName = data.lastName;
+    if (data.email !== undefined) updateData.email = data.email;
+
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        walletAddress: true,
+        profilePictureUrl: true,
+        kycStatus: true,
+        locale: true,
+        lastLoginAt: true,
+        createdAt: true,
+      },
+    });
+
+    return user;
   }
 
   /**

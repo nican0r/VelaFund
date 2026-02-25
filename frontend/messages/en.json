@@ -3,9 +3,11 @@
     "back": "Back",
     "cancel": "Cancel",
     "confirm": "Confirm",
+    "continue": "Continue",
     "create": "Create",
     "delete": "Delete",
     "edit": "Edit",
+    "error": "An unexpected error occurred. Please try again.",
     "loading": "Loading...",
     "next": "Next",
     "no": "No",
@@ -1049,6 +1051,54 @@
       "proRata": "Pro-rata"
     },
     "title": "Option Plans"
+  },
+  "onboarding": {
+    "companyCreation": {
+      "cnpj": "CNPJ",
+      "cnpjDuplicate": "This CNPJ is already registered",
+      "cnpjInvalid": "Invalid CNPJ",
+      "cnpjRequired": "CNPJ is required",
+      "description": "Set up your company to manage the cap table",
+      "entityType": "Entity type",
+      "entityTypePlaceholder": "Select the entity type",
+      "entityTypeRequired": "Entity type is required",
+      "entityTypes": {
+        "LTDA": "Ltda.",
+        "SA_CAPITAL_ABERTO": "S.A. Open Capital",
+        "SA_CAPITAL_FECHADO": "S.A. Closed Capital"
+      },
+      "entityTypesDescription": {
+        "LTDA": "Limited Liability Company",
+        "SA_CAPITAL_ABERTO": "Open capital corporation",
+        "SA_CAPITAL_FECHADO": "Closed capital corporation"
+      },
+      "name": "Company name",
+      "namePlaceholder": "e.g., Acme Technologies Ltd.",
+      "nameRequired": "Company name is required",
+      "nameTooShort": "Company name must be at least 2 characters",
+      "submit": "Create Company",
+      "title": "Your Company"
+    },
+    "personalInfo": {
+      "description": "We need a few details to get started",
+      "email": "Email",
+      "emailDuplicate": "This email is already in use",
+      "emailInvalid": "Enter a valid email address",
+      "emailPlaceholder": "your@email.com",
+      "emailRequired": "Email is required",
+      "firstName": "First name",
+      "firstNamePlaceholder": "e.g., John",
+      "firstNameRequired": "First name is required",
+      "lastName": "Last name",
+      "lastNamePlaceholder": "e.g., Smith",
+      "lastNameRequired": "Last name is required",
+      "title": "Your Information"
+    },
+    "stepper": {
+      "step1": "Your Information",
+      "step2": "Your Company"
+    },
+    "welcome": "Welcome to Navia"
   },
   "notifications": {
     "clearFilters": "Clear filters",

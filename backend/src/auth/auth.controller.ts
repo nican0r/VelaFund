@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Put,
   Body,
   Req,
   Res,
@@ -14,6 +15,7 @@ import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { SessionService } from './session.service';
 import { LoginDto } from './dto/login.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { Public } from './decorators/public.decorator';
 import { RequireAuth } from './decorators/require-auth.decorator';
 import {
@@ -111,5 +113,19 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Not authenticated' })
   async me(@CurrentUser() user: AuthenticatedUser) {
     return this.authService.getProfile(user.id);
+  }
+
+  @Put('me')
+  @RequireAuth()
+  @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @ApiOperation({ summary: 'Update current user profile' })
+  @ApiResponse({ status: 200, description: 'Profile updated' })
+  @ApiResponse({ status: 401, description: 'Not authenticated' })
+  @ApiResponse({ status: 409, description: 'Email already in use' })
+  async updateMe(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdateProfileDto,
+  ) {
+    return this.authService.updateProfile(user.id, dto);
   }
 }
