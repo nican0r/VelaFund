@@ -47,6 +47,38 @@ export function useFundingRound(
   });
 }
 
+// --- Create funding round ---
+
+export interface CreateFundingRoundData {
+  name: string;
+  roundType: 'PRE_SEED' | 'SEED' | 'SERIES_A' | 'SERIES_B' | 'SERIES_C' | 'BRIDGE' | 'OTHER';
+  shareClassId: string;
+  targetAmount: string;
+  minimumCloseAmount?: string;
+  hardCap?: string;
+  preMoneyValuation: string;
+  pricePerShare: string;
+  targetCloseDate?: string;
+  notes?: string;
+}
+
+export function useCreateFundingRound(companyId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: CreateFundingRoundData) =>
+      api.post<FundingRound>(
+        `/api/v1/companies/${companyId}/funding-rounds`,
+        data,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['funding-rounds', companyId] });
+    },
+  });
+}
+
+// --- Cancel funding round ---
+
 export function useCancelFundingRound(companyId: string | undefined) {
   const queryClient = useQueryClient();
 

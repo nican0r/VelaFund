@@ -54,32 +54,54 @@ ADMIN creates Funding Round (DRAFT)
 
 ## Flows
 
-### Happy Path: Create and Close a Funding Round
+### Happy Path: Create a Funding Round (Frontend Form)
 
-PRECONDITION: Company is ACTIVE. Target share class exists with sufficient authorized shares.
+PRECONDITION: Company is ACTIVE. At least one share class exists.
 ACTOR: ADMIN
-TRIGGER: ADMIN navigates to Funding Rounds and clicks "Create Round"
+TRIGGER: ADMIN clicks "+ New Round" on the Funding Rounds list page
 
-1. [UI] ADMIN fills in round details: name, type (SEED/SERIES_A/etc.), share class, target amount, pre-money valuation, price per share, optional minimum close amount, hard cap, target close date
-2. [Frontend] Validates input client-side
-   → IF invalid: show field-level errors, STOP
-3. [Frontend] Sends POST /api/v1/companies/:companyId/funding-rounds
-4. [Backend] Validates authentication and authorization (role: ADMIN)
-   → IF unauthenticated: return 401
-   → IF unauthorized: return 404
-5. [Backend] Validates company exists and is ACTIVE
-   → IF not found: return 404
-   → IF not ACTIVE: return 422 ROUND_COMPANY_NOT_ACTIVE
-6. [Backend] Validates share class belongs to company
-   → IF not found: return 404
-7. [Backend] Validates amounts (all positive, minimumCloseAmount ≤ targetAmount, hardCap ≥ targetAmount)
-   → IF invalid: return 422 ROUND_INVALID_AMOUNT / ROUND_MINIMUM_EXCEEDS_TARGET / ROUND_HARD_CAP_BELOW_TARGET
-8. [Backend] Creates FundingRound in DRAFT status
-9. [Backend] Returns 201 with round data
-10. [UI] Shows success toast, navigates to round detail
+1. [UI] User navigates to `/dashboard/funding-rounds/new`
+2. [UI] Page displays 2-step wizard: **Step 1: Details** → **Step 2: Review**
+3. [UI] Step 1 shows:
+   - 7 round type selection cards (Pre-Seed, Seed, Series A/B/C, Bridge, Other) — SEED selected by default
+   - Round name text field
+   - Share class dropdown (populated from useShareClasses hook)
+   - Financial terms: target amount, minimum close amount (optional), hard cap (optional), pre-money valuation, price per share
+   - Auto-calculated post-money valuation (pre-money + target) displayed as read-only
+   - Target close date (optional)
+   - Notes textarea (optional)
+4. [UI] User selects round type by clicking a type card
+5. [UI] User fills in required fields (name, share class, target, pre-money, price per share)
+6. [UI] User clicks "Next"
+7. [Frontend] Validates form client-side:
+   → IF name empty: show "Name is required" error
+   → IF share class not selected: show "Share class is required" error
+   → IF target/pre-money/price empty: show "Required" error
+   → IF any amount ≤ 0: show "Must be positive" error
+   → IF minimumCloseAmount > targetAmount: show "Must be ≤ target" error
+   → IF hardCap < targetAmount: show "Must be ≥ target" error
+   → IF any errors: highlight fields, STOP on Step 1
+8. [UI] Step 2 (Review) displays all entered values in read-only summary format with type name, formatted amounts, and optional fields (only shown if filled)
+9. [UI] User reviews data and clicks "Confirm"
+   → User can click "Back" to return to Step 1 for edits
+10. [Frontend] Sends POST /api/v1/companies/:companyId/funding-rounds via useCreateFundingRound mutation
+11. [Backend] Validates authentication and authorization (role: ADMIN)
+    → IF unauthenticated: return 401
+    → IF unauthorized: return 404
+12. [Backend] Validates company exists and is ACTIVE
+    → IF not found: return 404
+    → IF not ACTIVE: return 422 ROUND_COMPANY_NOT_ACTIVE
+13. [Backend] Validates share class belongs to company
+    → IF not found: return 404
+14. [Backend] Validates amounts (all positive, minimumCloseAmount ≤ targetAmount, hardCap ≥ targetAmount)
+    → IF invalid: return 422 ROUND_INVALID_AMOUNT / ROUND_MINIMUM_EXCEEDS_TARGET / ROUND_HARD_CAP_BELOW_TARGET
+15. [Backend] Creates FundingRound in DRAFT status
+16. [Backend] Returns 201 with round data
+17. [UI] Shows success toast: "Funding round created successfully"
+18. [UI] Navigates back to `/dashboard/funding-rounds`
 
 POSTCONDITION: FundingRound exists in DRAFT status
-SIDE EFFECTS: None (audit logging deferred to Phase 6)
+SIDE EFFECTS: Audit log ROUND_CREATED queued via Bull
 
 ### Happy Path: Open Round and Add Commitments
 
