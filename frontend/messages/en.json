@@ -29,6 +29,28 @@
       "cnpjDuplicate": "CNPJ already registered",
       "notFound": "Company not found"
     },
+    "kyc": {
+      "alreadyApproved": "KYC verification has already been approved",
+      "cpfDobMismatch": "Date of birth does not match the provided CPF",
+      "cpfDuplicate": "CPF is already registered with another account",
+      "cpfInvalid": "Invalid CPF",
+      "cpfNotFound": "CPF not found in the Federal Revenue database",
+      "documentExpired": "Document has expired",
+      "documentUnreadable": "Unable to read the document. Please submit a clearer photo.",
+      "faceMatchFailed": "Facial recognition does not match the document",
+      "fileTooLarge": "File exceeds the maximum allowed size",
+      "fileInvalidFormat": "Invalid file format. Use JPG or PNG.",
+      "invalidStatus": "Invalid verification status for this operation",
+      "livenessCheckFailed": "Liveness check failed. Please try again.",
+      "maxAttemptsExceeded": "Maximum number of attempts exceeded",
+      "s3Unavailable": "Storage service unavailable. Please try again.",
+      "stepOrderViolation": "Complete the previous steps before proceeding",
+      "underReview": "KYC verification under review",
+      "verifikUnavailable": "Verification service unavailable. Please try again."
+    },
+    "kycverification": {
+      "notFound": "KYC verification not found"
+    },
     "notification": {
       "notFound": "Notification not found",
       "preferencesInvalid": "Cannot disable security notifications"

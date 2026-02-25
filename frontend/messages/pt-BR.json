@@ -29,6 +29,28 @@
       "cnpjDuplicate": "CNPJ já cadastrado",
       "notFound": "Empresa não encontrada"
     },
+    "kyc": {
+      "alreadyApproved": "Verificação KYC já foi aprovada",
+      "cpfDobMismatch": "Data de nascimento não confere com o CPF informado",
+      "cpfDuplicate": "CPF já cadastrado em outra conta",
+      "cpfInvalid": "CPF inválido",
+      "cpfNotFound": "CPF não encontrado na base da Receita Federal",
+      "documentExpired": "Documento expirado",
+      "documentUnreadable": "Não foi possível ler o documento. Envie uma foto mais clara.",
+      "faceMatchFailed": "Reconhecimento facial não corresponde ao documento",
+      "fileTooLarge": "Arquivo excede o tamanho máximo permitido",
+      "fileInvalidFormat": "Formato de arquivo inválido. Use JPG ou PNG.",
+      "invalidStatus": "Status de verificação inválido para esta operação",
+      "livenessCheckFailed": "Verificação de vivacidade falhou. Tente novamente.",
+      "maxAttemptsExceeded": "Número máximo de tentativas excedido",
+      "s3Unavailable": "Serviço de armazenamento indisponível. Tente novamente.",
+      "stepOrderViolation": "Complete as etapas anteriores antes de prosseguir",
+      "underReview": "Verificação KYC em análise",
+      "verifikUnavailable": "Serviço de verificação indisponível. Tente novamente."
+    },
+    "kycverification": {
+      "notFound": "Verificação KYC não encontrada"
+    },
     "notification": {
       "notFound": "Notificação não encontrada",
       "preferencesInvalid": "Não é possível desativar notificações de segurança"

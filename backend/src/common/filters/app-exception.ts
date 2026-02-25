@@ -543,6 +543,79 @@ const MESSAGES: Record<string, Record<string, string>> = {
     'pt-BR': 'Registro de auditoria não encontrado',
     en: 'Audit log not found',
   },
+  // ─── KYC VERIFICATION MESSAGES ──────────────────────────────────────────
+  'errors.kyc.cpfInvalid': {
+    'pt-BR': 'CPF inválido — dígitos verificadores incorretos',
+    en: 'Invalid CPF — incorrect check digits',
+  },
+  'errors.kyc.cpfNotFound': {
+    'pt-BR': 'CPF não encontrado no cadastro da Receita Federal',
+    en: 'CPF not found in the Receita Federal registry',
+  },
+  'errors.kyc.cpfDobMismatch': {
+    'pt-BR': 'Data de nascimento não corresponde ao CPF informado',
+    en: 'Date of birth does not match the provided CPF',
+  },
+  'errors.kyc.cpfDuplicate': {
+    'pt-BR': 'CPF já vinculado a outra conta',
+    en: 'CPF already linked to another account',
+  },
+  'errors.kyc.documentUnreadable': {
+    'pt-BR': 'Documento ilegível ou não autêntico',
+    en: 'Document unreadable or not authentic',
+  },
+  'errors.kyc.documentExpired': {
+    'pt-BR': 'Documento expirado — envie um documento válido',
+    en: 'Document expired — please submit a valid document',
+  },
+  'errors.kyc.faceMatchFailed': {
+    'pt-BR': 'Verificação facial não correspondeu ao documento',
+    en: 'Facial verification did not match the document',
+  },
+  'errors.kyc.livenessCheckFailed': {
+    'pt-BR': 'Verificação de vivacidade falhou — tente novamente',
+    en: 'Liveness check failed — please try again',
+  },
+  'errors.kyc.verifikUnavailable': {
+    'pt-BR': 'Serviço de verificação indisponível — tente novamente mais tarde',
+    en: 'Verification service unavailable — please try again later',
+  },
+  'errors.kyc.alreadyApproved': {
+    'pt-BR': 'Verificação KYC já aprovada',
+    en: 'KYC verification already approved',
+  },
+  'errors.kyc.underReview': {
+    'pt-BR': 'Verificação KYC em análise — aguarde o resultado',
+    en: 'KYC verification under review — please wait for the result',
+  },
+  'errors.kyc.maxAttemptsExceeded': {
+    'pt-BR': 'Número máximo de tentativas de verificação excedido',
+    en: 'Maximum verification attempts exceeded',
+  },
+  'errors.kyc.stepOrderViolation': {
+    'pt-BR': 'Etapa anterior da verificação KYC deve ser concluída primeiro',
+    en: 'Previous KYC verification step must be completed first',
+  },
+  'errors.kyc.fileTooLarge': {
+    'pt-BR': 'Arquivo muito grande — tamanho máximo de 10 MB',
+    en: 'File too large — maximum size is 10 MB',
+  },
+  'errors.kyc.fileInvalidFormat': {
+    'pt-BR': 'Formato de arquivo inválido — apenas JPEG e PNG são aceitos',
+    en: 'Invalid file format — only JPEG and PNG are accepted',
+  },
+  'errors.kyc.s3Unavailable': {
+    'pt-BR': 'Armazenamento de documentos indisponível — tente novamente mais tarde',
+    en: 'Document storage unavailable — please try again later',
+  },
+  'errors.kyc.invalidStatus': {
+    'pt-BR': 'Status da verificação KYC não permite esta operação',
+    en: 'KYC verification status does not allow this operation',
+  },
+  'errors.kycverification.notFound': {
+    'pt-BR': 'Verificação KYC não encontrada — inicie o processo primeiro',
+    en: 'KYC verification not found — please start the process first',
+  },
 };
 
 export class AppException extends Error {
