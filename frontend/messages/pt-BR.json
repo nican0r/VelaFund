@@ -13,6 +13,11 @@
     "search": "Buscar",
     "yes": "Sim"
   },
+  "companySwitcher": {
+    "label": "Trocar empresa",
+    "select": "Selecione uma empresa",
+    "title": "Suas empresas"
+  },
   "capTable": {
     "authorized": "Autorizado",
     "description": "Visualize e gerencie a tabela de capitalização da sua empresa.",

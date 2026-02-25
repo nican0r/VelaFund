@@ -13,6 +13,11 @@
     "search": "Search",
     "yes": "Yes"
   },
+  "companySwitcher": {
+    "label": "Switch company",
+    "select": "Select a company",
+    "title": "Your companies"
+  },
   "capTable": {
     "authorized": "Authorized",
     "description": "View and manage your company's cap table.",

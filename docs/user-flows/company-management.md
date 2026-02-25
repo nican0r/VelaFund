@@ -5,7 +5,7 @@
 **Preconditions**: User is authenticated (valid session)
 **Related Flows**: [Authentication](./authentication.md) (requires auth), [Member Invitation](./member-invitation.md) (after company created)
 
-**MVP Constraint**: One company per user. Company creation happens during onboarding (Step 2 of the wizard). There is no company list page, no company switcher, and no multi-company navigation.
+**Note**: Users can be members of multiple companies. A company switcher in the topbar and sidebar allows switching between companies. Company creation happens during onboarding (Step 2 of the wizard).
 
 ---
 
@@ -64,18 +64,32 @@ Authenticated user (onboarding)
   |           +-- [same --> same] --> 422 COMPANY_INVALID_STATUS_TRANSITION
   |
   +-- (ADMIN only) "Dissolve Company"
+  |     |
+  |     +-- Settings danger zone --> CompanyDissolutionDialog
+  |           |
+  |           +-- [prerequisites not met] --> shows blocker list, cannot proceed
+  |           +-- [prerequisites met] --> name confirmation
+  |                 |
+  |                 +-- POST /api/v1/companies/:companyId/dissolve
+  |                       |
+  |                       +-- [has active shareholders] --> 422 COMPANY_HAS_ACTIVE_SHAREHOLDERS
+  |                       +-- [has active funding rounds] --> 422 COMPANY_HAS_ACTIVE_ROUNDS
+  |                       +-- [already dissolved] --> 422 COMPANY_ALREADY_DISSOLVED
+  |                       +-- [no blockers] --> Company status --> DISSOLVED (permanent, read-only)
+  |
+  +-- (Any role, 2+ companies) "Switch Company"
         |
-        +-- Settings danger zone --> CompanyDissolutionDialog
+        +-- Company switcher (topbar or sidebar)
               |
-              +-- [prerequisites not met] --> shows blocker list, cannot proceed
-              +-- [prerequisites met] --> name confirmation
+              +-- [only 1 company] --> Switcher shows company name (no dropdown)
+              +-- [2+ companies] --> Dropdown opens with company list
                     |
-                    +-- POST /api/v1/companies/:companyId/dissolve
+                    +-- User clicks different company
                           |
-                          +-- [has active shareholders] --> 422 COMPANY_HAS_ACTIVE_SHAREHOLDERS
-                          +-- [has active funding rounds] --> 422 COMPANY_HAS_ACTIVE_ROUNDS
-                          +-- [already dissolved] --> 422 COMPANY_ALREADY_DISSOLVED
-                          +-- [no blockers] --> Company status --> DISSOLVED (permanent, read-only)
+                          +-- CompanyProvider.setSelectedCompanyId(newId)
+                          +-- localStorage updated (navia-selected-company)
+                          +-- All TanStack Query hooks re-fetch with new companyId
+                          +-- Dashboard reflects new company data
 ```
 
 ---
@@ -277,6 +291,61 @@ POSTCONDITION: Company status = DISSOLVED, all data read-only
 SIDE EFFECTS: Audit log (COMPANY_STATUS_CHANGED), notification emails to all members, blockchain status update
 ```
 
+### Happy Path: Switch Company
+
+```
+PRECONDITION: User is authenticated and member of 2+ companies
+ACTOR: Any role
+TRIGGER: User clicks company switcher in topbar or sidebar
+
+1.  [UI] User clicks the company switcher dropdown trigger (Building2 icon + company name + ChevronDown)
+2.  [UI] Dropdown opens showing all companies the user is a member of
+    - Header: "Suas Empresas" title
+    - Each company shows: initial icon (first letter), company name, entity type (Ltda./S.A.), CNPJ
+    - Currently selected company has ocean-600 background highlight and a Check icon
+    - Max height 256px with scrollable overflow for long lists
+3.  [UI] User clicks on a different company
+4.  [Frontend] CompanyProvider.setSelectedCompanyId(newId) called
+5.  [Frontend] Selection persisted to localStorage (key: navia-selected-company)
+6.  [Frontend] All TanStack Query hooks that depend on companyId re-fetch with new company context
+7.  [UI] Dropdown closes, all pages reflect new company data
+
+POSTCONDITION: Selected company changed, all dashboard data reflects new company
+SIDE EFFECTS: localStorage updated with new company ID
+```
+
+### Alternative Path: Single Company (No Switcher)
+
+```
+PRECONDITION: User is authenticated and member of exactly 1 company
+ACTOR: Any role
+TRIGGER: Dashboard loads
+
+1.  [Frontend] CompanyProvider fetches GET /api/v1/companies?limit=100
+2.  [Frontend] companies.length === 1
+3.  [UI] Company switcher renders as static display: Building2 icon + company name, no dropdown trigger
+4.  [UI] No ChevronDown icon, no click handler
+
+POSTCONDITION: Company is auto-selected, no switching available
+```
+
+### Alternative Path: Auto-Select on First Load
+
+```
+PRECONDITION: User is authenticated, no company previously selected (no localStorage entry or stored ID is invalid)
+ACTOR: Any role
+TRIGGER: Dashboard loads
+
+1.  [Frontend] CompanyProvider fetches GET /api/v1/companies?limit=100
+2.  [Frontend] getPersistedCompanyId() returns null or ID not found in companies list
+3.  [Frontend] Auto-selects first ACTIVE company; if none active, selects first company
+4.  [Frontend] Persists selected ID to localStorage
+5.  [UI] Dashboard renders with auto-selected company data
+
+POSTCONDITION: Company auto-selected and persisted
+SIDE EFFECTS: localStorage set with auto-selected company ID
+```
+
 ### Error Path: CNPJ Already Registered
 
 ```
@@ -336,6 +405,10 @@ ACTOR: New user during onboarding
 | 6 (dissolve) | Prerequisites | Blockers exist | Alt | Blocker list shown, cannot proceed |
 | 9b (dissolve) | Name confirmation | Input != company name | Block | Dissolve button stays disabled |
 | 13 (dissolve) | Prerequisites (recheck) | Blockers appeared since dialog opened | Error | 422, error toast |
+| -- (switcher) | Company count | Only 1 company | Alt | Static display, no dropdown |
+| -- (switcher) | Company count | 2+ companies | Happy | Dropdown available for switching |
+| -- (auto-select) | Persisted selection | localStorage ID not in companies list | Alt | Auto-select first ACTIVE company |
+| -- (auto-select) | Persisted selection | localStorage ID found in companies list | Happy | Use persisted selection |
 
 ---
 
@@ -419,6 +492,16 @@ ACTOR: New user during onboarding
 | Success | Dialog closes, success toast | 200/204 response |
 | Error | Error toast, dialog stays open | 422/5xx response |
 
+### CompanySwitcher (Topbar / Sidebar)
+
+| State | Visual | Trigger |
+|-------|--------|---------|
+| Loading | Pulsing gray skeleton (icon + text) | Companies query loading |
+| Single Company | Static display: Building2 icon + company name, no dropdown | companies.length === 1 |
+| Multi-Company (closed) | Building2 icon + company name + ChevronDown, clickable | companies.length >= 2 |
+| Multi-Company (open) | Dropdown with company list, selected company highlighted in ocean-600 | Click trigger |
+| Company Selected | Dropdown closes, all page data refreshes | Click company item |
+
 ---
 
 ## By Role
@@ -430,10 +513,12 @@ ACTOR: New user during onboarding
 | Update company | Yes | No (404) | No (404) | No (404) | No (404) | No (401) |
 | Change status | Yes | No (404) | No (404) | No (404) | No (404) | No (401) |
 | Dissolve company | Yes | No (404) | No (404) | No (404) | No (404) | No (401) |
+| Switch company | Yes | Yes | Yes | Yes | Yes | No (401) |
 | View danger zone | Yes | No (hidden) | No (hidden) | No (hidden) | No (hidden) | No (401) |
 
 Note: Non-members receive 404 (not 403) to prevent company enumeration per security.md.
-Note: In MVP, company creation only happens during onboarding (Step 2), so only the creating user (who becomes ADMIN) performs it.
+Note: Company creation only happens during onboarding (Step 2), so only the creating user (who becomes ADMIN) performs it.
+Note: Company switching is a frontend-only operation (no backend call). All roles can switch between companies they are members of.
 
 ---
 
@@ -459,6 +544,11 @@ Note: In MVP, company creation only happens during onboarding (Step 2), so only 
 |-------|--------|-----------|-------------|
 | `/onboarding` (Step 2) | Auth layout | CompanyCreationStep | Company creation form during wizard |
 | `/dashboard/settings` | Dashboard shell | CompanySettingsPage | Company info, members link, notifications |
+
+**Layout Components**:
+- `CompanySwitcher` — rendered in topbar (light theme), shows Building2 icon + company name + dropdown
+- `SidebarCompanySwitcher` — rendered in sidebar (dark theme, supports collapsed mode), same functionality
+- `CompanyProvider` — React context in `dashboard-layout.tsx`, fetches `GET /api/v1/companies?limit=100`, manages selected company via localStorage
 
 ---
 

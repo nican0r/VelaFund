@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
+import { SidebarCompanySwitcher } from '@/components/layout/company-switcher';
 
 interface NavItem {
   label: string;
@@ -140,6 +141,11 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         ) : (
           <span className="text-xl font-bold text-white tracking-tight">Navia</span>
         )}
+      </div>
+
+      {/* Company switcher */}
+      <div className="border-b border-white/10 px-3 py-2">
+        <SidebarCompanySwitcher collapsed={collapsed} />
       </div>
 
       {/* Navigation */}

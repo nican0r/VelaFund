@@ -21,6 +21,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useEffect } from 'react';
 import { useAuth } from '@/lib/auth';
+import { SidebarCompanySwitcher } from '@/components/layout/company-switcher';
 
 interface NavItem {
   label: string;
@@ -128,6 +129,11 @@ export function MobileSidebar({ open, onClose }: MobileSidebarProps) {
           >
             <X className="h-5 w-5" />
           </button>
+        </div>
+
+        {/* Company switcher */}
+        <div className="border-b border-white/10 px-3 py-2">
+          <SidebarCompanySwitcher collapsed={false} />
         </div>
 
         {/* Navigation */}

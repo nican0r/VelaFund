@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { useUnreadCount } from '@/hooks/use-notifications';
 import { NotificationDropdown } from '@/components/notifications/notification-dropdown';
+import { CompanySwitcher } from '@/components/layout/company-switcher';
 
 interface TopbarProps {
   onMenuClick: () => void;
@@ -94,8 +95,14 @@ export function Topbar({ onMenuClick, sidebarCollapsed }: TopbarProps) {
         </div>
       </div>
 
-      {/* Right section: notifications + user */}
+      {/* Right section: company switcher + notifications + user */}
       <div className="flex items-center gap-x-2">
+        {/* Company switcher */}
+        <CompanySwitcher />
+
+        {/* Divider */}
+        <div className="mx-1 hidden h-6 w-px bg-gray-200 md:block" />
+
         {/* Notification bell */}
         <div className="relative" ref={notifRef}>
           <button
