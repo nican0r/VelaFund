@@ -134,6 +134,50 @@ const MESSAGES: Record<string, Record<string, string>> = {
     'pt-BR': 'Documento não encontrado',
     en: 'Document not found',
   },
+  'errors.doc.notFound': {
+    'pt-BR': 'Documento não encontrado',
+    en: 'Document not found',
+  },
+  'errors.doc.templateNotFound': {
+    'pt-BR': 'Modelo de documento não encontrado',
+    en: 'Document template not found',
+  },
+  'errors.doc.generationFailed': {
+    'pt-BR': 'Falha na geração do documento. Tente novamente',
+    en: 'Document generation failed. Please try again',
+  },
+  'errors.doc.uploadTooLarge': {
+    'pt-BR': 'Arquivo excede o tamanho máximo de 10 MB',
+    en: 'File exceeds maximum size of 10 MB',
+  },
+  'errors.doc.invalidFileType': {
+    'pt-BR': 'Tipo de arquivo não permitido. Use PDF, PNG ou JPG',
+    en: 'Invalid file type. Use PDF, PNG, or JPG',
+  },
+  'errors.doc.notDraft': {
+    'pt-BR': 'Somente documentos em rascunho podem ser editados',
+    en: 'Only draft documents can be edited',
+  },
+  'errors.doc.incompleteForm': {
+    'pt-BR': 'Campos obrigatórios não preenchidos',
+    en: 'Required form fields are missing',
+  },
+  'errors.doc.hasSignatures': {
+    'pt-BR': 'Documentos com assinaturas não podem ser excluídos',
+    en: 'Documents with signatures cannot be deleted',
+  },
+  'errors.doc.templateInactive': {
+    'pt-BR': 'Modelo de documento está desativado',
+    en: 'Document template is deactivated',
+  },
+  'errors.doc.notGenerated': {
+    'pt-BR': 'Documento ainda não foi gerado',
+    en: 'Document has not been generated yet',
+  },
+  'errors.documenttemplate.notFound': {
+    'pt-BR': 'Modelo de documento não encontrado',
+    en: 'Document template not found',
+  },
   'errors.auth.csrfInvalid': {
     'pt-BR': 'Token CSRF inválido',
     en: 'Invalid CSRF token',

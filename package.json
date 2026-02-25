@@ -27,6 +27,7 @@
       "@prisma/client",
       "@prisma/engines",
       "prisma",
+      "puppeteer",
       "unrs-resolver"
     ]
   },

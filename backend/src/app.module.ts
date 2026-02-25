@@ -23,6 +23,7 @@ import { AwsModule } from './aws/aws.module';
 import { EncryptionModule } from './encryption/encryption.module';
 import { EmailModule } from './email/email.module';
 import { KycModule } from './kyc/kyc.module';
+import { DocumentModule } from './document/document.module';
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { KycModule } from './kyc/kyc.module';
     NotificationModule,
     AuditLogModule,
     KycModule,
+    DocumentModule,
   ],
   providers: [
     // Register ThrottlerGuard globally — rate limits apply to all endpoints.

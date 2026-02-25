@@ -1,6 +1,6 @@
-# Navia MVP — Implementation Plan v26.0
+# Navia MVP — Implementation Plan v27.0
 
-> **Generated**: 2026-02-25 | **Tests**: 1244 passing | **Backend modules**: 16 of 23 built
+> **Generated**: 2026-02-25 | **Tests**: 1322 passing | **Backend modules**: 17 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -9,13 +9,13 @@
 
 ## Current State
 
-**Built backend modules** (16): auth (with Redis sessions + Redis-backed failed-attempt lockout), company, member, share-class, shareholder, cap-table, transaction, funding-round, option-plan (with exercises), convertible, notification, audit-log, email, kyc
+**Built backend modules** (17): auth (with Redis sessions + Redis-backed failed-attempt lockout), company, member, share-class, shareholder, cap-table, transaction, funding-round, option-plan (with exercises), convertible, notification, audit-log, email, kyc, document
 
-**Entirely missing backend modules** (10): document-generation, document-signatures, blockchain-integration, company-profile, company-dataroom, company-litigation, company-blockchain-admin, cap-table-reconciliation, reports-analytics, exit-waterfall
+**Entirely missing backend modules** (9): document-signatures, blockchain-integration, company-profile, company-dataroom, company-litigation, company-blockchain-admin, cap-table-reconciliation, reports-analytics, exit-waterfall
 
 **Frontend**: Scaffolding only (layout shell, static mock pages, typed API client with hardcoded `Accept-Language: 'pt-BR'`). No Privy SDK, no next-intl, no shadcn/ui components, no functional pages, no tests (0 `.test.tsx` files).
 
-**Infrastructure**: Redis/Bull configured (`@nestjs/bull`, `bull`, `ioredis` installed; BullModule.forRootAsync in AppModule). SessionService for Redis-backed auth sessions (7-day absolute, 2-hour inactivity timeouts). AWS SDK configured (`@aws-sdk/client-s3`, `@aws-sdk/client-ses`, `@aws-sdk/client-kms`, `@aws-sdk/s3-request-presigner` installed; AwsModule @Global with S3Service, SesService, KmsService). CSRF middleware implemented (double-submit cookie pattern, `navia-csrf` cookie, `X-CSRF-Token` header validation). Helmet fully configured (including `permittedCrossDomainPolicies: false`). `redactPii()` utility implemented (`common/utils/redact-pii.ts`: maskCpf, maskCnpj, maskEmail, maskWallet, maskIp + redactPiiFromString; integrated with GlobalExceptionFilter for PII-safe logging; AuthService refactored to use centralized utility). Body size limits configured (1MB JSON, 1MB URL-encoded in main.ts). EncryptionModule implemented (@Global) with EncryptionService wrapping KmsService: encrypt/decrypt via KMS and HMAC-SHA256 blind indexes via BLIND_INDEX_KEY env var; graceful degradation with SHA-256 fallback when BLIND_INDEX_KEY is not set and plaintext fallback when KMS is unavailable. AuditLogModule implemented (@Global export via AuditLogService) with Bull queue async processing, @Auditable() decorator, AuditInterceptor (registered as APP_INTERCEPTOR globally), hash chain verification, PII masking at write time. @Auditable() wired into 48 state-changing endpoints across 11 controllers (company, member, invitation, share-class, shareholder, cap-table, transaction, funding-round, convertible, option-plan, kyc). EmailModule implemented (@Global export via EmailService) with MJML template compilation, variable interpolation with HTML escaping, locale fallback (pt-BR default), plain-text auto-generation from HTML; 4 base email templates (invitation, exercise-notification, export-ready, password-reset) in PT-BR and EN; MemberService wired to send invitation emails via SES (fire-and-forget with graceful degradation). KycModule implemented with KycController (5 endpoints), KycService (6 methods), VerifikService (4 API methods with native fetch + AbortController timeout), KycProcessor (Bull queue for async AML screening), CPF Modulo 11 validation, Levenshtein fuzzy name matching, image magic bytes validation, S3 KYC bucket with KMS encryption, EncryptionService for CPF encryption + blind index, @Auditable() on all state-changing endpoints, 18 i18n error messages, 192 tests. No `@sentry/nestjs`. **0 TODOs remaining in the backend** (previously 2 in member.service.ts, now replaced with EmailService calls).
+**Infrastructure**: Redis/Bull configured (`@nestjs/bull`, `bull`, `ioredis` installed; BullModule.forRootAsync in AppModule). SessionService for Redis-backed auth sessions (7-day absolute, 2-hour inactivity timeouts). AWS SDK configured (`@aws-sdk/client-s3`, `@aws-sdk/client-ses`, `@aws-sdk/client-kms`, `@aws-sdk/s3-request-presigner` installed; AwsModule @Global with S3Service, SesService, KmsService). CSRF middleware implemented (double-submit cookie pattern, `navia-csrf` cookie, `X-CSRF-Token` header validation). Helmet fully configured (including `permittedCrossDomainPolicies: false`). `redactPii()` utility implemented (`common/utils/redact-pii.ts`: maskCpf, maskCnpj, maskEmail, maskWallet, maskIp + redactPiiFromString; integrated with GlobalExceptionFilter for PII-safe logging; AuthService refactored to use centralized utility). Body size limits configured (1MB JSON, 1MB URL-encoded in main.ts). EncryptionModule implemented (@Global) with EncryptionService wrapping KmsService: encrypt/decrypt via KMS and HMAC-SHA256 blind indexes via BLIND_INDEX_KEY env var; graceful degradation with SHA-256 fallback when BLIND_INDEX_KEY is not set and plaintext fallback when KMS is unavailable. AuditLogModule implemented (@Global export via AuditLogService) with Bull queue async processing, @Auditable() decorator, AuditInterceptor (registered as APP_INTERCEPTOR globally), hash chain verification, PII masking at write time. @Auditable() wired into 53 state-changing endpoints across 12 controllers (company, member, invitation, share-class, shareholder, cap-table, transaction, funding-round, convertible, option-plan, kyc, document). EmailModule implemented (@Global export via EmailService) with MJML template compilation, variable interpolation with HTML escaping, locale fallback (pt-BR default), plain-text auto-generation from HTML; 4 base email templates (invitation, exercise-notification, export-ready, password-reset) in PT-BR and EN; MemberService wired to send invitation emails via SES (fire-and-forget with graceful degradation). KycModule implemented with KycController (5 endpoints), KycService (6 methods), VerifikService (4 API methods with native fetch + AbortController timeout), KycProcessor (Bull queue for async AML screening), CPF Modulo 11 validation, Levenshtein fuzzy name matching, image magic bytes validation, S3 KYC bucket with KMS encryption, EncryptionService for CPF encryption + blind index, @Auditable() on all state-changing endpoints, 18 i18n error messages, 192 tests. No `@sentry/nestjs`. **0 TODOs remaining in the backend** (previously 2 in member.service.ts, now replaced with EmailService calls).
 
 **Prisma schema**: 32 models, 36 enums. Models already present: AuditHashChain, ConsentRecord. Models missing: WaterfallScenario, ExportJob, ProfileDocumentDownload. User.locale field exists.
 
@@ -251,21 +251,26 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 - [x] User flow doc: `docs/user-flows/kyc-verification.md` (exists, needs update when backend is built)
 - _Depends on_: P1 AWS SDK (DONE), P1 Redis+Bull (DONE)
 
-### 3.4 Document Generation Module (spec: `document-generation.md`)
+### 3.4 Document Generation Module (spec: `document-generation.md`) — DONE (v0.0.29)
 
-- [ ] Create `backend/src/document/` module
-- [ ] Prisma models: Document, DocumentTemplate (already in schema)
-- [ ] Handlebars template engine for variable interpolation
-- [ ] Puppeteer for HTML → PDF conversion
-- [ ] DocumentService: generate, upload, list, getPresignedUrl, delete
-- [ ] DocumentController: CRUD + generate endpoint
-- [ ] 5 pre-seeded document templates: Contrato Social, Ata de Assembleia, Boletim de Subscrição, Acordo de Sócios, Termo de Cessão
-- [ ] Template variable resolution from company/shareholder/transaction data
-- [ ] S3 storage for generated documents
-- [ ] Draft → Generated flow with preview
-- [ ] Tests: service + controller specs
-- [ ] User flow doc: `docs/user-flows/document-generation.md`
-- _Depends on_: P1 AWS SDK (S3)
+- [x] Create `backend/src/document/` module — DONE: DocumentModule with MulterModule (10MB limit)
+- [x] Prisma models: Document, DocumentTemplate, DocumentSigner (already in schema) — DONE: used as-is
+- [x] Handlebars template engine for variable interpolation — DONE: with custom helpers (formatNumber, formatCurrency, formatDate, eq), one-time registration pattern
+- [x] Puppeteer for HTML → PDF conversion — DONE: headless Chrome with --no-sandbox, A4 format, 2cm margins, page numbers in footer, try/finally browser cleanup
+- [x] DocumentService: 12 methods (findAllTemplates, findTemplateById, createDraft, createAndGenerate, findAllDocuments, findDocumentById, updateDraft, generateFromDraft, getPreviewHtml, getDownloadUrl, uploadDocument, deleteDocument) + seedTemplatesForCompany — DONE
+- [x] DocumentController: 12 endpoints (2 template + 10 document) — DONE: list/get templates, list/get/create/draft/update/generate/preview/download/upload/delete documents. @Auditable on 5 state-changing endpoints. @Roles for permission control (ADMIN/LEGAL write, ADMIN/FINANCE/LEGAL read, ADMIN-only delete)
+- [x] 5 pre-seeded document templates: Acordo de Acionistas, Ata de Assembleia, Certificado de Ações, Carta de Outorga de Opções, Acordo de Investimento — DONE: full Handlebars content with formSchema validation
+- [x] Template variable resolution from form data with Handlebars helpers — DONE: formatNumber (pt-BR), formatCurrency (BRL), formatDate (pt-BR), eq comparison
+- [x] S3 storage for generated documents — DONE: via S3Service with graceful degradation when unavailable
+- [x] Draft → Generated flow with preview — DONE: createDraft → updateDraft → generateFromDraft, getPreviewHtml returns compiled HTML
+- [x] File upload with magic bytes validation (PDF/JPEG/PNG) — DONE: validateFileType + getFileExtension
+- [x] SHA-256 content hashing for document integrity — DONE: stored as contentHash
+- [x] Pre-signed download URLs with 15-minute expiry — DONE: via S3Service.generatePresignedUrl
+- [x] Form schema validation (required fields, empty arrays) — DONE: DOC_INCOMPLETE_FORM with missingFields details
+- [x] 12 i18n error messages in PT-BR + EN — DONE: doc.notFound, doc.templateNotFound, doc.generationFailed, doc.uploadTooLarge, doc.invalidFileType, doc.notDraft, doc.incompleteForm, doc.hasSignatures, doc.templateInactive, doc.notGenerated, documenttemplate.notFound
+- [x] Tests: 35 service tests + 22 controller tests = 57 tests — DONE
+- [x] User flow doc: `docs/user-flows/document-generation.md` — DONE
+- _Depends on_: P1 AWS SDK (S3) — DONE
 
 ### 3.5 Document Signatures Module (spec: `document-signatures.md`)
 
@@ -571,7 +576,7 @@ Models/enums that exist in specs but are missing from the schema:
 
 ## P6 — Documentation Debt
 
-### Missing User Flow Docs (13)
+### Missing User Flow Docs (12)
 
 - [ ] `docs/user-flows/company-cnpj-validation.md`
 - [ ] `docs/user-flows/company-profile.md`
@@ -583,7 +588,7 @@ Models/enums that exist in specs but are missing from the schema:
 - [ ] `docs/user-flows/reports-analytics.md`
 - [ ] `docs/user-flows/notifications.md`
 - [ ] `docs/user-flows/blockchain-integration.md`
-- [ ] `docs/user-flows/document-generation.md`
+- [x] `docs/user-flows/document-generation.md` — DONE (v0.0.29)
 - [ ] `docs/user-flows/document-signatures.md`
 - [ ] `docs/user-flows/audit-logging.md`
 
@@ -629,10 +634,10 @@ P1 Redis+Bull (DONE v0.0.16) ┬──→ P3.1 Notifications
 P1 AWS SDK (DONE v0.0.18) ──┬──→ P1 Email (SES)
                             ├──→ P1 EncryptionService (DONE)
                             ├──→ P3.3 KYC (DONE) (S3+KMS)
-                            ├──→ P3.4 Document Generation (S3)
+                            ├──→ P3.4 Document Generation (DONE v0.0.29) (S3)
                             └──→ P3.7 Dataroom (S3)
 
-P3.4 Document Generation ───→ P3.5 Document Signatures (+ P3.8 Blockchain)
+P3.4 Document Generation (DONE v0.0.29) ───→ P3.5 Document Signatures (+ P3.8 Blockchain)
 
 P3.6 Company Profile ───────→ P3.10 Litigation (auto-trigger on profile creation)
 
@@ -651,7 +656,7 @@ P4.1 Frontend Foundation ───→ All P4.x pages
 **Sprint 2**: P1 remaining (~~CSRF~~ DONE, ~~redactPii~~ DONE, Sentry, ~~Email~~ DONE, ~~EncryptionService~~ DONE, ~~body limits~~ DONE, ~~helmet gap~~ DONE, test infra deps), P2 Auth gaps (~~Redis lockout~~ DONE)
 **Sprint 3**: P3.1 Notifications (module built, WebSocket + cross-module integration pending), P3.2 Audit Logging (core module built — @Auditable decorator, AuditInterceptor, AuditService, Bull queue processor, controller with list/detail/verify; remaining: ClsModule before-state, daily hash chain job, DLQ monitoring, DB immutability trigger, partitioning, cross-module integration of all 50+ events, export)
 **Sprint 4**: ~~P3.3 KYC~~ DONE, ~~P3.14 CNPJ Validation~~ DONE, P2 Company gaps
-**Sprint 5**: P3.4 Document Generation, P3.7 Dataroom
+**Sprint 5**: ~~P3.4 Document Generation~~ DONE (v0.0.29), P3.7 Dataroom
 **Sprint 6**: P3.6 Company Profile, P3.10 Litigation
 **Sprint 7**: P3.8 Blockchain, P3.9 Blockchain Admin
 **Sprint 8**: P3.5 Document Signatures, P3.11 Reconciliation

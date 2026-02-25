@@ -22,6 +22,7 @@ Each document follows the template defined in `.claude/rules/user-flow-documenta
 | [Notifications](./notifications.md) | All authenticated users (any role) | Backend complete |
 | [Audit Logging](./audit-logging.md) | ADMIN (full access), LEGAL (full access), System (event capture + hash chain) | Backend complete |
 | [Company CNPJ Validation](./company-cnpj-validation.md) | ADMIN (creator), System (Bull queue, Verifik API) | Backend complete |
+| [Document Generation](./document-generation.md) | ADMIN (full CRUD + generate + delete), LEGAL (create + generate), FINANCE (read-only) | Backend complete |
 
 ## Cross-References
 
