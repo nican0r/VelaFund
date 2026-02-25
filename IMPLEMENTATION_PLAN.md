@@ -1,6 +1,6 @@
-# Navia MVP — Implementation Plan v32.0
+# Navia MVP — Implementation Plan v33.0
 
-> **Generated**: 2026-02-25 | **Tests**: 1731 passing (1704 backend + 27 frontend) | **Backend modules**: 22 of 23 built
+> **Generated**: 2026-02-25 | **Tests**: 1745 passing (1704 backend + 41 frontend) | **Backend modules**: 22 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -13,7 +13,7 @@
 
 **Entirely missing backend modules** (4): document-signatures, blockchain-integration, company-blockchain-admin, cap-table-reconciliation
 
-**Frontend**: Scaffolding only (layout shell, static mock pages, typed API client with hardcoded `Accept-Language: 'pt-BR'`). No Privy SDK, no next-intl, no shadcn/ui components, no functional pages, no tests (0 `.test.tsx` files).
+**Frontend**: P4.1 Foundation complete (Privy auth, next-intl v4, shadcn/ui, typed API client with CSRF/i18n/401 handling). P4.3 Dashboard Page complete (real API data via TanStack Query hooks, Recharts ownership donut chart, loading/empty/no-company states, full i18n). CompanyProvider context for selected company state with localStorage persistence. TypeScript types for API responses (`types/company.ts`). 41 tests across 5 test suites (dashboard page, ownership chart, error boundary, button, API client).
 
 **Infrastructure**: Redis/Bull configured (`@nestjs/bull`, `bull`, `ioredis` installed; BullModule.forRootAsync in AppModule). SessionService for Redis-backed auth sessions (7-day absolute, 2-hour inactivity timeouts). AWS SDK configured (`@aws-sdk/client-s3`, `@aws-sdk/client-ses`, `@aws-sdk/client-kms`, `@aws-sdk/s3-request-presigner` installed; AwsModule @Global with S3Service, SesService, KmsService). CSRF middleware implemented (double-submit cookie pattern, `navia-csrf` cookie, `X-CSRF-Token` header validation). Helmet fully configured (including `permittedCrossDomainPolicies: false`). `redactPii()` utility implemented (`common/utils/redact-pii.ts`: maskCpf, maskCnpj, maskEmail, maskWallet, maskIp + redactPiiFromString; integrated with GlobalExceptionFilter for PII-safe logging; AuthService refactored to use centralized utility). Body size limits configured (1MB JSON, 1MB URL-encoded in main.ts). EncryptionModule implemented (@Global) with EncryptionService wrapping KmsService: encrypt/decrypt via KMS and HMAC-SHA256 blind indexes via BLIND_INDEX_KEY env var; graceful degradation with SHA-256 fallback when BLIND_INDEX_KEY is not set and plaintext fallback when KMS is unavailable. AuditLogModule implemented (@Global export via AuditLogService) with Bull queue async processing, @Auditable() decorator, AuditInterceptor (registered as APP_INTERCEPTOR globally), hash chain verification, PII masking at write time. @Auditable() wired into 53 state-changing endpoints across 12 controllers (company, member, invitation, share-class, shareholder, cap-table, transaction, funding-round, convertible, option-plan, kyc, document). EmailModule implemented (@Global export via EmailService) with MJML template compilation, variable interpolation with HTML escaping, locale fallback (pt-BR default), plain-text auto-generation from HTML; 4 base email templates (invitation, exercise-notification, export-ready, password-reset) in PT-BR and EN; MemberService wired to send invitation emails via SES (fire-and-forget with graceful degradation). KycModule implemented with KycController (5 endpoints), KycService (6 methods), VerifikService (4 API methods with native fetch + AbortController timeout), KycProcessor (Bull queue for async AML screening), CPF Modulo 11 validation, Levenshtein fuzzy name matching, image magic bytes validation, S3 KYC bucket with KMS encryption, EncryptionService for CPF encryption + blind index, @Auditable() on all state-changing endpoints, 18 i18n error messages, 192 tests. No `@sentry/nestjs`. **0 TODOs remaining in the backend** (previously 2 in member.service.ts, now replaced with EmailService calls).
 
@@ -472,12 +472,16 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 
 ### 4.3 Dashboard Page
 
-- [ ] Replace mock data with real API calls (currently all hardcoded values: "1.000.000", "12", "3", "24")
-- [ ] Stat cards with real data from API (Total Shares, Shareholders, Share Classes, Last Transaction)
-- [ ] Ownership pie chart (Recharts donut — currently "Chart will be rendered here" placeholder) — `GET /companies/:id/cap-table`
-- [ ] Recent transactions table — `GET /companies/:id/transactions?limit=5` (currently hardcoded 5 rows)
-- [ ] Quick actions card (buttons currently have no onClick handlers)
-- [ ] Company switcher in topbar (user may belong to multiple companies)
+- [x] Replace mock data with real API calls (TanStack Query hooks: useCapTable, useRecentTransactions)
+- [x] Stat cards with real data from API (Total Shares, Shareholders, Share Classes, Transactions)
+- [x] Ownership pie chart (Recharts donut with top-6 shareholders + "Others" aggregation) — `GET /companies/:id/cap-table`
+- [x] Recent transactions table — `GET /companies/:id/transactions?limit=5` with type badges, shareholder names, formatted quantities/dates
+- [x] Quick actions card (Link components to /dashboard/transactions, /dashboard/shareholders, etc.)
+- [x] Company context provider (CompanyProvider with auto-selection, localStorage persistence, TanStack Query)
+- [x] Loading skeleton states, empty states, no-company state
+- [x] Full i18n (pt-BR + en) for all dashboard strings
+- [x] 13 component tests (8 dashboard page + 5 ownership chart)
+- [ ] Company switcher in topbar (user may belong to multiple companies — context exists, UI pending)
 
 ### 4.4 Cap Table Page (no page exists — sidebar links to 404)
 

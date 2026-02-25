@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import { Sidebar } from '@/components/layout/sidebar';
 import { MobileSidebar } from '@/components/layout/mobile-sidebar';
 import { Topbar } from '@/components/layout/topbar';
+import { CompanyProvider } from '@/lib/company-context';
 import { cn } from '@/lib/utils';
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -46,7 +47,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         )}
       >
         <div className="mx-auto max-w-[1280px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-          {children}
+          <CompanyProvider>{children}</CompanyProvider>
         </div>
       </main>
     </div>

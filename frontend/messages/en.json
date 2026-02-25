@@ -9,7 +9,46 @@
     "search": "Search"
   },
   "dashboard": {
-    "title": "Dashboard"
+    "description": "Overview of your company cap table and recent activity.",
+    "noCompany": {
+      "description": "Create a company to start managing your cap table.",
+      "title": "No company found"
+    },
+    "ownership": {
+      "description": "Share distribution by shareholder",
+      "empty": "No holdings recorded",
+      "others": "Others",
+      "title": "Ownership Distribution"
+    },
+    "quickActions": {
+      "addShareholder": "Add Shareholder",
+      "description": "Common tasks for cap table management",
+      "exportCapTable": "Export Cap Table",
+      "issueShares": "Issue Shares",
+      "recordTransfer": "Record Transfer",
+      "title": "Quick Actions"
+    },
+    "recentTransactions": {
+      "description": "Last 5 transactions",
+      "empty": "No transactions found",
+      "shares": "shares",
+      "title": "Recent Transactions",
+      "viewAll": "View all"
+    },
+    "stats": {
+      "shareClasses": "Share Classes",
+      "shareholders": "Shareholders",
+      "totalShares": "Total Shares",
+      "transactions": "Transactions"
+    },
+    "title": "Dashboard",
+    "types": {
+      "cancellation": "Cancellation",
+      "conversion": "Conversion",
+      "issuance": "Issuance",
+      "split": "Split",
+      "transfer": "Transfer"
+    }
   },
   "errors": {
     "auth": {

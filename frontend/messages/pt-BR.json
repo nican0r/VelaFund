@@ -9,7 +9,46 @@
     "search": "Buscar"
   },
   "dashboard": {
-    "title": "Painel"
+    "description": "Visão geral da tabela de capitalização e atividade recente.",
+    "noCompany": {
+      "description": "Crie uma empresa para começar a gerenciar sua tabela de capitalização.",
+      "title": "Nenhuma empresa encontrada"
+    },
+    "ownership": {
+      "description": "Distribuição de ações por acionista",
+      "empty": "Nenhuma participação registrada",
+      "others": "Outros",
+      "title": "Distribuição de Participação"
+    },
+    "quickActions": {
+      "addShareholder": "Adicionar Acionista",
+      "description": "Tarefas comuns para gestão da tabela de capitalização",
+      "exportCapTable": "Exportar Cap Table",
+      "issueShares": "Emitir Ações",
+      "recordTransfer": "Registrar Transferência",
+      "title": "Ações Rápidas"
+    },
+    "recentTransactions": {
+      "description": "Últimas 5 transações",
+      "empty": "Nenhuma transação encontrada",
+      "shares": "ações",
+      "title": "Transações Recentes",
+      "viewAll": "Ver todas"
+    },
+    "stats": {
+      "shareClasses": "Classes de Ações",
+      "shareholders": "Acionistas",
+      "totalShares": "Total de Ações",
+      "transactions": "Transações"
+    },
+    "title": "Painel",
+    "types": {
+      "cancellation": "Cancelamento",
+      "conversion": "Conversão",
+      "issuance": "Emissão",
+      "split": "Desdobramento",
+      "transfer": "Transferência"
+    }
   },
   "errors": {
     "auth": {
