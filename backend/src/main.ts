@@ -8,6 +8,7 @@ import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
+import { CsrfMiddleware } from './common/middleware/csrf.middleware';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -22,6 +23,7 @@ async function bootstrap() {
       frameguard: { action: 'deny' },
       noSniff: true,
       referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+      permittedCrossDomainPolicies: false,
       dnsPrefetchControl: { allow: false },
     }),
   );
@@ -36,7 +38,7 @@ async function bootstrap() {
         : []),
     ],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept-Language', 'X-Request-Id'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept-Language', 'X-Request-Id', 'X-CSRF-Token'],
     exposedHeaders: [
       'X-Request-Id',
       'X-RateLimit-Limit',
@@ -51,7 +53,11 @@ async function bootstrap() {
   app.use(cookieParser());
 
   // Global middleware
-  app.use(new RequestIdMiddleware().use.bind(new RequestIdMiddleware()));
+  const requestIdMiddleware = new RequestIdMiddleware();
+  app.use(requestIdMiddleware.use.bind(requestIdMiddleware));
+
+  const csrfMiddleware = new CsrfMiddleware();
+  app.use(csrfMiddleware.use.bind(csrfMiddleware));
 
   // Global pipes
   app.useGlobalPipes(

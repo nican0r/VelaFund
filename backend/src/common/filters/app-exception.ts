@@ -134,6 +134,10 @@ const MESSAGES: Record<string, Record<string, string>> = {
     'pt-BR': 'Documento não encontrado',
     en: 'Document not found',
   },
+  'errors.auth.csrfInvalid': {
+    'pt-BR': 'Token CSRF inválido',
+    en: 'Invalid CSRF token',
+  },
   'errors.auth.invalidToken': {
     'pt-BR': 'Token de autenticação inválido',
     en: 'Invalid authentication token',
