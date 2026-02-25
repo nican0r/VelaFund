@@ -55,6 +55,31 @@ export function useOptionPlan(
   });
 }
 
+interface CreateOptionPlanPayload {
+  name: string;
+  shareClassId: string;
+  totalPoolSize: string;
+  boardApprovalDate?: string;
+  terminationPolicy?: string;
+  exerciseWindowDays?: number;
+  notes?: string;
+}
+
+export function useCreateOptionPlan(companyId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: CreateOptionPlanPayload) =>
+      api.post<OptionPlan>(
+        `/api/v1/companies/${companyId}/option-plans`,
+        payload,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['optionPlans', companyId] });
+    },
+  });
+}
+
 export function useClosePlan(companyId: string | undefined) {
   const queryClient = useQueryClient();
 

@@ -488,7 +488,9 @@
       "cancelExerciseTitle": "Cancelar Exercício"
     },
     "create": "Novo Plano",
+    "createDescription": "Configure um novo plano de opções de ações para sua empresa.",
     "createGrant": "Nova Outorga",
+    "createTitle": "Criar Plano de Opções",
     "description": "Gerencie planos de opções, outorgas e exercícios de colaboradores.",
     "empty": "Nenhum plano de opções encontrado. Crie o primeiro plano para começar.",
     "emptyExercises": "Nenhuma solicitação de exercício encontrada.",
@@ -503,6 +505,38 @@
     "filter": {
       "allPlans": "Todos os planos",
       "allStatuses": "Todos os status"
+    },
+    "form": {
+      "boardApprovalDate": "Data de Aprovação do Conselho",
+      "boardApprovalDateHelp": "Data em que o conselho aprovou este plano de opções.",
+      "accelerationDescription": "Todas as opções não vestidas são aceleradas imediatamente no desligamento.",
+      "exerciseWindowDays": "Janela de Exercício (dias)",
+      "exerciseWindowDaysHelp": "Número de dias após o desligamento que o colaborador pode exercer opções vestidas (1–365).",
+      "forfeitureDescription": "Todas as opções não vestidas são perdidas no desligamento.",
+      "name": "Nome do Plano",
+      "namePlaceholder": "ex.: Plano de Opções de Ações 2026",
+      "notes": "Observações",
+      "notesPlaceholder": "Observações adicionais sobre o plano...",
+      "proRataDescription": "Uma proporção das opções não vestidas é acelerada no desligamento.",
+      "reviewBoardApprovalDate": "Data de Aprovação",
+      "reviewExerciseWindowDays": "Janela de Exercício",
+      "reviewExerciseWindowDaysSuffix": "dias",
+      "reviewName": "Nome do Plano",
+      "reviewNotes": "Observações",
+      "reviewShareClass": "Classe de Ações",
+      "reviewTerminationPolicy": "Política de Término",
+      "reviewTotalPoolSize": "Tamanho do Pool",
+      "sectionDetails": "Detalhes do Plano",
+      "sectionTerms": "Termos do Plano",
+      "shareClass": "Classe de Ações",
+      "shareClassPlaceholder": "Selecione uma classe de ações",
+      "stepDetails": "Detalhes",
+      "stepReview": "Revisão",
+      "terminationPolicy": "Política de Término",
+      "terminationPolicyHelp": "O que acontece com as opções não vestidas quando um colaborador é desligado.",
+      "totalPoolSize": "Tamanho Total do Pool",
+      "totalPoolSizePlaceholder": "ex.: 100000",
+      "totalPoolSizeHelp": "Número total de opções disponíveis para outorgas neste plano."
     },
     "frequency": {
       "annually": "Anual",
@@ -548,7 +582,8 @@
     "success": {
       "cancelled": "Outorga cancelada com sucesso",
       "cancelledExercise": "Exercício cancelado com sucesso",
-      "closed": "Plano encerrado com sucesso"
+      "closed": "Plano encerrado com sucesso",
+      "created": "Plano de opções criado com sucesso"
     },
     "table": {
       "available": "Disponíveis",

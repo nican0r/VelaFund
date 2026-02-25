@@ -488,7 +488,9 @@
       "cancelExerciseTitle": "Cancel Exercise"
     },
     "create": "New Plan",
+    "createDescription": "Configure a new stock option plan for your company.",
     "createGrant": "New Grant",
+    "createTitle": "Create Option Plan",
     "description": "Manage option plans, grants, and employee exercises.",
     "empty": "No option plans found. Create the first plan to get started.",
     "emptyExercises": "No exercise requests found.",
@@ -503,6 +505,38 @@
     "filter": {
       "allPlans": "All plans",
       "allStatuses": "All statuses"
+    },
+    "form": {
+      "boardApprovalDate": "Board Approval Date",
+      "boardApprovalDateHelp": "Date the board approved this option plan.",
+      "accelerationDescription": "All unvested options vest immediately upon termination.",
+      "exerciseWindowDays": "Exercise Window (days)",
+      "exerciseWindowDaysHelp": "Number of days after termination an employee can exercise vested options (1–365).",
+      "forfeitureDescription": "All unvested options are forfeited upon termination.",
+      "name": "Plan Name",
+      "namePlaceholder": "e.g., 2026 Employee Stock Option Plan",
+      "notes": "Notes",
+      "notesPlaceholder": "Additional notes about the plan...",
+      "proRataDescription": "A proportional amount of unvested options vest upon termination.",
+      "reviewBoardApprovalDate": "Board Approval Date",
+      "reviewExerciseWindowDays": "Exercise Window",
+      "reviewExerciseWindowDaysSuffix": "days",
+      "reviewName": "Plan Name",
+      "reviewNotes": "Notes",
+      "reviewShareClass": "Share Class",
+      "reviewTerminationPolicy": "Termination Policy",
+      "reviewTotalPoolSize": "Total Pool Size",
+      "sectionDetails": "Plan Details",
+      "sectionTerms": "Plan Terms",
+      "shareClass": "Share Class",
+      "shareClassPlaceholder": "Select a share class",
+      "stepDetails": "Details",
+      "stepReview": "Review",
+      "terminationPolicy": "Termination Policy",
+      "terminationPolicyHelp": "What happens to unvested options when an employee is terminated.",
+      "totalPoolSize": "Total Pool Size",
+      "totalPoolSizePlaceholder": "e.g., 100000",
+      "totalPoolSizeHelp": "Total number of options available for grants under this plan."
     },
     "frequency": {
       "annually": "Annually",
@@ -548,7 +582,8 @@
     "success": {
       "cancelled": "Grant cancelled successfully",
       "cancelledExercise": "Exercise cancelled successfully",
-      "closed": "Plan closed successfully"
+      "closed": "Plan closed successfully",
+      "created": "Option plan created successfully"
     },
     "table": {
       "available": "Available",
