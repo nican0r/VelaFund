@@ -502,6 +502,64 @@
       "quota": "Quotas"
     }
   },
+  "transactions": {
+    "actions": "Actions",
+    "confirm": {
+      "cancel": "Are you sure you want to cancel this transaction?",
+      "cancelDescription": "This action cannot be undone. Confirmed transactions cannot be cancelled.",
+      "cancelTitle": "Cancel Transaction"
+    },
+    "create": "New Transaction",
+    "description": "View and manage all company share transactions.",
+    "empty": "No transactions found. Create the first transaction to get started.",
+    "filter": {
+      "allStatuses": "All statuses",
+      "allTypes": "All types"
+    },
+    "noFrom": "—",
+    "pagination": {
+      "next": "Next",
+      "of": "of",
+      "page": "Page",
+      "previous": "Previous",
+      "showing": "Showing {from} to {to} of {total}"
+    },
+    "stats": {
+      "confirmed": "Confirmed",
+      "draft": "Drafts",
+      "pending": "Pending",
+      "total": "Total Transactions"
+    },
+    "status": {
+      "cancelled": "Cancelled",
+      "confirmed": "Confirmed",
+      "draft": "Draft",
+      "failed": "Failed",
+      "pendingApproval": "Pending",
+      "submitted": "Submitted"
+    },
+    "success": {
+      "cancelled": "Transaction cancelled successfully"
+    },
+    "table": {
+      "date": "Date",
+      "from": "From",
+      "quantity": "Quantity",
+      "shareClass": "Class",
+      "status": "Status",
+      "to": "To",
+      "type": "Type",
+      "value": "Value"
+    },
+    "title": "Transactions",
+    "type": {
+      "cancellation": "Cancellation",
+      "conversion": "Conversion",
+      "issuance": "Issuance",
+      "split": "Split",
+      "transfer": "Transfer"
+    }
+  },
   "shareholders": {
     "actions": "Actions",
     "confirm": {

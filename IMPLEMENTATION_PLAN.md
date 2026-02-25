@@ -1,6 +1,6 @@
-# Navia MVP — Implementation Plan v36.0
+# Navia MVP — Implementation Plan v37.0
 
-> **Generated**: 2026-02-25 | **Tests**: 1811 passing (1704 backend + 107 frontend) | **Backend modules**: 22 of 23 built
+> **Generated**: 2026-02-25 | **Tests**: 1836 passing (1704 backend + 132 frontend) | **Backend modules**: 22 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -13,7 +13,7 @@
 
 **Entirely missing backend modules** (4): document-signatures, blockchain-integration, company-blockchain-admin, cap-table-reconciliation
 
-**Frontend**: P4.1 Foundation complete (Privy auth, next-intl v4, shadcn/ui, typed API client with CSRF/i18n/401 handling). P4.3 Dashboard Page complete. P4.4 Cap Table Page complete (3-tab view, data tables, export, 5 TanStack Query hooks). P4.5 Shareholders Page complete (list table, search/filters, CPF masking, delete dialog). P4.6 Share Classes Page (list) complete (4 stat cards, type filter, data table with 8 columns, delete confirmation, pagination, 22 tests). CompanyProvider context for selected company state with localStorage persistence. TypeScript types for API responses (`types/company.ts`). 107 tests across 8 test suites.
+**Frontend**: P4.1 Foundation complete (Privy auth, next-intl v4, shadcn/ui, typed API client with CSRF/i18n/401 handling). P4.3 Dashboard Page complete. P4.4 Cap Table Page complete (3-tab view, data tables, export, 5 TanStack Query hooks). P4.5 Shareholders Page complete (list table, search/filters, CPF masking, delete dialog). P4.6 Share Classes Page (list) complete (4 stat cards, type filter, data table with 8 columns, delete confirmation, pagination, 22 tests). P4.7 Transactions Page (list) complete (4 stat cards, type+status filters, 9-column data table with type/status badges, cancel dialog, pagination, BRL currency formatting, 25 tests). CompanyProvider context for selected company state with localStorage persistence. TypeScript types for API responses (`types/company.ts`). 132 tests across 9 test suites.
 
 **Infrastructure**: Redis/Bull configured (`@nestjs/bull`, `bull`, `ioredis` installed; BullModule.forRootAsync in AppModule). SessionService for Redis-backed auth sessions (7-day absolute, 2-hour inactivity timeouts). AWS SDK configured (`@aws-sdk/client-s3`, `@aws-sdk/client-ses`, `@aws-sdk/client-kms`, `@aws-sdk/s3-request-presigner` installed; AwsModule @Global with S3Service, SesService, KmsService). CSRF middleware implemented (double-submit cookie pattern, `navia-csrf` cookie, `X-CSRF-Token` header validation). Helmet fully configured (including `permittedCrossDomainPolicies: false`). `redactPii()` utility implemented (`common/utils/redact-pii.ts`: maskCpf, maskCnpj, maskEmail, maskWallet, maskIp + redactPiiFromString; integrated with GlobalExceptionFilter for PII-safe logging; AuthService refactored to use centralized utility). Body size limits configured (1MB JSON, 1MB URL-encoded in main.ts). EncryptionModule implemented (@Global) with EncryptionService wrapping KmsService: encrypt/decrypt via KMS and HMAC-SHA256 blind indexes via BLIND_INDEX_KEY env var; graceful degradation with SHA-256 fallback when BLIND_INDEX_KEY is not set and plaintext fallback when KMS is unavailable. AuditLogModule implemented (@Global export via AuditLogService) with Bull queue async processing, @Auditable() decorator, AuditInterceptor (registered as APP_INTERCEPTOR globally), hash chain verification, PII masking at write time. @Auditable() wired into 53 state-changing endpoints across 12 controllers (company, member, invitation, share-class, shareholder, cap-table, transaction, funding-round, convertible, option-plan, kyc, document). EmailModule implemented (@Global export via EmailService) with MJML template compilation, variable interpolation with HTML escaping, locale fallback (pt-BR default), plain-text auto-generation from HTML; 4 base email templates (invitation, exercise-notification, export-ready, password-reset) in PT-BR and EN; MemberService wired to send invitation emails via SES (fire-and-forget with graceful degradation). KycModule implemented with KycController (5 endpoints), KycService (6 methods), VerifikService (4 API methods with native fetch + AbortController timeout), KycProcessor (Bull queue for async AML screening), CPF Modulo 11 validation, Levenshtein fuzzy name matching, image magic bytes validation, S3 KYC bucket with KMS encryption, EncryptionService for CPF encryption + blind index, @Auditable() on all state-changing endpoints, 18 i18n error messages, 192 tests. No `@sentry/nestjs`. **0 TODOs remaining in the backend** (previously 2 in member.service.ts, now replaced with EmailService calls).
 
@@ -518,9 +518,19 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 - [ ] Create share class form with entity type compatibility checks
 - [ ] Share class detail: stats, holders list, rights summary
 
-### 4.7 Transactions Page (no page exists)
+### 4.7 Transactions Page
 
-- [ ] Transaction list with type filter badges, status filter, date range
+- [x] Transaction list page with type filter, status filter, pagination, and sorting
+- [x] 4 stat cards (Total Transactions, Confirmed, Pending, Drafts) with ocean-600 highlighted active card
+- [x] 9-column data table (Date, Type, From, To, Class, Quantity, Value, Status, Actions)
+- [x] Type badges with color coding (Issuance=green, Transfer=blue, Conversion=cream, Cancellation=red, Split=gray)
+- [x] Status badges with color coding (Draft=gray, Pending=cream, Submitted=blue, Confirmed=green, Failed=red, Cancelled=gray)
+- [x] Cancel confirmation dialog with conditional cancel button (only DRAFT, PENDING_APPROVAL, SUBMITTED, FAILED)
+- [x] BRL currency formatting and pt-BR number formatting
+- [x] useTransactions, useTransaction, useCancelTransaction TanStack Query hooks
+- [x] transactions i18n namespace (~50 keys, PT-BR + EN)
+- [x] Sidebar nav item with ArrowLeftRight icon (already wired)
+- [x] 25 component tests (all passing)
 - [ ] Create transaction flow (multi-step: Select Type → Details → Review → Confirm)
   - [ ] Issuance form
   - [ ] Transfer form with ROFR check

@@ -502,6 +502,64 @@
       "quota": "Quotas"
     }
   },
+  "transactions": {
+    "actions": "Ações",
+    "confirm": {
+      "cancel": "Tem certeza que deseja cancelar esta transação?",
+      "cancelDescription": "Esta ação não pode ser desfeita. Transações confirmadas não podem ser canceladas.",
+      "cancelTitle": "Cancelar Transação"
+    },
+    "create": "Nova Transação",
+    "description": "Visualize e gerencie todas as transações de ações da empresa.",
+    "empty": "Nenhuma transação registrada. Crie a primeira transação para começar.",
+    "filter": {
+      "allStatuses": "Todos os status",
+      "allTypes": "Todos os tipos"
+    },
+    "noFrom": "—",
+    "pagination": {
+      "next": "Próxima",
+      "of": "de",
+      "page": "Página",
+      "previous": "Anterior",
+      "showing": "Mostrando {from} a {to} de {total}"
+    },
+    "stats": {
+      "confirmed": "Confirmadas",
+      "draft": "Rascunhos",
+      "pending": "Pendentes",
+      "total": "Total de Transações"
+    },
+    "status": {
+      "cancelled": "Cancelado",
+      "confirmed": "Confirmado",
+      "draft": "Rascunho",
+      "failed": "Falhou",
+      "pendingApproval": "Pendente",
+      "submitted": "Enviado"
+    },
+    "success": {
+      "cancelled": "Transação cancelada com sucesso"
+    },
+    "table": {
+      "date": "Data",
+      "from": "De",
+      "quantity": "Quantidade",
+      "shareClass": "Classe",
+      "status": "Status",
+      "to": "Para",
+      "type": "Tipo",
+      "value": "Valor"
+    },
+    "title": "Transações",
+    "type": {
+      "cancellation": "Cancelamento",
+      "conversion": "Conversão",
+      "issuance": "Emissão",
+      "split": "Desdobramento",
+      "transfer": "Transferência"
+    }
+  },
   "shareholders": {
     "actions": "Ações",
     "confirm": {
