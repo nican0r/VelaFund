@@ -16,6 +16,7 @@ import { TransactionModule } from './transaction/transaction.module';
 import { FundingRoundModule } from './funding-round/funding-round.module';
 import { OptionPlanModule } from './option-plan/option-plan.module';
 import { ConvertibleModule } from './convertible/convertible.module';
+import { AwsModule } from './aws/aws.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { ConvertibleModule } from './convertible/convertible.module';
       }),
     }),
     RedisModule,
+    AwsModule,
     PrismaModule,
     HealthModule,
     AuthModule,

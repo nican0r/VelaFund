@@ -1,6 +1,6 @@
 # Navia MVP — Implementation Plan v21.0
 
-> **Generated**: 2026-02-24 | **Tests**: 677 passing | **Backend modules**: 12 of 23 built
+> **Generated**: 2026-02-24 | **Tests**: 734 passing | **Backend modules**: 12 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -15,7 +15,7 @@
 
 **Frontend**: Scaffolding only (layout shell, static mock pages, typed API client with hardcoded `Accept-Language: 'pt-BR'`). No Privy SDK, no next-intl, no shadcn/ui components, no functional pages, no tests (0 `.test.tsx` files).
 
-**Infrastructure**: Redis/Bull configured (`@nestjs/bull`, `bull`, `ioredis` installed; BullModule.forRootAsync in AppModule). SessionService for Redis-backed auth sessions (7-day absolute, 2-hour inactivity timeouts). No AWS SDK (`@aws-sdk/*` not in package.json), no `@sentry/nestjs`, no EncryptionService, no CSRF middleware, no `redactPii()` utility, no body size limits, no email sending.
+**Infrastructure**: Redis/Bull configured (`@nestjs/bull`, `bull`, `ioredis` installed; BullModule.forRootAsync in AppModule). SessionService for Redis-backed auth sessions (7-day absolute, 2-hour inactivity timeouts). AWS SDK configured (`@aws-sdk/client-s3`, `@aws-sdk/client-ses`, `@aws-sdk/client-kms`, `@aws-sdk/s3-request-presigner` installed; AwsModule @Global with S3Service, SesService, KmsService). No `@sentry/nestjs`, no EncryptionService, no CSRF middleware, no `redactPii()` utility, no body size limits, no email sending.
 
 **Prisma schema**: 32 models, 36 enums. Models already present: AuditHashChain, ConsentRecord. Models missing: WaterfallScenario, ExportJob, ProfileDocumentDownload. User.locale field exists.
 
@@ -40,13 +40,13 @@ These are prerequisites for many downstream features.
   - _Unlocks_: audit logging, notifications, email sending, daily interest accrual, async CNPJ validation, export jobs, session store
   - _Session store_: SessionService (v0.0.17) uses REDIS_CLIENT for auth sessions (7-day absolute, 2-hour inactivity)
 
-- [ ] **AWS SDK integration**
-  - [ ] Add `@aws-sdk/client-s3`, `@aws-sdk/client-ses`, `@aws-sdk/client-kms`, `@aws-sdk/s3-request-presigner` (none currently in package.json)
-  - [ ] Create `AwsModule` with S3Service, SesService, KmsService as injectable providers
-  - [ ] AWS credentials already in `.env.example` — add to backend ConfigModule validation
-  - [ ] S3Service: upload, download, delete, generatePresignedUrl (15-min expiry)
-  - [ ] SesService: sendTemplatedEmail with locale-aware template selection
-  - [ ] KmsService: encrypt, decrypt (AES-256-GCM via KMS)
+- [x] **AWS SDK integration** — DONE: Added `@aws-sdk/client-s3`, `@aws-sdk/client-ses`, `@aws-sdk/client-kms`, `@aws-sdk/s3-request-presigner`. Created `AwsModule` (@Global) with S3Service (upload, download, delete, generatePresignedUrl with 15-min default expiry, checkBucketHealth), SesService (sendEmail, sendTemplatedEmail with variable interpolation), KmsService (encrypt, decrypt via AES-256-GCM). All services gracefully degrade when AWS credentials are not configured. HealthController updated to report S3 status. 57 new tests (734 total passing).
+  - [x] Add `@aws-sdk/client-s3`, `@aws-sdk/client-ses`, `@aws-sdk/client-kms`, `@aws-sdk/s3-request-presigner` — DONE
+  - [x] Create `AwsModule` with S3Service, SesService, KmsService as injectable providers — DONE: @Global module in backend/src/aws/
+  - [x] AWS credentials already in `.env.example` — add to backend ConfigModule validation — DONE: services read AWS_REGION, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY via ConfigService
+  - [x] S3Service: upload, download, delete, generatePresignedUrl (15-min expiry) — DONE: plus checkBucketHealth, KMS SSE support, metadata support
+  - [x] SesService: sendTemplatedEmail with locale-aware template selection — DONE: sendEmail + sendTemplatedEmail with {{variable}} interpolation
+  - [x] KmsService: encrypt, decrypt (AES-256-GCM via KMS) — DONE: with custom key ARN override support
   - _Unlocks_: document storage, email sending, PII encryption, KYC document storage
 
 - [ ] **EncryptionService + Blind Index**
@@ -622,7 +622,7 @@ P1 Redis+Bull (DONE v0.0.16) ┬──→ P3.1 Notifications
                               ├──→ P2 Convertible daily accrual job
                               └──→ P0 BUG-1 session fix (DONE v0.0.17)
 
-P1 AWS SDK ─────────────────┬──→ P1 Email (SES)
+P1 AWS SDK (DONE v0.0.18) ──┬──→ P1 Email (SES)
                             ├──→ P1 EncryptionService (KMS)
                             ├──→ P3.3 KYC (S3+KMS)
                             ├──→ P3.4 Document Generation (S3)
@@ -643,7 +643,7 @@ P4.1 Frontend Foundation ───→ All P4.x pages
 
 ## Recommended Implementation Order
 
-**Sprint 1**: P0 bugs (BUG-1 DONE v0.0.17; BUG-2–6 DONE v0.0.15), P1 Redis+Bull (DONE v0.0.16), P1 AWS SDK
+**Sprint 1**: P0 bugs (BUG-1 DONE v0.0.17; BUG-2–6 DONE v0.0.15), P1 Redis+Bull (DONE v0.0.16), P1 AWS SDK (DONE v0.0.18)
 **Sprint 2**: P1 remaining (CSRF, redactPii, Sentry, Email, EncryptionService, body limits, helmet gap, test infra deps), P2 Auth gaps
 **Sprint 3**: P3.1 Notifications, P3.2 Audit Logging
 **Sprint 4**: P3.3 KYC, P3.14 CNPJ Validation, P2 Company gaps

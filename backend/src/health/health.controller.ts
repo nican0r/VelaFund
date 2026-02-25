@@ -4,6 +4,7 @@ import Redis from 'ioredis';
 import { PrismaService } from '../prisma/prisma.service';
 import { Public } from '../auth/decorators/public.decorator';
 import { REDIS_CLIENT } from '../redis/redis.constants';
+import { S3Service } from '../aws/s3.service';
 
 @ApiTags('Health')
 @Controller('api/v1/health')
@@ -11,6 +12,7 @@ export class HealthController {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis | null,
+    private readonly s3Service: S3Service,
   ) {}
 
   @Get()
@@ -30,6 +32,7 @@ export class HealthController {
       services: {
         database: dbHealthy ? 'up' : 'down',
         redis: this.redis ? (redisHealthy ? 'up' : 'down') : 'unconfigured',
+        s3: this.s3Service.isAvailable() ? 'configured' : 'unconfigured',
       },
     };
   }
