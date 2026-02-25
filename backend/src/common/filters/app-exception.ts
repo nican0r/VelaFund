@@ -746,6 +746,15 @@ const MESSAGES: Record<string, Record<string, string>> = {
     'pt-BR': 'CNPJ não encontrado na base de dados judicial',
     en: 'CNPJ not found in litigation database',
   },
+  // ─── EXIT WATERFALL MESSAGES ────────────────────────────────────────────
+  'errors.waterfallscenario.notFound': {
+    'pt-BR': 'Cenário de waterfall não encontrado',
+    en: 'Waterfall scenario not found',
+  },
+  'errors.waterfall.scenarioLimit': {
+    'pt-BR': 'Limite máximo de cenários salvos atingido (máximo: 50)',
+    en: 'Maximum number of saved scenarios reached (limit: 50)',
+  },
 };
 
 export class AppException extends Error {

@@ -1,6 +1,6 @@
-# Navia MVP — Implementation Plan v29.0
+# Navia MVP — Implementation Plan v30.0
 
-> **Generated**: 2026-02-25 | **Tests**: 1581 passing | **Backend modules**: 20 of 23 built
+> **Generated**: 2026-02-25 | **Tests**: 1617 passing | **Backend modules**: 21 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -9,15 +9,15 @@
 
 ## Current State
 
-**Built backend modules** (20): auth (with Redis sessions + Redis-backed failed-attempt lockout), company, member, share-class, shareholder, cap-table, transaction, funding-round, option-plan (with exercises), convertible, notification, audit-log, email, kyc, document, company-profile, company-dataroom, company-litigation
+**Built backend modules** (21): auth (with Redis sessions + Redis-backed failed-attempt lockout), company, member, share-class, shareholder, cap-table, transaction, funding-round, option-plan (with exercises), convertible, notification, audit-log, email, kyc, document, company-profile, company-dataroom, company-litigation, exit-waterfall
 
-**Entirely missing backend modules** (6): document-signatures, blockchain-integration, company-blockchain-admin, cap-table-reconciliation, reports-analytics, exit-waterfall
+**Entirely missing backend modules** (5): document-signatures, blockchain-integration, company-blockchain-admin, cap-table-reconciliation, reports-analytics
 
 **Frontend**: Scaffolding only (layout shell, static mock pages, typed API client with hardcoded `Accept-Language: 'pt-BR'`). No Privy SDK, no next-intl, no shadcn/ui components, no functional pages, no tests (0 `.test.tsx` files).
 
 **Infrastructure**: Redis/Bull configured (`@nestjs/bull`, `bull`, `ioredis` installed; BullModule.forRootAsync in AppModule). SessionService for Redis-backed auth sessions (7-day absolute, 2-hour inactivity timeouts). AWS SDK configured (`@aws-sdk/client-s3`, `@aws-sdk/client-ses`, `@aws-sdk/client-kms`, `@aws-sdk/s3-request-presigner` installed; AwsModule @Global with S3Service, SesService, KmsService). CSRF middleware implemented (double-submit cookie pattern, `navia-csrf` cookie, `X-CSRF-Token` header validation). Helmet fully configured (including `permittedCrossDomainPolicies: false`). `redactPii()` utility implemented (`common/utils/redact-pii.ts`: maskCpf, maskCnpj, maskEmail, maskWallet, maskIp + redactPiiFromString; integrated with GlobalExceptionFilter for PII-safe logging; AuthService refactored to use centralized utility). Body size limits configured (1MB JSON, 1MB URL-encoded in main.ts). EncryptionModule implemented (@Global) with EncryptionService wrapping KmsService: encrypt/decrypt via KMS and HMAC-SHA256 blind indexes via BLIND_INDEX_KEY env var; graceful degradation with SHA-256 fallback when BLIND_INDEX_KEY is not set and plaintext fallback when KMS is unavailable. AuditLogModule implemented (@Global export via AuditLogService) with Bull queue async processing, @Auditable() decorator, AuditInterceptor (registered as APP_INTERCEPTOR globally), hash chain verification, PII masking at write time. @Auditable() wired into 53 state-changing endpoints across 12 controllers (company, member, invitation, share-class, shareholder, cap-table, transaction, funding-round, convertible, option-plan, kyc, document). EmailModule implemented (@Global export via EmailService) with MJML template compilation, variable interpolation with HTML escaping, locale fallback (pt-BR default), plain-text auto-generation from HTML; 4 base email templates (invitation, exercise-notification, export-ready, password-reset) in PT-BR and EN; MemberService wired to send invitation emails via SES (fire-and-forget with graceful degradation). KycModule implemented with KycController (5 endpoints), KycService (6 methods), VerifikService (4 API methods with native fetch + AbortController timeout), KycProcessor (Bull queue for async AML screening), CPF Modulo 11 validation, Levenshtein fuzzy name matching, image magic bytes validation, S3 KYC bucket with KMS encryption, EncryptionService for CPF encryption + blind index, @Auditable() on all state-changing endpoints, 18 i18n error messages, 192 tests. No `@sentry/nestjs`. **0 TODOs remaining in the backend** (previously 2 in member.service.ts, now replaced with EmailService calls).
 
-**Prisma schema**: 32 models, 36 enums. Models already present: AuditHashChain, ConsentRecord. Models missing: WaterfallScenario, ExportJob, ProfileDocumentDownload. User.locale field exists.
+**Prisma schema**: 33 models, 36 enums. Models already present: AuditHashChain, ConsentRecord, WaterfallScenario. Models missing: ExportJob, ProfileDocumentDownload. User.locale field exists.
 
 ---
 
@@ -379,19 +379,21 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 - [ ] User flow doc: `docs/user-flows/cap-table-reconciliation.md`
 - _Depends on_: P3.8 Blockchain Integration, P1 Redis+Bull
 
-### 3.12 Exit Waterfall Module (spec: `exit-waterfall.md`)
+### 3.12 Exit Waterfall Module (spec: `exit-waterfall.md`) — DONE (v0.0.33)
 
-- [ ] Create `backend/src/exit-waterfall/` module
-- [ ] Prisma model: WaterfallScenario (**missing from schema** — needs migration)
-- [ ] WaterfallService: createScenario, calculateWaterfall, compareScenarios, breakeven
-- [ ] WaterfallController: CRUD + calculate + compare endpoints
-- [ ] 7-step liquidation preference algorithm (per spec)
-- [ ] Participating vs non-participating preferred, participation cap handling
-- [ ] Breakeven analysis (binary search, ≤100 iterations)
-- [ ] Optional inclusion of vested unexercised options and as-if-converted convertibles
-- [ ] Scenario comparison (side-by-side waterfall at different valuations)
-- [ ] Tests: service + controller specs
-- [ ] User flow doc: `docs/user-flows/exit-waterfall.md`
+- [x] Create `backend/src/exit-waterfall/` module (ExitWaterfallModule, ExitWaterfallController, ExitWaterfallService, 2 DTOs)
+- [x] Prisma model: WaterfallScenario (added to schema with Company + User relations)
+- [x] ExitWaterfallService: runWaterfall, saveScenario, listScenarios, getScenario, deleteScenario, executeWaterfall (public for testing)
+- [x] ExitWaterfallController: 5 endpoints (run waterfall, save/list/get/delete scenarios) at `/api/v1/companies/:companyId/reports/waterfall`
+- [x] 7-step liquidation preference algorithm (per spec): load share classes → validate order → include options → include convertibles → determine stacking → execute waterfall → compute breakeven
+- [x] Participating vs non-participating preferred, participation cap handling with excess redistribution
+- [x] Breakeven analysis (binary search, ≤100 iterations, R$0.01 tolerance)
+- [x] Optional inclusion of vested unexercised options and as-if-converted convertibles (with discount/cap pricing)
+- [ ] Scenario comparison (side-by-side waterfall at different valuations) — deferred to reports-analytics module
+- [x] Tests: 29 service + 7 controller = 36 tests
+- [x] User flow doc: `docs/user-flows/exit-waterfall.md`
+- [x] i18n: 2 backend error messages, ~33 frontend translation keys (errors.waterfall + reports.waterfall namespaces)
+- [x] @Roles('ADMIN') on all endpoints, @Throttle decorators (write: 30/min, read: 100/min)
 
 ### 3.13 Reports & Analytics Module (spec: `reports-analytics.md`)
 
@@ -569,7 +571,7 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 
 Models/enums that exist in specs but are missing from the schema:
 
-- [ ] `WaterfallScenario` model — for exit waterfall scenarios (exit-waterfall.md)
+- [x] `WaterfallScenario` model — for exit waterfall scenarios (exit-waterfall.md) — DONE (v0.0.33)
 - [ ] `ExportJob` model + `ExportFormat` enum + `ExportStatus` enum — for async report exports (reports-analytics.md)
 - [ ] `ProfileDocumentDownload` model — for dataroom access tracking (company-dataroom.md)
 - [ ] Add `lastBlockchainSyncAt` and `lastBlockchainHash` fields to Company model (cap-table-reconciliation.md)
@@ -593,7 +595,7 @@ Models/enums that exist in specs but are missing from the schema:
 - [ ] `docs/user-flows/company-litigation.md`
 - [ ] `docs/user-flows/company-blockchain-admin.md`
 - [ ] `docs/user-flows/cap-table-reconciliation.md`
-- [ ] `docs/user-flows/exit-waterfall.md`
+- [x] `docs/user-flows/exit-waterfall.md` — DONE (v0.0.33)
 - [ ] `docs/user-flows/reports-analytics.md`
 - [ ] `docs/user-flows/notifications.md`
 - [ ] `docs/user-flows/blockchain-integration.md`

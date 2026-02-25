@@ -39,6 +39,7 @@ model User {
   notifications             Notification[]
   notificationPreferences   UserNotificationPreferences?
   profileDocuments          ProfileDocument[]  @relation("ProfileDocumentUploader")
+  waterfallScenarios        WaterfallScenario[]
 
   @@index([cpfBlindIndex])
   @@index([privyUserId])
@@ -134,6 +135,7 @@ model Company {
   documentTemplates DocumentTemplate[]
   auditLogs         AuditLog[]
   capTableSnapshots CapTableSnapshot[]
+  waterfallScenarios WaterfallScenario[]
   profile           CompanyProfile?
 
   @@index([cnpj])
@@ -1240,4 +1242,28 @@ model AuditHashChain {
   computedAt   DateTime @map("computed_at")
 
   @@map("audit_hash_chain")
+}
+
+// =============================================================================
+// EXIT WATERFALL SCENARIOS
+// =============================================================================
+
+model WaterfallScenario {
+  id                  String   @id @default(uuid())
+  companyId           String   @map("company_id")
+  createdById         String   @map("created_by_id")
+  name                String
+  exitAmount          Decimal  @map("exit_amount") @db.Decimal(20, 2)
+  includeOptions      Boolean  @default(true) @map("include_options")
+  includeConvertibles Boolean  @default(true) @map("include_convertibles")
+  shareClassOrder     String[] @map("share_class_order")
+  resultData          Json     @map("result_data")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  // Relations
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy User    @relation(fields: [createdById], references: [id])
+
+  @@index([companyId, createdAt])
+  @@map("waterfall_scenarios")
 }

@@ -117,6 +117,10 @@
     },
     "val": {
       "invalidInput": "Dados de entrada inválidos"
+    },
+    "waterfall": {
+      "scenarioNotFound": "Cenário de waterfall não encontrado",
+      "scenarioLimit": "Limite máximo de cenários salvos atingido (máximo: 50)"
     }
   },
   "litigation": {
@@ -247,5 +251,42 @@
       "VESTING_MILESTONE": "Marco de vesting: {percentage}% alcançado"
     },
     "viewAll": "Ver todas as notificações"
+  },
+  "reports": {
+    "waterfall": {
+      "title": "Waterfall de Saída",
+      "description": "Modele cenários de saída e veja como os rendimentos seriam distribuídos entre os acionistas",
+      "exitAmount": "Valor de Saída",
+      "includeOptions": "Incluir opções vestidas",
+      "includeConvertibles": "Incluir conversíveis",
+      "customOrder": "Usar ordem personalizada",
+      "stackingOrder": "Ordem de preferência",
+      "runButton": "Executar Waterfall",
+      "saveButton": "Salvar Cenário",
+      "loadingResults": "Calculando distribuição...",
+      "emptyState": "Configure os parâmetros e execute o waterfall para ver os resultados",
+      "breakeven": {
+        "title": "Ponto de Equilíbrio",
+        "description": "Valor de saída de {value} no qual ações ordinárias superam as preferenciais por ação"
+      },
+      "table": {
+        "shareClass": "Classe de Ação",
+        "totalShares": "Total de Ações",
+        "liquidationPreference": "Preferência de Liquidação",
+        "participation": "Participação",
+        "totalProceeds": "Total Recebido",
+        "perShare": "Por Ação",
+        "roiMultiple": "Múltiplo ROI"
+      },
+      "scenarios": {
+        "title": "Cenários Salvos",
+        "save": "Salvar",
+        "delete": "Excluir",
+        "confirmDelete": "Tem certeza que deseja excluir este cenário?",
+        "nameLabel": "Nome do Cenário",
+        "namePlaceholder": "Ex: Cenário Otimista",
+        "limit": "Limite máximo de cenários atingido"
+      }
+    }
   }
 }
