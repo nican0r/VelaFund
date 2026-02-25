@@ -1,6 +1,6 @@
 # Navia MVP — Implementation Plan v22.0
 
-> **Generated**: 2026-02-25 | **Tests**: 854 passing | **Backend modules**: 12 of 23 built
+> **Generated**: 2026-02-25 | **Tests**: 905 passing | **Backend modules**: 13 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -9,9 +9,9 @@
 
 ## Current State
 
-**Built backend modules** (12): auth (with Redis sessions), company, member, share-class, shareholder, cap-table, transaction, funding-round, option-plan (with exercises), convertible
+**Built backend modules** (13): auth (with Redis sessions), company, member, share-class, shareholder, cap-table, transaction, funding-round, option-plan (with exercises), convertible, notification
 
-**Entirely missing backend modules** (13): kyc, notification, document-generation, document-signatures, audit-logging, blockchain-integration, company-profile, company-dataroom, company-litigation, company-blockchain-admin, cap-table-reconciliation, reports-analytics, exit-waterfall
+**Entirely missing backend modules** (12): kyc, document-generation, document-signatures, audit-logging, blockchain-integration, company-profile, company-dataroom, company-litigation, company-blockchain-admin, cap-table-reconciliation, reports-analytics, exit-waterfall
 
 **Frontend**: Scaffolding only (layout shell, static mock pages, typed API client with hardcoded `Accept-Language: 'pt-BR'`). No Privy SDK, no next-intl, no shadcn/ui components, no functional pages, no tests (0 `.test.tsx` files).
 
@@ -196,16 +196,16 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 
 ### 3.1 Notification Module (spec: `notifications.md`)
 
-- [ ] Create `backend/src/notification/` module
-- [ ] Prisma model: Notification (already in schema), UserNotificationPreferences (already in schema)
-- [ ] Bull queue: `notification` queue for async delivery
-- [ ] NotificationService: create, markRead, markAllRead, getUserNotifications
-- [ ] NotificationController: 7 endpoints per spec (list, unread count, mark read, mark all read, preferences, update preferences, delete)
-- [ ] 22 notification types per spec catalog
-- [ ] Critical notifications: cannot be disabled (COMPANY_ROLE_CHANGED, COMPANY_MEMBER_REMOVED, etc.)
+- [x] Create `backend/src/notification/` module
+- [x] Prisma model: Notification (already in schema), UserNotificationPreferences (already in schema, fundingRounds field added)
+- [x] Bull queue: `notification` queue for async delivery
+- [x] NotificationService: create, markRead, markAllRead, getUserNotifications
+- [x] NotificationController: 7 endpoints per spec (list, unread count, get detail, mark read, mark all read, preferences, update preferences, delete)
+- [x] 22 notification types per spec catalog (mapped to categories in create-notification.dto.ts)
+- [x] Critical notifications: cannot be disabled (KYC_COMPLETED, KYC_REJECTED, KYC_RESUBMISSION)
 - [ ] NotificationGateway: WebSocket for real-time push (optional MVP, can defer)
 - [ ] Integrate with all existing modules: trigger notifications on key events
-- [ ] Tests: service + controller specs
+- [x] Tests: service + controller + processor specs (51 tests)
 - [ ] User flow doc: `docs/user-flows/notifications.md`
 
 ### 3.2 Audit Logging Module (spec: `.claude/rules/audit-logging.md`)
@@ -645,7 +645,7 @@ P4.1 Frontend Foundation ───→ All P4.x pages
 
 **Sprint 1**: P0 bugs (BUG-1 DONE v0.0.17; BUG-2–6 DONE v0.0.15), P1 Redis+Bull (DONE v0.0.16), P1 AWS SDK (DONE v0.0.18)
 **Sprint 2**: P1 remaining (~~CSRF~~ DONE, ~~redactPii~~ DONE, Sentry, Email, ~~EncryptionService~~ DONE, ~~body limits~~ DONE, ~~helmet gap~~ DONE, test infra deps), P2 Auth gaps
-**Sprint 3**: P3.1 Notifications, P3.2 Audit Logging
+**Sprint 3**: P3.1 Notifications (module built, WebSocket + cross-module integration pending), P3.2 Audit Logging
 **Sprint 4**: P3.3 KYC, P3.14 CNPJ Validation, P2 Company gaps
 **Sprint 5**: P3.4 Document Generation, P3.7 Dataroom
 **Sprint 6**: P3.6 Company Profile, P3.10 Litigation

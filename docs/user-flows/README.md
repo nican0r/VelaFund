@@ -19,6 +19,7 @@ Each document follows the template defined in `.claude/rules/user-flow-documenta
 | [Convertible Instruments](./convertible-instruments.md) | ADMIN (full CRUD + convert/redeem/cancel), FINANCE (read + scenarios), LEGAL (read-only) | Backend complete |
 | [KYC Verification](./kyc-verification.md) | Authenticated user (all roles), System (Verifik, AML screening), Compliance team | Frontend spec complete |
 | [User Permissions](./user-permissions.md) | All roles (ADMIN, FINANCE, LEGAL, INVESTOR, EMPLOYEE) | Frontend spec complete |
+| [Notifications](./notifications.md) | All authenticated users (any role) | Backend complete |
 
 ## Cross-References
 

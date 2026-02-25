@@ -29,6 +29,10 @@
       "cnpjDuplicate": "CNPJ already registered",
       "notFound": "Company not found"
     },
+    "notification": {
+      "notFound": "Notification not found",
+      "preferencesInvalid": "Cannot disable security notifications"
+    },
     "opt": {
       "cliffExceedsVesting": "Cliff period cannot exceed total vesting duration",
       "companyNotActive": "Company must be active to manage option plans",
@@ -73,5 +77,77 @@
     "val": {
       "invalidInput": "Invalid input data"
     }
+  },
+  "notifications": {
+    "clearFilters": "Clear filters",
+    "description": "View and manage your notifications",
+    "empty": "No notifications",
+    "emptyDescription": "When important events happen, you'll see them here.",
+    "emptyFiltered": "No notifications match your filters",
+    "filters": {
+      "all": "All",
+      "allTypes": "All types",
+      "documents": "Documents",
+      "fundingRounds": "Funding Rounds",
+      "kyc": "KYC",
+      "options": "Options",
+      "readOnly": "Read only",
+      "search": "Search notifications...",
+      "security": "Security",
+      "transactions": "Transactions",
+      "unreadOnly": "Unread only"
+    },
+    "loadError": "Failed to load notifications",
+    "markAllRead": "Mark all as read",
+    "markAllReadSuccess": "All notifications marked as read",
+    "preferences": {
+      "description": "Choose which notifications you want to receive",
+      "documents": "Documents",
+      "documentsDescription": "Signature requests, document completions",
+      "fundingRounds": "Funding Rounds",
+      "fundingRoundsDescription": "Invitations, commitments, closings",
+      "options": "Options",
+      "optionsDescription": "Grants, vesting milestones, exercises",
+      "save": "Save Preferences",
+      "saveSuccess": "Preferences updated successfully",
+      "security": "Security",
+      "securityDescription": "Login alerts, KYC updates",
+      "securityLocked": "Security notifications cannot be disabled",
+      "title": "Notification Preferences",
+      "transactions": "Transactions",
+      "transactionsDescription": "Share issuances, transfers, confirmations"
+    },
+    "retry": "Retry",
+    "time": {
+      "daysAgo": "{count}d",
+      "hoursAgo": "{count}h",
+      "minutesAgo": "{count}m",
+      "now": "now"
+    },
+    "title": "Notifications",
+    "types": {
+      "DILUTION_EVENT": "Significant dilution event",
+      "DOCUMENT_DECLINED": "Signature declined",
+      "DOCUMENT_FULLY_SIGNED": "Document fully signed",
+      "DOCUMENT_SIGNED": "Document signed",
+      "KYC_COMPLETED": "KYC verification approved",
+      "KYC_REJECTED": "KYC verification rejected",
+      "KYC_RESUBMISSION": "KYC resubmission required",
+      "OPTION_EXERCISE_COMPLETED": "Option exercise completed",
+      "OPTION_EXERCISE_REQUESTED": "Option exercise requested",
+      "OPTION_GRANTED": "Options granted",
+      "OPTIONS_EXPIRING": "Options expiring in {days} days",
+      "ROUND_CLOSED": "Round closed",
+      "ROUND_CLOSING_SOON": "Round closing soon",
+      "ROUND_INVITATION": "Funding round invitation",
+      "SHAREHOLDER_ADDED": "New shareholder added",
+      "SHAREHOLDER_REMOVED": "Shareholder removed",
+      "SHARES_ISSUED": "{quantity} {shareClass} shares issued",
+      "SHARES_TRANSFERRED": "Shares transferred",
+      "SIGNATURE_REQUEST": "Document requires your signature",
+      "TRANSACTION_FAILED": "Transaction failed",
+      "VESTING_MILESTONE": "Vesting milestone: {percentage}% reached"
+    },
+    "viewAll": "View all notifications"
   }
 }

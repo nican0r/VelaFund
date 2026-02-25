@@ -29,6 +29,10 @@
       "cnpjDuplicate": "CNPJ já cadastrado",
       "notFound": "Empresa não encontrada"
     },
+    "notification": {
+      "notFound": "Notificação não encontrada",
+      "preferencesInvalid": "Não é possível desativar notificações de segurança"
+    },
     "opt": {
       "cliffExceedsVesting": "Período de cliff não pode exceder o período total de vesting",
       "companyNotActive": "A empresa deve estar ativa para gerenciar planos de opções",
@@ -73,5 +77,77 @@
     "val": {
       "invalidInput": "Dados de entrada inválidos"
     }
+  },
+  "notifications": {
+    "clearFilters": "Limpar filtros",
+    "description": "Veja e gerencie suas notificações",
+    "empty": "Nenhuma notificação",
+    "emptyDescription": "Quando eventos importantes acontecerem, você verá aqui.",
+    "emptyFiltered": "Nenhuma notificação encontrada com esses filtros",
+    "filters": {
+      "all": "Todas",
+      "allTypes": "Todos os tipos",
+      "documents": "Documentos",
+      "fundingRounds": "Rodadas",
+      "kyc": "KYC",
+      "options": "Opções",
+      "readOnly": "Apenas lidas",
+      "search": "Buscar notificações...",
+      "security": "Segurança",
+      "transactions": "Transações",
+      "unreadOnly": "Apenas não lidas"
+    },
+    "loadError": "Falha ao carregar notificações",
+    "markAllRead": "Marcar todas como lidas",
+    "markAllReadSuccess": "Todas as notificações foram marcadas como lidas",
+    "preferences": {
+      "description": "Escolha quais notificações você deseja receber",
+      "documents": "Documentos",
+      "documentsDescription": "Solicitações de assinatura, documentos finalizados",
+      "fundingRounds": "Rodadas de Investimento",
+      "fundingRoundsDescription": "Convites, compromissos, encerramentos",
+      "options": "Opções",
+      "optionsDescription": "Concessões, marcos de vesting, exercícios",
+      "save": "Salvar Preferências",
+      "saveSuccess": "Preferências atualizadas com sucesso",
+      "security": "Segurança",
+      "securityDescription": "Alertas de login, atualizações de KYC",
+      "securityLocked": "Notificações de segurança não podem ser desativadas",
+      "title": "Preferências de Notificação",
+      "transactions": "Transações",
+      "transactionsDescription": "Emissões de ações, transferências, confirmações"
+    },
+    "retry": "Tentar novamente",
+    "time": {
+      "daysAgo": "{count}d",
+      "hoursAgo": "{count}h",
+      "minutesAgo": "{count}m",
+      "now": "agora"
+    },
+    "title": "Notificações",
+    "types": {
+      "DILUTION_EVENT": "Evento de diluição significativo",
+      "DOCUMENT_DECLINED": "Assinatura recusada",
+      "DOCUMENT_FULLY_SIGNED": "Documento totalmente assinado",
+      "DOCUMENT_SIGNED": "Documento assinado",
+      "KYC_COMPLETED": "Verificação KYC aprovada",
+      "KYC_REJECTED": "Verificação KYC rejeitada",
+      "KYC_RESUBMISSION": "Reenvio de KYC necessário",
+      "OPTION_EXERCISE_COMPLETED": "Exercício de opções concluído",
+      "OPTION_EXERCISE_REQUESTED": "Exercício de opções solicitado",
+      "OPTION_GRANTED": "Opções concedidas",
+      "OPTIONS_EXPIRING": "Opções expiram em {days} dias",
+      "ROUND_CLOSED": "Rodada encerrada",
+      "ROUND_CLOSING_SOON": "Rodada fecha em breve",
+      "ROUND_INVITATION": "Convite para rodada de investimento",
+      "SHAREHOLDER_ADDED": "Novo acionista adicionado",
+      "SHAREHOLDER_REMOVED": "Acionista removido",
+      "SHARES_ISSUED": "{quantity} ações {shareClass} emitidas",
+      "SHARES_TRANSFERRED": "Ações transferidas",
+      "SIGNATURE_REQUEST": "Contrato requer sua assinatura",
+      "TRANSACTION_FAILED": "Transação falhou",
+      "VESTING_MILESTONE": "Marco de vesting: {percentage}% alcançado"
+    },
+    "viewAll": "Ver todas as notificações"
   }
 }

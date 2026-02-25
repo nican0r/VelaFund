@@ -529,6 +529,15 @@ const MESSAGES: Record<string, Record<string, string>> = {
     'pt-BR': 'Conversão excede o total autorizado da classe de ações',
     en: 'Conversion would exceed the authorized total of the share class',
   },
+  // Notification errors
+  'errors.notification.notFound': {
+    'pt-BR': 'Notificação não encontrada',
+    en: 'Notification not found',
+  },
+  'errors.notification.preferencesInvalid': {
+    'pt-BR': 'Não é possível desativar notificações de segurança',
+    en: 'Cannot disable security notifications',
+  },
 };
 
 export class AppException extends Error {

@@ -1126,6 +1126,7 @@ model UserNotificationPreferences {
   transactions  Boolean @default(true)
   documents     Boolean @default(true)
   options       Boolean @default(true)
+  fundingRounds Boolean @default(true) @map("funding_rounds")
   security      Boolean @default(true)
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
