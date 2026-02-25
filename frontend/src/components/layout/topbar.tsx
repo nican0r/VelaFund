@@ -4,6 +4,8 @@ import { Bell, Search, Menu, ChevronDown, LogOut } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
+import { useUnreadCount } from '@/hooks/use-notifications';
+import { NotificationDropdown } from '@/components/notifications/notification-dropdown';
 
 interface TopbarProps {
   onMenuClick: () => void;
@@ -36,7 +38,12 @@ function getUserDisplayName(firstName: string | null, lastName: string | null, e
 export function Topbar({ onMenuClick, sidebarCollapsed }: TopbarProps) {
   const { user, logout } = useAuth();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  const { data: unreadData } = useUnreadCount();
+  const unreadCount = unreadData?.count ?? 0;
 
   const initials = getUserInitials(user?.firstName ?? null, user?.lastName ?? null, user?.email ?? null);
   const displayName = getUserDisplayName(user?.firstName ?? null, user?.lastName ?? null, user?.email ?? null);
@@ -90,17 +97,25 @@ export function Topbar({ onMenuClick, sidebarCollapsed }: TopbarProps) {
       {/* Right section: notifications + user */}
       <div className="flex items-center gap-x-2">
         {/* Notification bell */}
-        <button
-          className="relative rounded-lg p-2 text-gray-500 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-700"
-          aria-label="Notifications"
-        >
-          <Bell className="h-5 w-5" />
-          {/* Unread badge — will be wired to real notification count later */}
-          <span className="absolute right-1.5 top-1.5 flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
-          </span>
-        </button>
+        <div className="relative" ref={notifRef}>
+          <button
+            onClick={() => setNotificationsOpen(!notificationsOpen)}
+            className="relative rounded-lg p-2 text-gray-500 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-700"
+            aria-label="Notifications"
+            aria-expanded={notificationsOpen}
+          >
+            <Bell className="h-5 w-5" />
+            {unreadCount > 0 && (
+              <span className="absolute right-1 top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </button>
+          <NotificationDropdown
+            open={notificationsOpen}
+            onClose={() => setNotificationsOpen(false)}
+          />
+        </div>
 
         {/* Divider */}
         <div className="mx-1 h-6 w-px bg-gray-200" />

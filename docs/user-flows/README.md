@@ -20,7 +20,7 @@ Each document follows the template defined in `.claude/rules/user-flow-documenta
 | [Convertible Instruments — Frontend List Page](./convertible-instruments-frontend.md) | ADMIN (view + filter + cancel), FINANCE (view + filter), LEGAL (view + filter) | Frontend list page complete |
 | [KYC Verification](./kyc-verification.md) | Authenticated user (all roles), System (Verifik, AML screening), Compliance team | Backend complete |
 | [User Permissions](./user-permissions.md) | All roles (ADMIN, FINANCE, LEGAL, INVESTOR, EMPLOYEE) | Frontend spec complete |
-| [Notifications](./notifications.md) | All authenticated users (any role) | Backend complete |
+| [Notifications](./notifications.md) | All authenticated users (any role) | Backend + Frontend complete |
 | [Audit Logging](./audit-logging.md) | ADMIN (full access), LEGAL (full access), System (event capture + hash chain) | Backend complete |
 | [Company CNPJ Validation](./company-cnpj-validation.md) | ADMIN (creator), System (Bull queue, Verifik API) | Backend complete |
 | [Document Generation](./document-generation.md) | ADMIN (full CRUD + generate + delete), LEGAL (create + generate), FINANCE (read-only) | Backend complete |

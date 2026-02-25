@@ -501,6 +501,63 @@ export interface ConversionScenarios {
   scenarios: ConversionScenario[];
 }
 
+// Notification types returned by GET /api/v1/users/me/notifications
+export type NotificationType =
+  | 'SIGNATURE_REQUEST'
+  | 'DOCUMENT_SIGNED'
+  | 'DOCUMENT_FULLY_SIGNED'
+  | 'DOCUMENT_DECLINED'
+  | 'SHARES_ISSUED'
+  | 'SHARES_TRANSFERRED'
+  | 'TRANSACTION_FAILED'
+  | 'SHAREHOLDER_ADDED'
+  | 'SHAREHOLDER_REMOVED'
+  | 'DILUTION_EVENT'
+  | 'OPTION_GRANTED'
+  | 'VESTING_MILESTONE'
+  | 'OPTION_EXERCISE_REQUESTED'
+  | 'OPTION_EXERCISE_COMPLETED'
+  | 'OPTIONS_EXPIRING'
+  | 'ROUND_INVITATION'
+  | 'ROUND_CLOSING_SOON'
+  | 'ROUND_CLOSED'
+  | 'KYC_COMPLETED'
+  | 'KYC_REJECTED'
+  | 'KYC_RESUBMISSION';
+
+export type NotificationCategory =
+  | 'documents'
+  | 'transactions'
+  | 'options'
+  | 'fundingRounds'
+  | 'security';
+
+export interface Notification {
+  id: string;
+  notificationType: NotificationType;
+  subject: string;
+  body: string;
+  status: 'PENDING' | 'SENT' | 'FAILED' | 'BOUNCED';
+  read: boolean;
+  readAt: string | null;
+  relatedEntityType: string | null;
+  relatedEntityId: string | null;
+  companyId: string | null;
+  companyName: string | null;
+  createdAt: string;
+}
+
+export interface NotificationPreferences {
+  categories: {
+    transactions: boolean;
+    documents: boolean;
+    options: boolean;
+    fundingRounds: boolean;
+    security: boolean;
+  };
+  updatedAt: string;
+}
+
 // Company member types returned by GET /api/v1/companies/:id/members
 export type MemberRole = 'ADMIN' | 'FINANCE' | 'LEGAL' | 'INVESTOR' | 'EMPLOYEE';
 export type MemberStatus = 'PENDING' | 'ACTIVE' | 'REMOVED';

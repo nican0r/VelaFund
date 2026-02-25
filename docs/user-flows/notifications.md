@@ -527,6 +527,63 @@ All notification endpoints are user-scoped (`/api/v1/users/me/notifications/*`).
 
 ---
 
+## Frontend UI (P4.13)
+
+### Notification Bell (Topbar)
+- Bell icon in topbar header with numeric unread count badge (red circle, capped at "99+")
+- Badge hidden when count is 0
+- `useUnreadCount()` hook polls every 30 seconds via TanStack Query `refetchInterval`
+- Clicking bell opens `NotificationDropdown` panel
+
+### Notification Dropdown (Topbar Panel)
+- Absolute-positioned panel (380px wide) below bell icon
+- Shows 5 most recent notifications sorted by `-createdAt`
+- Each item: type-colored icon dot, subject text, relative time (e.g., "2m ago"), company name
+- Unread items have blue-tinted background (`bg-blue-50/30`)
+- "Mark as read" button per unread item (Check icon)
+- "Mark all as read" button in header (when any unread)
+- "View all notifications" link to `/dashboard/notifications` page
+- Loading skeletons (3 skeleton items)
+- Empty state with Bell icon + description text
+- Closes on outside click (mousedown event listener)
+
+### Notifications Page (`/dashboard/notifications`)
+- **Two-tab layout**: All Notifications | Preferences
+- **All tab**:
+  - Read status filter dropdown: All / Unread only / Read only
+  - Category filter dropdown: All types / Transactions / Documents / Options / Funding Rounds / Security (client-side filtering via TYPE_CATEGORY_MAP)
+  - "Clear filters" link when any filter active
+  - "Mark all as read" button (when unread exist)
+  - Notification list in rounded card: icon dot + subject + body (2-line clamp) + formatted date (pt-BR dd/MM/yyyy HH:mm) + company name + type badge
+  - Per-item actions: Mark as read (Check icon, unread only) + Delete (Trash2 icon)
+  - Delete confirmation dialog (overlay modal)
+  - Pagination: "1–20 / 45" text + prev/next buttons (hidden when single page)
+  - Loading skeletons (5 items)
+  - Error state with retry button
+  - Empty state (generic or filtered-specific with "Clear filters" action)
+- **Preferences tab**:
+  - 5 category rows: Security, Transactions, Documents, Options, Funding Rounds
+  - Each row: colored icon, category label, description text, toggle switch
+  - Security row: Lock icon, disabled toggle, "cannot be disabled" text
+  - Save button appears only after toggling a preference
+  - Loading skeletons while fetching preferences
+
+### Sidebar Navigation
+- "Notifications" nav item added to both desktop sidebar (`sidebar.tsx`) and mobile sidebar (`mobile-sidebar.tsx`)
+- Uses Bell icon from lucide-react
+- Active state detection via `pathname.startsWith('/dashboard/notifications')`
+- Mobile sidebar synced with desktop sidebar (added missing Share Classes, Funding Rounds, Convertibles items)
+
+### i18n
+- All user-facing strings use `useTranslations('notifications')` from next-intl
+- Keys in `notifications.*` namespace in both `messages/pt-BR.json` and `messages/en.json`
+- Includes: title, description, filters, types (21 notification type labels), time (relative), preferences (5 categories + descriptions + save), empty/error/loading states
+
+### Tests
+- `notification-dropdown.test.tsx`: 15 tests (rendering, loading, empty, items, actions, navigation)
+- `page.test.tsx`: 38 tests (header, tabs, notification list, filters, actions, pagination, preferences)
+- Total: 53 new tests
+
 ## MVP Scope
 
 The notification module is **IN_APP only** for the MVP. Email delivery is not implemented. The channel field is always set to `IN_APP`. Future iterations may add email delivery based on user locale and SES integration.

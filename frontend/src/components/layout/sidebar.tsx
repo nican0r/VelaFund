@@ -12,6 +12,7 @@ import {
   Repeat,
   Gift,
   FileText,
+  Bell,
   Settings,
   HelpCircle,
   LogOut,
@@ -37,6 +38,7 @@ const menuItems: NavItem[] = [
   { label: 'Convertibles', href: '/dashboard/convertibles', icon: Repeat },
   { label: 'Options', href: '/dashboard/options', icon: Gift },
   { label: 'Documents', href: '/dashboard/documents', icon: FileText },
+  { label: 'Notifications', href: '/dashboard/notifications', icon: Bell },
 ];
 
 const generalItems: NavItem[] = [

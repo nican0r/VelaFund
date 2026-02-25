@@ -7,10 +7,13 @@ import {
   LayoutDashboard,
   Table2,
   Users,
+  Layers,
   ArrowLeftRight,
   TrendingUp,
+  Repeat,
   Gift,
   FileText,
+  Bell,
   Settings,
   HelpCircle,
   LogOut,
@@ -29,10 +32,13 @@ const menuItems: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Cap Table', href: '/dashboard/cap-table', icon: Table2 },
   { label: 'Shareholders', href: '/dashboard/shareholders', icon: Users },
+  { label: 'Share Classes', href: '/dashboard/share-classes', icon: Layers },
   { label: 'Transactions', href: '/dashboard/transactions', icon: ArrowLeftRight },
-  { label: 'Investments', href: '/dashboard/investments', icon: TrendingUp },
+  { label: 'Funding Rounds', href: '/dashboard/funding-rounds', icon: TrendingUp },
+  { label: 'Convertibles', href: '/dashboard/convertibles', icon: Repeat },
   { label: 'Options', href: '/dashboard/options', icon: Gift },
   { label: 'Documents', href: '/dashboard/documents', icon: FileText },
+  { label: 'Notifications', href: '/dashboard/notifications', icon: Bell },
 ];
 
 const generalItems: NavItem[] = [

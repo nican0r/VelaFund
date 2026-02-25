@@ -1002,6 +1002,7 @@
   },
   "notifications": {
     "clearFilters": "Clear filters",
+    "deleteSuccess": "Notification deleted",
     "description": "View and manage your notifications",
     "empty": "No notifications",
     "emptyDescription": "When important events happen, you'll see them here.",
