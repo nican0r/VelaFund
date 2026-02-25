@@ -119,6 +119,65 @@
       "transfer": "Transferência"
     }
   },
+  "convertibles": {
+    "actions": "Ações",
+    "confirm": {
+      "cancel": "Cancelar Instrumento",
+      "cancelDescription": "Tem certeza que deseja cancelar este instrumento conversível? Esta ação não pode ser desfeita.",
+      "cancelTitle": "Cancelar Instrumento"
+    },
+    "create": "Novo Conversível",
+    "description": "Visualize e gerencie instrumentos conversíveis — mútuos, investimento anjo e mais.",
+    "empty": "Nenhum instrumento conversível encontrado. Crie o primeiro para começar.",
+    "filter": {
+      "allStatuses": "Todos os status",
+      "allTypes": "Todos os tipos"
+    },
+    "instrumentType": {
+      "investimentoAnjo": "Investimento Anjo",
+      "mais": "MAIS",
+      "misto": "Misto",
+      "mutuoConversivel": "Mútuo Conversível"
+    },
+    "interestType": {
+      "compound": "Composto",
+      "simple": "Simples"
+    },
+    "pagination": {
+      "next": "Próxima",
+      "of": "de",
+      "page": "Página",
+      "previous": "Anterior",
+      "showing": "Mostrando {from} a {to} de {total}"
+    },
+    "stats": {
+      "accruedInterest": "Juros Acumulados",
+      "outstanding": "Vigentes",
+      "total": "Total de Instrumentos",
+      "totalPrincipal": "Principal Total"
+    },
+    "status": {
+      "cancelled": "Cancelado",
+      "converted": "Convertido",
+      "matured": "Vencido",
+      "outstanding": "Vigente",
+      "redeemed": "Resgatado"
+    },
+    "success": {
+      "cancelled": "Instrumento cancelado com sucesso"
+    },
+    "table": {
+      "accruedInterest": "Juros Acum.",
+      "interestRate": "Taxa de Juros",
+      "investor": "Investidor",
+      "issueDate": "Data Emissão",
+      "maturityDate": "Vencimento",
+      "principal": "Principal",
+      "status": "Status",
+      "type": "Tipo"
+    },
+    "title": "Instrumentos Conversíveis"
+  },
   "fundingRounds": {
     "actions": "Ações",
     "confirm": {

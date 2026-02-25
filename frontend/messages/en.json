@@ -119,6 +119,65 @@
       "transfer": "Transfer"
     }
   },
+  "convertibles": {
+    "actions": "Actions",
+    "confirm": {
+      "cancel": "Cancel Instrument",
+      "cancelDescription": "Are you sure you want to cancel this convertible instrument? This action cannot be undone.",
+      "cancelTitle": "Cancel Instrument"
+    },
+    "create": "New Convertible",
+    "description": "View and manage convertible instruments — convertible notes, angel investments, and more.",
+    "empty": "No convertible instruments found. Create the first one to get started.",
+    "filter": {
+      "allStatuses": "All statuses",
+      "allTypes": "All types"
+    },
+    "instrumentType": {
+      "investimentoAnjo": "Angel Investment",
+      "mais": "MAIS",
+      "misto": "Mixed",
+      "mutuoConversivel": "Convertible Note"
+    },
+    "interestType": {
+      "compound": "Compound",
+      "simple": "Simple"
+    },
+    "pagination": {
+      "next": "Next",
+      "of": "of",
+      "page": "Page",
+      "previous": "Previous",
+      "showing": "Showing {from} to {to} of {total}"
+    },
+    "stats": {
+      "accruedInterest": "Accrued Interest",
+      "outstanding": "Outstanding",
+      "total": "Total Instruments",
+      "totalPrincipal": "Total Principal"
+    },
+    "status": {
+      "cancelled": "Cancelled",
+      "converted": "Converted",
+      "matured": "Matured",
+      "outstanding": "Outstanding",
+      "redeemed": "Redeemed"
+    },
+    "success": {
+      "cancelled": "Instrument cancelled successfully"
+    },
+    "table": {
+      "accruedInterest": "Accrued Int.",
+      "interestRate": "Interest Rate",
+      "investor": "Investor",
+      "issueDate": "Issue Date",
+      "maturityDate": "Maturity",
+      "principal": "Principal",
+      "status": "Status",
+      "type": "Type"
+    },
+    "title": "Convertible Instruments"
+  },
   "fundingRounds": {
     "actions": "Actions",
     "confirm": {

@@ -278,7 +278,7 @@ function PlansTab({
   pageLoading,
 }: {
   companyId: string | undefined;
-  t: (key: string, params?: Record<string, unknown>) => string;
+  t: (key: string, params?: Record<string, string | number | Date>) => string;
   pageLoading: boolean;
 }) {
   const [statusFilter, setStatusFilter] = useState('');
@@ -546,7 +546,7 @@ function GrantsTab({
   pageLoading,
 }: {
   companyId: string | undefined;
-  t: (key: string, params?: Record<string, unknown>) => string;
+  t: (key: string, params?: Record<string, string | number | Date>) => string;
   pageLoading: boolean;
 }) {
   const [statusFilter, setStatusFilter] = useState('');
@@ -818,7 +818,7 @@ function ExercisesTab({
   pageLoading,
 }: {
   companyId: string | undefined;
-  t: (key: string, params?: Record<string, unknown>) => string;
+  t: (key: string, params?: Record<string, string | number | Date>) => string;
   pageLoading: boolean;
 }) {
   const [statusFilter, setStatusFilter] = useState('');

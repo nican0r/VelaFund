@@ -313,6 +313,51 @@ export interface OptionExerciseRequest {
   };
 }
 
+// Convertible Instrument types returned by GET /api/v1/companies/:id/convertibles
+export type InstrumentType = 'MUTUO_CONVERSIVEL' | 'INVESTIMENTO_ANJO' | 'MISTO' | 'MAIS';
+export type ConvertibleStatus = 'OUTSTANDING' | 'CONVERTED' | 'REDEEMED' | 'MATURED' | 'CANCELLED';
+export type InterestType = 'SIMPLE' | 'COMPOUND';
+export type ConversionTrigger = 'QUALIFIED_FINANCING' | 'MATURITY' | 'CHANGE_OF_CONTROL' | 'INVESTOR_OPTION';
+
+export interface ConvertibleInstrument {
+  id: string;
+  companyId: string;
+  shareholderId: string;
+  instrumentType: InstrumentType;
+  status: ConvertibleStatus;
+  principalAmount: string;
+  interestRate: string;
+  interestType: InterestType;
+  accruedInterest: string;
+  valuationCap: string | null;
+  discountRate: string | null;
+  qualifiedFinancingThreshold: string | null;
+  conversionTrigger: ConversionTrigger | null;
+  targetShareClassId: string | null;
+  autoConvert: boolean;
+  mfnClause: boolean;
+  issueDate: string;
+  maturityDate: string;
+  convertedAt: string | null;
+  redeemedAt: string | null;
+  cancelledAt: string | null;
+  conversionData: Record<string, unknown> | null;
+  notes: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  shareholder?: {
+    id: string;
+    name: string;
+    type: string;
+  };
+  targetShareClass?: {
+    id: string;
+    className: string;
+    type: string;
+  } | null;
+}
+
 export interface Transaction {
   id: string;
   companyId: string;

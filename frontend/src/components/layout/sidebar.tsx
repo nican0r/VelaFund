@@ -9,6 +9,7 @@ import {
   Layers,
   ArrowLeftRight,
   TrendingUp,
+  Repeat,
   Gift,
   FileText,
   Settings,
@@ -33,6 +34,7 @@ const menuItems: NavItem[] = [
   { label: 'Share Classes', href: '/dashboard/share-classes', icon: Layers },
   { label: 'Transactions', href: '/dashboard/transactions', icon: ArrowLeftRight },
   { label: 'Funding Rounds', href: '/dashboard/funding-rounds', icon: TrendingUp },
+  { label: 'Convertibles', href: '/dashboard/convertibles', icon: Repeat },
   { label: 'Options', href: '/dashboard/options', icon: Gift },
   { label: 'Documents', href: '/dashboard/documents', icon: FileText },
 ];

@@ -17,6 +17,7 @@ Each document follows the template defined in `.claude/rules/user-flow-documenta
 | [Funding Rounds](./funding-rounds.md) | ADMIN (full lifecycle + commitments), FINANCE (read + payment updates), LEGAL (read-only) | Backend complete |
 | [Option Plans, Grants & Exercises](./option-plans.md) | ADMIN (full CRUD + close/cancel + exercise confirm/cancel), FINANCE/LEGAL (read-only) | Backend complete, Frontend list page complete |
 | [Convertible Instruments](./convertible-instruments.md) | ADMIN (full CRUD + convert/redeem/cancel), FINANCE (read + scenarios), LEGAL (read-only) | Backend complete |
+| [Convertible Instruments — Frontend List Page](./convertible-instruments-frontend.md) | ADMIN (view + filter + cancel), FINANCE (view + filter), LEGAL (view + filter) | Frontend list page complete |
 | [KYC Verification](./kyc-verification.md) | Authenticated user (all roles), System (Verifik, AML screening), Compliance team | Backend complete |
 | [User Permissions](./user-permissions.md) | All roles (ADMIN, FINANCE, LEGAL, INVESTOR, EMPLOYEE) | Frontend spec complete |
 | [Notifications](./notifications.md) | All authenticated users (any role) | Backend complete |
