@@ -195,18 +195,31 @@ POSTCONDITION: User sees shareholders for this company
 ```
 PRECONDITION: Shareholder exists, user has ADMIN, FINANCE, or LEGAL role
 ACTOR: Any permitted member
-TRIGGER: User clicks on a shareholder row
+TRIGGER: User clicks on a shareholder row or navigates to /dashboard/shareholders/:id
 
-1. [UI] User clicks on shareholder row in list
-2. [Frontend] Sends GET /api/v1/companies/:companyId/shareholders/:shareholderId
-3. [Backend] Returns shareholder with shareholdings (including shareClass) and beneficialOwners
+1. [UI] User clicks on shareholder row in list or navigates directly via URL
+2. [Frontend] Navigates to /dashboard/shareholders/:id
+3. [Frontend] useShareholder hook sends GET /api/v1/companies/:companyId/shareholders/:shareholderId
+4. [Frontend] useTransactions hook sends GET /api/v1/companies/:companyId/transactions?shareholderId=:id&sort=-createdAt
+5. [Backend] Returns shareholder with shareholdings (including shareClass) and beneficialOwners
    - If the shareholder has an encrypted CPF (cpfCnpjEncrypted), it is transparently decrypted
      via AWS KMS and returned in the cpfCnpj response field
-4. [UI] Displays shareholder profile: name, type badge, status badge, contact info
-5. [UI] Displays holdings table: share class, quantity, percentage
-6. [UI] For CORPORATE shareholders: displays beneficial owners section
+6. [UI] Displays header: avatar with initials, name (h1), type badge, status badge
+   - For foreign shareholders: displays globe icon + "Estrangeiro" badge
+7. [UI] Displays 3 stat cards computed from shareholdings:
+   - Total Shares (ocean-600 highlighted), Ownership %, Voting Power
+8. [UI] Displays 4-tab view (default: Overview):
+   a. Overview tab: Personal info card (masked CPF/CNPJ, nationality, type, tax residency,
+      foreign status) + Contact info card (email, phone, full address)
+   b. Holdings tab: Table with share class name, type, quantity, ownership %, voting %
+   c. Transactions tab: Table filtered by shareholderId showing date, type badge, from/to
+      shareholder names, quantity, BRL value, status badge. Paginated (10 per page).
+   d. Compliance tab: Foreign info section (if isForeign: RDE-IED number + date),
+      Beneficial owners table (if CORPORATE: name, masked CPF, ownership %),
+      Basic compliance info (nationality, tax residency, foreign status)
 
-POSTCONDITION: User sees full shareholder details
+POSTCONDITION: User sees full shareholder details across all tabs
+SIDE EFFECTS: None (read-only view)
 ```
 
 ### Happy Path: Update Shareholder

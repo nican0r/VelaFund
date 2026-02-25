@@ -1,6 +1,6 @@
-# Navia MVP — Implementation Plan v46.0
+# Navia MVP — Implementation Plan v47.0
 
-> **Generated**: 2026-02-25 | **Tests**: 2220 passing (1704 backend + 516 frontend) | **Backend modules**: 22 of 23 built
+> **Generated**: 2026-02-25 | **Tests**: 2251 passing (1704 backend + 547 frontend) | **Backend modules**: 22 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -514,7 +514,19 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
   - [x] Success toast + navigation, error toast via useErrorToast
   - [x] shareholders.form.* i18n namespace (50+ keys PT-BR + EN)
   - [x] 50 component tests (type selection, CPF/CNPJ validation, foreign detection, address, form submission)
-- [ ] Shareholder detail page: profile card, holdings table, transaction history, documents tab
+- [x] Shareholder detail page (`/dashboard/shareholders/[id]`)
+  - [x] Avatar with initials (skips Brazilian prepositions da/de/do/dos/das)
+  - [x] Profile header: name, type badge, status badge, foreign indicator
+  - [x] 3 stat cards (Total Shares, Ownership %, Voting Power) computed from holdings
+  - [x] 4 tabs: Overview, Holdings, Transactions, Compliance
+  - [x] Overview tab: personal info card (CPF/CNPJ masked, nationality, type) + contact info card (email, phone, address)
+  - [x] Holdings tab: share class table with type, quantity, ownership %, voting %
+  - [x] Transactions tab: filtered by shareholderId with type/status badges, pagination, BRL currency formatting
+  - [x] Compliance tab: foreign info (RDE-IED), beneficial owners table (for CORPORATE), basic compliance info
+  - [x] Loading skeleton, error, not-found, no-company states
+  - [x] shareholders.detail.* i18n namespace (~35 keys PT-BR + EN)
+  - [x] PointerEvent + ResizeObserver polyfills in jest.setup.ts for Radix UI tab testing
+  - [x] 31 component tests (rendering, tab switching, data display, masking, states, pagination)
 - [ ] Beneficial owners management (for CORPORATE type)
 - [x] Foreign shareholder indicator
 
