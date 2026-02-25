@@ -75,6 +75,55 @@ export function useTransaction(
   });
 }
 
+// --- Create transaction ---
+
+export interface CreateTransactionData {
+  type: 'ISSUANCE' | 'TRANSFER' | 'CONVERSION' | 'CANCELLATION' | 'SPLIT';
+  shareClassId: string;
+  quantity: string;
+  fromShareholderId?: string;
+  toShareholderId?: string;
+  pricePerShare?: string;
+  notes?: string;
+  requiresBoardApproval?: boolean;
+  toShareClassId?: string;
+  splitRatio?: string;
+}
+
+export function useCreateTransaction(companyId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: CreateTransactionData) =>
+      api.post<Transaction>(
+        `/api/v1/companies/${companyId}/transactions`,
+        data,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['cap-table', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['shareClasses', companyId] });
+    },
+  });
+}
+
+// --- Submit transaction ---
+
+export function useSubmitTransaction(companyId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (transactionId: string) =>
+      api.post<Transaction>(
+        `/api/v1/companies/${companyId}/transactions/${transactionId}/submit`,
+        {},
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions', companyId] });
+    },
+  });
+}
+
 // --- Cancel transaction ---
 
 export function useCancelTransaction(companyId: string | undefined) {

@@ -161,15 +161,17 @@ PRECONDITION: Company is ACTIVE, share class exists, to-shareholder exists, user
 ACTOR: ADMIN or FINANCE member
 TRIGGER: User clicks "New Transaction" and selects type ISSUANCE
 
-1. [UI] User navigates to /companies/:companyId/transactions
-2. [UI] User clicks "New Transaction"
-3. [UI] Transaction form opens with type selector
-4. [UI] User selects type = ISSUANCE
-5. [UI] Form shows fields: toShareholderId, shareClassId, quantity, pricePerShare, boardResolutionDate, notes
-6. [UI] User fills in required fields and clicks "Save as Draft"
+1. [UI] User navigates to /dashboard/transactions
+2. [UI] User clicks "New Transaction" -> navigates to /dashboard/transactions/new
+3. [UI] Page shows Step 1: Details with 5 transaction type cards (Issuance, Transfer, Conversion, Cancellation, Split)
+4. [UI] User clicks the "Issuance" type card (selected by default)
+5. [UI] Form shows fields: shareClassId (dropdown), toShareholderId (dropdown), quantity, pricePerShare, notes, boardApproval checkbox
+6. [UI] User fills in required fields and clicks "Next"
 7. [Frontend] Validates input client-side (quantity > 0, required fields present)
-   -> IF invalid: show field-level errors, STOP
-8. [Frontend] Sends POST /api/v1/companies/:companyId/transactions
+   -> IF invalid: show field-level errors under each field, STOP
+8. [UI] Step 2: Review — shows formatted transaction summary (type, share class, shareholder, quantity, price, total value, board approval status, notes)
+9. [UI] User clicks "Create Transaction"
+10. [Frontend] Sends POST /api/v1/companies/:companyId/transactions
    Body: { type: "ISSUANCE", toShareholderId, shareClassId, quantity, pricePerShare, boardResolutionDate, notes }
 9. [Backend] Validates authentication (AuthGuard)
    -> IF unauthenticated: return 401, frontend redirects to login
@@ -832,3 +834,60 @@ SIDE EFFECTS: None
 | POST | /api/v1/companies/:companyId/transactions/:transactionId/approve | ADMIN | Approve PENDING_APPROVAL transaction |
 | POST | /api/v1/companies/:companyId/transactions/:transactionId/confirm | ADMIN | Confirm & execute cap table mutation |
 | POST | /api/v1/companies/:companyId/transactions/:transactionId/cancel | ADMIN, FINANCE | Cancel a non-confirmed transaction |
+
+---
+
+## Frontend UI: Create Transaction Flow
+
+### Page: `/dashboard/transactions/new`
+
+**Component**: `CreateTransactionPage` (`frontend/src/app/(dashboard)/dashboard/transactions/new/page.tsx`)
+
+### 2-Step Wizard
+
+| Step | Name | Content |
+|------|------|---------|
+| 1 | Details | Transaction type selection (5 cards), dynamic form fields per type, notes, board approval |
+| 2 | Review | Formatted summary of all entered data, total value calculation, create button |
+
+### Transaction Type Cards
+
+| Type | Icon | Fields Shown |
+|------|------|-------------|
+| ISSUANCE | Plus (green) | shareClass, toShareholder, quantity, pricePerShare |
+| TRANSFER | ArrowLeftRight (blue) | shareClass, fromShareholder, toShareholder, quantity, pricePerShare |
+| CONVERSION | RefreshCw (cream) | shareClass, fromShareholder, toShareClass, quantity |
+| CANCELLATION | XCircle (red) | shareClass, fromShareholder, quantity, pricePerShare |
+| SPLIT | GitBranch (gray) | shareClass, splitRatio |
+
+### Smart Dropdown Filtering
+
+- **TRANSFER**: "To Shareholder" dropdown excludes the selected "From Shareholder" to prevent same-shareholder transfers
+- **CONVERSION**: "Target Share Class" dropdown excludes the selected source share class
+
+### Client-Side Validation
+
+| Field | Validation | Error Key |
+|-------|-----------|-----------|
+| shareClassId | Required for all types | `errors.val.required` |
+| toShareholderId | Required for ISSUANCE, TRANSFER | `errors.val.required` |
+| fromShareholderId | Required for TRANSFER, CONVERSION, CANCELLATION | `errors.val.required` |
+| quantity | Required + > 0 for all except SPLIT | `errors.val.required` / `errors.val.mustBePositive` |
+| pricePerShare | If provided, must be >= 0 | `errors.val.mustBePositive` |
+| toShareClassId | Required for CONVERSION | `errors.val.required` |
+| splitRatio | Required + > 0 for SPLIT | `errors.val.required` / `errors.val.mustBePositive` |
+
+### TanStack Query Hooks
+
+- `useCreateTransaction(companyId)` — `POST /api/v1/companies/:companyId/transactions`, invalidates transactions + cap-table + shareClasses queries on success
+- `useSubmitTransaction(companyId)` — `POST /api/v1/companies/:companyId/transactions/:id/submit`, invalidates transactions query on success
+
+### i18n Namespace
+
+- `transactions.form.*` — ~50 keys covering all form labels, placeholders, review labels, descriptions
+- `transactions.success.created` — success toast message
+- Error messages via root namespace: `errors.val.required`, `errors.val.mustBePositive`, `errors.txn.sameShareholder`
+
+### Tests
+
+38 component tests covering: rendering, type selection, field visibility per type, dropdown population, validation, step navigation, review display, API submission per type, error handling, smart filtering, form reset on type change.
