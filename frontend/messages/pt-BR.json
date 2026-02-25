@@ -8,8 +8,10 @@
     "edit": "Editar",
     "loading": "Carregando...",
     "next": "Próximo",
+    "no": "Não",
     "save": "Salvar",
-    "search": "Buscar"
+    "search": "Buscar",
+    "yes": "Sim"
   },
   "capTable": {
     "authorized": "Autorizado",
@@ -142,6 +144,12 @@
       "misto": "Misto",
       "mutuoConversivel": "Mútuo Conversível"
     },
+    "conversionTriggerType": {
+      "changeOfControl": "Mudança de Controle",
+      "investorOption": "Opção do Investidor",
+      "maturity": "Vencimento",
+      "qualifiedFinancing": "Financiamento Qualificado"
+    },
     "interestType": {
       "compound": "Composto",
       "simple": "Simples"
@@ -166,8 +174,67 @@
       "outstanding": "Vigente",
       "redeemed": "Resgatado"
     },
+    "createTitle": "Novo Instrumento Conversível",
+    "createDescription": "Registre um novo instrumento conversível preenchendo os dados abaixo.",
+    "form": {
+      "autoConvert": "Conversão automática",
+      "autoConvertHelp": "Converter automaticamente ao atingir o financiamento qualificado",
+      "conversionTrigger": "Gatilho de Conversão",
+      "conversionTriggerPlaceholder": "Selecione o gatilho...",
+      "discountRate": "Taxa de Desconto (%)",
+      "discountRatePlaceholder": "Ex: 20",
+      "interestRate": "Taxa de Juros Anual (%)",
+      "interestRatePlaceholder": "Ex: 8",
+      "interestType": "Tipo de Juros",
+      "investor": "Investidor",
+      "investorPlaceholder": "Selecione o investidor...",
+      "issueDate": "Data de Emissão",
+      "maturityDate": "Data de Vencimento",
+      "mfnClause": "Cláusula MFN",
+      "mfnClauseHelp": "Nação mais favorecida — permite adesão a termos melhores de futuras rodadas",
+      "notes": "Observações",
+      "notesPlaceholder": "Termos adicionais ou condições...",
+      "principalAmount": "Valor Principal (R$)",
+      "principalAmountPlaceholder": "Ex: 100000",
+      "qualifiedFinancingThreshold": "Limiar de Financiamento Qualificado (R$)",
+      "qualifiedFinancingThresholdPlaceholder": "Ex: 500000",
+      "reviewAutoConvert": "Conversão Automática",
+      "reviewConversionTrigger": "Gatilho de Conversão",
+      "reviewDiscountRate": "Taxa de Desconto",
+      "reviewInterestRate": "Taxa de Juros",
+      "reviewInterestType": "Tipo de Juros",
+      "reviewInvestor": "Investidor",
+      "reviewIssueDate": "Data de Emissão",
+      "reviewMaturityDate": "Data de Vencimento",
+      "reviewMfnClause": "Cláusula MFN",
+      "reviewNotes": "Observações",
+      "reviewPrincipalAmount": "Valor Principal",
+      "reviewQualifiedFinancing": "Financiamento Qualificado",
+      "reviewShareClass": "Classe de Ações",
+      "reviewTitle": "Revisão",
+      "reviewType": "Tipo de Instrumento",
+      "reviewValuationCap": "Valuation Cap",
+      "sectionConversion": "Termos de Conversão",
+      "sectionDetails": "Detalhes Financeiros",
+      "sectionType": "Tipo de Instrumento",
+      "shareClass": "Classe de Ações Alvo",
+      "shareClassPlaceholder": "Selecione a classe de ações...",
+      "stepDetails": "Detalhes",
+      "stepReview": "Revisão",
+      "typeCardInvestimentoAnjo": "Investimento Anjo",
+      "typeCardInvestimentoAnjoDesc": "Investimento anjo conforme a Lei Complementar 155/2016, com benefícios fiscais e período de retenção.",
+      "typeCardMais": "MAIS",
+      "typeCardMaisDesc": "Modelo de Acordo de Investimento Simples para startups em estágio inicial.",
+      "typeCardMisto": "Misto",
+      "typeCardMistoDesc": "Instrumento com características mistas de diferentes modalidades de conversão.",
+      "typeCardMutuoConversivel": "Mútuo Conversível",
+      "typeCardMutuoConversivelDesc": "Empréstimo conversível em participação societária com juros e desconto na conversão.",
+      "valuationCap": "Valuation Cap (R$)",
+      "valuationCapPlaceholder": "Ex: 5000000"
+    },
     "success": {
-      "cancelled": "Instrumento cancelado com sucesso"
+      "cancelled": "Instrumento cancelado com sucesso",
+      "created": "Instrumento conversível criado com sucesso"
     },
     "table": {
       "accruedInterest": "Juros Acum.",

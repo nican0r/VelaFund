@@ -8,8 +8,10 @@
     "edit": "Edit",
     "loading": "Loading...",
     "next": "Next",
+    "no": "No",
     "save": "Save",
-    "search": "Search"
+    "search": "Search",
+    "yes": "Yes"
   },
   "capTable": {
     "authorized": "Authorized",
@@ -142,6 +144,12 @@
       "misto": "Mixed",
       "mutuoConversivel": "Convertible Note"
     },
+    "conversionTriggerType": {
+      "changeOfControl": "Change of Control",
+      "investorOption": "Investor Option",
+      "maturity": "Maturity",
+      "qualifiedFinancing": "Qualified Financing"
+    },
     "interestType": {
       "compound": "Compound",
       "simple": "Simple"
@@ -166,8 +174,67 @@
       "outstanding": "Outstanding",
       "redeemed": "Redeemed"
     },
+    "createTitle": "New Convertible Instrument",
+    "createDescription": "Register a new convertible instrument by filling in the details below.",
+    "form": {
+      "autoConvert": "Auto-convert",
+      "autoConvertHelp": "Automatically convert when qualified financing threshold is reached",
+      "conversionTrigger": "Conversion Trigger",
+      "conversionTriggerPlaceholder": "Select trigger...",
+      "discountRate": "Discount Rate (%)",
+      "discountRatePlaceholder": "E.g. 20",
+      "interestRate": "Annual Interest Rate (%)",
+      "interestRatePlaceholder": "E.g. 8",
+      "interestType": "Interest Type",
+      "investor": "Investor",
+      "investorPlaceholder": "Select investor...",
+      "issueDate": "Issue Date",
+      "maturityDate": "Maturity Date",
+      "mfnClause": "MFN Clause",
+      "mfnClauseHelp": "Most Favored Nation — allows adoption of better terms from future rounds",
+      "notes": "Notes",
+      "notesPlaceholder": "Additional terms or conditions...",
+      "principalAmount": "Principal Amount (R$)",
+      "principalAmountPlaceholder": "E.g. 100000",
+      "qualifiedFinancingThreshold": "Qualified Financing Threshold (R$)",
+      "qualifiedFinancingThresholdPlaceholder": "E.g. 500000",
+      "reviewAutoConvert": "Auto-Convert",
+      "reviewConversionTrigger": "Conversion Trigger",
+      "reviewDiscountRate": "Discount Rate",
+      "reviewInterestRate": "Interest Rate",
+      "reviewInterestType": "Interest Type",
+      "reviewInvestor": "Investor",
+      "reviewIssueDate": "Issue Date",
+      "reviewMaturityDate": "Maturity Date",
+      "reviewMfnClause": "MFN Clause",
+      "reviewNotes": "Notes",
+      "reviewPrincipalAmount": "Principal Amount",
+      "reviewQualifiedFinancing": "Qualified Financing",
+      "reviewShareClass": "Share Class",
+      "reviewTitle": "Review",
+      "reviewType": "Instrument Type",
+      "reviewValuationCap": "Valuation Cap",
+      "sectionConversion": "Conversion Terms",
+      "sectionDetails": "Financial Details",
+      "sectionType": "Instrument Type",
+      "shareClass": "Target Share Class",
+      "shareClassPlaceholder": "Select share class...",
+      "stepDetails": "Details",
+      "stepReview": "Review",
+      "typeCardInvestimentoAnjo": "Angel Investment",
+      "typeCardInvestimentoAnjoDesc": "Angel investment per Complementary Law 155/2016, with tax benefits and holding period.",
+      "typeCardMais": "MAIS",
+      "typeCardMaisDesc": "Simple Investment Agreement Model for early-stage startups.",
+      "typeCardMisto": "Mixed",
+      "typeCardMistoDesc": "Instrument with mixed characteristics from different conversion modalities.",
+      "typeCardMutuoConversivel": "Convertible Note",
+      "typeCardMutuoConversivelDesc": "Loan convertible into equity with interest and conversion discount.",
+      "valuationCap": "Valuation Cap (R$)",
+      "valuationCapPlaceholder": "E.g. 5000000"
+    },
     "success": {
-      "cancelled": "Instrument cancelled successfully"
+      "cancelled": "Instrument cancelled successfully",
+      "created": "Convertible instrument created successfully"
     },
     "table": {
       "accruedInterest": "Accrued Int.",

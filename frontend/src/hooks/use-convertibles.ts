@@ -56,6 +56,39 @@ export function useConvertible(
   });
 }
 
+export interface CreateConvertibleData {
+  shareholderId: string;
+  instrumentType: 'MUTUO_CONVERSIVEL' | 'INVESTIMENTO_ANJO' | 'MISTO' | 'MAIS';
+  principalAmount: string;
+  interestRate: string;
+  interestType?: 'SIMPLE' | 'COMPOUND';
+  discountRate?: string;
+  valuationCap?: string;
+  qualifiedFinancingThreshold?: string;
+  conversionTrigger?: string;
+  targetShareClassId?: string;
+  autoConvert?: boolean;
+  mfnClause?: boolean;
+  issueDate: string;
+  maturityDate: string;
+  notes?: string;
+}
+
+export function useCreateConvertible(companyId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: CreateConvertibleData) =>
+      api.post<ConvertibleInstrument>(
+        `/api/v1/companies/${companyId}/convertibles`,
+        data,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['convertibles', companyId] });
+    },
+  });
+}
+
 export function useCancelConvertible(companyId: string | undefined) {
   const queryClient = useQueryClient();
 
