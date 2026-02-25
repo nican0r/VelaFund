@@ -14,6 +14,7 @@ import {
 import { MemberService } from './member.service';
 import { Public } from '../auth/decorators/public.decorator';
 import { CurrentUser, AuthenticatedUser } from '../auth/decorators/current-user.decorator';
+import { Auditable } from '../audit-log/decorators/auditable.decorator';
 
 @ApiTags('Invitations')
 @Controller('api/v1/invitations')
@@ -34,6 +35,11 @@ export class InvitationController {
 
   @Post(':token/accept')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'COMPANY_MEMBER_ACCEPTED',
+    resourceType: 'CompanyMember',
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Accept an invitation and join the company' })
   @ApiParam({ name: 'token', description: 'Invitation token from the email link' })
   @ApiResponse({ status: 200, description: 'Invitation accepted, user is now a member' })

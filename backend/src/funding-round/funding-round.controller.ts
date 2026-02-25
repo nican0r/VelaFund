@@ -32,6 +32,7 @@ import {
   CurrentUser,
   AuthenticatedUser,
 } from '../auth/decorators/current-user.decorator';
+import { Auditable } from '../audit-log/decorators/auditable.decorator';
 
 @ApiTags('Funding Rounds')
 @Controller('api/v1/companies/:companyId/funding-rounds')
@@ -48,6 +49,11 @@ export class FundingRoundController {
   @HttpCode(HttpStatus.CREATED)
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'ROUND_CREATED',
+    resourceType: 'FundingRound',
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Create a new funding round' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiResponse({ status: 201, description: 'Funding round created' })
@@ -97,6 +103,13 @@ export class FundingRoundController {
   @Put(':roundId')
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'ROUND_UPDATED',
+    resourceType: 'FundingRound',
+    resourceIdParam: 'roundId',
+    captureBeforeState: true,
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Update funding round (DRAFT/OPEN only)' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiParam({ name: 'roundId', description: 'Funding round UUID' })
@@ -114,6 +127,12 @@ export class FundingRoundController {
   @Post(':roundId/open')
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'ROUND_OPENED',
+    resourceType: 'FundingRound',
+    resourceIdParam: 'roundId',
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Open a DRAFT funding round for commitments' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiParam({ name: 'roundId', description: 'Funding round UUID' })
@@ -130,6 +149,12 @@ export class FundingRoundController {
   @Post(':roundId/close')
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'ROUND_CLOSED',
+    resourceType: 'FundingRound',
+    resourceIdParam: 'roundId',
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Close funding round and issue shares' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiParam({ name: 'roundId', description: 'Funding round UUID' })
@@ -146,6 +171,12 @@ export class FundingRoundController {
   @Post(':roundId/cancel')
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'ROUND_CANCELLED',
+    resourceType: 'FundingRound',
+    resourceIdParam: 'roundId',
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Cancel a funding round' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiParam({ name: 'roundId', description: 'Funding round UUID' })
@@ -182,6 +213,11 @@ export class FundingRoundController {
   @HttpCode(HttpStatus.CREATED)
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'COMMITMENT_CREATED',
+    resourceType: 'RoundCommitment',
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Add an investor commitment' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiParam({ name: 'roundId', description: 'Funding round UUID' })
@@ -226,6 +262,13 @@ export class FundingRoundController {
   @Put(':roundId/commitments/:commitmentId/payment')
   @Roles('ADMIN', 'FINANCE')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'COMMITMENT_CONFIRMED',
+    resourceType: 'RoundCommitment',
+    resourceIdParam: 'commitmentId',
+    captureBeforeState: true,
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Update commitment payment status' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiParam({ name: 'roundId', description: 'Funding round UUID' })
@@ -251,6 +294,12 @@ export class FundingRoundController {
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
   @HttpCode(HttpStatus.OK)
+  @Auditable({
+    action: 'COMMITMENT_CANCELLED',
+    resourceType: 'RoundCommitment',
+    resourceIdParam: 'commitmentId',
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Cancel a commitment' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiParam({ name: 'roundId', description: 'Funding round UUID' })

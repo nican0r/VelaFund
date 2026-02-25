@@ -1,4 +1,4 @@
-# Navia MVP — Implementation Plan v23.0
+# Navia MVP — Implementation Plan v24.0
 
 > **Generated**: 2026-02-25 | **Tests**: 1013 passing | **Backend modules**: 15 of 23 built
 >
@@ -15,7 +15,7 @@
 
 **Frontend**: Scaffolding only (layout shell, static mock pages, typed API client with hardcoded `Accept-Language: 'pt-BR'`). No Privy SDK, no next-intl, no shadcn/ui components, no functional pages, no tests (0 `.test.tsx` files).
 
-**Infrastructure**: Redis/Bull configured (`@nestjs/bull`, `bull`, `ioredis` installed; BullModule.forRootAsync in AppModule). SessionService for Redis-backed auth sessions (7-day absolute, 2-hour inactivity timeouts). AWS SDK configured (`@aws-sdk/client-s3`, `@aws-sdk/client-ses`, `@aws-sdk/client-kms`, `@aws-sdk/s3-request-presigner` installed; AwsModule @Global with S3Service, SesService, KmsService). CSRF middleware implemented (double-submit cookie pattern, `navia-csrf` cookie, `X-CSRF-Token` header validation). Helmet fully configured (including `permittedCrossDomainPolicies: false`). `redactPii()` utility implemented (`common/utils/redact-pii.ts`: maskCpf, maskCnpj, maskEmail, maskWallet, maskIp + redactPiiFromString; integrated with GlobalExceptionFilter for PII-safe logging; AuthService refactored to use centralized utility). Body size limits configured (1MB JSON, 1MB URL-encoded in main.ts). EncryptionModule implemented (@Global) with EncryptionService wrapping KmsService: encrypt/decrypt via KMS and HMAC-SHA256 blind indexes via BLIND_INDEX_KEY env var; graceful degradation with SHA-256 fallback when BLIND_INDEX_KEY is not set and plaintext fallback when KMS is unavailable. AuditLogModule implemented (@Global export via AuditLogService) with Bull queue async processing, @Auditable() decorator, AuditInterceptor, hash chain verification, PII masking at write time. EmailModule implemented (@Global export via EmailService) with MJML template compilation, variable interpolation with HTML escaping, locale fallback (pt-BR default), plain-text auto-generation from HTML; 4 base email templates (invitation, exercise-notification, export-ready, password-reset) in PT-BR and EN; MemberService wired to send invitation emails via SES (fire-and-forget with graceful degradation). No `@sentry/nestjs`. **0 TODOs remaining in the backend** (previously 2 in member.service.ts, now replaced with EmailService calls).
+**Infrastructure**: Redis/Bull configured (`@nestjs/bull`, `bull`, `ioredis` installed; BullModule.forRootAsync in AppModule). SessionService for Redis-backed auth sessions (7-day absolute, 2-hour inactivity timeouts). AWS SDK configured (`@aws-sdk/client-s3`, `@aws-sdk/client-ses`, `@aws-sdk/client-kms`, `@aws-sdk/s3-request-presigner` installed; AwsModule @Global with S3Service, SesService, KmsService). CSRF middleware implemented (double-submit cookie pattern, `navia-csrf` cookie, `X-CSRF-Token` header validation). Helmet fully configured (including `permittedCrossDomainPolicies: false`). `redactPii()` utility implemented (`common/utils/redact-pii.ts`: maskCpf, maskCnpj, maskEmail, maskWallet, maskIp + redactPiiFromString; integrated with GlobalExceptionFilter for PII-safe logging; AuthService refactored to use centralized utility). Body size limits configured (1MB JSON, 1MB URL-encoded in main.ts). EncryptionModule implemented (@Global) with EncryptionService wrapping KmsService: encrypt/decrypt via KMS and HMAC-SHA256 blind indexes via BLIND_INDEX_KEY env var; graceful degradation with SHA-256 fallback when BLIND_INDEX_KEY is not set and plaintext fallback when KMS is unavailable. AuditLogModule implemented (@Global export via AuditLogService) with Bull queue async processing, @Auditable() decorator, AuditInterceptor (registered as APP_INTERCEPTOR globally), hash chain verification, PII masking at write time. @Auditable() wired into 44 state-changing endpoints across 10 controllers (company, member, invitation, share-class, shareholder, cap-table, transaction, funding-round, convertible, option-plan). EmailModule implemented (@Global export via EmailService) with MJML template compilation, variable interpolation with HTML escaping, locale fallback (pt-BR default), plain-text auto-generation from HTML; 4 base email templates (invitation, exercise-notification, export-ready, password-reset) in PT-BR and EN; MemberService wired to send invitation emails via SES (fire-and-forget with graceful degradation). No `@sentry/nestjs`. **0 TODOs remaining in the backend** (previously 2 in member.service.ts, now replaced with EmailService calls).
 
 **Prisma schema**: 32 models, 36 enums. Models already present: AuditHashChain, ConsentRecord. Models missing: WaterfallScenario, ExportJob, ProfileDocumentDownload. User.locale field exists.
 
@@ -110,7 +110,7 @@ Gaps in the 12 built modules, ordered by module.
 - [x] Move failed-attempt lockout from in-memory Map to Redis — DONE: Redis INCR with TTL-based auto-expiry (15-min lockout period). Graceful degradation: if Redis is unavailable or errors, falls back to in-memory Map with 10K IP cap. 8 new tests (968 total passing).
 - [ ] Duplicate wallet check — prevent two users from linking the same wallet address
 - [ ] Privy API retry with exponential backoff (currently no retry on verify failure)
-- [ ] Audit logging events: AUTH_LOGIN_SUCCESS, AUTH_LOGIN_FAILED, AUTH_LOGOUT (depends on P3 Audit module)
+- [ ] Audit logging events: AUTH_LOGIN_SUCCESS, AUTH_LOGIN_FAILED, AUTH_LOGOUT (requires programmatic AuditLogService.log() — @Public endpoints don't have request.user for interceptor)
 - [ ] Onboarding wizard status tracking per `authentication.md` spec (step tracking: profile → company → done)
 
 ### Company Module
@@ -125,7 +125,7 @@ Gaps in the 12 built modules, ordered by module.
 
 - [x] Send invitation email via SES (2 TODO comments at `member.service.ts:137,354`) — DONE: EmailService integration with invitation template, locale detection, inviter name lookup, role name translation (PT-BR/EN), async fire-and-forget sending.
 - [ ] `GET /companies/:companyId/members/:memberId/permissions` endpoint — returns fully-resolved permissions per `user-permissions.md` (role defaults + overrides). Note: no single-member GET endpoint is defined in the spec; the IMPLEMENTATION_PLAN previously stated this incorrectly.
-- [ ] Audit logging events: COMPANY_MEMBER_INVITED, COMPANY_MEMBER_ACCEPTED, COMPANY_MEMBER_REMOVED, COMPANY_ROLE_CHANGED (depends on P3 Audit module)
+- [x] Audit logging events: COMPANY_MEMBER_INVITED, COMPANY_MEMBER_ACCEPTED, COMPANY_MEMBER_REMOVED, COMPANY_ROLE_CHANGED — DONE (v0.0.24): @Auditable() decorators on MemberController (invite, update, remove, resend) and InvitationController (accept)
 - [ ] Permission override management endpoints (spec defines fine-grained overrides, not fully exposed in API)
 
 ### Share Class Module
@@ -226,8 +226,8 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 - [ ] Dead letter queue monitoring (alert at 10/50 failed jobs)
 - [ ] PostgreSQL immutability trigger (migration to add BEFORE UPDATE OR DELETE trigger on audit_logs)
 - [ ] PostgreSQL table partitioning for audit_logs by month (migration)
-- [ ] Integrate `@Auditable()` into all 12 existing controllers
-- [ ] All 50+ event types from the catalog
+- [x] Integrate `@Auditable()` into all 10 target controllers — DONE (v0.0.24): Registered AuditInterceptor as APP_INTERCEPTOR in AppModule (useExisting to reuse AuditLogModule instance with Bull queue). Added @Auditable() decorators to 44 state-changing endpoints across 10 controllers: CompanyController (4), MemberController (4), InvitationController (1), ShareClassController (3), ShareholderController (4), CapTableController (2), TransactionController (5), FundingRoundController (8), ConvertibleController (5), OptionPlanController (8). Covers 40+ event types from the audit catalog. Auth events (login/logout) require programmatic logging via AuditLogService.log() — deferred. NotificationController skipped (user-scoped, not company audit-relevant). captureBeforeState set on update/delete ops for forward-compatibility (requires ClsModule for actual before-state capture).
+- [ ] All 50+ event types from the catalog — ~40 covered via @Auditable decorators; auth events (AUTH_LOGIN_SUCCESS/FAILED/LOGOUT), KYC events, blockchain events, and SYSTEM events (reconciliation, vesting milestones) require programmatic AuditLogService.log() calls in their respective modules
 - [ ] Export (CSV/PDF/XLSX)
 - [ ] User flow doc: `docs/user-flows/audit-logging.md`
 

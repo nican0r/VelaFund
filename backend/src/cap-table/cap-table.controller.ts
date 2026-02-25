@@ -16,6 +16,7 @@ import { CreateSnapshotDto } from './dto/create-snapshot.dto';
 import { SnapshotHistoryQueryDto } from './dto/snapshot-history-query.dto';
 import { paginate } from '../common/helpers/paginate';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { Auditable } from '../audit-log/decorators/auditable.decorator';
 
 @ApiTags('Cap Table')
 @Controller('api/v1/companies/:companyId/cap-table')
@@ -118,6 +119,10 @@ export class CapTableController {
   @Get('export/oct')
   @Roles('ADMIN', 'FINANCE')
   @Throttle({ read: { ttl: 60000, limit: 100 } })
+  @Auditable({
+    action: 'CAP_TABLE_EXPORTED',
+    resourceType: 'CapTableSnapshot',
+  })
   @ApiOperation({ summary: 'Export cap table in OCT format' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiResponse({ status: 200, description: 'OCT-formatted cap table JSON' })
@@ -136,6 +141,11 @@ export class CapTableController {
   @HttpCode(HttpStatus.CREATED)
   @Roles('ADMIN', 'FINANCE')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'CAP_TABLE_SNAPSHOT_CREATED',
+    resourceType: 'CapTableSnapshot',
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Create manual cap table snapshot' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiResponse({ status: 201, description: 'Snapshot created' })

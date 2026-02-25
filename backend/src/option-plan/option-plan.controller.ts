@@ -35,6 +35,7 @@ import {
   CurrentUser,
   AuthenticatedUser,
 } from '../auth/decorators/current-user.decorator';
+import { Auditable } from '../audit-log/decorators/auditable.decorator';
 
 @ApiTags('Option Plans')
 @Controller('api/v1/companies/:companyId')
@@ -49,6 +50,11 @@ export class OptionPlanController {
   @HttpCode(HttpStatus.CREATED)
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'OPTION_PLAN_CREATED',
+    resourceType: 'OptionPlan',
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Create a new option plan' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiResponse({ status: 201, description: 'Option plan created' })
@@ -98,6 +104,13 @@ export class OptionPlanController {
   @Put('option-plans/:planId')
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'OPTION_PLAN_UPDATED',
+    resourceType: 'OptionPlan',
+    resourceIdParam: 'planId',
+    captureBeforeState: true,
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Update option plan (ACTIVE only)' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiParam({ name: 'planId', description: 'Option plan UUID' })
@@ -115,6 +128,12 @@ export class OptionPlanController {
   @Post('option-plans/:planId/close')
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'OPTION_PLAN_CLOSED',
+    resourceType: 'OptionPlan',
+    resourceIdParam: 'planId',
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Close an option plan (no new grants allowed)' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiParam({ name: 'planId', description: 'Option plan UUID' })
@@ -136,6 +155,11 @@ export class OptionPlanController {
   @HttpCode(HttpStatus.CREATED)
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'OPTION_GRANTED',
+    resourceType: 'OptionGrant',
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Grant options to an employee' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiResponse({ status: 201, description: 'Option grant created' })
@@ -200,6 +224,12 @@ export class OptionPlanController {
   @Post('option-grants/:grantId/cancel')
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'OPTION_FORFEITED',
+    resourceType: 'OptionGrant',
+    resourceIdParam: 'grantId',
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Cancel/terminate an option grant' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiParam({ name: 'grantId', description: 'Option grant UUID' })
@@ -221,6 +251,11 @@ export class OptionPlanController {
   @HttpCode(HttpStatus.CREATED)
   @Roles('ADMIN', 'EMPLOYEE')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'OPTION_EXERCISE_REQUESTED',
+    resourceType: 'OptionExerciseRequest',
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Create an exercise request for a grant' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiParam({ name: 'grantId', description: 'Option grant UUID' })
@@ -271,6 +306,13 @@ export class OptionPlanController {
   @Post('option-exercises/:exerciseId/confirm')
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'OPTION_EXERCISE_CONFIRMED',
+    resourceType: 'OptionExerciseRequest',
+    resourceIdParam: 'exerciseId',
+    captureBeforeState: true,
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Confirm payment and issue shares for exercise' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiParam({ name: 'exerciseId', description: 'Exercise request UUID' })
@@ -289,6 +331,12 @@ export class OptionPlanController {
   @Post('option-exercises/:exerciseId/cancel')
   @Roles('ADMIN', 'EMPLOYEE')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'OPTION_EXERCISE_CANCELLED',
+    resourceType: 'OptionExerciseRequest',
+    resourceIdParam: 'exerciseId',
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Cancel a pending exercise request' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiParam({ name: 'exerciseId', description: 'Exercise request UUID' })

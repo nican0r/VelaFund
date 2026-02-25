@@ -19,6 +19,7 @@ import { ListShareholdersQueryDto } from './dto/list-shareholders-query.dto';
 import { SetBeneficialOwnersDto } from './dto/set-beneficial-owners.dto';
 import { paginate } from '../common/helpers/paginate';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { Auditable } from '../audit-log/decorators/auditable.decorator';
 
 @ApiTags('Shareholders')
 @Controller('api/v1/companies/:companyId/shareholders')
@@ -35,6 +36,11 @@ export class ShareholderController {
   @HttpCode(HttpStatus.CREATED)
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'SHAREHOLDER_CREATED',
+    resourceType: 'Shareholder',
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Create a shareholder' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiResponse({ status: 201, description: 'Shareholder created' })
@@ -118,6 +124,13 @@ export class ShareholderController {
   @Put(':shareholderId')
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'SHAREHOLDER_UPDATED',
+    resourceType: 'Shareholder',
+    resourceIdParam: 'shareholderId',
+    captureBeforeState: true,
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Update a shareholder' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiParam({ name: 'shareholderId', description: 'Shareholder UUID' })
@@ -142,6 +155,13 @@ export class ShareholderController {
   @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'SHAREHOLDER_DELETED',
+    resourceType: 'Shareholder',
+    resourceIdParam: 'shareholderId',
+    captureBeforeState: true,
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Delete or inactivate a shareholder' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiParam({ name: 'shareholderId', description: 'Shareholder UUID' })
@@ -165,6 +185,12 @@ export class ShareholderController {
   @HttpCode(HttpStatus.OK)
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'SHAREHOLDER_UPDATED',
+    resourceType: 'Shareholder',
+    resourceIdParam: 'shareholderId',
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Set beneficial owners for a corporate shareholder' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiParam({ name: 'shareholderId', description: 'Shareholder UUID' })

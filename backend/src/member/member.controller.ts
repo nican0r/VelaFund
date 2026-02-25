@@ -24,6 +24,7 @@ import { ListMembersQueryDto } from './dto/list-members-query.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { paginate } from '../common/helpers/paginate';
+import { Auditable } from '../audit-log/decorators/auditable.decorator';
 
 @ApiTags('Members')
 @Controller('api/v1/companies/:companyId/members')
@@ -34,6 +35,11 @@ export class MemberController {
   @Roles('ADMIN')
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'COMPANY_MEMBER_INVITED',
+    resourceType: 'CompanyMember',
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Invite a new member to the company' })
   @ApiParam({ name: 'companyId', description: 'Company ID' })
   @ApiResponse({ status: 201, description: 'Member invited successfully' })
@@ -66,6 +72,13 @@ export class MemberController {
   @Put(':memberId')
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'COMPANY_ROLE_CHANGED',
+    resourceType: 'CompanyMember',
+    resourceIdParam: 'memberId',
+    captureBeforeState: true,
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Update member role or permissions' })
   @ApiParam({ name: 'companyId', description: 'Company ID' })
   @ApiParam({ name: 'memberId', description: 'Member ID' })
@@ -83,6 +96,12 @@ export class MemberController {
   @Roles('ADMIN')
   @HttpCode(HttpStatus.NO_CONTENT)
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'COMPANY_MEMBER_REMOVED',
+    resourceType: 'CompanyMember',
+    resourceIdParam: 'memberId',
+    captureBeforeState: true,
+  })
   @ApiOperation({ summary: 'Remove a member from the company' })
   @ApiParam({ name: 'companyId', description: 'Company ID' })
   @ApiParam({ name: 'memberId', description: 'Member ID' })
@@ -99,6 +118,12 @@ export class MemberController {
   @Post(':memberId/resend-invitation')
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'COMPANY_MEMBER_INVITED',
+    resourceType: 'CompanyMember',
+    resourceIdParam: 'memberId',
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Resend an invitation email with a new token' })
   @ApiParam({ name: 'companyId', description: 'Company ID' })
   @ApiParam({ name: 'memberId', description: 'Member ID of the pending invitation' })

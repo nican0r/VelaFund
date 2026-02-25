@@ -501,10 +501,10 @@ Because PII is masked at write time:
 - [Transactions](./transactions.md) -- SHARES_ISSUED, SHARES_TRANSFERRED, SHARES_CANCELLED, SHARES_CONVERTED, TRANSACTION_SUBMITTED, TRANSACTION_APPROVED, TRANSACTION_REJECTED, TRANSACTION_CANCELLED
 - [Shareholder Management](./shareholder-management.md) -- SHAREHOLDER_CREATED, SHAREHOLDER_UPDATED, SHAREHOLDER_DELETED, SHAREHOLDER_INVITED
 - [Company Management](./company-management.md) -- COMPANY_CREATED, COMPANY_UPDATED, COMPANY_STATUS_CHANGED, COMPANY_MEMBER_INVITED, COMPANY_MEMBER_ACCEPTED, COMPANY_MEMBER_REMOVED, COMPANY_ROLE_CHANGED
-- [Share Class Management](./share-class-management.md) -- Share class CRUD events via @Auditable()
-- [Cap Table Management](./cap-table-management.md) -- CAP_TABLE_SNAPSHOT_CREATED, CAP_TABLE_EXPORTED
+- [Share Class Management](./share-class-management.md) -- SHARE_CLASS_CREATED, SHARE_CLASS_UPDATED, SHARE_CLASS_DELETED via @Auditable()
+- [Cap Table Management](./cap-table-management.md) -- CAP_TABLE_SNAPSHOT_CREATED, CAP_TABLE_EXPORTED via @Auditable()
 - [Funding Rounds](./funding-rounds.md) -- ROUND_CREATED, ROUND_UPDATED, ROUND_OPENED, ROUND_CLOSED, ROUND_CANCELLED, COMMITMENT_CREATED, COMMITMENT_CONFIRMED, COMMITMENT_CANCELLED
 - [Option Plans](./option-plans.md) -- OPTION_PLAN_CREATED, OPTION_GRANTED, OPTION_EXERCISE_REQUESTED, OPTION_EXERCISE_CONFIRMED, OPTION_FORFEITED, OPTION_VESTING_MILESTONE
-- [Convertible Instruments](./convertible-instruments.md) -- Convertible CRUD and conversion events via @Auditable()
+- [Convertible Instruments](./convertible-instruments.md) -- CONVERTIBLE_CREATED, CONVERTIBLE_UPDATED, CONVERTIBLE_REDEEMED, CONVERTIBLE_CANCELLED, CONVERTIBLE_CONVERTED via @Auditable()
 - Authentication module -- AUTH_LOGIN_SUCCESS, AUTH_LOGIN_FAILED, AUTH_LOGOUT
 - Self-referential -- AUDIT_LOG_VIEWED, AUDIT_LOG_INTEGRITY_VERIFIED

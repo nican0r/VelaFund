@@ -2,7 +2,8 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { BullModule } from '@nestjs/bull';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { AuditInterceptor } from './audit-log/interceptors/audit.interceptor';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 import { HealthModule } from './health/health.module';
@@ -76,6 +77,13 @@ import { EmailModule } from './email/email.module';
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
+    },
+    // Register AuditInterceptor globally — audit events are captured for all
+    // controller methods decorated with @Auditable(). Uses the existing instance
+    // from AuditLogModule (which has the Bull queue injected).
+    {
+      provide: APP_INTERCEPTOR,
+      useExisting: AuditInterceptor,
     },
   ],
 })

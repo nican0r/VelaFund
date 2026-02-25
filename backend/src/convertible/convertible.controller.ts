@@ -17,6 +17,7 @@ import {
   AuthenticatedUser,
 } from '../auth/decorators/current-user.decorator';
 import { paginate } from '../common/helpers/paginate';
+import { Auditable } from '../audit-log/decorators/auditable.decorator';
 import { ConvertibleService } from './convertible.service';
 import { CreateConvertibleDto } from './dto/create-convertible.dto';
 import { UpdateConvertibleDto } from './dto/update-convertible.dto';
@@ -34,6 +35,11 @@ export class ConvertibleController {
   @Roles('ADMIN')
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'CONVERTIBLE_CREATED',
+    resourceType: 'Convertible',
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Create a new convertible instrument' })
   @ApiResponse({ status: 201, description: 'Convertible created' })
   @ApiResponse({ status: 400, description: 'Validation error' })
@@ -111,6 +117,13 @@ export class ConvertibleController {
   @Put(':convertibleId')
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'CONVERTIBLE_UPDATED',
+    resourceType: 'Convertible',
+    resourceIdParam: 'convertibleId',
+    captureBeforeState: true,
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Update an OUTSTANDING convertible instrument' })
   @ApiResponse({ status: 200, description: 'Updated convertible' })
   @ApiResponse({ status: 404, description: 'Not found' })
@@ -126,6 +139,12 @@ export class ConvertibleController {
   @Post(':convertibleId/redeem')
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'CONVERTIBLE_REDEEMED',
+    resourceType: 'Convertible',
+    resourceIdParam: 'convertibleId',
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Redeem a convertible (investor buyback)' })
   @ApiResponse({ status: 200, description: 'Redeemed convertible' })
   @ApiResponse({ status: 404, description: 'Not found' })
@@ -141,6 +160,12 @@ export class ConvertibleController {
   @Post(':convertibleId/cancel')
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'CONVERTIBLE_CANCELLED',
+    resourceType: 'Convertible',
+    resourceIdParam: 'convertibleId',
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Cancel a convertible by mutual agreement' })
   @ApiResponse({ status: 200, description: 'Cancelled convertible' })
   @ApiResponse({ status: 404, description: 'Not found' })
@@ -156,6 +181,13 @@ export class ConvertibleController {
   @Post(':convertibleId/convert')
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'CONVERTIBLE_CONVERTED',
+    resourceType: 'Convertible',
+    resourceIdParam: 'convertibleId',
+    captureBeforeState: true,
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Execute conversion of convertible to equity' })
   @ApiResponse({ status: 200, description: 'Conversion executed' })
   @ApiResponse({ status: 404, description: 'Not found' })

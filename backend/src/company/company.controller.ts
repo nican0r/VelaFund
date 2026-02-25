@@ -23,6 +23,7 @@ import {
   AuthenticatedUser,
 } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { Auditable } from '../audit-log/decorators/auditable.decorator';
 
 @ApiTags('Companies')
 @Controller('api/v1/companies')
@@ -39,6 +40,11 @@ export class CompanyController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'COMPANY_CREATED',
+    resourceType: 'Company',
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Create a new company' })
   @ApiResponse({ status: 201, description: 'Company created' })
   @ApiResponse({ status: 400, description: 'Invalid input' })
@@ -101,6 +107,13 @@ export class CompanyController {
   @Put(':companyId')
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'COMPANY_UPDATED',
+    resourceType: 'Company',
+    resourceIdParam: 'companyId',
+    captureBeforeState: true,
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Update company details' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiResponse({ status: 200, description: 'Company updated' })
@@ -124,6 +137,13 @@ export class CompanyController {
   @Patch(':companyId/status')
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'COMPANY_STATUS_CHANGED',
+    resourceType: 'Company',
+    resourceIdParam: 'companyId',
+    captureBeforeState: true,
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Update company status (activate/deactivate)' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiResponse({ status: 200, description: 'Status updated' })
@@ -145,6 +165,12 @@ export class CompanyController {
   @Roles('ADMIN')
   @HttpCode(HttpStatus.NO_CONTENT)
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'COMPANY_STATUS_CHANGED',
+    resourceType: 'Company',
+    resourceIdParam: 'companyId',
+    captureBeforeState: true,
+  })
   @ApiOperation({ summary: 'Dissolve (archive) a company' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiResponse({ status: 204, description: 'Company dissolved' })

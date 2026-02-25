@@ -18,6 +18,7 @@ import { UpdateShareClassDto } from './dto/update-share-class.dto';
 import { ListShareClassesQueryDto } from './dto/list-share-classes-query.dto';
 import { paginate } from '../common/helpers/paginate';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { Auditable } from '../audit-log/decorators/auditable.decorator';
 
 @ApiTags('Share Classes')
 @Controller('api/v1/companies/:companyId/share-classes')
@@ -34,6 +35,11 @@ export class ShareClassController {
   @HttpCode(HttpStatus.CREATED)
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'SHARE_CLASS_CREATED',
+    resourceType: 'ShareClass',
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Create a share class' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiResponse({ status: 201, description: 'Share class created' })
@@ -99,6 +105,13 @@ export class ShareClassController {
   @Put(':id')
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'SHARE_CLASS_UPDATED',
+    resourceType: 'ShareClass',
+    resourceIdParam: 'id',
+    captureBeforeState: true,
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Update a share class' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiParam({ name: 'id', description: 'Share class UUID' })
@@ -123,6 +136,12 @@ export class ShareClassController {
   @Roles('ADMIN')
   @HttpCode(HttpStatus.NO_CONTENT)
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'SHARE_CLASS_DELETED',
+    resourceType: 'ShareClass',
+    resourceIdParam: 'id',
+    captureBeforeState: true,
+  })
   @ApiOperation({ summary: 'Delete a share class' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiParam({ name: 'id', description: 'Share class UUID' })

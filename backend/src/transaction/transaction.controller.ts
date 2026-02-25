@@ -24,6 +24,7 @@ import {
   CurrentUser,
   AuthenticatedUser,
 } from '../auth/decorators/current-user.decorator';
+import { Auditable } from '../audit-log/decorators/auditable.decorator';
 
 @ApiTags('Transactions')
 @Controller('api/v1/companies/:companyId/transactions')
@@ -34,6 +35,11 @@ export class TransactionController {
   @HttpCode(HttpStatus.CREATED)
   @Roles('ADMIN', 'FINANCE')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'TRANSACTION_SUBMITTED',
+    resourceType: 'Transaction',
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Create a new transaction' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiResponse({ status: 201, description: 'Transaction created' })
@@ -84,6 +90,12 @@ export class TransactionController {
   @Post(':transactionId/submit')
   @Roles('ADMIN', 'FINANCE')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'TRANSACTION_SUBMITTED',
+    resourceType: 'Transaction',
+    resourceIdParam: 'transactionId',
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Submit a DRAFT transaction for processing' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiParam({ name: 'transactionId', description: 'Transaction UUID' })
@@ -100,6 +112,12 @@ export class TransactionController {
   @Post(':transactionId/approve')
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'TRANSACTION_APPROVED',
+    resourceType: 'Transaction',
+    resourceIdParam: 'transactionId',
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Approve a pending transaction' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiParam({ name: 'transactionId', description: 'Transaction UUID' })
@@ -121,6 +139,13 @@ export class TransactionController {
   @Post(':transactionId/confirm')
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'SHARES_ISSUED',
+    resourceType: 'Transaction',
+    resourceIdParam: 'transactionId',
+    captureBeforeState: true,
+    captureAfterState: true,
+  })
   @ApiOperation({
     summary: 'Confirm a submitted transaction (execute cap table mutation)',
   })
@@ -139,6 +164,12 @@ export class TransactionController {
   @Post(':transactionId/cancel')
   @Roles('ADMIN', 'FINANCE')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
+  @Auditable({
+    action: 'TRANSACTION_CANCELLED',
+    resourceType: 'Transaction',
+    resourceIdParam: 'transactionId',
+    captureAfterState: true,
+  })
   @ApiOperation({ summary: 'Cancel a transaction' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiParam({ name: 'transactionId', description: 'Transaction UUID' })
