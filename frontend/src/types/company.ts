@@ -303,6 +303,40 @@ export interface OptionPlan {
   activeGrantCount?: number;
 }
 
+export interface GrantVesting {
+  vestedQuantity: string;
+  unvestedQuantity: string;
+  exercisableQuantity: string;
+  vestingPercentage: string;
+  cliffDate: string;
+  cliffMet: boolean;
+  nextVestingDate: string | null;
+  nextVestingAmount: string | null;
+}
+
+export interface VestingScheduleEntry {
+  date: string;
+  quantity: string;
+  cumulative: string;
+  type: 'CLIFF' | 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
+}
+
+export interface VestingSchedule {
+  grantId: string;
+  shareholderName: string | null;
+  totalOptions: string;
+  vestedOptions: string;
+  unvestedOptions: string;
+  exercisedOptions: string;
+  exercisableOptions: string;
+  vestingPercentage: string;
+  nextVestingDate: string | null;
+  nextVestingAmount: string | null;
+  cliffDate: string;
+  cliffMet: boolean;
+  schedule: VestingScheduleEntry[];
+}
+
 export interface OptionGrant {
   id: string;
   companyId: string;
@@ -329,7 +363,14 @@ export interface OptionGrant {
   plan?: {
     id: string;
     name: string;
+    terminationPolicy?: string;
+    exerciseWindowDays?: number;
   };
+  shareholder?: {
+    id: string;
+    name: string;
+  };
+  vesting?: GrantVesting;
 }
 
 export interface OptionExerciseRequest {

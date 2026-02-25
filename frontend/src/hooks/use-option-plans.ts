@@ -6,6 +6,7 @@ import type {
   OptionPlan,
   OptionGrant,
   OptionExerciseRequest,
+  VestingSchedule,
 } from '@/types/company';
 
 // --- Option Plans ---
@@ -173,6 +174,21 @@ export function useCreateOptionGrant(companyId: string | undefined) {
       queryClient.invalidateQueries({ queryKey: ['optionGrants', companyId] });
       queryClient.invalidateQueries({ queryKey: ['optionPlans', companyId] });
     },
+  });
+}
+
+export function useGrantVestingSchedule(
+  companyId: string | undefined,
+  grantId: string | undefined,
+) {
+  return useQuery({
+    queryKey: ['optionGrants', companyId, grantId, 'vesting'],
+    queryFn: () =>
+      api.get<VestingSchedule>(
+        `/api/v1/companies/${companyId}/option-grants/${grantId}/vesting`,
+      ),
+    enabled: !!companyId && !!grantId,
+    staleTime: 60 * 1000,
   });
 }
 
