@@ -538,6 +538,11 @@ const MESSAGES: Record<string, Record<string, string>> = {
     'pt-BR': 'Não é possível desativar notificações de segurança',
     en: 'Cannot disable security notifications',
   },
+  // Audit log errors
+  'errors.auditlog.notFound': {
+    'pt-BR': 'Registro de auditoria não encontrado',
+    en: 'Audit log not found',
+  },
 };
 
 export class AppException extends Error {

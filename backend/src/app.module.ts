@@ -17,6 +17,7 @@ import { FundingRoundModule } from './funding-round/funding-round.module';
 import { OptionPlanModule } from './option-plan/option-plan.module';
 import { ConvertibleModule } from './convertible/convertible.module';
 import { NotificationModule } from './notification/notification.module';
+import { AuditLogModule } from './audit-log/audit-log.module';
 import { AwsModule } from './aws/aws.module';
 import { EncryptionModule } from './encryption/encryption.module';
 
@@ -65,6 +66,7 @@ import { EncryptionModule } from './encryption/encryption.module';
     OptionPlanModule,
     ConvertibleModule,
     NotificationModule,
+    AuditLogModule,
   ],
   providers: [
     // Register ThrottlerGuard globally — rate limits apply to all endpoints.

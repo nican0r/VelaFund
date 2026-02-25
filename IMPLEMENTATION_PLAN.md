@@ -1,6 +1,6 @@
-# Navia MVP — Implementation Plan v22.0
+# Navia MVP — Implementation Plan v23.0
 
-> **Generated**: 2026-02-25 | **Tests**: 905 passing | **Backend modules**: 13 of 23 built
+> **Generated**: 2026-02-25 | **Tests**: 960 passing | **Backend modules**: 14 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -9,13 +9,13 @@
 
 ## Current State
 
-**Built backend modules** (13): auth (with Redis sessions), company, member, share-class, shareholder, cap-table, transaction, funding-round, option-plan (with exercises), convertible, notification
+**Built backend modules** (14): auth (with Redis sessions), company, member, share-class, shareholder, cap-table, transaction, funding-round, option-plan (with exercises), convertible, notification, audit-log
 
-**Entirely missing backend modules** (12): kyc, document-generation, document-signatures, audit-logging, blockchain-integration, company-profile, company-dataroom, company-litigation, company-blockchain-admin, cap-table-reconciliation, reports-analytics, exit-waterfall
+**Entirely missing backend modules** (11): kyc, document-generation, document-signatures, blockchain-integration, company-profile, company-dataroom, company-litigation, company-blockchain-admin, cap-table-reconciliation, reports-analytics, exit-waterfall
 
 **Frontend**: Scaffolding only (layout shell, static mock pages, typed API client with hardcoded `Accept-Language: 'pt-BR'`). No Privy SDK, no next-intl, no shadcn/ui components, no functional pages, no tests (0 `.test.tsx` files).
 
-**Infrastructure**: Redis/Bull configured (`@nestjs/bull`, `bull`, `ioredis` installed; BullModule.forRootAsync in AppModule). SessionService for Redis-backed auth sessions (7-day absolute, 2-hour inactivity timeouts). AWS SDK configured (`@aws-sdk/client-s3`, `@aws-sdk/client-ses`, `@aws-sdk/client-kms`, `@aws-sdk/s3-request-presigner` installed; AwsModule @Global with S3Service, SesService, KmsService). CSRF middleware implemented (double-submit cookie pattern, `navia-csrf` cookie, `X-CSRF-Token` header validation). Helmet fully configured (including `permittedCrossDomainPolicies: false`). `redactPii()` utility implemented (`common/utils/redact-pii.ts`: maskCpf, maskCnpj, maskEmail, maskWallet, maskIp + redactPiiFromString; integrated with GlobalExceptionFilter for PII-safe logging; AuthService refactored to use centralized utility). Body size limits configured (1MB JSON, 1MB URL-encoded in main.ts). EncryptionModule implemented (@Global) with EncryptionService wrapping KmsService: encrypt/decrypt via KMS and HMAC-SHA256 blind indexes via BLIND_INDEX_KEY env var; graceful degradation with SHA-256 fallback when BLIND_INDEX_KEY is not set and plaintext fallback when KMS is unavailable. No `@sentry/nestjs`, no email sending.
+**Infrastructure**: Redis/Bull configured (`@nestjs/bull`, `bull`, `ioredis` installed; BullModule.forRootAsync in AppModule). SessionService for Redis-backed auth sessions (7-day absolute, 2-hour inactivity timeouts). AWS SDK configured (`@aws-sdk/client-s3`, `@aws-sdk/client-ses`, `@aws-sdk/client-kms`, `@aws-sdk/s3-request-presigner` installed; AwsModule @Global with S3Service, SesService, KmsService). CSRF middleware implemented (double-submit cookie pattern, `navia-csrf` cookie, `X-CSRF-Token` header validation). Helmet fully configured (including `permittedCrossDomainPolicies: false`). `redactPii()` utility implemented (`common/utils/redact-pii.ts`: maskCpf, maskCnpj, maskEmail, maskWallet, maskIp + redactPiiFromString; integrated with GlobalExceptionFilter for PII-safe logging; AuthService refactored to use centralized utility). Body size limits configured (1MB JSON, 1MB URL-encoded in main.ts). EncryptionModule implemented (@Global) with EncryptionService wrapping KmsService: encrypt/decrypt via KMS and HMAC-SHA256 blind indexes via BLIND_INDEX_KEY env var; graceful degradation with SHA-256 fallback when BLIND_INDEX_KEY is not set and plaintext fallback when KMS is unavailable. AuditLogModule implemented (@Global export via AuditLogService) with Bull queue async processing, @Auditable() decorator, AuditInterceptor, hash chain verification, PII masking at write time. No `@sentry/nestjs`, no email sending.
 
 **Prisma schema**: 32 models, 36 enums. Models already present: AuditHashChain, ConsentRecord. Models missing: WaterfallScenario, ExportJob, ProfileDocumentDownload. User.locale field exists.
 
@@ -210,24 +210,25 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 
 ### 3.2 Audit Logging Module (spec: `.claude/rules/audit-logging.md`)
 
-- [ ] Create `backend/src/audit-log/` module
-- [ ] Prisma models: AuditLog (already in schema), AuditHashChain (already in schema)
-- [ ] Bull queue: `audit-log` queue per spec
-- [ ] AuditLogProcessor: Bull worker that persists events to DB
-- [ ] AuditInterceptor: NestJS interceptor for `@Auditable()` decorator
-- [ ] `@Auditable()` decorator with action, resourceType, captureBeforeState, captureAfterState
-- [ ] AuditService: programmatic logging for SYSTEM events (background jobs)
-- [ ] AuditLogController: list (paginated, filtered), detail, export (CSV/PDF/XLSX), verify hash chain
+- [x] Create `backend/src/audit-log/` module
+- [x] Prisma models: AuditLog (already in schema), AuditHashChain (already in schema)
+- [x] Bull queue: `audit-log` queue per spec
+- [x] AuditLogProcessor: Bull worker that persists events to DB
+- [x] AuditInterceptor: NestJS interceptor for `@Auditable()` decorator
+- [x] `@Auditable()` decorator with action, resourceType, captureBeforeState, captureAfterState
+- [x] AuditService: programmatic logging for SYSTEM events (background jobs)
+- [x] AuditLogController: list (paginated, filtered), detail, verify hash chain
+- [x] PII masking at write time using redactPii() (depends on P1 redactPii)
+- [x] Role access: ADMIN + LEGAL only
+- [x] Tests: processor, interceptor, service, controller specs (55 tests)
 - [ ] Before-state capture via AsyncLocalStorage (ClsModule)
-- [ ] PII masking at write time using redactPii() (depends on P1 redactPii)
 - [ ] Daily hash chain job (SHA-256, runs at 00:05 UTC)
 - [ ] Dead letter queue monitoring (alert at 10/50 failed jobs)
 - [ ] PostgreSQL immutability trigger (migration to add BEFORE UPDATE OR DELETE trigger on audit_logs)
 - [ ] PostgreSQL table partitioning for audit_logs by month (migration)
-- [ ] Role access: ADMIN + LEGAL only
 - [ ] Integrate `@Auditable()` into all 12 existing controllers
 - [ ] All 50+ event types from the catalog
-- [ ] Tests: processor, interceptor, service, controller specs
+- [ ] Export (CSV/PDF/XLSX)
 - [ ] User flow doc: `docs/user-flows/audit-logging.md`
 
 ### 3.3 KYC Verification Module (spec: `kyc-verification.md`)
@@ -611,7 +612,7 @@ Models/enums that exist in specs but are missing from the schema:
 
 ```
 P1 Redis+Bull (DONE v0.0.16) ┬──→ P3.1 Notifications
-                              ├──→ P3.2 Audit Logging (+ P1 redactPii)
+                              ├──→ P3.2 Audit Logging (core DONE, integration pending) (+ P1 redactPii)
                               ├──→ P3.3 KYC (+ P1 AWS)
                               ├──→ P3.7 Dataroom (+ P1 AWS)
                               ├──→ P3.8 Blockchain
@@ -645,7 +646,7 @@ P4.1 Frontend Foundation ───→ All P4.x pages
 
 **Sprint 1**: P0 bugs (BUG-1 DONE v0.0.17; BUG-2–6 DONE v0.0.15), P1 Redis+Bull (DONE v0.0.16), P1 AWS SDK (DONE v0.0.18)
 **Sprint 2**: P1 remaining (~~CSRF~~ DONE, ~~redactPii~~ DONE, Sentry, Email, ~~EncryptionService~~ DONE, ~~body limits~~ DONE, ~~helmet gap~~ DONE, test infra deps), P2 Auth gaps
-**Sprint 3**: P3.1 Notifications (module built, WebSocket + cross-module integration pending), P3.2 Audit Logging
+**Sprint 3**: P3.1 Notifications (module built, WebSocket + cross-module integration pending), P3.2 Audit Logging (core module built — @Auditable decorator, AuditInterceptor, AuditService, Bull queue processor, controller with list/detail/verify; remaining: ClsModule before-state, daily hash chain job, DLQ monitoring, DB immutability trigger, partitioning, cross-module integration of all 50+ events, export)
 **Sprint 4**: P3.3 KYC, P3.14 CNPJ Validation, P2 Company gaps
 **Sprint 5**: P3.4 Document Generation, P3.7 Dataroom
 **Sprint 6**: P3.6 Company Profile, P3.10 Litigation

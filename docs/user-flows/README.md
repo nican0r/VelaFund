@@ -20,6 +20,7 @@ Each document follows the template defined in `.claude/rules/user-flow-documenta
 | [KYC Verification](./kyc-verification.md) | Authenticated user (all roles), System (Verifik, AML screening), Compliance team | Frontend spec complete |
 | [User Permissions](./user-permissions.md) | All roles (ADMIN, FINANCE, LEGAL, INVESTOR, EMPLOYEE) | Frontend spec complete |
 | [Notifications](./notifications.md) | All authenticated users (any role) | Backend complete |
+| [Audit Logging](./audit-logging.md) | ADMIN (full access), LEGAL (full access), System (event capture + hash chain) | Backend complete |
 
 ## Cross-References
 
