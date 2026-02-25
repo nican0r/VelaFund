@@ -573,6 +573,22 @@
     "kycverification": {
       "notFound": "KYC verification not found"
     },
+    "member": {
+      "alreadyExists": "You are already a member of this company.",
+      "companyLimitReached": "Maximum number of companies reached.",
+      "invitationAlreadyAccepted": "This invitation has already been accepted.",
+      "invitationExpired": "The invitation has expired. Request a new one from the administrator.",
+      "invitationPending": "There is already a pending invitation for this email.",
+      "invitationRateLimit": "Invitation limit reached. Please try again later.",
+      "lastAdmin": "Cannot remove the last administrator from the company.",
+      "notActive": "Member is not active.",
+      "notFound": "Member not found.",
+      "notPending": "Member is not pending.",
+      "permissionProtected": "Cannot change this permission."
+    },
+    "invitation": {
+      "notFound": "Invitation not found or already used."
+    },
     "notification": {
       "notFound": "Notification not found",
       "preferencesInvalid": "Cannot disable security notifications"
@@ -654,6 +670,35 @@
     "waterfall": {
       "scenarioNotFound": "Waterfall scenario not found",
       "scenarioLimit": "Maximum number of saved scenarios reached (limit: 50)"
+    }
+  },
+  "invitations": {
+    "accept": "Accept invitation",
+    "acceptSuccess": "Welcome to {companyName}!",
+    "alreadyAccepted": "This invitation has already been accepted.",
+    "alreadyMember": "You are already a member of this company.",
+    "createAccount": "Create account",
+    "description": "You have been invited to join a company on the Navia platform.",
+    "expired": "This invitation has expired.",
+    "expiredDescription": "Ask the company administrator to send a new invitation.",
+    "expiresAt": "Expires on",
+    "invitedAs": "Invited as",
+    "invitedBy": "Invited by",
+    "invitedOn": "Invited on",
+    "limitReached": "You have reached the maximum number of companies.",
+    "loading": "Loading invitation...",
+    "notFound": "Invitation not found or already used.",
+    "notFoundDescription": "Check the invitation link or request a new one from the administrator.",
+    "signIn": "Sign in",
+    "signInDescription": "Sign in to your account to accept the invitation.",
+    "signUpDescription": "Create an account to accept the invitation.",
+    "title": "Company invitation",
+    "role": {
+      "admin": "Administrator",
+      "employee": "Employee",
+      "finance": "Finance",
+      "investor": "Investor",
+      "legal": "Legal"
     }
   },
   "litigation": {

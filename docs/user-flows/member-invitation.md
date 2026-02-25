@@ -507,6 +507,7 @@ Note: Non-members receive 404 (not 403) to prevent company enumeration per secur
 - **Rate limiting**: Throttle decorators applied — write endpoints: 30/min, read endpoints: 100/min.
 - **Email sending**: Invitation emails are sent asynchronously via EmailService (MJML template rendered to HTML, delivered via AWS SES). Email sending is fire-and-forget and gracefully degrades if SES is unavailable -- the invitation is still created and the token is valid even if the email fails to send.
 - **Pending items**: Audit logging for all member events.
+- **Frontend implementation** (v0.0.61): Public invitation acceptance page at `/invitations/[token]` with three-state UI (loading/error/invitation details), role badges, pt-BR date formatting, Privy login trigger for unauthenticated users, accept mutation with toast+redirect for authenticated users. TanStack Query hooks: `useInvitationDetails` (staleTime: 60s, retry: false) and `useAcceptInvitation` (invalidates companies query). Note: The current implementation covers the "Accept Invitation (Logged In)" and basic "Not Logged In → Login → Accept" flows. The "Personal Info Form" for new users (steps 11–16 in the new user flow) is deferred to P4.2 Onboarding Wizard.
 
 ---
 

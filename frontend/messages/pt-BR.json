@@ -573,6 +573,22 @@
     "kycverification": {
       "notFound": "Verificação KYC não encontrada"
     },
+    "member": {
+      "alreadyExists": "Você já é membro desta empresa.",
+      "companyLimitReached": "Limite máximo de empresas atingido.",
+      "invitationAlreadyAccepted": "Este convite já foi aceito.",
+      "invitationExpired": "O convite expirou. Solicite um novo ao administrador.",
+      "invitationPending": "Já existe um convite pendente para este e-mail.",
+      "invitationRateLimit": "Limite de convites atingido. Tente novamente mais tarde.",
+      "lastAdmin": "Não é possível remover o último administrador da empresa.",
+      "notActive": "Membro não está ativo.",
+      "notFound": "Membro não encontrado.",
+      "notPending": "Membro não está pendente.",
+      "permissionProtected": "Não é possível alterar esta permissão."
+    },
+    "invitation": {
+      "notFound": "Convite não encontrado ou já utilizado."
+    },
     "notification": {
       "notFound": "Notificação não encontrada",
       "preferencesInvalid": "Não é possível desativar notificações de segurança"
@@ -654,6 +670,35 @@
     "waterfall": {
       "scenarioNotFound": "Cenário de waterfall não encontrado",
       "scenarioLimit": "Limite máximo de cenários salvos atingido (máximo: 50)"
+    }
+  },
+  "invitations": {
+    "accept": "Aceitar convite",
+    "acceptSuccess": "Bem-vindo à {companyName}!",
+    "alreadyAccepted": "Este convite já foi aceito.",
+    "alreadyMember": "Você já é membro desta empresa.",
+    "createAccount": "Criar conta",
+    "description": "Você foi convidado(a) para participar de uma empresa na plataforma Navia.",
+    "expired": "Este convite expirou.",
+    "expiredDescription": "Solicite ao administrador da empresa que envie um novo convite.",
+    "expiresAt": "Expira em",
+    "invitedAs": "Convidado(a) como",
+    "invitedBy": "Convidado(a) por",
+    "invitedOn": "Convidado(a) em",
+    "limitReached": "Você atingiu o limite máximo de empresas.",
+    "loading": "Carregando convite...",
+    "notFound": "Convite não encontrado ou já utilizado.",
+    "notFoundDescription": "Verifique o link do convite ou solicite um novo ao administrador.",
+    "signIn": "Entrar",
+    "signInDescription": "Entre na sua conta para aceitar o convite.",
+    "signUpDescription": "Crie uma conta para aceitar o convite.",
+    "title": "Convite de empresa",
+    "role": {
+      "admin": "Administrador",
+      "employee": "Funcionário(a)",
+      "finance": "Financeiro",
+      "investor": "Investidor(a)",
+      "legal": "Jurídico"
     }
   },
   "litigation": {
