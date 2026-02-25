@@ -24,6 +24,7 @@ import { EncryptionModule } from './encryption/encryption.module';
 import { EmailModule } from './email/email.module';
 import { KycModule } from './kyc/kyc.module';
 import { DocumentModule } from './document/document.module';
+import { CompanyProfileModule } from './company-profile/company-profile.module';
 
 @Module({
   imports: [
@@ -74,6 +75,7 @@ import { DocumentModule } from './document/document.module';
     AuditLogModule,
     KycModule,
     DocumentModule,
+    CompanyProfileModule,
   ],
   providers: [
     // Register ThrottlerGuard globally — rate limits apply to all endpoints.

@@ -92,6 +92,8 @@ pnpm --filter @navia/backend prisma:generate
 | `backend/src/common/interceptors/response.interceptor.ts` | Success response envelope |
 | `frontend/src/app/globals.css` | shadcn/ui CSS variables (Navia theme) |
 | `frontend/tailwind.config.ts` | Design system tokens |
+| `backend/src/company-profile/company-profile.service.ts` | CompanyProfileService — profile CRUD, slug, publish/unpublish/archive, metrics, team, analytics |
+| `backend/src/company-profile/public-profile.controller.ts` | Public profile endpoint — @Public, password/email gating |
 | `backend/src/email/email.service.ts` | EmailService — MJML template compilation + SES email sending |
 | `backend/templates/email/` | MJML email templates (4 types × 2 locales) |
 | `frontend/messages/pt-BR.json` | Portuguese translations |

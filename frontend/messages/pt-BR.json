@@ -58,6 +58,20 @@
       "notFound": "Notificação não encontrada",
       "preferencesInvalid": "Não é possível desativar notificações de segurança"
     },
+    "profile": {
+      "alreadyExists": "Empresa já possui um perfil",
+      "companyNotActive": "Empresa não está ativa para criação de perfil",
+      "emailRequired": "Email é obrigatório para acessar este perfil",
+      "empty": "Perfil não pode ser publicado sem conteúdo",
+      "invalidPassword": "Senha incorreta",
+      "maxMetrics": "Máximo de 6 métricas por perfil",
+      "maxTeam": "Máximo de 10 membros de equipe por perfil",
+      "notFound": "Perfil da empresa não encontrado",
+      "passwordRequired": "Senha é obrigatória para acessar este perfil",
+      "slugInvalid": "Slug inválido — use letras minúsculas, números e hifens (3-50 caracteres)",
+      "slugReserved": "Este slug é reservado",
+      "slugTaken": "Este slug já está em uso"
+    },
     "opt": {
       "cliffExceedsVesting": "Período de cliff não pode exceder o período total de vesting",
       "companyNotActive": "A empresa deve estar ativa para gerenciar planos de opções",

@@ -660,6 +660,59 @@ const MESSAGES: Record<string, Record<string, string>> = {
     'pt-BR': 'Verificação KYC não encontrada — inicie o processo primeiro',
     en: 'KYC verification not found — please start the process first',
   },
+  // ─── COMPANY PROFILE MESSAGES ──────────────────────────────────────────
+  'errors.profile.notFound': {
+    'pt-BR': 'Perfil da empresa não encontrado',
+    en: 'Company profile not found',
+  },
+  'errors.profile.alreadyExists': {
+    'pt-BR': 'Empresa já possui um perfil',
+    en: 'Company already has a profile',
+  },
+  'errors.profile.companyNotActive': {
+    'pt-BR': 'Empresa não está ativa para criação de perfil',
+    en: 'Company is not active for profile creation',
+  },
+  'errors.profile.empty': {
+    'pt-BR': 'Perfil não pode ser publicado sem conteúdo',
+    en: 'Profile cannot be published without content',
+  },
+  'errors.profile.emailRequired': {
+    'pt-BR': 'Email é obrigatório para acessar este perfil',
+    en: 'Email is required to access this profile',
+  },
+  'errors.profile.passwordRequired': {
+    'pt-BR': 'Senha é obrigatória para acessar este perfil',
+    en: 'Password is required to access this profile',
+  },
+  'errors.profile.invalidPassword': {
+    'pt-BR': 'Senha incorreta',
+    en: 'Incorrect password',
+  },
+  'errors.profile.slugTaken': {
+    'pt-BR': 'Este slug já está em uso',
+    en: 'This slug is already taken',
+  },
+  'errors.profile.slugReserved': {
+    'pt-BR': 'Este slug é reservado',
+    en: 'This slug is reserved',
+  },
+  'errors.profile.slugInvalid': {
+    'pt-BR': 'Slug inválido — use letras minúsculas, números e hifens (3-50 caracteres)',
+    en: 'Invalid slug — use lowercase letters, numbers, and hyphens (3-50 characters)',
+  },
+  'errors.profile.maxMetrics': {
+    'pt-BR': 'Máximo de 6 métricas por perfil',
+    en: 'Maximum 6 metrics per profile',
+  },
+  'errors.profile.maxTeam': {
+    'pt-BR': 'Máximo de 10 membros de equipe por perfil',
+    en: 'Maximum 10 team members per profile',
+  },
+  'errors.companyprofile.notFound': {
+    'pt-BR': 'Perfil da empresa não encontrado',
+    en: 'Company profile not found',
+  },
 };
 
 export class AppException extends Error {

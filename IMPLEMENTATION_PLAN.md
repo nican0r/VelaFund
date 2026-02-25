@@ -1,6 +1,6 @@
-# Navia MVP — Implementation Plan v27.0
+# Navia MVP — Implementation Plan v28.0
 
-> **Generated**: 2026-02-25 | **Tests**: 1322 passing | **Backend modules**: 17 of 23 built
+> **Generated**: 2026-02-25 | **Tests**: 1454 passing | **Backend modules**: 18 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -9,9 +9,9 @@
 
 ## Current State
 
-**Built backend modules** (17): auth (with Redis sessions + Redis-backed failed-attempt lockout), company, member, share-class, shareholder, cap-table, transaction, funding-round, option-plan (with exercises), convertible, notification, audit-log, email, kyc, document
+**Built backend modules** (18): auth (with Redis sessions + Redis-backed failed-attempt lockout), company, member, share-class, shareholder, cap-table, transaction, funding-round, option-plan (with exercises), convertible, notification, audit-log, email, kyc, document, company-profile
 
-**Entirely missing backend modules** (9): document-signatures, blockchain-integration, company-profile, company-dataroom, company-litigation, company-blockchain-admin, cap-table-reconciliation, reports-analytics, exit-waterfall
+**Entirely missing backend modules** (8): document-signatures, blockchain-integration, company-dataroom, company-litigation, company-blockchain-admin, cap-table-reconciliation, reports-analytics, exit-waterfall
 
 **Frontend**: Scaffolding only (layout shell, static mock pages, typed API client with hardcoded `Accept-Language: 'pt-BR'`). No Privy SDK, no next-intl, no shadcn/ui components, no functional pages, no tests (0 `.test.tsx` files).
 
@@ -287,17 +287,18 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 - [ ] User flow doc: `docs/user-flows/document-signatures.md`
 - _Depends on_: P3.4 Document Generation, P3.8 Blockchain Integration
 
-### 3.6 Company Profile Module (spec: `company-profile.md`)
+### 3.6 Company Profile Module (spec: `company-profile.md`) — DONE
 
-- [ ] Create `backend/src/company-profile/` module
-- [ ] Prisma models: CompanyProfile, ProfileMetric, ProfileTeamMember, ProfileView (all already in schema)
-- [ ] ProfileService: create/update profile, publish/unpublish, metrics calculation, team members
-- [ ] ProfileController: CRUD + publish + public view endpoints
-- [ ] Email-gated access for non-public profiles
-- [ ] Profile analytics (view count, document downloads)
+- [x] Create `backend/src/company-profile/` module — DONE: CompanyProfileModule with CompanyProfileController (11 endpoints) + PublicProfileController (1 endpoint)
+- [x] Prisma models: CompanyProfile, ProfileMetric, ProfileTeamMember, ProfileView (all already in schema) — DONE
+- [x] ProfileService: create/update profile, publish/unpublish, metrics calculation, team members — DONE: CompanyProfileService with 12 methods (create, findByCompanyId, update, updateSlug, publish, unpublish, archive, replaceMetrics, replaceTeamMembers, uploadTeamPhoto, getPublicProfile, getAnalytics)
+- [x] ProfileController: CRUD + publish + public view endpoints — DONE: 11 company-scoped endpoints + 1 public profile endpoint
+- [x] Email-gated access for non-public profiles — DONE: PASSWORD and EMAIL_GATED access control on public profile endpoint
+- [x] Profile analytics (view count, document downloads) — DONE: Daily series + recent viewers analytics endpoint
 - [ ] Auto-trigger BigDataCorp litigation check on profile creation (depends on P3.10)
-- [ ] Tests: service + controller specs
-- [ ] User flow doc: `docs/user-flows/company-profile.md`
+- [x] Tests: service + controller specs — DONE: 132 tests (96 service + 36 controller)
+- [x] User flow doc: `docs/user-flows/company-profile.md` — DONE
+- _Implementation details_: 5 DTOs (CreateProfileDto, UpdateProfileDto, UpdateMetricsDto, UpdateTeamDto, UpdateSlugDto), 12 i18n error messages (PT-BR + EN), @Auditable on 8 state-changing endpoints, @Roles permission matrix (ADMIN create/publish/unpublish/archive/slug, ADMIN+FINANCE update/metrics/team/photo/analytics, all roles read), S3 team photo upload with presigned URLs, manual slug generation (NFD normalization), bcryptjs for PASSWORD access type hashing, profile lifecycle DRAFT -> PUBLISHED -> ARCHIVED
 
 ### 3.7 Company Dataroom Module (spec: `company-dataroom.md`)
 
@@ -576,10 +577,10 @@ Models/enums that exist in specs but are missing from the schema:
 
 ## P6 — Documentation Debt
 
-### Missing User Flow Docs (12)
+### Missing User Flow Docs (11)
 
 - [ ] `docs/user-flows/company-cnpj-validation.md`
-- [ ] `docs/user-flows/company-profile.md`
+- [x] `docs/user-flows/company-profile.md` — DONE (v0.0.30)
 - [ ] `docs/user-flows/company-dataroom.md`
 - [ ] `docs/user-flows/company-litigation.md`
 - [ ] `docs/user-flows/company-blockchain-admin.md`
@@ -657,7 +658,7 @@ P4.1 Frontend Foundation ───→ All P4.x pages
 **Sprint 3**: P3.1 Notifications (module built, WebSocket + cross-module integration pending), P3.2 Audit Logging (core module built — @Auditable decorator, AuditInterceptor, AuditService, Bull queue processor, controller with list/detail/verify; remaining: ClsModule before-state, daily hash chain job, DLQ monitoring, DB immutability trigger, partitioning, cross-module integration of all 50+ events, export)
 **Sprint 4**: ~~P3.3 KYC~~ DONE, ~~P3.14 CNPJ Validation~~ DONE, P2 Company gaps
 **Sprint 5**: ~~P3.4 Document Generation~~ DONE (v0.0.29), P3.7 Dataroom
-**Sprint 6**: P3.6 Company Profile, P3.10 Litigation
+**Sprint 6**: ~~P3.6 Company Profile~~ DONE, P3.10 Litigation
 **Sprint 7**: P3.8 Blockchain, P3.9 Blockchain Admin
 **Sprint 8**: P3.5 Document Signatures, P3.11 Reconciliation
 **Sprint 9**: P3.12 Exit Waterfall, P3.13 Reports & Analytics
