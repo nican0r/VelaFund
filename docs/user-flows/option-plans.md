@@ -359,6 +359,77 @@ POSTCONDITION: OptionGrant exists with status ACTIVE. Plan.totalGranted incremen
 SIDE EFFECTS: Audit log (future: OPTION_GRANTED)
 ```
 
+### Frontend Flow: Create Option Grant Form (2-Step Wizard)
+
+```
+PRECONDITION: Company is ACTIVE, at least one ACTIVE option plan exists, user has ADMIN role
+ACTOR: ADMIN member
+TRIGGER: User clicks "New Grant" button on Grants tab of Option Plans page
+
+STEP 1 — DETAILS:
+
+1. [UI] User navigates to /dashboard/options/grants/new
+2. [UI] Page renders 3-section form:
+   - Employee Information: employeeName (required), employeeEmail (required, email format),
+     shareholderId (optional dropdown populated from useShareholders hook)
+   - Grant Terms: optionPlanId (required dropdown from useOptionPlans with ACTIVE filter),
+     quantity (required, must be > 0 and <= available pool), strikePrice (required, > 0),
+     grantDate (required), expirationDate (required, must be after grantDate)
+   - Vesting Configuration: cliffMonths (required, default 12, 0-60, must be <= vestingDurationMonths),
+     vestingDurationMonths (required, default 48, > 0), vestingFrequency (MONTHLY/QUARTERLY/ANNUALLY, default MONTHLY),
+     accelerationOnCoc (checkbox, default false), notes (optional textarea)
+3. [UI] When plan is selected, shows available options count (totalPoolSize - totalGranted)
+4. [UI] When quantity and strikePrice are filled, shows calculated total value
+5. [UI] User fills fields and clicks "Next"
+6. [Frontend] Validates all fields client-side:
+   → IF employeeName empty: show "Employee name is required"
+   → IF employeeEmail empty: show "Email is required"
+   → IF employeeEmail invalid: show "Invalid email format"
+   → IF optionPlanId not selected: show "Option plan is required"
+   → IF quantity empty or <= 0: show "Must be greater than 0"
+   → IF quantity > available pool: show "Exceeds available options in this plan"
+   → IF strikePrice empty or <= 0: show "Must be greater than 0"
+   → IF grantDate empty: show "Grant date is required"
+   → IF expirationDate empty: show "Expiration date is required"
+   → IF expirationDate <= grantDate: show "Must be after grant date"
+   → IF cliffMonths > vestingDurationMonths: show "Cliff cannot exceed vesting duration"
+   → IF vestingDurationMonths <= 0: show "Must be greater than 0"
+   → IF any error: STOP, show field-level errors
+
+STEP 2 — REVIEW:
+
+7. [UI] Displays read-only summary of all fields:
+   - Employee: name, email, linked shareholder (if selected)
+   - Grant: plan name, quantity (formatted), strike price (BRL formatted), total value, dates (dd/MM/yyyy)
+   - Vesting: cliff months, duration months, frequency label, acceleration flag, notes (if provided)
+8. [UI] User clicks "Create Grant"
+9. [Frontend] Calls useCreateOptionGrant mutate() with payload:
+   { optionPlanId, employeeName, employeeEmail, quantity, strikePrice, grantDate, expirationDate,
+     cliffMonths (as number), vestingDurationMonths (as number), vestingFrequency,
+     accelerationOnCoc? (only if true), shareholderId? (only if selected), notes? (only if non-empty) }
+10. [Backend] Validates and creates grant (see "Happy Path: Create Option Grant" above)
+11. [UI] On success: shows toast "Option grant created successfully", navigates to /dashboard/options
+12. [UI] On error: shows error toast with backend messageKey
+13. [UI] User can click "Back" to return to Step 1 and edit fields
+14. [UI] User can click "Cancel" to return to /dashboard/options
+
+POSTCONDITION: Same as "Happy Path: Create Option Grant"
+SIDE EFFECTS: Same as "Happy Path: Create Option Grant"
+```
+
+### Frontend Flow: Create Option Grant Form — No Company State
+
+```
+PRECONDITION: No company selected in CompanyProvider
+ACTOR: Any user
+
+1. [UI] User navigates to /dashboard/options/grants/new
+2. [UI] Page renders "No company selected" message (from optionPlans.noCompany i18n key)
+3. [UI] No form is displayed
+
+POSTCONDITION: User must select a company before creating grants
+```
+
 ### Happy Path: View Grant Detail with Vesting
 
 ```

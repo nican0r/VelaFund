@@ -144,6 +144,38 @@ export function useOptionGrant(
   });
 }
 
+export interface CreateOptionGrantPayload {
+  optionPlanId: string;
+  employeeName: string;
+  employeeEmail: string;
+  quantity: string;
+  strikePrice: string;
+  grantDate: string;
+  expirationDate: string;
+  cliffMonths: number;
+  vestingDurationMonths: number;
+  vestingFrequency?: string;
+  accelerationOnCoc?: boolean;
+  shareholderId?: string;
+  notes?: string;
+}
+
+export function useCreateOptionGrant(companyId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: CreateOptionGrantPayload) =>
+      api.post<OptionGrant>(
+        `/api/v1/companies/${companyId}/option-grants`,
+        payload,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['optionGrants', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['optionPlans', companyId] });
+    },
+  });
+}
+
 export function useCancelGrant(companyId: string | undefined) {
   const queryClient = useQueryClient();
 

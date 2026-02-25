@@ -1,6 +1,6 @@
-# Navia MVP — Implementation Plan v47.0
+# Navia MVP — Implementation Plan v48.0
 
-> **Generated**: 2026-02-25 | **Tests**: 2251 passing (1704 backend + 547 frontend) | **Backend modules**: 22 of 23 built
+> **Generated**: 2026-02-25 | **Tests**: 2300 passing (1704 backend + 596 frontend) | **Backend modules**: 22 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -597,7 +597,7 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 - [x] 53 component tests
 - [x] Create plan form (2-step wizard Details→Review, 3 termination policy cards Forfeiture/Acceleration/Pro-rata, share class dropdown, exercise window configuration, useCreateOptionPlan hook, optionPlans.form.* i18n namespace ~30 keys PT-BR+EN, 42 tests)
 - [ ] Plan detail: grants table, pool stats
-- [ ] Create grant form
+- [x] Create grant form (2-step wizard Details→Review, 3-section layout Employee/GrantTerms/Vesting, plan dropdown with available options display, shareholder linking, total value calculation, vesting frequency MONTHLY/QUARTERLY/ANNUALLY, acceleration on CoC checkbox, client-side validation quantity≤available/cliff≤vesting/expirationDate>grantDate, useCreateOptionGrant mutation hook, optionPlans.grantForm.* i18n namespace ~55 keys PT-BR+EN, 49 tests)
 - [ ] Grant detail: vesting schedule timeline/table, exercise history
 - [ ] Exercise request form (employee view)
 - [ ] Exercise confirmation form (admin view)
