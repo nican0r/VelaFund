@@ -29,6 +29,7 @@ Each document follows the template defined in `.claude/rules/user-flow-documenta
 | [Company Litigation](./company-litigation.md) | System (Bull queue, BigDataCorp API), ADMIN/FINANCE (view on profile), public visitors (view on public profile) | Backend complete |
 | [Exit Waterfall](./exit-waterfall.md) | ADMIN (run analysis, save/list/view/delete scenarios) | Backend complete |
 | [Reports & Analytics](./reports-analytics.md) | ADMIN/FINANCE/LEGAL (company reports + exports), any user (portfolio), System (Bull queue export) | Backend complete |
+| [Settings](./settings.md) | ADMIN (full access: edit company, invite/manage members), all members (view) | Frontend Company Info tab + Members tab complete |
 
 ## Cross-References
 

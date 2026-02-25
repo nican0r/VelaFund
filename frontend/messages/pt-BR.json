@@ -1033,6 +1033,126 @@
       "transfer": "Transferência"
     }
   },
+  "settings": {
+    "company": {
+      "cnpj": "CNPJ",
+      "currency": "Moeda padrão",
+      "description": "Descrição",
+      "descriptionPlaceholder": "Descreva brevemente a atividade da empresa...",
+      "entityType": "Tipo de entidade",
+      "entityTypes": {
+        "LTDA": "Ltda.",
+        "SA_CAPITAL_ABERTO": "S.A. Capital Aberto",
+        "SA_CAPITAL_FECHADO": "S.A. Capital Fechado"
+      },
+      "fiscalYearEnd": "Fim do ano fiscal",
+      "foundedDate": "Data de fundação",
+      "locale": "Idioma",
+      "name": "Nome da empresa",
+      "namePlaceholder": "ex: Acme Ltda.",
+      "saveError": "Erro ao salvar as informações da empresa",
+      "saveSuccess": "Informações da empresa atualizadas com sucesso",
+      "status": "Status",
+      "statuses": {
+        "ACTIVE": "Ativa",
+        "DISSOLVED": "Dissolvida",
+        "DRAFT": "Rascunho",
+        "INACTIVE": "Inativa"
+      },
+      "subtitle": "Gerencie as informações básicas da sua empresa.",
+      "timezone": "Fuso horário",
+      "title": "Informações da Empresa"
+    },
+    "description": "Gerencie as configurações da sua empresa.",
+    "members": {
+      "actions": {
+        "changeRole": "Alterar função",
+        "remove": "Remover",
+        "resend": "Reenviar convite"
+      },
+      "dialog": {
+        "changeRole": {
+          "cancel": "Cancelar",
+          "confirm": "Salvar",
+          "label": "Nova função",
+          "title": "Alterar função"
+        },
+        "invite": {
+          "cancel": "Cancelar",
+          "confirm": "Enviar convite",
+          "email": "E-mail",
+          "emailPlaceholder": "nome@empresa.com",
+          "message": "Mensagem (opcional)",
+          "messagePlaceholder": "Mensagem personalizada para o convite...",
+          "role": "Função",
+          "sending": "Enviando...",
+          "title": "Convidar membro"
+        },
+        "remove": {
+          "cancel": "Cancelar",
+          "confirm": "Remover",
+          "message": "Tem certeza que deseja remover {name} da empresa? O acesso será revogado imediatamente.",
+          "title": "Remover membro"
+        }
+      },
+      "empty": "Nenhum membro encontrado.",
+      "filter": {
+        "allRoles": "Todas as funções",
+        "allStatuses": "Todos os status",
+        "searchPlaceholder": "Buscar por e-mail ou nome..."
+      },
+      "inviteButton": "Convidar membro",
+      "pagination": {
+        "next": "Próxima",
+        "of": "de",
+        "page": "Página",
+        "previous": "Anterior",
+        "showing": "Mostrando {from} a {to} de {total}"
+      },
+      "resendError": "Erro ao reenviar convite",
+      "resendSuccess": "Convite reenviado com sucesso",
+      "role": {
+        "ADMIN": "Administrador",
+        "EMPLOYEE": "Funcionário",
+        "FINANCE": "Financeiro",
+        "INVESTOR": "Investidor",
+        "LEGAL": "Jurídico"
+      },
+      "roleChangeError": "Erro ao alterar a função do membro",
+      "roleChangeSuccess": "Função do membro alterada com sucesso",
+      "stats": {
+        "active": "Ativos",
+        "admins": "Administradores",
+        "pending": "Pendentes",
+        "total": "Total de Membros"
+      },
+      "status": {
+        "ACTIVE": "Ativo",
+        "PENDING": "Pendente",
+        "REMOVED": "Removido"
+      },
+      "subtitle": "Gerencie os membros da equipe e suas permissões.",
+      "success": {
+        "invited": "Convite enviado com sucesso",
+        "removed": "Membro removido com sucesso"
+      },
+      "table": {
+        "acceptedAt": "Aceito em",
+        "actions": "Ações",
+        "email": "E-mail",
+        "invitedAt": "Convidado em",
+        "member": "Membro",
+        "role": "Função",
+        "status": "Status"
+      },
+      "title": "Membros da Equipe"
+    },
+    "tabs": {
+      "company": "Empresa",
+      "members": "Membros"
+    },
+    "title": "Configurações"
+  },
   "shareholders": {
     "actions": "Ações",
     "confirm": {

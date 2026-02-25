@@ -358,6 +358,53 @@ export interface ConvertibleInstrument {
   } | null;
 }
 
+// Company member types returned by GET /api/v1/companies/:id/members
+export type MemberRole = 'ADMIN' | 'FINANCE' | 'LEGAL' | 'INVESTOR' | 'EMPLOYEE';
+export type MemberStatus = 'PENDING' | 'ACTIVE' | 'REMOVED';
+
+export interface CompanyMember {
+  id: string;
+  companyId: string;
+  userId: string | null;
+  email: string;
+  role: MemberRole;
+  status: MemberStatus;
+  permissions: Record<string, boolean> | null;
+  invitedBy: string | null;
+  invitedAt: string;
+  acceptedAt: string | null;
+  removedAt: string | null;
+  removedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  user?: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    profilePictureUrl: string | null;
+    walletAddress: string | null;
+  } | null;
+}
+
+// Company detail type for settings page
+export interface CompanyDetail {
+  id: string;
+  name: string;
+  entityType: 'LTDA' | 'SA_CAPITAL_FECHADO' | 'SA_CAPITAL_ABERTO';
+  cnpj: string;
+  description: string | null;
+  logoUrl: string | null;
+  foundedDate: string | null;
+  status: 'DRAFT' | 'ACTIVE' | 'INACTIVE' | 'DISSOLVED';
+  cnpjValidatedAt: string | null;
+  defaultCurrency: string;
+  fiscalYearEnd: string;
+  timezone: string;
+  locale: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Transaction {
   id: string;
   companyId: string;

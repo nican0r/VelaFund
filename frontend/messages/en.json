@@ -1033,6 +1033,126 @@
       "transfer": "Transfer"
     }
   },
+  "settings": {
+    "company": {
+      "cnpj": "CNPJ",
+      "currency": "Default currency",
+      "description": "Description",
+      "descriptionPlaceholder": "Briefly describe the company's activity...",
+      "entityType": "Entity type",
+      "entityTypes": {
+        "LTDA": "Ltda.",
+        "SA_CAPITAL_ABERTO": "S.A. Public",
+        "SA_CAPITAL_FECHADO": "S.A. Private"
+      },
+      "fiscalYearEnd": "Fiscal year end",
+      "foundedDate": "Founded date",
+      "locale": "Language",
+      "name": "Company name",
+      "namePlaceholder": "e.g. Acme Ltda.",
+      "saveError": "Failed to save company information",
+      "saveSuccess": "Company information updated successfully",
+      "status": "Status",
+      "statuses": {
+        "ACTIVE": "Active",
+        "DISSOLVED": "Dissolved",
+        "DRAFT": "Draft",
+        "INACTIVE": "Inactive"
+      },
+      "subtitle": "Manage your company's basic information.",
+      "timezone": "Timezone",
+      "title": "Company Information"
+    },
+    "description": "Manage your company settings.",
+    "members": {
+      "actions": {
+        "changeRole": "Change role",
+        "remove": "Remove",
+        "resend": "Resend invitation"
+      },
+      "dialog": {
+        "changeRole": {
+          "cancel": "Cancel",
+          "confirm": "Save",
+          "label": "New role",
+          "title": "Change role"
+        },
+        "invite": {
+          "cancel": "Cancel",
+          "confirm": "Send invitation",
+          "email": "Email",
+          "emailPlaceholder": "name@company.com",
+          "message": "Message (optional)",
+          "messagePlaceholder": "Custom message for the invitation...",
+          "role": "Role",
+          "sending": "Sending...",
+          "title": "Invite member"
+        },
+        "remove": {
+          "cancel": "Cancel",
+          "confirm": "Remove",
+          "message": "Are you sure you want to remove {name} from the company? Access will be revoked immediately.",
+          "title": "Remove member"
+        }
+      },
+      "empty": "No members found.",
+      "filter": {
+        "allRoles": "All roles",
+        "allStatuses": "All statuses",
+        "searchPlaceholder": "Search by email or name..."
+      },
+      "inviteButton": "Invite member",
+      "pagination": {
+        "next": "Next",
+        "of": "of",
+        "page": "Page",
+        "previous": "Previous",
+        "showing": "Showing {from} to {to} of {total}"
+      },
+      "resendError": "Failed to resend invitation",
+      "resendSuccess": "Invitation resent successfully",
+      "role": {
+        "ADMIN": "Administrator",
+        "EMPLOYEE": "Employee",
+        "FINANCE": "Finance",
+        "INVESTOR": "Investor",
+        "LEGAL": "Legal"
+      },
+      "roleChangeError": "Failed to change member role",
+      "roleChangeSuccess": "Member role changed successfully",
+      "stats": {
+        "active": "Active",
+        "admins": "Administrators",
+        "pending": "Pending",
+        "total": "Total Members"
+      },
+      "status": {
+        "ACTIVE": "Active",
+        "PENDING": "Pending",
+        "REMOVED": "Removed"
+      },
+      "subtitle": "Manage team members and their permissions.",
+      "success": {
+        "invited": "Invitation sent successfully",
+        "removed": "Member removed successfully"
+      },
+      "table": {
+        "acceptedAt": "Accepted at",
+        "actions": "Actions",
+        "email": "Email",
+        "invitedAt": "Invited at",
+        "member": "Member",
+        "role": "Role",
+        "status": "Status"
+      },
+      "title": "Team Members"
+    },
+    "tabs": {
+      "company": "Company",
+      "members": "Members"
+    },
+    "title": "Settings"
+  },
   "shareholders": {
     "actions": "Actions",
     "confirm": {

@@ -412,7 +412,7 @@ export default function CreateTransactionPage() {
     }
 
     try {
-      await createMutation.mutateAsync(payload as Parameters<typeof createMutation.mutateAsync>[0]);
+      await createMutation.mutateAsync(payload as unknown as Parameters<typeof createMutation.mutateAsync>[0]);
       toast.success(t('success.created'));
       router.push('/dashboard/transactions');
     } catch (error) {

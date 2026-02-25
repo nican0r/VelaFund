@@ -354,7 +354,7 @@ export default function CreateConvertiblePage() {
 
     try {
       await createMutation.mutateAsync(
-        payload as Parameters<typeof createMutation.mutateAsync>[0],
+        payload as unknown as Parameters<typeof createMutation.mutateAsync>[0],
       );
       toast.success(t('success.created'));
       router.push('/dashboard/convertibles');

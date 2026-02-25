@@ -1,6 +1,6 @@
-# Navia MVP — Implementation Plan v45.0
+# Navia MVP — Implementation Plan v46.0
 
-> **Generated**: 2026-02-25 | **Tests**: 2182 passing (1704 backend + 478 frontend) | **Backend modules**: 22 of 23 built
+> **Generated**: 2026-02-25 | **Tests**: 2220 passing (1704 backend + 516 frontend) | **Backend modules**: 22 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -598,10 +598,10 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 - [ ] Conversion scenario simulator (slider for valuation → shows resulting shares)
 - [ ] Convert action with confirmation
 
-### 4.11 Settings Pages (no page exists)
+### 4.11 Settings Pages
 
-- [ ] Company Info tab: edit company details
-- [ ] Members tab: list, invite, role management
+- [x] Company Info tab: edit company details — DONE: Two-tab layout (Company/Members) with ocean-600 underline active tab indicator, Company Info form with editable name+description fields, read-only entityType/CNPJ/status/currency/timezone/foundedDate/locale, dirty-tracking save button, useCompanyDetail+useUpdateCompany TanStack Query hooks, loading skeletons, success/error toast notifications, settings.company.* i18n namespace (~25 keys PT-BR+EN)
+- [x] Members tab: list, invite, role management — DONE: 4 stat cards (Total Members, Active, Pending, Administrators) with ocean-600 highlight, search input + role/status filter dropdowns, member table with avatar+initials/name/email/role badge/status badge/invited date/action menu, Invite Member dialog (email+role+optional message), Change Role dialog (role select), Remove Member dialog (confirmation), Resend Invitation action for PENDING members, hidden actions for REMOVED members, pagination, useMembers+useInviteMember+useUpdateMember+useRemoveMember+useResendInvitation hooks, settings.members.* i18n namespace (~60 keys PT-BR+EN), 38 component tests
 - [ ] Share Classes tab: manage classes
 - [ ] Notifications tab: preference toggles
 - [ ] Security tab: sessions, MFA status (from Privy)
@@ -618,9 +618,9 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 - [ ] Notification list page (all notifications with pagination)
 - [ ] Mark read/unread actions
 
-### 4.14 Frontend Testing (0 test files exist)
+### 4.14 Frontend Testing (19 test suites, 516 tests)
 
-- [ ] Configure Jest + React Testing Library (infrastructure is in place: jest.config.ts, jest.setup.ts, dependencies installed)
+- [x] Configure Jest + React Testing Library (infrastructure is in place: jest.config.ts, jest.setup.ts, dependencies installed)
 - [ ] Tests for all auth flows (login, logout, protected routes)
 - [ ] Tests for all form components (validation, submission, error display)
 - [ ] Tests for all data display components (tables, cards, charts)
