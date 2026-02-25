@@ -891,3 +891,84 @@ SIDE EFFECTS: None
 ### Tests
 
 38 component tests covering: rendering, type selection, field visibility per type, dropdown population, validation, step navigation, review display, API submission per type, error handling, smart filtering, form reset on type change.
+
+---
+
+## Frontend UI: Transaction Detail Page
+
+### Page: `/dashboard/transactions/[id]`
+
+**Component**: `TransactionDetailPage` (`frontend/src/app/(dashboard)/dashboard/transactions/[id]/page.tsx`)
+
+### Layout
+
+Two-column layout with responsive grid (collapses to single column on mobile):
+
+| Area | Content |
+|------|---------|
+| Back link | "Voltar para Transações" → `/dashboard/transactions` |
+| Header | Type icon + title ("Detalhe da Transação") + type badge + status badge + action buttons |
+| Left column (2/3) | Transaction Summary card + Metadata card |
+| Right column (1/3) | Status Timeline card |
+
+### State Cascade
+
+| Priority | Condition | UI |
+|----------|-----------|-----|
+| 1 | No company selected | Empty state with Building2 icon |
+| 2 | Loading | DetailSkeleton with animated pulse elements |
+| 3 | Fetch error | Error message + back link |
+| 4 | Transaction not found | Not-found illustration + description |
+| 5 | Transaction loaded | Full detail page |
+
+### Action Buttons by Status
+
+| Status | Primary Action | Cancel Available |
+|--------|---------------|-----------------|
+| DRAFT | "Enviar para Processamento" (submit) | Yes |
+| PENDING_APPROVAL | "Aprovar" (approve) | Yes |
+| SUBMITTED | "Confirmar e Executar" (confirm) | Yes |
+| FAILED | "Tentar Novamente" (retry → confirm) | Yes |
+| CONFIRMED | None | No |
+| CANCELLED | None | No |
+
+All actions open a `ConfirmDialog` component before executing. Cancel uses destructive (red) variant.
+
+### Type-Specific Field Rendering
+
+| Type | Fields Displayed |
+|------|-----------------|
+| ISSUANCE | toShareholder, shareClass, quantity, pricePerShare, totalValue |
+| TRANSFER | fromShareholder, toShareholder, shareClass, quantity, pricePerShare, totalValue |
+| CONVERSION | fromShareholder, shareClass, targetShareClass (from notes), quantity |
+| CANCELLATION | fromShareholder, shareClass, quantity, pricePerShare, totalValue |
+| SPLIT | shareClass, splitRatio (from notes as "N:1"), quantity |
+
+### Status Timeline
+
+Visual timeline (`StatusTimeline` component) built dynamically by `buildTimelineSteps()`:
+
+- **Created** — always present (completed)
+- **Pending Approval** — shown when `requiresBoardApproval` is true
+- **Approved** — shown when `approvedBy` is set
+- **Submitted** — shown for non-DRAFT statuses
+- **Confirmed / Failed / Cancelled** — terminal state (completed, error, or error)
+
+Each step shows: colored icon (green=completed, blue=active, red=error, gray=pending), label, and timestamp.
+
+### TanStack Query Hooks
+
+- `useTransaction(companyId, transactionId)` — `GET /api/v1/companies/:companyId/transactions/:id`
+- `useSubmitTransaction(companyId)` — `POST .../submit`, invalidates transactions
+- `useApproveTransaction(companyId)` — `POST .../approve`, invalidates transactions
+- `useConfirmTransaction(companyId)` — `POST .../confirm`, invalidates transactions + cap-table + shareClasses + shareholders
+- `useCancelTransaction(companyId)` — `POST .../cancel`, invalidates transactions + cap-table
+
+### i18n Namespace
+
+- `transactions.detail.*` — ~50 keys covering field labels, action buttons, dialog titles/descriptions, timeline labels, error states
+- `transactions.success.submitted`, `transactions.success.approved`, `transactions.success.confirmed` — success toast messages
+
+### Tests
+
+37 component tests covering: state handling (no-company, loading, error, not-found), rendering for all 5 transaction types, currency/number formatting, board approval display, notes rendering (plain text + JSON), action buttons by status (6 statuses), action dialog flows (submit, approve, confirm, retry, cancel), dialog close, timeline rendering for CONFIRMED/CANCELLED/PENDING_APPROVAL, metadata timestamps, hook parameter verification.

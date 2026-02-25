@@ -1,6 +1,6 @@
-# Navia MVP — Implementation Plan v48.0
+# Navia MVP — Implementation Plan v49.0
 
-> **Generated**: 2026-02-25 | **Tests**: 2300 passing (1704 backend + 596 frontend) | **Backend modules**: 22 of 23 built
+> **Generated**: 2026-02-25 | **Tests**: 2337 passing (1704 backend + 633 frontend) | **Backend modules**: 22 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -573,8 +573,13 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
   - [x] useCreateTransaction + useSubmitTransaction TanStack Query mutation hooks
   - [x] transactions.form.* i18n namespace (~50 keys PT-BR + EN)
   - [x] 38 component tests (all passing)
-- [ ] Transaction detail page with status timeline
-- [ ] Approval workflow UI (submit → approve/reject)
+- [x] Transaction detail page with status timeline (visual StatusTimeline, buildTimelineSteps, DetailSkeleton)
+- [x] Approval workflow UI (submit, approve, confirm, retry, cancel) with ConfirmDialog, 5 action buttons conditional on status
+  - [x] useApproveTransaction + useConfirmTransaction TanStack Query mutation hooks
+  - [x] transactions.detail.* i18n namespace (~50 keys, PT-BR + EN)
+  - [x] Type-specific field rendering (ISSUANCE/TRANSFER/CONVERSION/CANCELLATION/SPLIT)
+  - [x] Brazilian formatting (BRL currency, pt-BR numbers, dates)
+  - [x] 37 component tests (all passing)
 
 ### 4.8 Funding Rounds Page
 

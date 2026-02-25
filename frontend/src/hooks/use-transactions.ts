@@ -124,6 +124,43 @@ export function useSubmitTransaction(companyId: string | undefined) {
   });
 }
 
+// --- Approve transaction ---
+
+export function useApproveTransaction(companyId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (transactionId: string) =>
+      api.post<Transaction>(
+        `/api/v1/companies/${companyId}/transactions/${transactionId}/approve`,
+        {},
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions', companyId] });
+    },
+  });
+}
+
+// --- Confirm transaction ---
+
+export function useConfirmTransaction(companyId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (transactionId: string) =>
+      api.post<Transaction>(
+        `/api/v1/companies/${companyId}/transactions/${transactionId}/confirm`,
+        {},
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['cap-table', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['shareClasses', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['shareholders', companyId] });
+    },
+  });
+}
+
 // --- Cancel transaction ---
 
 export function useCancelTransaction(companyId: string | undefined) {
