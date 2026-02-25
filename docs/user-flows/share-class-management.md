@@ -4,7 +4,7 @@
 **Actors**: ADMIN (full CRUD), FINANCE/LEGAL/INVESTOR (read-only)
 **Preconditions**: User is authenticated, user is an ACTIVE member of the company
 **Related Flows**: [Company Management](./company-management.md) (company must be ACTIVE), [Authentication](./authentication.md) (user must be logged in)
-**Implementation Status**: Backend complete, Frontend list page + create form complete (P4.6)
+**Implementation Status**: Backend complete, Frontend list page + create form + detail page complete (P4.6)
 
 ---
 
@@ -25,6 +25,21 @@ User navigates to Share Classes page
   ├─ [ADMIN clicks "Delete" on a share class] ─→ Delete flow (see below)
   │
   └─ [any role clicks a share class row] ─→ GET /share-classes/:id → Detail view
+        │
+        ├─ [loading] ─→ Skeleton placeholders
+        ├─ [not found] ─→ "Not Found" message with back link
+        ├─ [success] ─→ Detail page with 2 tabs (Holders / Details)
+        │     │
+        │     ├─ Holders tab (default): cap table entries filtered by shareClassId
+        │     │     ├─ [has holders] ─→ Table with name links, type badges, shares, ownership%, voting%
+        │     │     └─ [no holders] ─→ Empty state message
+        │     │
+        │     ├─ Details tab: info cards (Class Info, Voting Rights, Preferences, Restrictions)
+        │     │     └─ [PREFERRED_SHARES] ─→ Shows Liquidation Preferences card
+        │     │
+        │     └─ [ADMIN clicks Delete, totalIssued = 0] ─→ Delete confirmation dialog
+        │           ├─ [confirm] ─→ DELETE /share-classes/:id → redirect to list
+        │           └─ [cancel] ─→ Dialog closed
 
 
 ADMIN clicks "Create Share Class"
@@ -76,6 +91,66 @@ ADMIN clicks "Delete Share Class"
 ---
 
 ## Flows
+
+### Happy Path: View Share Class Detail (Frontend implemented)
+
+```
+PRECONDITION: User is ACTIVE member with ADMIN, FINANCE, LEGAL, or INVESTOR role
+ACTOR: Any permitted member
+TRIGGER: User clicks a share class name link in the list page
+
+1. [UI] User clicks a share class name in the list table
+2. [UI] Browser navigates to /dashboard/share-classes/:id
+3. [Frontend] useShareClass(companyId, shareClassId) fires TanStack Query
+   → While loading: render DetailSkeleton (pulse animation placeholders for header, stat cards, tabs)
+   → IF no company selected: show "No company selected" message
+4. [Frontend] useCapTable(companyId) fires in parallel for holders data
+5. [UI] Page header renders:
+   - Back link "← Back to Share Classes"
+   - Share class name (h1)
+   - Type badge (QUOTA=blue, COMMON_SHARES=green, PREFERRED_SHARES=cream)
+   - Delete button (only visible when totalIssued = 0, role = ADMIN)
+6. [UI] 4 stat cards:
+   - Authorized (highlighted with ocean-600 bg): totalAuthorized formatted pt-BR
+   - Issued: totalIssued formatted pt-BR
+   - Available: (totalAuthorized - totalIssued) formatted pt-BR
+   - % Issued: percentage with comma decimal (e.g., "50,0%")
+7. [UI] 2-tab layout (default: Holders tab):
+   a. Holders tab:
+      - Filters cap table entries by shareClassId
+      → IF has holders: table with Name (link to /shareholders/:id), Type badge, Shares, Ownership %, Voting %
+      → IF no holders: empty state message
+   b. Details tab:
+      - Class Information card: type, authorized, issued, available, seniority, conversion ratio
+      - Voting Rights card: votes per share
+      - Liquidation Preferences card (PREFERRED_SHARES only): multiple, participating rights, participation cap
+      - Transfer Restrictions card: right of first refusal, lock-up period, tag-along percentage
+
+POSTCONDITION: User views share class details with holders and rights information
+```
+
+### Happy Path: Delete from Detail Page (Frontend implemented)
+
+```
+PRECONDITION: Share class has totalIssued = 0, user has ADMIN role
+ACTOR: ADMIN member
+TRIGGER: User clicks "Delete" button on share class detail page
+
+1. [UI] User clicks "Delete" button in the detail page header
+2. [UI] Confirmation dialog appears: "Delete {className}?"
+3. [UI] User clicks "Delete" to confirm
+4. [Frontend] useDeleteShareClass mutation fires DELETE /api/v1/companies/:companyId/share-classes/:id
+5. [Backend] Validates auth, role, share class exists, totalIssued = 0
+   → IF shares issued: return 422 CAP_SHARE_CLASS_IN_USE
+   → IF not found: return 404
+6. [Backend] Deletes share class record, returns 204
+7. [Frontend] onSuccess invalidates shareClasses query cache
+8. [UI] Shows success toast via sonner
+9. [UI] Router navigates to /dashboard/share-classes (list page)
+
+POSTCONDITION: Share class deleted, user redirected to list
+SIDE EFFECTS: Audit log (SHARE_CLASS_DELETED), TanStack Query cache invalidation
+```
 
 ### Happy Path: Create Share Class (Frontend implemented)
 

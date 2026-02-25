@@ -155,6 +155,8 @@ export interface ForeignShareholdersSummary {
 // Share class types returned by GET /api/v1/companies/:id/share-classes
 export type ShareClassType = 'QUOTA' | 'COMMON_SHARES' | 'PREFERRED_SHARES';
 
+export type AntiDilutionType = 'FULL_RATCHET' | 'WEIGHTED_AVERAGE';
+
 export interface ShareClass {
   id: string;
   companyId: string;
@@ -165,9 +167,13 @@ export interface ShareClass {
   votesPerShare: number;
   liquidationPreferenceMultiple: string | null;
   participatingRights: boolean;
+  participationCap: string | null;
+  seniority: number;
   rightOfFirstRefusal: boolean;
   lockUpPeriodMonths: number | null;
   tagAlongPercentage: string | null;
+  conversionRatio: string | null;
+  antiDilutionType: AntiDilutionType | null;
   createdAt: string;
   updatedAt: string;
 }
