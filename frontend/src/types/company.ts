@@ -152,6 +152,26 @@ export interface ForeignShareholdersSummary {
   };
 }
 
+// Share class types returned by GET /api/v1/companies/:id/share-classes
+export type ShareClassType = 'QUOTA' | 'COMMON_SHARES' | 'PREFERRED_SHARES';
+
+export interface ShareClass {
+  id: string;
+  companyId: string;
+  className: string;
+  type: ShareClassType;
+  totalAuthorized: string;
+  totalIssued: string;
+  votesPerShare: number;
+  liquidationPreferenceMultiple: string | null;
+  participatingRights: boolean;
+  rightOfFirstRefusal: boolean;
+  lockUpPeriodMonths: number | null;
+  tagAlongPercentage: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Transaction types returned by GET /api/v1/companies/:id/transactions
 export interface TransactionShareholder {
   id: string;

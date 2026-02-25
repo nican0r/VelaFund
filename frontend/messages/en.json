@@ -452,6 +452,56 @@
       }
     }
   },
+  "shareClasses": {
+    "actions": "Actions",
+    "confirm": {
+      "delete": "Are you sure you want to delete this share class?",
+      "deleteDescription": "Only classes with no issued shares can be deleted.",
+      "deleteTitle": "Delete Share Class"
+    },
+    "create": "New Class",
+    "description": "Manage the company's share classes, their rights, and issuance limits.",
+    "empty": "No share classes found. Create the first class to get started.",
+    "filter": {
+      "allTypes": "All types"
+    },
+    "pagination": {
+      "next": "Next",
+      "of": "of",
+      "page": "Page",
+      "previous": "Previous",
+      "showing": "Showing {from} to {to} of {total}"
+    },
+    "stats": {
+      "available": "Available",
+      "issued": "Issued",
+      "preferred": "Preferred",
+      "total": "Total Classes"
+    },
+    "success": {
+      "created": "Share class created successfully",
+      "deleted": "Share class deleted successfully",
+      "updated": "Share class updated successfully"
+    },
+    "table": {
+      "authorized": "Authorized",
+      "available": "Available",
+      "issued": "Issued",
+      "issuedPct": "% Issued",
+      "lockUp": "Lock-up",
+      "lockUpMonths": "{months} months",
+      "name": "Name",
+      "noLockUp": "None",
+      "type": "Type",
+      "votesPerShare": "Votes/Share"
+    },
+    "title": "Share Classes",
+    "type": {
+      "commonShares": "Common Shares",
+      "preferredShares": "Preferred Shares",
+      "quota": "Quotas"
+    }
+  },
   "shareholders": {
     "actions": "Actions",
     "confirm": {

@@ -4,6 +4,7 @@
 **Actors**: ADMIN (full CRUD), FINANCE/LEGAL/INVESTOR (read-only)
 **Preconditions**: User is authenticated, user is an ACTIVE member of the company
 **Related Flows**: [Company Management](./company-management.md) (company must be ACTIVE), [Authentication](./authentication.md) (user must be logged in)
+**Implementation Status**: Backend complete, Frontend list page complete (P4.6)
 
 ---
 
@@ -115,22 +116,41 @@ POSTCONDITION: New share class exists with totalIssued = 0
 SIDE EFFECTS: Audit log (future: SHARE_CLASS_CREATED)
 ```
 
-### Happy Path: List Share Classes
+### Happy Path: List Share Classes (Frontend implemented)
 
 ```
 PRECONDITION: User is ACTIVE member with ADMIN, FINANCE, LEGAL, or INVESTOR role
 ACTOR: Any permitted member
-TRIGGER: User navigates to share classes page
+TRIGGER: User clicks "Share Classes" in sidebar navigation
 
-1. [UI] User navigates to /companies/:companyId/share-classes
-2. [Frontend] Sends GET /api/v1/companies/:companyId/share-classes?page=1&limit=20
-3. [Backend] Validates auth and role (ADMIN, FINANCE, LEGAL, INVESTOR)
-4. [Backend] Returns paginated list with meta
-5. [UI] Displays table with columns: className, type, totalAuthorized, totalIssued, votesPerShare
-6. [UI] User can filter by type (dropdown) and sort by columns
-7. [UI] User can paginate through results
+1. [UI] User clicks "Share Classes" nav item (Layers icon) in sidebar
+2. [UI] Page renders at /dashboard/share-classes
+3. [Frontend] CompanyProvider supplies selectedCompany context
+   → IF no company selected: show empty state "No share classes found"
+4. [Frontend] useShareClasses(companyId, { page, limit, type }) fires TanStack Query
+   → While loading: render skeleton placeholders (pulse animation)
+   → IF error: show error message from API
+5. [UI] Page header: "Share Classes" title + description + "New Class" link button
+6. [UI] 4 stat cards displayed:
+   - Total Classes (highlighted with ocean-600 bg): count of all share classes
+   - Issued: sum of all totalIssued (pt-BR formatted)
+   - Available: sum of (totalAuthorized - totalIssued) (pt-BR formatted)
+   - Preferred: count of PREFERRED_SHARES type classes
+7. [UI] Type filter dropdown: All types / Quotas / Common Shares / Preferred Shares
+   → Filter change updates useShareClasses params, triggers re-fetch
+8. [UI] Data table with 8 columns:
+   - Name (link text to /dashboard/share-classes/:id)
+   - Type (color-coded badge: QUOTA=blue, COMMON=green, PREFERRED=cream)
+   - Votes/Share (numeric)
+   - Authorized (pt-BR formatted number)
+   - Issued (pt-BR formatted number)
+   - % Issued (percentage with comma decimal: e.g., "60,0%")
+   - Lock-up (months or "None")
+   - Actions (Edit link icon + Delete button)
+9. [UI] Delete button disabled for classes with totalIssued > 0 (tooltip explains)
+10. [UI] Pagination shown when totalPages > 1 (Previous/Next + page indicator)
 
-POSTCONDITION: User sees share classes for this company
+POSTCONDITION: User sees paginated share classes with stats and type filter
 ```
 
 ### Happy Path: Update Share Class

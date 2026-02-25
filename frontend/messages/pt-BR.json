@@ -452,6 +452,56 @@
       }
     }
   },
+  "shareClasses": {
+    "actions": "Ações",
+    "confirm": {
+      "delete": "Tem certeza que deseja excluir esta classe de ações?",
+      "deleteDescription": "Só é possível excluir classes sem ações emitidas.",
+      "deleteTitle": "Excluir Classe de Ações"
+    },
+    "create": "Nova Classe",
+    "description": "Gerencie as classes de ações da empresa, seus direitos e limites de emissão.",
+    "empty": "Nenhuma classe de ações cadastrada. Crie a primeira classe para começar.",
+    "filter": {
+      "allTypes": "Todos os tipos"
+    },
+    "pagination": {
+      "next": "Próxima",
+      "of": "de",
+      "page": "Página",
+      "previous": "Anterior",
+      "showing": "Mostrando {from} a {to} de {total}"
+    },
+    "stats": {
+      "available": "Disponíveis",
+      "issued": "Emitidas",
+      "preferred": "Preferenciais",
+      "total": "Total de Classes"
+    },
+    "success": {
+      "created": "Classe de ações criada com sucesso",
+      "deleted": "Classe de ações excluída com sucesso",
+      "updated": "Classe de ações atualizada com sucesso"
+    },
+    "table": {
+      "authorized": "Autorizadas",
+      "available": "Disponíveis",
+      "issued": "Emitidas",
+      "issuedPct": "% Emitido",
+      "lockUp": "Lock-up",
+      "lockUpMonths": "{months} meses",
+      "name": "Nome",
+      "noLockUp": "Sem",
+      "type": "Tipo",
+      "votesPerShare": "Votos/Ação"
+    },
+    "title": "Classes de Ações",
+    "type": {
+      "commonShares": "Ações Ordinárias",
+      "preferredShares": "Ações Preferenciais",
+      "quota": "Quotas"
+    }
+  },
   "shareholders": {
     "actions": "Ações",
     "confirm": {
