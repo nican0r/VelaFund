@@ -32,7 +32,7 @@ const menuItems: NavItem[] = [
   { label: 'Shareholders', href: '/dashboard/shareholders', icon: Users },
   { label: 'Share Classes', href: '/dashboard/share-classes', icon: Layers },
   { label: 'Transactions', href: '/dashboard/transactions', icon: ArrowLeftRight },
-  { label: 'Investments', href: '/dashboard/investments', icon: TrendingUp },
+  { label: 'Funding Rounds', href: '/dashboard/funding-rounds', icon: TrendingUp },
   { label: 'Options', href: '/dashboard/options', icon: Gift },
   { label: 'Documents', href: '/dashboard/documents', icon: FileText },
 ];

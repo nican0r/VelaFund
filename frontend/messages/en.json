@@ -119,6 +119,64 @@
       "transfer": "Transfer"
     }
   },
+  "fundingRounds": {
+    "actions": "Actions",
+    "confirm": {
+      "cancel": "Cancel Round",
+      "cancelDescription": "Are you sure you want to cancel this round? All pending commitments will be cancelled. This action cannot be undone.",
+      "cancelTitle": "Cancel Round"
+    },
+    "create": "New Round",
+    "description": "View and manage all funding rounds for the company.",
+    "empty": "No funding rounds found. Create the first round to get started.",
+    "filter": {
+      "allStatuses": "All statuses",
+      "allTypes": "All types"
+    },
+    "pagination": {
+      "next": "Next",
+      "of": "of",
+      "page": "Page",
+      "previous": "Previous",
+      "showing": "Showing {from} to {to} of {total}"
+    },
+    "stats": {
+      "closed": "Closed",
+      "draft": "Drafts",
+      "open": "Open",
+      "total": "Total Rounds"
+    },
+    "status": {
+      "cancelled": "Cancelled",
+      "closed": "Closed",
+      "closing": "Closing",
+      "draft": "Draft",
+      "open": "Open"
+    },
+    "success": {
+      "cancelled": "Round cancelled successfully"
+    },
+    "table": {
+      "closeDate": "Close Date",
+      "created": "Created",
+      "name": "Name",
+      "preMoney": "Pre-Money",
+      "pricePerShare": "Price/Share",
+      "status": "Status",
+      "target": "Target",
+      "type": "Type"
+    },
+    "title": "Funding Rounds",
+    "type": {
+      "bridge": "Bridge",
+      "other": "Other",
+      "preSeed": "Pre-Seed",
+      "seed": "Seed",
+      "seriesA": "Series A",
+      "seriesB": "Series B",
+      "seriesC": "Series C"
+    }
+  },
   "errors": {
     "auth": {
       "accountLocked": "Account locked due to too many attempts. Try again in 15 minutes.",

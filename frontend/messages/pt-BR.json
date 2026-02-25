@@ -119,6 +119,64 @@
       "transfer": "Transferência"
     }
   },
+  "fundingRounds": {
+    "actions": "Ações",
+    "confirm": {
+      "cancel": "Cancelar Rodada",
+      "cancelDescription": "Tem certeza que deseja cancelar esta rodada? Todos os compromissos pendentes serão cancelados. Esta ação não pode ser desfeita.",
+      "cancelTitle": "Cancelar Rodada"
+    },
+    "create": "Nova Rodada",
+    "description": "Visualize e gerencie todas as rodadas de captação da empresa.",
+    "empty": "Nenhuma rodada de investimento encontrada. Crie a primeira rodada para começar.",
+    "filter": {
+      "allStatuses": "Todos os status",
+      "allTypes": "Todos os tipos"
+    },
+    "pagination": {
+      "next": "Próxima",
+      "of": "de",
+      "page": "Página",
+      "previous": "Anterior",
+      "showing": "Mostrando {from} a {to} de {total}"
+    },
+    "stats": {
+      "closed": "Encerradas",
+      "draft": "Rascunhos",
+      "open": "Abertas",
+      "total": "Total de Rodadas"
+    },
+    "status": {
+      "cancelled": "Cancelada",
+      "closed": "Encerrada",
+      "closing": "Encerrando",
+      "draft": "Rascunho",
+      "open": "Aberta"
+    },
+    "success": {
+      "cancelled": "Rodada cancelada com sucesso"
+    },
+    "table": {
+      "closeDate": "Encerramento",
+      "created": "Criação",
+      "name": "Nome",
+      "preMoney": "Pré-Money",
+      "pricePerShare": "Preço/Ação",
+      "status": "Status",
+      "target": "Alvo",
+      "type": "Tipo"
+    },
+    "title": "Rodadas de Investimento",
+    "type": {
+      "bridge": "Bridge",
+      "other": "Outro",
+      "preSeed": "Pré-Seed",
+      "seed": "Seed",
+      "seriesA": "Série A",
+      "seriesB": "Série B",
+      "seriesC": "Série C"
+    }
+  },
   "errors": {
     "auth": {
       "accountLocked": "Conta bloqueada por excesso de tentativas. Tente novamente em 15 minutos.",

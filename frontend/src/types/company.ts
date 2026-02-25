@@ -185,6 +185,43 @@ export interface TransactionShareClass {
   type: string;
 }
 
+// Funding Round types returned by GET /api/v1/companies/:id/funding-rounds
+export type RoundType = 'PRE_SEED' | 'SEED' | 'SERIES_A' | 'SERIES_B' | 'SERIES_C' | 'BRIDGE' | 'OTHER';
+export type FundingRoundStatus = 'DRAFT' | 'OPEN' | 'CLOSING' | 'CLOSED' | 'CANCELLED';
+
+export interface FundingRound {
+  id: string;
+  companyId: string;
+  name: string;
+  roundType: RoundType;
+  shareClassId: string;
+  targetAmount: string;
+  minimumCloseAmount: string | null;
+  hardCap: string | null;
+  preMoneyValuation: string;
+  pricePerShare: string;
+  status: FundingRoundStatus;
+  notes: string | null;
+  targetCloseDate: string | null;
+  openedAt: string | null;
+  closedAt: string | null;
+  cancelledAt: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FundingRoundDetail extends FundingRound {
+  currentAmount: string;
+  postMoneyValuation: string;
+  commitmentCount: number;
+  shareClass: {
+    id: string;
+    className: string;
+    type: string;
+  };
+}
+
 export interface Transaction {
   id: string;
   companyId: string;
