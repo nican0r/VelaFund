@@ -103,6 +103,111 @@ TRIGGER: ADMIN clicks "+ New Round" on the Funding Rounds list page
 POSTCONDITION: FundingRound exists in DRAFT status
 SIDE EFFECTS: Audit log ROUND_CREATED queued via Bull
 
+### Happy Path: View Round Detail (Frontend)
+
+PRECONDITION: FundingRound exists. User has company access.
+ACTOR: ADMIN, FINANCE, or LEGAL
+TRIGGER: User clicks a round row on the Funding Rounds list page
+
+1. [UI] User navigates to `/dashboard/funding-rounds/:roundId`
+2. [Frontend] Fetches round detail via `useFundingRound(companyId, roundId)` — GET /api/v1/companies/:companyId/funding-rounds/:roundId
+3. [Frontend] Fetches commitments via `useRoundCommitments(companyId, roundId)` — GET .../commitments
+4. [UI] Page renders state cascade:
+   → IF no company selected: show empty state ("Nenhuma rodada registrada")
+   → IF loading: show DetailSkeleton with animated pulse elements
+   → IF error: show error message with back link
+   → IF round null: show "Rodada não encontrada" with description
+5. [UI] Happy path renders:
+   - Header: Round name, type badge (PRE_SEED/SEED/SERIES_A/B/C/BRIDGE/OTHER), status badge (DRAFT/OPEN/CLOSING/CLOSED/CANCELLED)
+   - 4 stat cards: Target amount (active/highlighted), Raised amount, Investor count, Price per share
+   - Progress bar with current/target percentage, minimum close marker (if set)
+   - 3-tab layout: Commitments (default), Details, Pro-Forma
+   - Status timeline on right: Created → Opened → Closed/Cancelled
+6. [UI] Action buttons conditional on status:
+   → DRAFT: "Open Round", "Cancel Round"
+   → OPEN: "Add Commitment", "Close Round", "Cancel Round"
+   → CLOSED/CANCELLED: no action buttons
+7. [UI] Commitments tab shows data table with columns: Investor, Amount (BRL), Shares Allocated, Payment Status badge, Side Letter, Commitment Date, Actions
+8. [UI] Commitment inline actions (OPEN round only):
+   - PENDING: "Mark Received", "Confirm Payment", "Cancel Commitment"
+   - RECEIVED: "Confirm Payment", "Cancel Commitment"
+   - CONFIRMED: no actions
+   - CANCELLED: no actions
+9. [UI] Details tab shows InfoRow grid: name, type, share class, target, minimum, hard cap, pre-money, post-money, price per share, target close date, notes, timestamps
+10. [UI] Pro-Forma tab (lazy-loaded): fetches `useRoundProForma` only when tab is active
+    → IF no data: show "Nenhum dado pro-forma disponível."
+    → IF data: show before/after dilution table with Shareholder, Before %, After %, Change %
+
+POSTCONDITION: No state changes (read-only)
+SIDE EFFECTS: None
+
+### Happy Path: Open Round and Add Commitments (Frontend)
+
+PRECONDITION: FundingRound in DRAFT status (for open) or OPEN (for add commitment)
+ACTOR: ADMIN
+TRIGGER: ADMIN clicks "Open Round" or "Add Commitment" on detail page
+
+--- Opening a round: ---
+
+1. [UI] ADMIN clicks "Open Round" button on round detail page
+2. [UI] Confirmation dialog appears: "Após abrir, investidores poderão realizar compromissos."
+3. [UI] ADMIN clicks confirm
+4. [Frontend] Calls `openMutation.mutateAsync(roundId)` — POST .../open
+5. [UI] On success: dialog closes, TanStack Query invalidates funding-rounds cache, page re-renders with OPEN status
+
+--- Adding a commitment: ---
+
+6. [UI] ADMIN clicks "Add Commitment" button (header or empty-state CTA)
+7. [UI] AddCommitmentModal opens with: investor select dropdown (from useShareholders), amount input, side letter checkbox, notes textarea
+8. [UI] ADMIN selects investor, enters amount, clicks "Add Commitment"
+   → IF no investor or amount: button disabled, form does not submit
+9. [Frontend] Calls `addCommitmentMutation.mutateAsync({ shareholderId, committedAmount, hasSideLetter, notes })`
+10. [UI] On success: modal closes, commitments list refreshes
+
+--- Managing payment status: ---
+
+11. [UI] ADMIN/FINANCE clicks "Mark Received" on a PENDING commitment
+12. [UI] Confirmation dialog appears
+13. [Frontend] Calls `confirmPaymentMutation.mutateAsync({ commitmentId, paymentStatus: 'RECEIVED' })`
+14. [UI] Payment badge updates to RECEIVED
+
+15. [UI] ADMIN/FINANCE clicks "Confirm Payment" on a PENDING or RECEIVED commitment
+16. [Frontend] Calls `confirmPaymentMutation.mutateAsync({ commitmentId, paymentStatus: 'CONFIRMED' })`
+17. [UI] Payment badge updates to CONFIRMED, action buttons removed
+
+--- Cancelling a commitment: ---
+
+18. [UI] ADMIN clicks "Cancel Commitment" on a non-cancelled commitment
+19. [UI] Confirmation dialog: "Esta ação cancelará o compromisso do investidor."
+20. [Frontend] Calls `cancelCommitmentMutation.mutateAsync(commitmentId)`
+21. [UI] Commitment payment badge updates to CANCELLED
+
+POSTCONDITION: Round opened, commitments added/managed
+SIDE EFFECTS: TanStack Query cache invalidated for funding-rounds and commitments
+
+### Happy Path: Close or Cancel Round (Frontend)
+
+PRECONDITION: Round is OPEN (for close) or DRAFT/OPEN (for cancel)
+ACTOR: ADMIN
+TRIGGER: ADMIN clicks "Close Round" or "Cancel Round" on detail page
+
+--- Closing: ---
+
+1. [UI] ADMIN clicks "Close Round"
+2. [UI] Confirmation dialog: "Ao fechar, as ações serão emitidas para os investidores."
+3. [Frontend] Calls `closeMutation.mutateAsync(roundId)` — POST .../close
+4. [UI] On success: status updates to CLOSED, cap-table/transactions/shareholders caches invalidated
+
+--- Cancelling: ---
+
+5. [UI] ADMIN clicks "Cancel Round"
+6. [UI] Confirmation dialog: "Esta ação cancelará a rodada permanentemente."
+7. [Frontend] Calls `cancelMutation.mutateAsync(roundId)` — POST .../cancel
+8. [UI] On success: status updates to CANCELLED, all action buttons removed
+
+POSTCONDITION: Round closed (shares issued) or cancelled
+SIDE EFFECTS: TanStack Query invalidates cap-table, transactions, shareholders caches (on close)
+
 ### Happy Path: Open Round and Add Commitments
 
 PRECONDITION: FundingRound in DRAFT status

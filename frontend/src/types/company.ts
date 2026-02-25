@@ -222,6 +222,48 @@ export interface FundingRoundDetail extends FundingRound {
   };
 }
 
+// Commitment types returned by GET /api/v1/companies/:id/funding-rounds/:roundId/commitments
+export type CommitmentPaymentStatus = 'PENDING' | 'RECEIVED' | 'CONFIRMED' | 'CANCELLED';
+
+export interface RoundCommitment {
+  id: string;
+  roundId: string;
+  shareholderId: string;
+  amount: string;
+  sharesAllocated: string | null;
+  paymentStatus: CommitmentPaymentStatus;
+  paymentConfirmedAt: string | null;
+  hasSideLetter: boolean;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  shareholder: {
+    id: string;
+    name: string;
+    type: string;
+  };
+}
+
+// Pro-forma cap table types
+export interface ProFormaEntry {
+  shareholderId: string;
+  name: string;
+  shares: string;
+  percentage: string;
+}
+
+export interface ProFormaCapTable {
+  beforeRound: {
+    totalShares: string;
+    shareholders: ProFormaEntry[];
+  };
+  afterRound: {
+    totalShares: string;
+    shareholders: ProFormaEntry[];
+  };
+  dilution: Record<string, { before: string; after: string; change: string }>;
+}
+
 // Option Plan types returned by GET /api/v1/companies/:id/option-plans
 export type OptionPlanStatus = 'ACTIVE' | 'CLOSED';
 export type TerminationPolicy = 'FORFEITURE' | 'ACCELERATION' | 'PRO_RATA';

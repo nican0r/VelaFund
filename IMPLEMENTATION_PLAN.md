@@ -1,6 +1,6 @@
-# Navia MVP — Implementation Plan v49.0
+# Navia MVP — Implementation Plan v50.0
 
-> **Generated**: 2026-02-25 | **Tests**: 2337 passing (1704 backend + 633 frontend) | **Backend modules**: 22 of 23 built
+> **Generated**: 2026-02-25 | **Tests**: 2388 passing (1704 backend + 684 frontend) | **Backend modules**: 22 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -585,11 +585,7 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 
 - [x] Round list with status badges
 - [x] Create round form (2-step wizard Details→Review, 7 round type cards with icons, share class dropdown, financial terms with auto post-money calc, cross-field validation min≤target/hardCap≥target, useCreateFundingRound hook, fundingRounds.form.* i18n ~50 keys PT-BR+EN, 37 tests)
-- [ ] Round detail page: terms, commitments table, progress bar
-- [ ] Add commitment flow
-- [ ] Record payment UI
-- [ ] Close round confirmation with dilution preview
-- [ ] Pro-forma cap table view
+- [x] Round detail page with commitments table, progress bar, status timeline, stat cards, 3-tab layout (Commitments/Details/Pro-Forma), add commitment modal, payment management (mark received/confirm/cancel), round lifecycle actions (open/close/cancel) with confirmation dialogs, lazy pro-forma loading, 7 new TanStack Query hooks (useOpenFundingRound, useCloseFundingRound, useRoundCommitments, useAddCommitment, useConfirmPayment, useCancelCommitment, useRoundProForma), fundingRounds.detail.* i18n ~70 keys PT-BR+EN, 51 tests
 
 ### 4.9 Option Plans Page
 
