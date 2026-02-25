@@ -1,7 +1,8 @@
-import { Injectable, Logger, HttpStatus } from '@nestjs/common';
+import { Injectable, Logger, HttpStatus, Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrivyClient, type User as PrivyUser } from '@privy-io/node';
 import { Prisma } from '@prisma/client';
+import Redis from 'ioredis';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   UnauthorizedException,
@@ -9,6 +10,7 @@ import {
 } from '../common/filters/app-exception';
 import { AuthenticatedUser } from './decorators/current-user.decorator';
 import { maskEmail, maskIp } from '../common/utils/redact-pii';
+import { REDIS_CLIENT } from '../redis/redis.constants';
 
 export class AccountLockedException extends AppException {
   constructor() {
@@ -39,16 +41,23 @@ interface FailedAttempt {
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
   private readonly privyClient: PrivyClient;
+
+  // In-memory fallback for when Redis is unavailable
   private readonly failedAttempts = new Map<string, FailedAttempt>();
 
-  private static readonly MAX_FAILED_ATTEMPTS = 5;
-  private static readonly LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+  static readonly MAX_FAILED_ATTEMPTS = 5;
+  static readonly LOCKOUT_DURATION_S = 15 * 60; // 15 minutes in seconds (Redis TTL)
+  private static readonly LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes in ms (in-memory fallback)
   // BUG-13 fix: Cap in-memory lockout map to prevent memory exhaustion from DDoS
   private static readonly MAX_TRACKED_IPS = 10000;
+
+  // Redis key prefix for rate-limit lockout data
+  private static readonly LOCKOUT_PREFIX = 'lockout:';
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis | null,
   ) {
     const appId = this.configService.get<string>('PRIVY_APP_ID', '');
     const appSecret = this.configService.get<string>('PRIVY_APP_SECRET', '');
@@ -106,7 +115,7 @@ export class AuthService {
     user: AuthenticatedUser;
     isNewUser: boolean;
   }> {
-    this.checkLockout(ipAddress);
+    await this.checkLockout(ipAddress);
 
     // Verify the Privy token
     let privyUserId: string;
@@ -117,7 +126,7 @@ export class AuthService {
         .verifyAccessToken(privyAccessToken);
       privyUserId = verifiedClaims.user_id;
     } catch (error) {
-      this.recordFailedAttempt(ipAddress);
+      await this.recordFailedAttempt(ipAddress);
       this.logger.warn(
         `Login failed - invalid Privy token from IP: ${maskIp(ipAddress)}`,
       );
@@ -220,7 +229,7 @@ export class AuthService {
     });
 
     // Clear failed attempts on successful login
-    this.clearFailedAttempts(ipAddress);
+    await this.clearFailedAttempts(ipAddress);
 
     return {
       user: this.toAuthenticatedUser(user),
@@ -378,7 +387,31 @@ export class AuthService {
     return { first: null, last: null };
   }
 
-  private checkLockout(ipAddress: string): void {
+  /**
+   * Check if an IP is locked out due to too many failed login attempts.
+   * Uses Redis as primary store; falls back to in-memory Map if Redis is unavailable.
+   */
+  private async checkLockout(ipAddress: string): Promise<void> {
+    if (this.redis) {
+      try {
+        const key = `${AuthService.LOCKOUT_PREFIX}${ipAddress}`;
+        const countStr = await this.redis.get(key);
+        if (
+          countStr !== null &&
+          parseInt(countStr, 10) >= AuthService.MAX_FAILED_ATTEMPTS
+        ) {
+          throw new AccountLockedException();
+        }
+        return;
+      } catch (error) {
+        if (error instanceof AccountLockedException) throw error;
+        this.logger.warn(
+          `Redis lockout check failed, falling back to in-memory: ${error instanceof Error ? error.message : 'Unknown'}`,
+        );
+      }
+    }
+
+    // In-memory fallback
     const attempt = this.failedAttempts.get(ipAddress);
     if (!attempt) return;
 
@@ -393,10 +426,37 @@ export class AuthService {
   }
 
   /**
-   * BUG-13 fix: Cap the in-memory Map size. When the limit is reached, evict the
-   * oldest non-locked entries to prevent memory exhaustion from DDoS with many IPs.
+   * Record a failed login attempt for an IP address.
+   * Uses Redis INCR for atomic counter with TTL-based auto-expiry.
+   * Falls back to in-memory Map (BUG-13 cap) if Redis is unavailable.
    */
-  private recordFailedAttempt(ipAddress: string): void {
+  private async recordFailedAttempt(ipAddress: string): Promise<void> {
+    if (this.redis) {
+      try {
+        const key = `${AuthService.LOCKOUT_PREFIX}${ipAddress}`;
+        const count = await this.redis.incr(key);
+
+        // Set TTL on first failure (start the attempt window)
+        if (count === 1) {
+          await this.redis.expire(key, AuthService.LOCKOUT_DURATION_S);
+        }
+
+        // Reset TTL to full lockout duration when threshold is reached
+        if (count === AuthService.MAX_FAILED_ATTEMPTS) {
+          await this.redis.expire(key, AuthService.LOCKOUT_DURATION_S);
+          this.logger.warn(
+            `IP ${maskIp(ipAddress)} locked out after ${count} failed attempts (Redis)`,
+          );
+        }
+        return;
+      } catch (error) {
+        this.logger.warn(
+          `Redis lockout record failed, falling back to in-memory: ${error instanceof Error ? error.message : 'Unknown'}`,
+        );
+      }
+    }
+
+    // In-memory fallback
     const attempt = this.failedAttempts.get(ipAddress) || {
       count: 0,
       lockedUntil: null,
@@ -414,7 +474,7 @@ export class AuthService {
 
     this.failedAttempts.set(ipAddress, attempt);
 
-    // Evict oldest non-locked entries if map exceeds cap
+    // BUG-13 fix: Evict oldest non-locked entries if map exceeds cap
     if (this.failedAttempts.size > AuthService.MAX_TRACKED_IPS) {
       const now = new Date();
       for (const [ip, entry] of this.failedAttempts) {
@@ -426,7 +486,24 @@ export class AuthService {
     }
   }
 
-  private clearFailedAttempts(ipAddress: string): void {
+  /**
+   * Clear failed login attempts for an IP address (on successful login).
+   * Clears from both Redis and in-memory store.
+   */
+  private async clearFailedAttempts(ipAddress: string): Promise<void> {
+    if (this.redis) {
+      try {
+        const key = `${AuthService.LOCKOUT_PREFIX}${ipAddress}`;
+        await this.redis.del(key);
+        return;
+      } catch (error) {
+        this.logger.warn(
+          `Redis lockout clear failed, falling back to in-memory: ${error instanceof Error ? error.message : 'Unknown'}`,
+        );
+      }
+    }
+
+    // In-memory fallback
     this.failedAttempts.delete(ipAddress);
   }
 

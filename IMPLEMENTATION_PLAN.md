@@ -1,6 +1,6 @@
 # Navia MVP — Implementation Plan v23.0
 
-> **Generated**: 2026-02-25 | **Tests**: 960 passing | **Backend modules**: 14 of 23 built
+> **Generated**: 2026-02-25 | **Tests**: 968 passing | **Backend modules**: 14 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -9,7 +9,7 @@
 
 ## Current State
 
-**Built backend modules** (14): auth (with Redis sessions), company, member, share-class, shareholder, cap-table, transaction, funding-round, option-plan (with exercises), convertible, notification, audit-log
+**Built backend modules** (14): auth (with Redis sessions + Redis-backed failed-attempt lockout), company, member, share-class, shareholder, cap-table, transaction, funding-round, option-plan (with exercises), convertible, notification, audit-log
 
 **Entirely missing backend modules** (11): kyc, document-generation, document-signatures, blockchain-integration, company-profile, company-dataroom, company-litigation, company-blockchain-admin, cap-table-reconciliation, reports-analytics, exit-waterfall
 
@@ -107,7 +107,7 @@ Gaps in the 12 built modules, ordered by module.
 
 - [x] ~~`/auth/refresh` endpoint~~ — REPLACED by Redis session store (v0.0.17). Sessions are managed server-side; no token refresh needed.
 - [x] ~~Inactivity timeout (2h)~~ — DONE in v0.0.17. SessionService.isInactive() checks lastActivityAt; AuthGuard destroys inactive sessions and returns 401 with `errors.auth.sessionExpired`.
-- [ ] Move failed-attempt lockout from in-memory Map to Redis (current 10K cap is fragile) — Redis infrastructure now available
+- [x] Move failed-attempt lockout from in-memory Map to Redis — DONE: Redis INCR with TTL-based auto-expiry (15-min lockout period). Graceful degradation: if Redis is unavailable or errors, falls back to in-memory Map with 10K IP cap. 8 new tests (968 total passing).
 - [ ] Duplicate wallet check — prevent two users from linking the same wallet address
 - [ ] Privy API retry with exponential backoff (currently no retry on verify failure)
 - [ ] Audit logging events: AUTH_LOGIN_SUCCESS, AUTH_LOGIN_FAILED, AUTH_LOGOUT (depends on P3 Audit module)
@@ -124,7 +124,7 @@ Gaps in the 12 built modules, ordered by module.
 ### Member Module
 
 - [ ] Send invitation email via SES (2 TODO comments at `member.service.ts:137,354`) — depends on P1 Email
-- [ ] `GET /companies/:companyId/members/:id` single-member endpoint (spec has it, confirmed missing from controller and service)
+- [ ] `GET /companies/:companyId/members/:memberId/permissions` endpoint — returns fully-resolved permissions per `user-permissions.md` (role defaults + overrides). Note: no single-member GET endpoint is defined in the spec; the IMPLEMENTATION_PLAN previously stated this incorrectly.
 - [ ] Audit logging events: COMPANY_MEMBER_INVITED, COMPANY_MEMBER_ACCEPTED, COMPANY_MEMBER_REMOVED, COMPANY_ROLE_CHANGED (depends on P3 Audit module)
 - [ ] Permission override management endpoints (spec defines fine-grained overrides, not fully exposed in API)
 
@@ -645,7 +645,7 @@ P4.1 Frontend Foundation ───→ All P4.x pages
 ## Recommended Implementation Order
 
 **Sprint 1**: P0 bugs (BUG-1 DONE v0.0.17; BUG-2–6 DONE v0.0.15), P1 Redis+Bull (DONE v0.0.16), P1 AWS SDK (DONE v0.0.18)
-**Sprint 2**: P1 remaining (~~CSRF~~ DONE, ~~redactPii~~ DONE, Sentry, Email, ~~EncryptionService~~ DONE, ~~body limits~~ DONE, ~~helmet gap~~ DONE, test infra deps), P2 Auth gaps
+**Sprint 2**: P1 remaining (~~CSRF~~ DONE, ~~redactPii~~ DONE, Sentry, Email, ~~EncryptionService~~ DONE, ~~body limits~~ DONE, ~~helmet gap~~ DONE, test infra deps), P2 Auth gaps (~~Redis lockout~~ DONE)
 **Sprint 3**: P3.1 Notifications (module built, WebSocket + cross-module integration pending), P3.2 Audit Logging (core module built — @Auditable decorator, AuditInterceptor, AuditService, Bull queue processor, controller with list/detail/verify; remaining: ClsModule before-state, daily hash chain job, DLQ monitoring, DB immutability trigger, partitioning, cross-module integration of all 50+ events, export)
 **Sprint 4**: P3.3 KYC, P3.14 CNPJ Validation, P2 Company gaps
 **Sprint 5**: P3.4 Document Generation, P3.7 Dataroom

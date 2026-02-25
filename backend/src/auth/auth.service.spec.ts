@@ -4,6 +4,7 @@ import { HttpStatus } from '@nestjs/common';
 import { AuthService, AccountLockedException, PrivyUnavailableException } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UnauthorizedException, AppException } from '../common/filters/app-exception';
+import { REDIS_CLIENT } from '../redis/redis.constants';
 
 // Mock the PrivyClient from @privy-io/node
 const mockVerifyAccessToken = jest.fn();
@@ -22,6 +23,31 @@ jest.mock('@privy-io/node', () => ({
   })),
 }));
 
+/**
+ * Creates a stateful Redis mock that simulates real Redis GET/INCR/EXPIRE/DEL behavior.
+ * This is more reliable than sequencing mockResolvedValueOnce calls.
+ */
+function createStatefulRedisMock() {
+  const store: Record<string, string> = {};
+
+  return {
+    get: jest.fn(async (key: string) => store[key] ?? null),
+    incr: jest.fn(async (key: string) => {
+      const current = parseInt(store[key] ?? '0', 10);
+      const next = current + 1;
+      store[key] = String(next);
+      return next;
+    }),
+    expire: jest.fn(async () => 1),
+    del: jest.fn(async (key: string) => {
+      const existed = key in store ? 1 : 0;
+      delete store[key];
+      return existed;
+    }),
+    _store: store, // Expose for assertions
+  };
+}
+
 describe('AuthService', () => {
   let service: AuthService;
   let prisma: {
@@ -32,6 +58,7 @@ describe('AuthService', () => {
     };
     $transaction: jest.Mock;
   };
+  let mockRedis: ReturnType<typeof createStatefulRedisMock>;
 
   const mockDbUser = {
     id: 'user-uuid-1',
@@ -60,9 +87,21 @@ describe('AuthService', () => {
     mfa_methods: [],
   };
 
-  beforeEach(async () => {
-    jest.clearAllMocks();
+  const configServiceMock = {
+    get: jest.fn((key: string, defaultValue?: string) => {
+      const config: Record<string, string> = {
+        PRIVY_APP_ID: 'test-app-id',
+        PRIVY_APP_SECRET: 'test-app-secret',
+      };
+      return config[key] || defaultValue || '';
+    }),
+  };
 
+  /**
+   * Helper to create a test module with optional Redis client.
+   * Pass null for Redis to test in-memory fallback mode.
+   */
+  async function createTestModule(redisClient: unknown) {
     prisma = {
       user: {
         findUnique: jest.fn(),
@@ -71,30 +110,24 @@ describe('AuthService', () => {
       },
       $transaction: jest.fn(),
     };
-
-    // $transaction calls the callback with the prisma mock itself as the tx client
     prisma.$transaction.mockImplementation((fn: (tx: typeof prisma) => Promise<unknown>) => fn(prisma));
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
         { provide: PrismaService, useValue: prisma },
-        {
-          provide: ConfigService,
-          useValue: {
-            get: jest.fn((key: string, defaultValue?: string) => {
-              const config: Record<string, string> = {
-                PRIVY_APP_ID: 'test-app-id',
-                PRIVY_APP_SECRET: 'test-app-secret',
-              };
-              return config[key] || defaultValue || '';
-            }),
-          },
-        },
+        { provide: ConfigService, useValue: configServiceMock },
+        { provide: REDIS_CLIENT, useValue: redisClient },
       ],
     }).compile();
 
-    service = module.get<AuthService>(AuthService);
+    return module.get<AuthService>(AuthService);
+  }
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    mockRedis = createStatefulRedisMock();
+    service = await createTestModule(mockRedis);
   });
 
   describe('verifyTokenAndGetUser', () => {
@@ -289,65 +322,6 @@ describe('AuthService', () => {
       );
     });
 
-    it('should record failed attempts and lock out after 5 failures', async () => {
-      mockVerifyAccessToken.mockRejectedValue(new Error('Invalid token'));
-
-      const ip = '10.0.0.1';
-
-      // First 5 attempts should throw UnauthorizedException
-      for (let i = 0; i < 5; i++) {
-        await expect(service.login('bad-token', ip)).rejects.toThrow(
-          UnauthorizedException,
-        );
-      }
-
-      // 6th attempt should throw AccountLockedException
-      await expect(service.login('any-token', ip)).rejects.toThrow(
-        AccountLockedException,
-      );
-    });
-
-    it('should clear failed attempts on successful login', async () => {
-      mockVerifyAccessToken.mockRejectedValue(new Error('Invalid token'));
-
-      const ip = '10.0.0.2';
-
-      // Record 3 failed attempts
-      for (let i = 0; i < 3; i++) {
-        await expect(service.login('bad-token', ip)).rejects.toThrow(
-          UnauthorizedException,
-        );
-      }
-
-      // Successful login
-      mockVerifyAccessToken.mockResolvedValue({
-        user_id: 'did:privy:abc123',
-      });
-      mockGetUser.mockResolvedValue(mockPrivyUser);
-      prisma.user.findUnique.mockResolvedValue(mockDbUser);
-      prisma.user.update.mockResolvedValue(mockDbUser);
-
-      const result = await service.login('valid-token', ip);
-      expect(result.user.id).toBe('user-uuid-1');
-
-      // After clearing, 5 more failures should be needed to lock
-      mockVerifyAccessToken.mockRejectedValue(new Error('Invalid token'));
-      for (let i = 0; i < 4; i++) {
-        await expect(service.login('bad-token', ip)).rejects.toThrow(
-          UnauthorizedException,
-        );
-      }
-      // Still not locked (only 4 after clear)
-      await expect(service.login('bad-token', ip)).rejects.toThrow(
-        UnauthorizedException,
-      );
-
-      // Now locked after 5th
-      await expect(service.login('any-token', ip)).rejects.toThrow(
-        AccountLockedException,
-      );
-    });
-
     it('should sync wallet address if changed in Privy', async () => {
       mockVerifyAccessToken.mockResolvedValue({
         user_id: 'did:privy:abc123',
@@ -374,6 +348,213 @@ describe('AuthService', () => {
           walletAddress: '0xNEWWALLET',
         }),
       });
+    });
+  });
+
+  describe('lockout (Redis-backed)', () => {
+    it('should record failed attempts in Redis using INCR', async () => {
+      mockVerifyAccessToken.mockRejectedValue(new Error('Invalid token'));
+      const ip = '10.0.0.1';
+
+      await expect(service.login('bad-token', ip)).rejects.toThrow(UnauthorizedException);
+
+      expect(mockRedis.incr).toHaveBeenCalledWith('lockout:10.0.0.1');
+      expect(mockRedis.expire).toHaveBeenCalledWith('lockout:10.0.0.1', AuthService.LOCKOUT_DURATION_S);
+    });
+
+    it('should set TTL only on first failure and at lockout threshold', async () => {
+      mockVerifyAccessToken.mockRejectedValue(new Error('Invalid token'));
+      const ip = '10.0.0.50';
+
+      // First failure: EXPIRE called (count === 1)
+      await expect(service.login('bad', ip)).rejects.toThrow(UnauthorizedException);
+      expect(mockRedis.expire).toHaveBeenCalledTimes(1);
+
+      // 2nd, 3rd, 4th failures: EXPIRE not called again
+      for (let i = 0; i < 3; i++) {
+        await expect(service.login('bad', ip)).rejects.toThrow(UnauthorizedException);
+      }
+      // expire was called once on first, not on 2,3,4
+      expect(mockRedis.expire).toHaveBeenCalledTimes(1);
+
+      // 5th failure: EXPIRE called again (count === MAX_FAILED_ATTEMPTS)
+      await expect(service.login('bad', ip)).rejects.toThrow(UnauthorizedException);
+      expect(mockRedis.expire).toHaveBeenCalledTimes(2);
+    });
+
+    it('should lock out after 5 failed attempts via Redis', async () => {
+      mockVerifyAccessToken.mockRejectedValue(new Error('Invalid token'));
+      const ip = '10.0.0.2';
+
+      // First 5 attempts: UnauthorizedException (each increments counter)
+      for (let i = 0; i < 5; i++) {
+        await expect(service.login('bad-token', ip)).rejects.toThrow(UnauthorizedException);
+      }
+
+      // 6th attempt: checkLockout reads count=5 from Redis → AccountLockedException
+      await expect(service.login('any-token', ip)).rejects.toThrow(AccountLockedException);
+    });
+
+    it('should clear failed attempts in Redis on successful login', async () => {
+      mockVerifyAccessToken.mockRejectedValue(new Error('Invalid token'));
+      const ip = '10.0.0.3';
+
+      // Record 3 failed attempts
+      for (let i = 0; i < 3; i++) {
+        await expect(service.login('bad-token', ip)).rejects.toThrow(UnauthorizedException);
+      }
+      expect(mockRedis._store['lockout:10.0.0.3']).toBe('3');
+
+      // Successful login clears the counter
+      mockVerifyAccessToken.mockResolvedValue({ user_id: 'did:privy:abc123' });
+      mockGetUser.mockResolvedValue(mockPrivyUser);
+      prisma.user.findUnique.mockResolvedValue(mockDbUser);
+      prisma.user.update.mockResolvedValue(mockDbUser);
+
+      const result = await service.login('valid-token', ip);
+      expect(result.user.id).toBe('user-uuid-1');
+
+      // Redis DEL was called
+      expect(mockRedis.del).toHaveBeenCalledWith('lockout:10.0.0.3');
+      // Counter is cleared
+      expect(mockRedis._store['lockout:10.0.0.3']).toBeUndefined();
+
+      // After clearing, 5 more failures needed to lock
+      mockVerifyAccessToken.mockRejectedValue(new Error('Invalid token'));
+      for (let i = 0; i < 5; i++) {
+        await expect(service.login('bad-token', ip)).rejects.toThrow(UnauthorizedException);
+      }
+      // Now locked
+      await expect(service.login('any-token', ip)).rejects.toThrow(AccountLockedException);
+    });
+
+    it('should not lock different IPs independently', async () => {
+      mockVerifyAccessToken.mockRejectedValue(new Error('Invalid token'));
+
+      // Lock IP A
+      for (let i = 0; i < 5; i++) {
+        await expect(service.login('bad', '10.0.0.10')).rejects.toThrow(UnauthorizedException);
+      }
+      await expect(service.login('any', '10.0.0.10')).rejects.toThrow(AccountLockedException);
+
+      // IP B is not locked — still gets UnauthorizedException (not AccountLocked)
+      await expect(service.login('bad', '10.0.0.11')).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
+  describe('lockout (in-memory fallback when Redis is null)', () => {
+    let fallbackService: AuthService;
+
+    beforeEach(async () => {
+      jest.clearAllMocks();
+      fallbackService = await createTestModule(null);
+    });
+
+    it('should record failed attempts and lock out using in-memory Map', async () => {
+      mockVerifyAccessToken.mockRejectedValue(new Error('Invalid token'));
+      const ip = '10.0.0.20';
+
+      // First 5 attempts should throw UnauthorizedException
+      for (let i = 0; i < 5; i++) {
+        await expect(fallbackService.login('bad-token', ip)).rejects.toThrow(
+          UnauthorizedException,
+        );
+      }
+
+      // 6th attempt should throw AccountLockedException
+      await expect(fallbackService.login('any-token', ip)).rejects.toThrow(
+        AccountLockedException,
+      );
+    });
+
+    it('should clear failed attempts on successful login in in-memory mode', async () => {
+      mockVerifyAccessToken.mockRejectedValue(new Error('Invalid token'));
+      const ip = '10.0.0.21';
+
+      // Record 3 failed attempts
+      for (let i = 0; i < 3; i++) {
+        await expect(fallbackService.login('bad-token', ip)).rejects.toThrow(
+          UnauthorizedException,
+        );
+      }
+
+      // Successful login clears
+      mockVerifyAccessToken.mockResolvedValue({ user_id: 'did:privy:abc123' });
+      mockGetUser.mockResolvedValue(mockPrivyUser);
+      prisma.user.findUnique.mockResolvedValue(mockDbUser);
+      prisma.user.update.mockResolvedValue(mockDbUser);
+
+      const result = await fallbackService.login('valid-token', ip);
+      expect(result.user.id).toBe('user-uuid-1');
+
+      // After clearing, 5 more failures needed to lock
+      mockVerifyAccessToken.mockRejectedValue(new Error('Invalid token'));
+      for (let i = 0; i < 4; i++) {
+        await expect(fallbackService.login('bad-token', ip)).rejects.toThrow(
+          UnauthorizedException,
+        );
+      }
+      // Still not locked (only 4 after clear)
+      await expect(fallbackService.login('bad-token', ip)).rejects.toThrow(
+        UnauthorizedException,
+      );
+
+      // Now locked after 5th
+      await expect(fallbackService.login('any-token', ip)).rejects.toThrow(
+        AccountLockedException,
+      );
+    });
+
+    it('should not use Redis when REDIS_CLIENT is null', async () => {
+      mockVerifyAccessToken.mockRejectedValue(new Error('Invalid token'));
+      await expect(fallbackService.login('bad', '10.0.0.22')).rejects.toThrow(UnauthorizedException);
+
+      // mockRedis should not have been called (it's a fresh one from beforeEach above,
+      // but fallbackService was created with null Redis)
+      expect(mockRedis.get).not.toHaveBeenCalled();
+      expect(mockRedis.incr).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('lockout (Redis error fallback)', () => {
+    let errorService: AuthService;
+    let errorRedis: { get: jest.Mock; incr: jest.Mock; expire: jest.Mock; del: jest.Mock };
+
+    beforeEach(async () => {
+      jest.clearAllMocks();
+      errorRedis = {
+        get: jest.fn().mockRejectedValue(new Error('Redis connection refused')),
+        incr: jest.fn().mockRejectedValue(new Error('Redis connection refused')),
+        expire: jest.fn().mockRejectedValue(new Error('Redis connection refused')),
+        del: jest.fn().mockRejectedValue(new Error('Redis connection refused')),
+      };
+      errorService = await createTestModule(errorRedis);
+    });
+
+    it('should fall back to in-memory when Redis GET fails', async () => {
+      mockVerifyAccessToken.mockRejectedValue(new Error('Invalid token'));
+      const ip = '10.0.0.30';
+
+      // Redis fails, but in-memory fallback works
+      for (let i = 0; i < 5; i++) {
+        await expect(errorService.login('bad-token', ip)).rejects.toThrow(
+          UnauthorizedException,
+        );
+      }
+
+      // 6th attempt locks via in-memory fallback
+      await expect(errorService.login('any-token', ip)).rejects.toThrow(
+        AccountLockedException,
+      );
+    });
+
+    it('should attempt Redis first then fall back on every call', async () => {
+      mockVerifyAccessToken.mockRejectedValue(new Error('Invalid token'));
+      await expect(errorService.login('bad', '10.0.0.31')).rejects.toThrow(UnauthorizedException);
+
+      // Redis was attempted for both checkLockout (GET) and recordFailedAttempt (INCR)
+      expect(errorRedis.get).toHaveBeenCalledWith('lockout:10.0.0.31');
+      expect(errorRedis.incr).toHaveBeenCalledWith('lockout:10.0.0.31');
     });
   });
 

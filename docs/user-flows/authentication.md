@@ -139,6 +139,21 @@ If Redis is unavailable (not configured or connection failed):
 
 This ensures the application remains functional without Redis, with degraded session reliability.
 
+### Failed-Attempt Lockout (Redis-Backed)
+
+The per-IP failed-login counter is stored in Redis for shared state across instances and automatic expiry.
+
+| Aspect | Detail |
+|--------|--------|
+| Redis key pattern | `lockout:{ipAddress}` |
+| Counter operation | `INCR` (atomic — no race conditions) |
+| TTL | 15 minutes, set on first increment; subsequent INCRs preserve the existing TTL |
+| Lockout threshold | 5 failed attempts → IP locked for the remainder of the TTL window |
+| Successful login | `DEL lockout:{ipAddress}` clears the counter immediately |
+| Auto-cleanup | Redis TTL handles expiry — no scheduled job or manual eviction needed |
+
+**Graceful degradation**: If Redis is unavailable or the INCR/GET call errors, the service falls back to an in-memory `Map<ipAddress, { count, expiresAt }>` with a 10K-entry cap (BUG-13 fix: LRU eviction prevents unbounded growth). The in-memory store is per-process and does not survive restarts, so lockout state is lost on redeploy when Redis is down.
+
 ---
 
 ## Flows
@@ -293,11 +308,13 @@ ACTOR: User (potentially attacker)
 TRIGGER: Login attempt from locked IP
 
 1. [Frontend] Sends POST /api/v1/auth/login
-2. [Backend] Checks lockout: IP has active lockout
+2. [Backend] Checks lockout via INCR on Redis key lockout:{ipAddress}
+   -> IF Redis available: reads atomic counter; lockout active if counter >= 5 and TTL > 0
+   -> IF Redis unavailable: falls back to in-memory Map check (10K IP cap)
 3. [Backend] Returns 429 AUTH_ACCOUNT_LOCKED
 4. [UI] Shows error: "Account temporarily locked. Try again in 15 minutes."
 
-POSTCONDITION: No login possible from this IP until lockout expires
+POSTCONDITION: No login possible from this IP until lockout expires (Redis TTL or in-memory eviction)
 ```
 
 ### Error Path: Privy Service Down
@@ -342,7 +359,7 @@ POSTCONDITION: User authenticated, but without Redis session resilience
 
 | # | Decision Point | Condition | Path | Outcome |
 |---|---------------|-----------|------|---------|
-| 8 | IP lockout check | IP has >= 5 failures and lock not expired | Error | 429 AUTH_ACCOUNT_LOCKED |
+| 8 | IP lockout check | IP has >= 5 failures and lock not expired (Redis INCR counter or in-memory fallback) | Error | 429 AUTH_ACCOUNT_LOCKED |
 | 9 | Token verification | Invalid or expired Privy token | Error | 401 AUTH_INVALID_TOKEN, failed attempt recorded |
 | 10 | Privy user fetch | Privy API unavailable | Error | 502 AUTH_PRIVY_UNAVAILABLE |
 | 11 | Email extraction | No email in linked_accounts (email, google_oauth, apple_oauth) | Error | 401 AUTH_INVALID_TOKEN |
