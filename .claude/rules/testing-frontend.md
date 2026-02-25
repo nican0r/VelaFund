@@ -19,6 +19,12 @@
 - **Accessibility**: ARIA labels, keyboard navigation, focus management
 - Test user behavior, not implementation details
 
+## Provider/Layout Integration Testing
+- When a component calls a context hook (`useCompany`, `useAuth`, etc.), include at least one test that wraps it in the **real provider** — not a module-level mock — to verify the component works within its actual provider hierarchy
+- Layout components (`DashboardLayout`, `Sidebar`, `Topbar`) that compose multiple context-dependent children must have integration tests rendering the full layout tree with real providers to catch misplaced provider boundaries
+- Mocking context at the module level (`jest.mock(...)`) is fine for unit-testing individual features, but never sufficient on its own — it hides provider hierarchy bugs where a component sits outside its required provider in the real component tree
+- Every context provider (`AuthProvider`, `CompanyProvider`, etc.) must have its own dedicated test file that renders the **real provider** with controlled mocks of its dependencies (e.g., mock `usePrivy` but render real `AuthProvider`). Tests must verify the full state machine: initial → loading → success/failure → final state. Module-level mocking of a provider in consuming component tests is not a substitute for testing the provider itself.
+
 ## Coverage
 - General minimum: 80% statements/lines
 - Critical components (auth, investments, KYC, smart contract interactions): 100%

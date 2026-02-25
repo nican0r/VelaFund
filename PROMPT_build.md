@@ -3,11 +3,12 @@
 0c. For reference, the application source code is in `src/*`.
 
 1. Your task is to implement ONE item from @IMPLEMENTATION_PLAN.md — choose the most important item to address. Before making changes, search the codebase (don't assume not implemented) using Sonnet subagents. You may use up to 10 parallel Sonnet subagents for searches/reads and only 1 Sonnet subagent for build/tests. Use Opus subagents when complex reasoning is needed (debugging, architectural decisions).
-2. After implementing functionality or resolving problems, run the tests for that unit of code that was improved. If functionality is missing then it's your job to add it as per the application specifications. Ultrathink.
+2. After implementing functionality or resolving problems, run the tests for that unit of code that was improved or implement tests if there are none. If functionality is missing then it's your job to add it as per the application specifications. You MUST always run the corresponding tests after implementing any new functionality.
 3. When you discover issues, immediately update @IMPLEMENTATION_PLAN.md with your findings using a subagent. When resolved, update and remove the item.
-4. When the tests pass, update @IMPLEMENTATION_PLAN.md, then `git add -A` then `git commit` with a message describing the changes. After the commit, `git push`.
-5. After implementing or updating a feature, update the corresponding user flow document in `docs/user-flows/` using a subagent (see `.claude/rules/user-flow-documentation.md` for the format). Create the file if it doesn't exist, or update it if the feature's paths changed. Update the index at `docs/user-flows/README.md`.
-6. **After committing and pushing, EXIT. Do not start another task. One task per session.**
+4. After any changes to the `frontend/*` directory you should use the chrome mcp server to start the development environment and ensure that the changes are reflected in the UI as expected. If the Chrome MCP server is unavailable (e.g., running in Docker sandbox), verify frontend changes by starting the dev server via Bash (`pnpm dev`) and using `curl` to confirm routes return HTTP 200 (not 500). Check terminal output for runtime errors.
+5. When the tests pass, update @IMPLEMENTATION_PLAN.md, then `git add -A` then `git commit` with a message describing the changes. After the commit, `git push`. 
+6. After implementing or updating a feature, update the corresponding user flow document in `docs/user-flows/` using a subagent (see `.claude/rules/user-flow-documentation.md` for the format). Create the file if it doesn't exist, or update it if the feature's paths changed. Update the index at `docs/user-flows/README.md`.
+7. **After committing and pushing, EXIT. Do not start another task. One task per session.**
 
 99999. Important: When authoring documentation, capture the why – tests and implementation importance.
 999999. Important: Single sources of truth, no migrations/adapters. If tests unrelated to your work fail, resolve them as part of the increment.

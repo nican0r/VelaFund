@@ -24,32 +24,34 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Desktop sidebar */}
-      <div className="hidden lg:block">
-        <Sidebar collapsed={sidebarCollapsed} onToggle={handleToggleSidebar} />
-      </div>
-
-      {/* Mobile sidebar */}
-      <MobileSidebar open={mobileSidebarOpen} onClose={handleCloseMobileSidebar} />
-
-      {/* Topbar */}
-      <Topbar
-        onMenuClick={handleOpenMobileSidebar}
-        sidebarCollapsed={sidebarCollapsed}
-      />
-
-      {/* Main content area */}
-      <main
-        className={cn(
-          'min-h-screen pt-topbar transition-[padding-left] duration-200',
-          sidebarCollapsed ? 'lg:pl-sidebar-collapsed' : 'lg:pl-sidebar',
-        )}
-      >
-        <div className="mx-auto max-w-[1280px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-          <CompanyProvider>{children}</CompanyProvider>
+    <CompanyProvider>
+      <div className="min-h-screen bg-background">
+        {/* Desktop sidebar */}
+        <div className="hidden lg:block">
+          <Sidebar collapsed={sidebarCollapsed} onToggle={handleToggleSidebar} />
         </div>
-      </main>
-    </div>
+
+        {/* Mobile sidebar */}
+        <MobileSidebar open={mobileSidebarOpen} onClose={handleCloseMobileSidebar} />
+
+        {/* Topbar */}
+        <Topbar
+          onMenuClick={handleOpenMobileSidebar}
+          sidebarCollapsed={sidebarCollapsed}
+        />
+
+        {/* Main content area */}
+        <main
+          className={cn(
+            'min-h-screen pt-topbar transition-[padding-left] duration-200',
+            sidebarCollapsed ? 'lg:pl-sidebar-collapsed' : 'lg:pl-sidebar',
+          )}
+        >
+          <div className="mx-auto max-w-[1280px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+            {children}
+          </div>
+        </main>
+      </div>
+    </CompanyProvider>
   );
 }

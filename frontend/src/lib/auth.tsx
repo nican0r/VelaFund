@@ -5,6 +5,7 @@ import {
   useContext,
   useCallback,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -59,51 +60,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [hasBackendSession, setHasBackendSession] = useState(false);
 
-  // When Privy authenticates, create a backend session
-  useEffect(() => {
-    if (!ready || !authenticated || hasBackendSession || isLoggingIn) return;
+  // When Privy authenticates, create a backend session.
+  // Uses a ref guard instead of a cancelled flag to avoid the cleanup race condition
+  // where React re-runs the effect (due to isLoggingIn state change) before the async
+  // work completes, which would leave isLoggingIn permanently stuck at true.
+  const isLoggingInRef = useRef(false);
 
-    let cancelled = false;
+  useEffect(() => {
+    if (!ready || !authenticated || hasBackendSession || isLoggingInRef.current) return;
+
+    isLoggingInRef.current = true;
+    setIsLoggingIn(true);
 
     async function createBackendSession() {
-      setIsLoggingIn(true);
       try {
         const token = await getAccessToken();
-        if (!token || cancelled) return;
+        if (!token) return;
 
         const result = await api.post<{ user: User; isNewUser: boolean }>(
           '/api/v1/auth/login',
           { privyAccessToken: token },
         );
 
-        if (!cancelled) {
-          setUser(result.user);
-          setHasBackendSession(true);
+        setUser(result.user);
+        setHasBackendSession(true);
 
-          // Set locale cookie for next-intl
-          if (result.user.locale) {
-            document.cookie = `navia-locale=${result.user.locale};path=/;max-age=${365 * 24 * 60 * 60};samesite=strict`;
-          }
+        // Set locale cookie for next-intl
+        if (result.user.locale) {
+          document.cookie = `navia-locale=${result.user.locale};path=/;max-age=${365 * 24 * 60 * 60};samesite=strict`;
         }
       } catch {
         // If backend login fails, log out of Privy too
-        if (!cancelled) {
-          await privyLogout();
-          setHasBackendSession(false);
-        }
+        await privyLogout();
+        setHasBackendSession(false);
       } finally {
-        if (!cancelled) {
-          setIsLoggingIn(false);
-        }
+        isLoggingInRef.current = false;
+        setIsLoggingIn(false);
       }
     }
 
     createBackendSession();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [ready, authenticated, hasBackendSession, isLoggingIn, getAccessToken, privyLogout]);
+  }, [ready, authenticated, hasBackendSession, getAccessToken, privyLogout]);
 
   // Load user profile if we have a session but no user data (e.g., page refresh)
   useEffect(() => {
