@@ -21,46 +21,17 @@
     "title": "Suas empresas"
   },
   "dashboard": {
-    "description": "Visão geral da tabela de capitalização e atividade recente.",
+    "description": "Visão geral da sua empresa e atividade recente.",
     "noCompany": {
-      "description": "Crie uma empresa para começar a gerenciar sua tabela de capitalização.",
+      "description": "Crie uma empresa para montar seu perfil pronto para investidores.",
       "title": "Nenhuma empresa encontrada"
     },
-    "ownership": {
-      "description": "Distribuição de ações por acionista",
-      "empty": "Nenhuma participação registrada",
-      "others": "Outros",
-      "title": "Distribuição de Participação"
-    },
-    "quickActions": {
-      "addShareholder": "Adicionar Acionista",
-      "description": "Tarefas comuns para gestão da tabela de capitalização",
-      "exportCapTable": "Exportar Cap Table",
-      "issueShares": "Emitir Ações",
-      "recordTransfer": "Registrar Transferência",
-      "title": "Ações Rápidas"
-    },
-    "recentTransactions": {
-      "description": "Últimas 5 transações",
-      "empty": "Nenhuma transação encontrada",
-      "shares": "ações",
-      "title": "Transações Recentes",
-      "viewAll": "Ver todas"
-    },
     "stats": {
-      "shareClasses": "Classes de Ações",
-      "shareholders": "Acionistas",
-      "totalShares": "Total de Ações",
-      "transactions": "Transações"
+      "company": "Empresa",
+      "notifications": "Notificações",
+      "settings": "Configurações"
     },
-    "title": "Painel",
-    "types": {
-      "cancellation": "Cancelamento",
-      "conversion": "Conversão",
-      "issuance": "Emissão",
-      "split": "Desdobramento",
-      "transfer": "Transferência"
-    }
+    "title": "Painel"
   },
   "errors": {
     "auth": {
@@ -73,11 +44,6 @@
       "privyUnavailable": "Serviço de autenticação indisponível. Tente novamente.",
       "sessionExpired": "Sua sessão expirou. Faça login novamente.",
       "unauthorized": "Não autorizado"
-    },
-    "cap": {
-      "immutableAfterIssuance": "Este campo não pode ser alterado após ações terem sido emitidas",
-      "insufficientShares": "Ações insuficientes para completar a operação",
-      "missingCommonShares": "Empresas S.A. devem ter pelo menos uma classe de ações ordinárias antes de emitir ações"
     },
     "company": {
       "cnpjDuplicate": "CNPJ já cadastrado",
@@ -144,48 +110,10 @@
       "slugReserved": "Este slug é reservado",
       "slugTaken": "Este slug já está em uso"
     },
-    "opt": {
-      "cliffExceedsVesting": "Período de cliff não pode exceder o período total de vesting",
-      "companyNotActive": "A empresa deve estar ativa para gerenciar planos de opções",
-      "exerciseAlreadyCancelled": "A solicitação de exercício já foi cancelada",
-      "exerciseAlreadyConfirmed": "A solicitação de exercício já foi confirmada",
-      "exerciseNotPending": "A solicitação de exercício não está pendente de pagamento",
-      "exercisePending": "Já existe uma solicitação de exercício pendente para esta outorga",
-      "exerciseWindowClosed": "O prazo para exercício pós-término expirou",
-      "grantAlreadyCancelled": "A outorga de opções já foi cancelada",
-      "grantNotActive": "A outorga de opções não está ativa",
-      "grantTerminated": "A outorga de opções foi finalizada",
-      "insufficientVested": "Opções vestidas insuficientes para o exercício solicitado",
-      "invalidExpiration": "Data de expiração deve ser posterior à data de outorga",
-      "invalidPoolSize": "O tamanho do pool deve ser maior que zero",
-      "invalidQuantity": "Quantidade de opções deve ser maior que zero",
-      "invalidStrikePrice": "Preço de exercício deve ser maior que zero",
-      "noShareholderLinked": "A outorga precisa estar vinculada a um acionista para emitir ações",
-      "planAlreadyClosed": "O plano de opções já está encerrado",
-      "planClosed": "O plano de opções está encerrado",
-      "planExhausted": "Plano de opções não possui opções disponíveis suficientes",
-      "poolCannotShrink": "O pool não pode ser reduzido abaixo do total já outorgado"
-    },
     "sys": {
       "httpError": "Erro HTTP",
       "internalError": "Erro interno do servidor",
       "rateLimited": "Limite de requisições excedido. Tente novamente em alguns segundos."
-    },
-    "txn": {
-      "alreadyCancelled": "Transação já foi cancelada",
-      "cannotCancelConfirmed": "Transação confirmada não pode ser cancelada",
-      "companyNotActive": "A empresa deve estar ativa para criar transações",
-      "exceedsAuthorized": "Emissão excede o total autorizado da classe de ações",
-      "fromShareholderRequired": "Acionista de origem é obrigatório para este tipo de transação",
-      "insufficientShares": "Ações insuficientes para completar a transferência",
-      "invalidQuantity": "Quantidade de ações deve ser maior que zero",
-      "lockupActive": "Ações estão em período de lock-up e não podem ser transferidas",
-      "invalidStatusTransition": "Transição de status inválida para esta transação",
-      "invalidSplitRatio": "Razão de desdobramento resultaria em ações fracionárias",
-      "sameShareholder": "Acionista de origem e destino não podem ser o mesmo",
-      "splitRatioRequired": "Proporção de desdobramento é obrigatória para split",
-      "toShareClassRequired": "Classe de ações de destino é obrigatória para conversão",
-      "toShareholderRequired": "Acionista de destino é obrigatório para este tipo de transação"
     },
     "val": {
       "invalidEmail": "Formato de e-mail inválido",
@@ -203,10 +131,6 @@
       "exportNotFound": "Exportação não encontrada",
       "formatUnsupported": "Formato de exportação não suportado",
       "generationFailed": "Falha na geração do relatório"
-    },
-    "waterfall": {
-      "scenarioNotFound": "Cenário de waterfall não encontrado",
-      "scenarioLimit": "Limite máximo de cenários salvos atingido (máximo: 50)"
     }
   },
   "invitations": {
@@ -374,7 +298,7 @@
       "cnpjDuplicate": "Este CNPJ já está cadastrado",
       "cnpjInvalid": "CNPJ inválido",
       "cnpjRequired": "CNPJ é obrigatório",
-      "description": "Configure sua empresa para gerenciar o cap table",
+      "description": "Configure sua empresa para montar seu perfil pronto para investidores",
       "entityType": "Tipo de empresa",
       "entityTypePlaceholder": "Selecione o tipo de empresa",
       "entityTypeRequired": "Tipo de empresa é obrigatório",
@@ -415,17 +339,6 @@
       "step2": "Sua Empresa"
     },
     "welcome": "Bem-vindo ao Navia"
-  },
-  "portfolio": {
-    "companies": "Empresas",
-    "currentValue": "Valor Atual",
-    "description": "Visão consolidada das suas participações em todas as empresas",
-    "emptyState": "Você ainda não possui participações em nenhuma empresa",
-    "ownership": "Participação",
-    "shares": "Ações",
-    "title": "Meu Portfólio",
-    "totalInvested": "Total Investido",
-    "totalValue": "Valor Total"
   },
   "reports": {
     "description": "Relatórios de participação, diluição e exportação de dados",
@@ -518,42 +431,7 @@
       "export": "Exportar",
       "ownership": "Participação"
     },
-    "title": "Relatórios & Análises",
-    "waterfall": {
-      "title": "Waterfall de Saída",
-      "description": "Modele cenários de saída e veja como os rendimentos seriam distribuídos entre os acionistas",
-      "exitAmount": "Valor de Saída",
-      "includeOptions": "Incluir opções vestidas",
-      "includeConvertibles": "Incluir conversíveis",
-      "customOrder": "Usar ordem personalizada",
-      "stackingOrder": "Ordem de preferência",
-      "runButton": "Executar Waterfall",
-      "saveButton": "Salvar Cenário",
-      "loadingResults": "Calculando distribuição...",
-      "emptyState": "Configure os parâmetros e execute o waterfall para ver os resultados",
-      "breakeven": {
-        "title": "Ponto de Equilíbrio",
-        "description": "Valor de saída de {value} no qual ações ordinárias superam as preferenciais por ação"
-      },
-      "table": {
-        "shareClass": "Classe de Ação",
-        "totalShares": "Total de Ações",
-        "liquidationPreference": "Preferência de Liquidação",
-        "participation": "Participação",
-        "totalProceeds": "Total Recebido",
-        "perShare": "Por Ação",
-        "roiMultiple": "Múltiplo ROI"
-      },
-      "scenarios": {
-        "title": "Cenários Salvos",
-        "save": "Salvar",
-        "delete": "Excluir",
-        "confirmDelete": "Tem certeza que deseja excluir este cenário?",
-        "nameLabel": "Nome do Cenário",
-        "namePlaceholder": "Ex: Cenário Otimista",
-        "limit": "Limite máximo de cenários atingido"
-      }
-    }
+    "title": "Relatórios & Análises"
   },
   "settings": {
     "company": {

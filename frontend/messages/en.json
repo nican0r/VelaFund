@@ -21,46 +21,17 @@
     "title": "Your companies"
   },
   "dashboard": {
-    "description": "Overview of your company cap table and recent activity.",
+    "description": "Overview of your company and recent activity.",
     "noCompany": {
-      "description": "Create a company to start managing your cap table.",
+      "description": "Create a company to build your investor-ready profile.",
       "title": "No company found"
     },
-    "ownership": {
-      "description": "Share distribution by shareholder",
-      "empty": "No holdings recorded",
-      "others": "Others",
-      "title": "Ownership Distribution"
-    },
-    "quickActions": {
-      "addShareholder": "Add Shareholder",
-      "description": "Common tasks for cap table management",
-      "exportCapTable": "Export Cap Table",
-      "issueShares": "Issue Shares",
-      "recordTransfer": "Record Transfer",
-      "title": "Quick Actions"
-    },
-    "recentTransactions": {
-      "description": "Last 5 transactions",
-      "empty": "No transactions found",
-      "shares": "shares",
-      "title": "Recent Transactions",
-      "viewAll": "View all"
-    },
     "stats": {
-      "shareClasses": "Share Classes",
-      "shareholders": "Shareholders",
-      "totalShares": "Total Shares",
-      "transactions": "Transactions"
+      "company": "Company",
+      "notifications": "Notifications",
+      "settings": "Settings"
     },
-    "title": "Dashboard",
-    "types": {
-      "cancellation": "Cancellation",
-      "conversion": "Conversion",
-      "issuance": "Issuance",
-      "split": "Split",
-      "transfer": "Transfer"
-    }
+    "title": "Dashboard"
   },
   "errors": {
     "auth": {
@@ -73,11 +44,6 @@
       "privyUnavailable": "Authentication service unavailable. Please try again.",
       "sessionExpired": "Your session has expired. Please log in again.",
       "unauthorized": "Unauthorized"
-    },
-    "cap": {
-      "immutableAfterIssuance": "This field cannot be changed after shares have been issued",
-      "insufficientShares": "Insufficient shares to complete the operation",
-      "missingCommonShares": "S.A. companies must have at least one common shares class before issuing shares"
     },
     "company": {
       "cnpjDuplicate": "CNPJ already registered",
@@ -144,48 +110,10 @@
       "slugReserved": "This slug is reserved",
       "slugTaken": "This slug is already taken"
     },
-    "opt": {
-      "cliffExceedsVesting": "Cliff period cannot exceed total vesting duration",
-      "companyNotActive": "Company must be active to manage option plans",
-      "exerciseAlreadyCancelled": "Exercise request has already been cancelled",
-      "exerciseAlreadyConfirmed": "Exercise request has already been confirmed",
-      "exerciseNotPending": "Exercise request is not pending payment",
-      "exercisePending": "An exercise request is already pending for this grant",
-      "exerciseWindowClosed": "Post-termination exercise window has expired",
-      "grantAlreadyCancelled": "Option grant has already been cancelled",
-      "grantNotActive": "Option grant is not active",
-      "grantTerminated": "Option grant has been terminated",
-      "insufficientVested": "Insufficient vested options for the requested exercise",
-      "invalidExpiration": "Expiration date must be after grant date",
-      "invalidPoolSize": "Pool size must be greater than zero",
-      "invalidQuantity": "Option quantity must be greater than zero",
-      "invalidStrikePrice": "Strike price must be greater than zero",
-      "noShareholderLinked": "Grant must be linked to a shareholder to issue shares",
-      "planAlreadyClosed": "Option plan is already closed",
-      "planClosed": "Option plan is closed",
-      "planExhausted": "Option plan does not have enough available options",
-      "poolCannotShrink": "Pool size cannot be reduced below total granted amount"
-    },
     "sys": {
       "httpError": "HTTP Error",
       "internalError": "Internal server error",
       "rateLimited": "Rate limit exceeded. Please try again in a few seconds."
-    },
-    "txn": {
-      "alreadyCancelled": "Transaction has already been cancelled",
-      "cannotCancelConfirmed": "Confirmed transaction cannot be cancelled",
-      "companyNotActive": "Company must be active to create transactions",
-      "exceedsAuthorized": "Issuance exceeds the authorized total of the share class",
-      "fromShareholderRequired": "Source shareholder is required for this transaction type",
-      "insufficientShares": "Insufficient shares to complete the transfer",
-      "invalidQuantity": "Share quantity must be greater than zero",
-      "lockupActive": "Shares are in a lock-up period and cannot be transferred",
-      "invalidStatusTransition": "Invalid status transition for this transaction",
-      "invalidSplitRatio": "Split ratio would result in fractional shares",
-      "sameShareholder": "Source and destination shareholder cannot be the same",
-      "splitRatioRequired": "Split ratio is required for split transactions",
-      "toShareClassRequired": "Target share class is required for conversion",
-      "toShareholderRequired": "Destination shareholder is required for this transaction type"
     },
     "val": {
       "invalidEmail": "Invalid email format",
@@ -203,10 +131,6 @@
       "exportNotFound": "Export not found",
       "formatUnsupported": "Unsupported export format",
       "generationFailed": "Report generation failed"
-    },
-    "waterfall": {
-      "scenarioNotFound": "Waterfall scenario not found",
-      "scenarioLimit": "Maximum number of saved scenarios reached (limit: 50)"
     }
   },
   "invitations": {
@@ -374,7 +298,7 @@
       "cnpjDuplicate": "This CNPJ is already registered",
       "cnpjInvalid": "Invalid CNPJ",
       "cnpjRequired": "CNPJ is required",
-      "description": "Set up your company to manage the cap table",
+      "description": "Set up your company to build your investor-ready profile",
       "entityType": "Entity type",
       "entityTypePlaceholder": "Select the entity type",
       "entityTypeRequired": "Entity type is required",
@@ -415,17 +339,6 @@
       "step2": "Your Company"
     },
     "welcome": "Welcome to Navia"
-  },
-  "portfolio": {
-    "companies": "Companies",
-    "currentValue": "Current Value",
-    "description": "Consolidated view of your holdings across all companies",
-    "emptyState": "You don't have holdings in any company yet",
-    "ownership": "Ownership",
-    "shares": "Shares",
-    "title": "My Portfolio",
-    "totalInvested": "Total Invested",
-    "totalValue": "Total Value"
   },
   "reports": {
     "description": "Ownership reports, dilution analysis, and data export",
@@ -518,42 +431,7 @@
       "export": "Export",
       "ownership": "Ownership"
     },
-    "title": "Reports & Analytics",
-    "waterfall": {
-      "title": "Exit Waterfall",
-      "description": "Model exit scenarios and see how proceeds would be distributed among shareholders",
-      "exitAmount": "Exit Amount",
-      "includeOptions": "Include vested options",
-      "includeConvertibles": "Include convertibles",
-      "customOrder": "Use custom order",
-      "stackingOrder": "Preference stacking order",
-      "runButton": "Run Waterfall",
-      "saveButton": "Save Scenario",
-      "loadingResults": "Calculating distribution...",
-      "emptyState": "Configure the parameters and run the waterfall to see results",
-      "breakeven": {
-        "title": "Breakeven",
-        "description": "Exit value of {value} at which common per-share proceeds exceed preferred"
-      },
-      "table": {
-        "shareClass": "Share Class",
-        "totalShares": "Total Shares",
-        "liquidationPreference": "Liquidation Preference",
-        "participation": "Participation",
-        "totalProceeds": "Total Proceeds",
-        "perShare": "Per Share",
-        "roiMultiple": "ROI Multiple"
-      },
-      "scenarios": {
-        "title": "Saved Scenarios",
-        "save": "Save",
-        "delete": "Delete",
-        "confirmDelete": "Are you sure you want to delete this scenario?",
-        "nameLabel": "Scenario Name",
-        "namePlaceholder": "E.g., Optimistic Scenario",
-        "limit": "Maximum number of scenarios reached"
-      }
-    }
+    "title": "Reports & Analytics"
   },
   "settings": {
     "company": {
