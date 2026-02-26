@@ -78,6 +78,23 @@ User clicks "Logout"
         +-- Clear cookie
         +-- Redirect to login
 
+Frontend calls Privy SDK getAccessToken() (session refresh)
+  |
+  +-- [Privy token obtained] --> POST /api/v1/auth/refresh
+  |     |
+  |     +-- [Privy token valid + user exists] --> Session refreshed
+  |     |     |
+  |     |     +-- [Old session cookie exists] --> Old session destroyed, new session created
+  |     |     +-- [No old session cookie] --> New session created directly
+  |     |
+  |     +-- [Privy token invalid/expired] --> 401 Unauthorized (errors.auth.tokenExpired)
+  |     |     +-- Frontend redirects to login
+  |     |
+  |     +-- [User not found or deleted] --> 401 Unauthorized (errors.auth.tokenExpired)
+  |           +-- Frontend redirects to login
+  |
+  +-- [Privy token refresh failed] --> Frontend redirects to login
+
 User session becomes inactive (>= 2h without requests)
   |
   +-- Next request arrives
@@ -249,6 +266,73 @@ TRIGGER: User clicks logout button
 POSTCONDITION: Redis session destroyed, cookie cleared, user redirected to login
 ```
 
+### Happy Path: Session Refresh (Token Refresh)
+
+**Purpose**: Extend a session without requiring a full re-login. The frontend uses Privy SDK's `getAccessToken()` to obtain a fresh Privy token, then sends it to the backend to create a new session.
+
+**When it's used**:
+- When the backend session is about to expire (approaching 2-hour inactivity or 7-day absolute limit)
+- After the frontend detects a 401 from the backend
+- Proactively by the frontend to keep the session alive
+
+```
+PRECONDITION: User is authenticated with Privy (Privy session valid), regardless of backend session state
+ACTOR: Frontend (initiated automatically, not by explicit user action)
+TRIGGER: Proactive session refresh, or 401 detected from backend API call
+
+1.  [Frontend] Detects session is expiring or receives 401 from any backend API call
+2.  [Frontend] Calls getAccessToken() from Privy SDK to obtain a fresh Privy access token
+    -> IF Privy cannot refresh token: redirect to /login (Privy session also expired)
+3.  [Frontend] Sends POST /api/v1/auth/refresh with { privyAccessToken: "..." }
+4.  [Backend] Endpoint is @Public() (no existing valid session required)
+    Auth-tier rate limiting applies (10 requests/min per IP)
+5.  [Backend] Calls AuthService.refreshSession(privyAccessToken):
+    a. Verifies the Privy token via privyClient.utils().auth().verifyAccessToken()
+       -> IF invalid/expired: return 401 AUTH_INVALID_TOKEN (messageKey: errors.auth.tokenExpired)
+    b. Looks up the user by privyUserId in the database
+       -> IF not found: return 401 AUTH_INVALID_TOKEN (messageKey: errors.auth.tokenExpired)
+       -> IF soft-deleted: return 401 AUTH_INVALID_TOKEN (messageKey: errors.auth.tokenExpired)
+    c. Updates User.lastLoginAt timestamp
+    d. Returns the AuthenticatedUser object
+6.  [Backend] Reads the navia-auth-token cookie from the request (if present)
+7.  [Backend] If an old session ID is found in the cookie: destroys the old Redis session
+    (deletes session:{oldSessionId} key, removes from user-sessions:{userId} set)
+8.  [Backend] Creates a new Redis session with 7-day TTL
+    -> Session data: { userId, createdAt: now, lastActivityAt: now, ipAddress, userAgent }
+    -> Redis key: session:{new-64-char-hex-id}, TTL: 7 days
+    -> New session ID added to user-sessions:{userId} Redis set
+9.  [Backend] Sets a fresh navia-auth-token HTTP-only cookie with the new session ID
+    (httpOnly: true, secure: true in production, sameSite: strict, path: /, maxAge: 7 days)
+10. [Backend] Fires AUTH_TOKEN_REFRESHED audit event (fire-and-forget, does not block response)
+11. [Backend] Returns 200 with { user, expiresAt }
+12. [Frontend] Updates local user state with the fresh user data
+13. [Frontend] Retries the original failed API call (if refresh was triggered by a 401)
+
+POSTCONDITION: Old Redis session destroyed, new Redis session created, fresh cookie set
+SIDE EFFECTS:
+  - Old Redis session destroyed (if one existed)
+  - New Redis session created with 7-day TTL
+  - User.lastLoginAt updated
+  - AUTH_TOKEN_REFRESHED audit event queued (async, non-blocking)
+```
+
+**Key differences from login**:
+- No user find-or-create — user must already exist in the database
+- No IP-based failed-attempt lockout tracking
+- No Privy user profile fetch — no wallet/email sync from Privy
+- Uses `errors.auth.tokenExpired` messageKey (not `errors.auth.invalidToken`) for all 401 responses
+
+**Error paths**:
+
+| Condition | HTTP Status | Error Code | MessageKey |
+|-----------|------------|------------|------------|
+| Invalid/expired Privy token | 401 | AUTH_INVALID_TOKEN | errors.auth.tokenExpired |
+| User not found in DB | 401 | AUTH_INVALID_TOKEN | errors.auth.tokenExpired |
+| User soft-deleted | 401 | AUTH_INVALID_TOKEN | errors.auth.tokenExpired |
+| Rate limited | 429 | SYS_RATE_LIMITED | errors.sys.rateLimited |
+
+---
+
 ### Happy Path: Get Profile
 
 ```
@@ -383,6 +467,13 @@ POSTCONDITION: User authenticated, but without Redis session resilience
 | Guard | Session lookup | Session found + inactive (>=2h idle) | Error | Destroy session, 401 SESSION_EXPIRED |
 | Guard | Session lookup | Session not found | Fallback | Fall through to Privy token verification |
 | Guard | Redis availability | Redis unavailable | Fallback | Skip session lookup, use Privy token verification |
+| Refresh R1 | Privy token validity | Invalid or expired Privy token | Error | 401 AUTH_INVALID_TOKEN (errors.auth.tokenExpired) |
+| Refresh R2 | User lookup | No user with this privyUserId | Error | 401 AUTH_INVALID_TOKEN (errors.auth.tokenExpired) |
+| Refresh R3 | User state | User is soft-deleted | Error | 401 AUTH_INVALID_TOKEN (errors.auth.tokenExpired) |
+| Refresh R4 | Old session cookie | Cookie present with valid session ID | Happy | Old session destroyed before new session created |
+| Refresh R4 | Old session cookie | No cookie or session not found in Redis | Happy | New session created directly (no old session to destroy) |
+| Refresh R5 | Redis availability | Redis available | Happy | New session stored in Redis, ID in cookie |
+| Refresh R5 | Redis availability | Redis unavailable | Fallback | Session creation fails silently; Privy token stored in cookie |
 
 ---
 
@@ -397,9 +488,11 @@ POSTCONDITION: User authenticated, but without Redis session resilience
 | User | email | old email | new email | Email changed in Privy |
 | Redis session | -- | -- (not exists) | Created with userId, timestamps, metadata | Successful login (Redis available) |
 | Redis session | lastActivityAt | previous timestamp | now() | Any authenticated request (throttled: >60s gap) |
-| Redis session | -- | Exists | Deleted | Logout, inactivity timeout, or Redis TTL expiry |
+| Redis session | -- | Exists | Deleted | Logout, inactivity timeout, Redis TTL expiry, or session refresh |
+| Redis session | -- | -- (not exists) | Created with userId, timestamps, metadata | Successful session refresh (Redis available) |
 | Redis user-sessions set | -- | -- | sessionId added | Session created |
 | Redis user-sessions set | -- | sessionId present | sessionId removed | Session destroyed |
+| User | lastLoginAt | previous timestamp | now() | Successful session refresh |
 
 ---
 
@@ -412,6 +505,7 @@ Authentication events are audit-logged programmatically via `AuditLogService.log
 | Login success | `AUTH_LOGIN_SUCCESS` | `USER` | Successful Privy token verification + user lookup/creation | `ipAddress` (masked /24), `userAgent`, `requestId`, `loginMethod: 'privy'`, `isNewUser` |
 | Login failed | `AUTH_LOGIN_FAILED` | `SYSTEM` | Invalid Privy token or lockout | `ipAddress` (masked /24), `userAgent`, `requestId`, `reason` |
 | Logout | `AUTH_LOGOUT` | `USER` or `SYSTEM` | User initiates logout | `ipAddress` (masked /24), `userAgent`, `requestId` |
+| Session refresh | `AUTH_TOKEN_REFRESHED` | `USER` | Successful POST /api/v1/auth/refresh | `ipAddress` (masked /24), `userAgent`, `requestId` |
 
 **Notes**:
 - Auth events are not company-scoped (`companyId` is null) since login/logout are global operations.
@@ -500,6 +594,7 @@ All authentication endpoints are role-agnostic -- they operate on the authentica
 |----------|----------------|----------------------|
 | POST /api/v1/auth/login | Allowed (@Public) | Allowed (re-login) |
 | POST /api/v1/auth/logout | Allowed (@Public) | Allowed |
+| POST /api/v1/auth/refresh | Allowed (@Public, requires valid Privy token in body) | Allowed |
 | GET /api/v1/auth/me | 401 | Allowed |
 | GET /api/v1/health | Allowed (@Public) | Allowed |
 

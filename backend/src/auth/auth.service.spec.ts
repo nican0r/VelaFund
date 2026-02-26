@@ -819,6 +819,101 @@ describe('AuthService', () => {
     });
   });
 
+  describe('refreshSession', () => {
+    it('should verify Privy token and return authenticated user', async () => {
+      mockVerifyAccessToken.mockResolvedValue({
+        user_id: 'did:privy:abc123',
+      });
+      prisma.user.findUnique.mockResolvedValue(mockDbUser);
+      prisma.user.update.mockResolvedValue({
+        ...mockDbUser,
+        lastLoginAt: new Date(),
+      });
+
+      const result = await service.refreshSession('fresh-privy-token');
+
+      expect(result).toEqual({
+        id: 'user-uuid-1',
+        privyUserId: 'did:privy:abc123',
+        email: 'test@example.com',
+        walletAddress: '0x1234567890abcdef',
+        firstName: 'Test',
+        lastName: 'User',
+        kycStatus: 'NOT_STARTED',
+        locale: 'pt-BR',
+      });
+      expect(mockVerifyAccessToken).toHaveBeenCalledWith('fresh-privy-token');
+    });
+
+    it('should update lastLoginAt on refresh', async () => {
+      mockVerifyAccessToken.mockResolvedValue({
+        user_id: 'did:privy:abc123',
+      });
+      prisma.user.findUnique.mockResolvedValue(mockDbUser);
+      prisma.user.update.mockResolvedValue(mockDbUser);
+
+      await service.refreshSession('fresh-token');
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-uuid-1' },
+        data: { lastLoginAt: expect.any(Date) },
+      });
+    });
+
+    it('should throw UnauthorizedException with tokenExpired when Privy token is invalid', async () => {
+      mockVerifyAccessToken.mockRejectedValue(new Error('Token expired'));
+
+      try {
+        await service.refreshSession('expired-token');
+        fail('Expected UnauthorizedException to be thrown');
+      } catch (e) {
+        expect(e).toBeInstanceOf(UnauthorizedException);
+        expect((e as UnauthorizedException).messageKey).toBe('errors.auth.tokenExpired');
+      }
+    });
+
+    it('should throw UnauthorizedException when user not found in database', async () => {
+      mockVerifyAccessToken.mockResolvedValue({
+        user_id: 'did:privy:nonexistent',
+      });
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(service.refreshSession('valid-token')).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should throw UnauthorizedException when user is soft-deleted', async () => {
+      mockVerifyAccessToken.mockResolvedValue({
+        user_id: 'did:privy:abc123',
+      });
+      prisma.user.findUnique.mockResolvedValue({
+        ...mockDbUser,
+        deletedAt: new Date(),
+      });
+
+      await expect(service.refreshSession('valid-token')).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should not create new users (unlike login)', async () => {
+      mockVerifyAccessToken.mockResolvedValue({
+        user_id: 'did:privy:brand-new',
+      });
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(service.refreshSession('valid-token')).rejects.toThrow(UnauthorizedException);
+      expect(prisma.user.create).not.toHaveBeenCalled();
+    });
+
+    it('should not affect lockout tracking (unlike login)', async () => {
+      mockVerifyAccessToken.mockRejectedValue(new Error('Invalid token'));
+
+      await expect(service.refreshSession('bad-token')).rejects.toThrow(UnauthorizedException);
+
+      // Redis lockout methods should not be called
+      expect(mockRedis.incr).not.toHaveBeenCalled();
+      expect(mockRedis.get).not.toHaveBeenCalled();
+    });
+  });
+
   describe('getUserById', () => {
     it('should return authenticated user by database ID', async () => {
       prisma.user.findUnique.mockResolvedValue(mockDbUser);

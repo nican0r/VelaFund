@@ -13,6 +13,7 @@ describe('AuthController', () => {
   let controller: AuthController;
   let authService: {
     login: jest.Mock;
+    refreshSession: jest.Mock;
     getProfile: jest.Mock;
     updateProfile: jest.Mock;
   };
@@ -52,6 +53,7 @@ describe('AuthController', () => {
   beforeEach(async () => {
     authService = {
       login: jest.fn(),
+      refreshSession: jest.fn(),
       getProfile: jest.fn(),
       updateProfile: jest.fn(),
     };
@@ -249,6 +251,212 @@ describe('AuthController', () => {
       expect(result).toEqual({ messageKey: 'errors.auth.loggedOut' });
       expect(sessionService.destroySession).not.toHaveBeenCalled();
       expect(mockRes.clearCookie).toHaveBeenCalled();
+    });
+  });
+
+  describe('refresh', () => {
+    it('should refresh session and set new cookie', async () => {
+      authService.refreshSession.mockResolvedValue(mockAuthenticatedUser);
+      sessionService.createSession.mockResolvedValue('new-session-id');
+
+      const mockReq = {
+        cookies: { 'navia-auth-token': 'old-session-id' },
+        ip: '192.168.1.1',
+        socket: { remoteAddress: '192.168.1.1' },
+        headers: { 'user-agent': 'Mozilla/5.0', 'x-request-id': 'req-refresh' },
+      };
+      const mockRes = { cookie: jest.fn() };
+
+      const result = await controller.refresh(
+        { privyAccessToken: 'fresh-privy-token' },
+        mockReq as any,
+        mockRes as any,
+      );
+
+      expect(result.user).toEqual(mockAuthenticatedUser);
+      expect(result.expiresAt).toBeDefined();
+      expect(authService.refreshSession).toHaveBeenCalledWith('fresh-privy-token');
+
+      // Old session should be destroyed
+      expect(sessionService.destroySession).toHaveBeenCalledWith('old-session-id');
+
+      // New session should be created
+      expect(sessionService.createSession).toHaveBeenCalledWith('user-uuid-1', {
+        ipAddress: '192.168.1.1',
+        userAgent: 'Mozilla/5.0',
+      });
+
+      // New cookie should be set with new session ID
+      expect(mockRes.cookie).toHaveBeenCalledWith(
+        'navia-auth-token',
+        'new-session-id',
+        expect.objectContaining({
+          httpOnly: true,
+          sameSite: 'strict',
+          path: '/',
+          maxAge: 7 * 24 * 60 * 60 * 1000,
+        }),
+      );
+    });
+
+    it('should handle refresh when no existing cookie', async () => {
+      authService.refreshSession.mockResolvedValue(mockAuthenticatedUser);
+      sessionService.createSession.mockResolvedValue('new-session-id');
+
+      const mockReq = {
+        cookies: {},
+        ip: '10.0.0.1',
+        socket: { remoteAddress: '10.0.0.1' },
+        headers: {},
+      };
+      const mockRes = { cookie: jest.fn() };
+
+      const result = await controller.refresh(
+        { privyAccessToken: 'fresh-token' },
+        mockReq as any,
+        mockRes as any,
+      );
+
+      expect(result.user).toEqual(mockAuthenticatedUser);
+      // Should not try to destroy a non-existent session
+      expect(sessionService.destroySession).not.toHaveBeenCalled();
+      // Should still create new session
+      expect(sessionService.createSession).toHaveBeenCalled();
+      expect(mockRes.cookie).toHaveBeenCalled();
+    });
+
+    it('should fall back to Privy token cookie when Redis unavailable', async () => {
+      authService.refreshSession.mockResolvedValue(mockAuthenticatedUser);
+      sessionService.createSession.mockResolvedValue(null); // Redis unavailable
+
+      const mockReq = {
+        cookies: {},
+        ip: '10.0.0.1',
+        socket: { remoteAddress: '10.0.0.1' },
+        headers: {},
+      };
+      const mockRes = { cookie: jest.fn() };
+
+      await controller.refresh(
+        { privyAccessToken: 'privy-token-fallback' },
+        mockReq as any,
+        mockRes as any,
+      );
+
+      // Cookie stores Privy token as fallback
+      expect(mockRes.cookie).toHaveBeenCalledWith(
+        'navia-auth-token',
+        'privy-token-fallback',
+        expect.objectContaining({
+          maxAge: 7 * 24 * 60 * 60 * 1000,
+        }),
+      );
+    });
+
+    it('should propagate errors from refreshSession', async () => {
+      authService.refreshSession.mockRejectedValue(new Error('errors.auth.tokenExpired'));
+
+      const mockReq = {
+        cookies: {},
+        ip: '10.0.0.1',
+        socket: { remoteAddress: '10.0.0.1' },
+        headers: {},
+      };
+      const mockRes = { cookie: jest.fn() };
+
+      await expect(
+        controller.refresh(
+          { privyAccessToken: 'expired-token' },
+          mockReq as any,
+          mockRes as any,
+        ),
+      ).rejects.toThrow('errors.auth.tokenExpired');
+
+      // No cookie should be set on failure
+      expect(mockRes.cookie).not.toHaveBeenCalled();
+    });
+
+    it('should return expiresAt in ISO format', async () => {
+      authService.refreshSession.mockResolvedValue(mockAuthenticatedUser);
+      sessionService.createSession.mockResolvedValue('session-123');
+
+      const mockReq = {
+        cookies: {},
+        ip: '10.0.0.1',
+        socket: { remoteAddress: '10.0.0.1' },
+        headers: {},
+      };
+      const mockRes = { cookie: jest.fn() };
+
+      const result = await controller.refresh(
+        { privyAccessToken: 'token' },
+        mockReq as any,
+        mockRes as any,
+      );
+
+      // expiresAt should be a valid ISO date string ~7 days from now
+      const expiresAt = new Date(result.expiresAt);
+      const sevenDaysFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      const diff = Math.abs(expiresAt.getTime() - sevenDaysFromNow.getTime());
+      expect(diff).toBeLessThan(5000); // Within 5 seconds tolerance
+    });
+  });
+
+  describe('audit logging — AUTH_TOKEN_REFRESHED', () => {
+    it('should log AUTH_TOKEN_REFRESHED on successful refresh', async () => {
+      authService.refreshSession.mockResolvedValue(mockAuthenticatedUser);
+      sessionService.createSession.mockResolvedValue('new-session');
+
+      const mockReq = {
+        cookies: { 'navia-auth-token': 'old-session' },
+        ip: '192.168.1.100',
+        socket: { remoteAddress: '192.168.1.100' },
+        headers: { 'user-agent': 'Mozilla/5.0', 'x-request-id': 'req-uuid-refresh' },
+      };
+      const mockRes = { cookie: jest.fn() };
+
+      await controller.refresh(
+        { privyAccessToken: 'fresh-token' },
+        mockReq as any,
+        mockRes as any,
+      );
+
+      expect(auditLogService.log).toHaveBeenCalledWith({
+        actorId: 'user-uuid-1',
+        actorType: 'USER',
+        action: 'AUTH_TOKEN_REFRESHED',
+        resourceType: 'User',
+        resourceId: 'user-uuid-1',
+        metadata: {
+          source: 'api',
+          ipAddress: '192.168.1.0/24',
+          userAgent: 'Mozilla/5.0',
+          requestId: 'req-uuid-refresh',
+        },
+      });
+    });
+
+    it('should not block refresh if audit logging fails', async () => {
+      authService.refreshSession.mockResolvedValue(mockAuthenticatedUser);
+      sessionService.createSession.mockResolvedValue('new-session');
+      auditLogService.log.mockRejectedValue(new Error('Queue down'));
+
+      const mockReq = {
+        cookies: {},
+        ip: '10.0.0.1',
+        socket: { remoteAddress: '10.0.0.1' },
+        headers: {},
+      };
+      const mockRes = { cookie: jest.fn() };
+
+      const result = await controller.refresh(
+        { privyAccessToken: 'token' },
+        mockReq as any,
+        mockRes as any,
+      );
+
+      expect(result.user).toEqual(mockAuthenticatedUser);
+      expect(mockRes.cookie).toHaveBeenCalled();
     });
   });
 

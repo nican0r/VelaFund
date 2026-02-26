@@ -251,6 +251,49 @@ export class AuthService {
   }
 
   /**
+   * Refresh a session by verifying a fresh Privy token.
+   * Unlike login(), this does NOT perform find-or-create or lockout tracking.
+   * The user must already exist in the database.
+   * Returns the authenticated user for session re-creation.
+   */
+  async refreshSession(privyAccessToken: string): Promise<AuthenticatedUser> {
+    let privyUserId: string;
+
+    try {
+      const verifiedClaims = await this.privyClient
+        .utils()
+        .auth()
+        .verifyAccessToken(privyAccessToken);
+      privyUserId = verifiedClaims.user_id;
+    } catch (error) {
+      this.logger.debug(
+        `Token refresh failed - invalid Privy token: ${error instanceof Error ? error.message : 'Unknown'}`,
+      );
+      throw new UnauthorizedException('errors.auth.tokenExpired');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { privyUserId },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('errors.auth.tokenExpired');
+    }
+
+    if (user.deletedAt) {
+      throw new UnauthorizedException('errors.auth.tokenExpired');
+    }
+
+    // Update last login timestamp
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    return this.toAuthenticatedUser(user);
+  }
+
+  /**
    * Look up a user by database ID and return the AuthenticatedUser object.
    * Used by session-based auth (AuthGuard) to load the user from a Redis session's userId.
    */

@@ -95,6 +95,7 @@
       "loggedOut": "You have been logged out successfully.",
       "privyUnavailable": "Authentication service unavailable. Please try again.",
       "sessionExpired": "Your session has expired. Please log in again.",
+      "tokenExpired": "Your authentication token has expired. Please log in again.",
       "unauthorized": "Unauthorized"
     },
     "company": {

@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 import { SessionService } from './session.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { LoginDto } from './dto/login.dto';
+import { RefreshDto } from './dto/refresh.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { Public } from './decorators/public.decorator';
 import { RequireAuth } from './decorators/require-auth.decorator';
@@ -161,6 +162,77 @@ export class AuthController {
       });
 
     return { messageKey: 'errors.auth.loggedOut' };
+  }
+
+  @Post('refresh')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ auth: { ttl: 60000, limit: 10 } })
+  @ApiOperation({ summary: 'Refresh session with a fresh Privy access token' })
+  @ApiResponse({ status: 200, description: 'Session refreshed' })
+  @ApiResponse({ status: 401, description: 'Invalid or expired token' })
+  async refresh(
+    @Body() dto: RefreshDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
+    const userAgent = req.headers['user-agent'] || '';
+    const requestId = (req.headers['x-request-id'] as string) || '';
+
+    // Verify the fresh Privy token and get the user
+    const user = await this.authService.refreshSession(dto.privyAccessToken);
+
+    // Destroy the old session if one exists in the cookie
+    const oldSessionId = req.cookies?.['navia-auth-token'];
+    if (oldSessionId) {
+      await this.sessionService.destroySession(oldSessionId);
+    }
+
+    // Create a new session
+    const sessionId = await this.sessionService.createSession(user.id, {
+      ipAddress,
+      userAgent,
+    });
+
+    // If Redis is unavailable, fall back to storing the Privy token
+    const cookieValue = sessionId || dto.privyAccessToken;
+
+    const isProduction = process.env.NODE_ENV === 'production';
+    res.cookie('navia-auth-token', cookieValue, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'strict',
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    // Calculate expiry for the response
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    // Log AUTH_TOKEN_REFRESHED (fire-and-forget)
+    this.auditLogService
+      .log({
+        actorId: user.id,
+        actorType: 'USER',
+        action: 'AUTH_TOKEN_REFRESHED',
+        resourceType: 'User',
+        resourceId: user.id,
+        metadata: {
+          source: 'api',
+          ipAddress: maskIp(ipAddress),
+          userAgent,
+          requestId,
+        },
+      })
+      .catch(() => {
+        /* audit log failure should not affect refresh flow */
+      });
+
+    return {
+      user,
+      expiresAt,
+    };
   }
 
   @Get('me')

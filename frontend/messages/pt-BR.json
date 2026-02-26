@@ -95,6 +95,7 @@
       "loggedOut": "Você foi desconectado com sucesso.",
       "privyUnavailable": "Serviço de autenticação indisponível. Tente novamente.",
       "sessionExpired": "Sua sessão expirou. Faça login novamente.",
+      "tokenExpired": "Seu token de autenticação expirou. Faça login novamente.",
       "unauthorized": "Não autorizado"
     },
     "company": {
