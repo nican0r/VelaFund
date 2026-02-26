@@ -1,12 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { AuditLogService } from '../audit-log/audit-log.service';
+import { ConvertibleService } from '../convertible/convertible.service';
 
 @Injectable()
 export class ScheduledTasksService {
   private readonly logger = new Logger(ScheduledTasksService.name);
 
-  constructor(private readonly auditLogService: AuditLogService) {}
+  constructor(
+    private readonly auditLogService: AuditLogService,
+    private readonly convertibleService: ConvertibleService,
+  ) {}
 
   /**
    * Daily hash chain computation for audit log tamper detection.
@@ -30,6 +34,36 @@ export class ScheduledTasksService {
     } catch (error) {
       this.logger.error(
         `Failed to compute daily audit hash chain for ${yesterday}: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
+  }
+
+  /**
+   * Daily interest accrual for convertible instruments.
+   * Runs at 01:00 UTC daily to update the accruedInterest DB field
+   * for all OUTSTANDING convertible instruments.
+   *
+   * This keeps list views, summary aggregations, and report exports
+   * accurate without requiring on-the-fly calculation for each query.
+   * The interest breakdown and conversion endpoints still compute
+   * interest on-the-fly for real-time precision.
+   *
+   * If the update fails, the error is logged but does not crash the application.
+   * The on-the-fly calculation in findById/findAll serves as a fallback.
+   */
+  @Cron('0 0 1 * * *', { name: 'convertible-interest-accrual', timeZone: 'UTC' })
+  async accrueConvertibleInterest(): Promise<void> {
+    this.logger.log('Starting daily convertible interest accrual');
+
+    try {
+      const updatedCount = await this.convertibleService.updateAccruedInterestForAll();
+      this.logger.log(
+        `Daily convertible interest accrual completed: ${updatedCount} instruments updated`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to accrue convertible interest: ${error instanceof Error ? error.message : String(error)}`,
         error instanceof Error ? error.stack : undefined,
       );
     }

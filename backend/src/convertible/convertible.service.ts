@@ -167,17 +167,26 @@ export class ConvertibleService {
     const totalAccruedInterest = aggregate._sum.accruedInterest ?? new Prisma.Decimal(0);
     const totalValue = totalPrincipal.add(totalAccruedInterest);
 
-    const enrichedItems = items.map((item) => ({
-      ...item,
-      principalAmount: item.principalAmount.toString(),
-      accruedInterest: item.accruedInterest.toString(),
-      interestRate: item.interestRate.toString(),
-      discountRate: item.discountRate?.toString() ?? null,
-      valuationCap: item.valuationCap?.toString() ?? null,
-      qualifiedFinancingThreshold: item.qualifiedFinancingThreshold?.toString() ?? null,
-      totalValue: item.principalAmount.add(item.accruedInterest).toString(),
-      daysToMaturity: this.calculateDaysToMaturity(item.maturityDate),
-    }));
+    const enrichedItems = items.map((item) => {
+      // Use on-the-fly interest for OUTSTANDING instruments to ensure accuracy.
+      // Terminal statuses use the stored DB value (last updated by daily accrual job).
+      const liveInterest =
+        item.status === 'OUTSTANDING'
+          ? this.calculateAccruedInterest(item)
+          : item.accruedInterest;
+
+      return {
+        ...item,
+        principalAmount: item.principalAmount.toString(),
+        accruedInterest: liveInterest.toString(),
+        interestRate: item.interestRate.toString(),
+        discountRate: item.discountRate?.toString() ?? null,
+        valuationCap: item.valuationCap?.toString() ?? null,
+        qualifiedFinancingThreshold: item.qualifiedFinancingThreshold?.toString() ?? null,
+        totalValue: item.principalAmount.add(liveInterest).toString(),
+        daysToMaturity: this.calculateDaysToMaturity(item.maturityDate),
+      };
+    });
 
     return {
       items: enrichedItems,
@@ -206,16 +215,24 @@ export class ConvertibleService {
       throw new NotFoundException('convertible', convertibleId);
     }
 
+    // Use on-the-fly interest for OUTSTANDING instruments to ensure accuracy.
+    // Terminal statuses (CONVERTED, REDEEMED, CANCELLED) use the stored DB value
+    // which was last updated by the daily accrual job before the status changed.
+    const liveInterest =
+      convertible.status === 'OUTSTANDING'
+        ? this.calculateAccruedInterest(convertible)
+        : convertible.accruedInterest;
+
     return {
       ...convertible,
       principalAmount: convertible.principalAmount.toString(),
-      accruedInterest: convertible.accruedInterest.toString(),
+      accruedInterest: liveInterest.toString(),
       interestRate: convertible.interestRate.toString(),
       discountRate: convertible.discountRate?.toString() ?? null,
       valuationCap: convertible.valuationCap?.toString() ?? null,
       qualifiedFinancingThreshold: convertible.qualifiedFinancingThreshold?.toString() ?? null,
       totalConversionAmount: convertible.principalAmount
-        .add(convertible.accruedInterest)
+        .add(liveInterest)
         .toString(),
       daysToMaturity: this.calculateDaysToMaturity(convertible.maturityDate),
     };
@@ -225,10 +242,10 @@ export class ConvertibleService {
 
   /**
    * Calculate accrued interest on-the-fly from issue date to now.
-   * Used by interest breakdown, conversion scenarios, and actual conversion
-   * to ensure interest is always current (not stale DB value).
+   * Used by interest breakdown, conversion scenarios, actual conversion,
+   * and the daily accrual cron job to ensure interest is always current.
    */
-  private calculateAccruedInterest(convertible: {
+  calculateAccruedInterest(convertible: {
     principalAmount: Prisma.Decimal;
     interestRate: Prisma.Decimal;
     interestType: string;
@@ -808,6 +825,53 @@ export class ConvertibleService {
     );
 
     return result;
+  }
+
+  // ─── DAILY INTEREST ACCRUAL ─────────────────────────────────────────
+
+  /**
+   * Updates the accruedInterest DB field for all OUTSTANDING convertibles.
+   * Called by the daily scheduled task to keep list views, summaries,
+   * and reports accurate without on-the-fly computation for each item.
+   *
+   * Returns the number of instruments updated.
+   */
+  async updateAccruedInterestForAll(): Promise<number> {
+    const outstandingInstruments = await this.prisma.convertibleInstrument.findMany({
+      where: { status: 'OUTSTANDING' },
+      select: {
+        id: true,
+        principalAmount: true,
+        interestRate: true,
+        interestType: true,
+        issueDate: true,
+      },
+    });
+
+    if (outstandingInstruments.length === 0) {
+      return 0;
+    }
+
+    let updatedCount = 0;
+
+    // Batch update in chunks of 50 to avoid overwhelming the DB
+    const chunkSize = 50;
+    for (let i = 0; i < outstandingInstruments.length; i += chunkSize) {
+      const chunk = outstandingInstruments.slice(i, i + chunkSize);
+      const updatePromises = chunk.map((instrument) => {
+        const interest = this.calculateAccruedInterest(instrument);
+        return this.prisma.convertibleInstrument.update({
+          where: { id: instrument.id },
+          data: { accruedInterest: interest },
+          select: { id: true },
+        });
+      });
+
+      const results = await Promise.all(updatePromises);
+      updatedCount += results.length;
+    }
+
+    return updatedCount;
   }
 
   // ─── HELPERS ─────────────────────────────────────────────────────────

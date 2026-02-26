@@ -1,14 +1,20 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ScheduledTasksService } from './scheduled-tasks.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
+import { ConvertibleService } from '../convertible/convertible.service';
 
 const mockAuditLogService = {
   computeDailyHash: jest.fn().mockResolvedValue(undefined),
 };
 
+const mockConvertibleService = {
+  updateAccruedInterestForAll: jest.fn().mockResolvedValue(0),
+};
+
 describe('ScheduledTasksService', () => {
   let service: ScheduledTasksService;
   let auditLogService: typeof mockAuditLogService;
+  let convertibleService: typeof mockConvertibleService;
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -17,11 +23,13 @@ describe('ScheduledTasksService', () => {
       providers: [
         ScheduledTasksService,
         { provide: AuditLogService, useValue: mockAuditLogService },
+        { provide: ConvertibleService, useValue: mockConvertibleService },
       ],
     }).compile();
 
     service = module.get<ScheduledTasksService>(ScheduledTasksService);
     auditLogService = module.get(AuditLogService);
+    convertibleService = module.get(ConvertibleService);
   });
 
   describe('getYesterdayDateString', () => {
@@ -101,9 +109,54 @@ describe('ScheduledTasksService', () => {
     });
   });
 
+  describe('accrueConvertibleInterest', () => {
+    it('should call convertibleService.updateAccruedInterestForAll', async () => {
+      convertibleService.updateAccruedInterestForAll.mockResolvedValue(5);
+
+      await service.accrueConvertibleInterest();
+
+      expect(convertibleService.updateAccruedInterestForAll).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not throw when updateAccruedInterestForAll succeeds', async () => {
+      convertibleService.updateAccruedInterestForAll.mockResolvedValue(10);
+
+      await expect(service.accrueConvertibleInterest()).resolves.not.toThrow();
+    });
+
+    it('should handle zero instruments gracefully', async () => {
+      convertibleService.updateAccruedInterestForAll.mockResolvedValue(0);
+
+      await expect(service.accrueConvertibleInterest()).resolves.not.toThrow();
+      expect(convertibleService.updateAccruedInterestForAll).toHaveBeenCalledTimes(1);
+    });
+
+    it('should catch and log errors without rethrowing', async () => {
+      convertibleService.updateAccruedInterestForAll.mockRejectedValue(
+        new Error('Database connection failed'),
+      );
+
+      await expect(service.accrueConvertibleInterest()).resolves.not.toThrow();
+      expect(convertibleService.updateAccruedInterestForAll).toHaveBeenCalledTimes(1);
+    });
+
+    it('should catch non-Error exceptions without rethrowing', async () => {
+      convertibleService.updateAccruedInterestForAll.mockRejectedValue(
+        'unexpected string error',
+      );
+
+      await expect(service.accrueConvertibleInterest()).resolves.not.toThrow();
+      expect(convertibleService.updateAccruedInterestForAll).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('@Cron decorator', () => {
     it('should have computeDailyAuditHashChain as a method', () => {
       expect(typeof service.computeDailyAuditHashChain).toBe('function');
+    });
+
+    it('should have accrueConvertibleInterest as a method', () => {
+      expect(typeof service.accrueConvertibleInterest).toBe('function');
     });
 
     it('should have the correct cron metadata', () => {
@@ -111,6 +164,7 @@ describe('ScheduledTasksService', () => {
       // reads the metadata at runtime. We verify the behavior, not the decorator.
       const proto = Object.getPrototypeOf(service);
       expect(proto.computeDailyAuditHashChain).toBeDefined();
+      expect(proto.accrueConvertibleInterest).toBeDefined();
     });
   });
 });

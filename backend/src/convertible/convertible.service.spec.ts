@@ -220,7 +220,30 @@ describe('ConvertibleService', () => {
       expect(result.total).toBe(1);
       expect(result.summary.totalOutstanding).toBe(1);
       expect(result.summary.totalPrincipal).toBe('100000');
+      // Summary uses DB aggregate values (updated by daily cron job)
       expect(result.summary.totalValue).toBe('104000');
+      // Individual items use on-the-fly interest for OUTSTANDING
+      expect(parseFloat(result.items[0].accruedInterest)).toBeGreaterThan(0);
+    });
+
+    it('should use stored interest for non-OUTSTANDING items', async () => {
+      const convertedInstrument = {
+        ...mockConvertible,
+        status: 'CONVERTED' as const,
+        accruedInterest: new Prisma.Decimal('3000.00'),
+      };
+
+      prisma.convertibleInstrument.findMany.mockResolvedValue([convertedInstrument]);
+      prisma.convertibleInstrument.count.mockResolvedValue(1);
+      prisma.convertibleInstrument.aggregate.mockResolvedValue({
+        _sum: { principalAmount: null, accruedInterest: null },
+        _count: 0,
+      });
+
+      const result = await service.findAll(companyId, { page: 1, limit: 20 });
+
+      expect(result.items[0].accruedInterest).toBe('3000');
+      expect(result.items[0].totalValue).toBe('103000');
     });
 
     it('should filter by status', async () => {
@@ -269,9 +292,10 @@ describe('ConvertibleService', () => {
   // ─── FIND BY ID ──────────────────────────────────────────────────
 
   describe('findById', () => {
-    it('should return enriched convertible details', async () => {
+    it('should return on-the-fly interest for OUTSTANDING instruments', async () => {
       prisma.convertibleInstrument.findFirst.mockResolvedValue({
         ...mockConvertible,
+        status: 'OUTSTANDING',
         shareholder: { id: shareholderId, name: 'Test Investor', type: 'INDIVIDUAL' },
         targetShareClass: null,
       });
@@ -279,8 +303,42 @@ describe('ConvertibleService', () => {
       const result = await service.findById(companyId, convertibleId);
 
       expect(result.principalAmount).toBe('100000');
-      expect(result.totalConversionAmount).toBe('104000');
+      // On-the-fly interest for OUTSTANDING should be greater than 0
+      // (issue date 2024-01-15 is in the past, so interest has accrued)
+      expect(parseFloat(result.accruedInterest)).toBeGreaterThan(0);
+      expect(parseFloat(result.totalConversionAmount)).toBeGreaterThan(100000);
       expect(result.daysToMaturity).toBeDefined();
+    });
+
+    it('should return stored DB interest for CONVERTED instruments', async () => {
+      prisma.convertibleInstrument.findFirst.mockResolvedValue({
+        ...mockConvertible,
+        status: 'CONVERTED',
+        accruedInterest: new Prisma.Decimal('4000.00'),
+        shareholder: { id: shareholderId, name: 'Test Investor', type: 'INDIVIDUAL' },
+        targetShareClass: null,
+      });
+
+      const result = await service.findById(companyId, convertibleId);
+
+      expect(result.principalAmount).toBe('100000');
+      expect(result.accruedInterest).toBe('4000');
+      expect(result.totalConversionAmount).toBe('104000');
+    });
+
+    it('should return stored DB interest for CANCELLED instruments', async () => {
+      prisma.convertibleInstrument.findFirst.mockResolvedValue({
+        ...mockConvertible,
+        status: 'CANCELLED',
+        accruedInterest: new Prisma.Decimal('2500.00'),
+        shareholder: { id: shareholderId, name: 'Test Investor', type: 'INDIVIDUAL' },
+        targetShareClass: null,
+      });
+
+      const result = await service.findById(companyId, convertibleId);
+
+      expect(result.accruedInterest).toBe('2500');
+      expect(result.totalConversionAmount).toBe('102500');
     });
 
     it('should throw if not found', async () => {
@@ -788,6 +846,167 @@ describe('ConvertibleService', () => {
       await expect(service.convert(companyId, convertibleId, convertDto, userId)).rejects.toThrow(
         BusinessRuleException,
       );
+    });
+  });
+
+  // ─── CALCULATE ACCRUED INTEREST ─────────────────────────────────
+
+  describe('calculateAccruedInterest', () => {
+    it('should calculate SIMPLE interest correctly', () => {
+      const instrument = {
+        principalAmount: new Prisma.Decimal('100000.00'),
+        interestRate: new Prisma.Decimal('0.10'), // 10%
+        interestType: 'SIMPLE',
+        issueDate: new Date('2024-01-15'),
+      };
+
+      const result = service.calculateAccruedInterest(instrument);
+
+      // Interest should be positive (issue date is in the past)
+      expect(result.toNumber()).toBeGreaterThan(0);
+
+      // Simple interest: I = P × r × (days / 365)
+      // After ~2 years: 100000 * 0.10 * 730/365 ≈ 20000
+      expect(result.toNumber()).toBeGreaterThan(10000);
+    });
+
+    it('should calculate COMPOUND interest correctly', () => {
+      const instrument = {
+        principalAmount: new Prisma.Decimal('100000.00'),
+        interestRate: new Prisma.Decimal('0.10'), // 10%
+        interestType: 'COMPOUND',
+        issueDate: new Date('2024-01-15'),
+      };
+
+      const result = service.calculateAccruedInterest(instrument);
+
+      // Compound interest should be greater than simple interest
+      const simpleResult = service.calculateAccruedInterest({
+        ...instrument,
+        interestType: 'SIMPLE',
+      });
+
+      expect(result.toNumber()).toBeGreaterThan(simpleResult.toNumber());
+    });
+
+    it('should return zero for future issue date', () => {
+      const futureDate = new Date();
+      futureDate.setFullYear(futureDate.getFullYear() + 1);
+
+      const instrument = {
+        principalAmount: new Prisma.Decimal('100000.00'),
+        interestRate: new Prisma.Decimal('0.10'),
+        interestType: 'SIMPLE',
+        issueDate: futureDate,
+      };
+
+      const result = service.calculateAccruedInterest(instrument);
+
+      // Future issue date should produce zero or near-zero interest
+      expect(result.toNumber()).toBeLessThanOrEqual(0);
+    });
+
+    it('should return zero for zero interest rate', () => {
+      const instrument = {
+        principalAmount: new Prisma.Decimal('100000.00'),
+        interestRate: new Prisma.Decimal('0'),
+        interestType: 'SIMPLE',
+        issueDate: new Date('2024-01-15'),
+      };
+
+      const result = service.calculateAccruedInterest(instrument);
+
+      expect(result.toNumber()).toBe(0);
+    });
+  });
+
+  // ─── UPDATE ACCRUED INTEREST FOR ALL ────────────────────────────
+
+  describe('updateAccruedInterestForAll', () => {
+    it('should update accrued interest for all OUTSTANDING instruments', async () => {
+      const instruments = [
+        {
+          id: 'conv-1',
+          principalAmount: new Prisma.Decimal('100000.00'),
+          interestRate: new Prisma.Decimal('0.08'),
+          interestType: 'SIMPLE',
+          issueDate: new Date('2024-01-15'),
+        },
+        {
+          id: 'conv-2',
+          principalAmount: new Prisma.Decimal('200000.00'),
+          interestRate: new Prisma.Decimal('0.10'),
+          interestType: 'COMPOUND',
+          issueDate: new Date('2025-06-01'),
+        },
+      ];
+
+      prisma.convertibleInstrument.findMany.mockResolvedValue(instruments);
+      prisma.convertibleInstrument.update.mockResolvedValue({ id: 'conv-1' });
+
+      const result = await service.updateAccruedInterestForAll();
+
+      expect(result).toBe(2);
+      expect(prisma.convertibleInstrument.findMany).toHaveBeenCalledWith({
+        where: { status: 'OUTSTANDING' },
+        select: {
+          id: true,
+          principalAmount: true,
+          interestRate: true,
+          interestType: true,
+          issueDate: true,
+        },
+      });
+      expect(prisma.convertibleInstrument.update).toHaveBeenCalledTimes(2);
+
+      // Verify each update was called with a positive interest value
+      const firstUpdateCall = prisma.convertibleInstrument.update.mock.calls[0][0];
+      expect(firstUpdateCall.where.id).toBe('conv-1');
+      expect(firstUpdateCall.data.accruedInterest.toNumber()).toBeGreaterThan(0);
+
+      const secondUpdateCall = prisma.convertibleInstrument.update.mock.calls[1][0];
+      expect(secondUpdateCall.where.id).toBe('conv-2');
+      expect(secondUpdateCall.data.accruedInterest.toNumber()).toBeGreaterThan(0);
+    });
+
+    it('should return 0 when no OUTSTANDING instruments exist', async () => {
+      prisma.convertibleInstrument.findMany.mockResolvedValue([]);
+
+      const result = await service.updateAccruedInterestForAll();
+
+      expect(result).toBe(0);
+      expect(prisma.convertibleInstrument.update).not.toHaveBeenCalled();
+    });
+
+    it('should only query OUTSTANDING instruments', async () => {
+      prisma.convertibleInstrument.findMany.mockResolvedValue([]);
+
+      await service.updateAccruedInterestForAll();
+
+      expect(prisma.convertibleInstrument.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { status: 'OUTSTANDING' },
+        }),
+      );
+    });
+
+    it('should handle large batches with chunking', async () => {
+      // Create 75 mock instruments to test chunking (chunk size is 50)
+      const instruments = Array.from({ length: 75 }, (_, i) => ({
+        id: `conv-${i}`,
+        principalAmount: new Prisma.Decimal('100000.00'),
+        interestRate: new Prisma.Decimal('0.08'),
+        interestType: 'SIMPLE',
+        issueDate: new Date('2024-01-15'),
+      }));
+
+      prisma.convertibleInstrument.findMany.mockResolvedValue(instruments);
+      prisma.convertibleInstrument.update.mockResolvedValue({ id: 'conv-0' });
+
+      const result = await service.updateAccruedInterestForAll();
+
+      expect(result).toBe(75);
+      expect(prisma.convertibleInstrument.update).toHaveBeenCalledTimes(75);
     });
   });
 });
