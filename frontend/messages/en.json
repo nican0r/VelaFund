@@ -85,6 +85,54 @@
     "welcome": "Welcome back, {firstName}!",
     "welcomeGeneric": "Welcome back!"
   },
+  "dataroom": {
+    "category": {
+      "all": "All",
+      "financials": "Financial",
+      "legal": "Legal",
+      "other": "Other",
+      "pitchDeck": "Pitch Deck",
+      "product": "Product",
+      "team": "Team"
+    },
+    "delete": {
+      "confirm": "Are you sure you want to delete \"{name}\"? This action cannot be undone.",
+      "error": "Failed to delete document. Please try again.",
+      "success": "Document deleted successfully.",
+      "title": "Delete Document"
+    },
+    "document": {
+      "delete": "Delete",
+      "download": "Download",
+      "pages": "{count} pages",
+      "uploaded": "Uploaded {date}"
+    },
+    "empty": {
+      "description": "Upload your first document to get started building your dataroom.",
+      "filtered": "No documents in this category.",
+      "title": "No documents yet"
+    },
+    "storage": {
+      "label": "{used} of {max} used",
+      "limit": "Storage limit reached. Delete files to free up space."
+    },
+    "subtitle": "Manage the documents that investors will see on your company page.",
+    "title": "Dataroom",
+    "upload": {
+      "button": "Upload Document",
+      "category": "Category",
+      "categoryPlaceholder": "Select a category",
+      "dragDrop": "Drag and drop your file here, or click to browse",
+      "error": "Failed to upload document. Please try again.",
+      "fileSelected": "File selected: {name}",
+      "formats": "PDF, PNG, JPG, XLSX, PPTX, DOCX up to 25 MB",
+      "name": "Display name",
+      "namePlaceholder": "Optional display name",
+      "success": "Document uploaded successfully.",
+      "title": "Upload Document",
+      "uploading": "Uploading..."
+    }
+  },
   "errors": {
     "auth": {
       "accountLocked": "Account locked due to too many attempts. Try again in 15 minutes.",

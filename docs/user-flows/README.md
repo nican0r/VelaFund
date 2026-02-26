@@ -16,6 +16,7 @@ Each document follows the template defined in `.claude/rules/user-flow-documenta
 | [Company CNPJ Validation](./company-cnpj-validation.md) | ADMIN (creator), System (Bull queue, Verifik API) | Backend complete |
 | [Company Profile](./company-profile.md) | ADMIN (full lifecycle + publish/archive + analytics), FINANCE (update + analytics), all members (read), public visitors (view via slug) | Backend complete — publish requires KYC APPROVED (KycGatingGuard) |
 | [Company Dataroom](./company-dataroom.md) | ADMIN/FINANCE (upload/delete/reorder), all members (read/download), public visitors (download via slug) | Backend complete |
+| [Dataroom (Frontend)](./dataroom.md) | ADMIN/FINANCE (upload/delete), all members (view/download), category filtering, storage tracking | Frontend flow spec complete |
 | [Company Litigation](./company-litigation.md) | System (Bull queue, BigDataCorp API), ADMIN/FINANCE (view on profile), public visitors (view on public profile) | Backend complete |
 | [Member Invitation](./member-invitation.md) | ADMIN member, any company member, authenticated user, unauthenticated user | Backend complete, Frontend invitation acceptance page complete |
 | [User Permissions](./user-permissions.md) | All roles (ADMIN, FINANCE, LEGAL, INVESTOR, EMPLOYEE) | Frontend spec complete |

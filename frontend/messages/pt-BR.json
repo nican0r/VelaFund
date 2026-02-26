@@ -85,6 +85,54 @@
     "welcome": "Bem-vindo(a), {firstName}!",
     "welcomeGeneric": "Bem-vindo(a)!"
   },
+  "dataroom": {
+    "category": {
+      "all": "Todos",
+      "financials": "Financeiro",
+      "legal": "Jurídico",
+      "other": "Outros",
+      "pitchDeck": "Pitch Deck",
+      "product": "Produto",
+      "team": "Equipe"
+    },
+    "delete": {
+      "confirm": "Tem certeza que deseja excluir \"{name}\"? Esta ação não pode ser desfeita.",
+      "error": "Falha ao excluir documento. Tente novamente.",
+      "success": "Documento excluído com sucesso.",
+      "title": "Excluir Documento"
+    },
+    "document": {
+      "delete": "Excluir",
+      "download": "Baixar",
+      "pages": "{count} páginas",
+      "uploaded": "Enviado em {date}"
+    },
+    "empty": {
+      "description": "Envie seu primeiro documento para começar a montar seu dataroom.",
+      "filtered": "Nenhum documento nesta categoria.",
+      "title": "Nenhum documento"
+    },
+    "storage": {
+      "label": "{used} de {max} utilizado",
+      "limit": "Limite de armazenamento atingido. Exclua arquivos para liberar espaço."
+    },
+    "subtitle": "Gerencie os documentos que investidores verão na página da empresa.",
+    "title": "Dataroom",
+    "upload": {
+      "button": "Enviar Documento",
+      "category": "Categoria",
+      "categoryPlaceholder": "Selecione uma categoria",
+      "dragDrop": "Arraste e solte seu arquivo aqui, ou clique para procurar",
+      "error": "Falha ao enviar documento. Tente novamente.",
+      "fileSelected": "Arquivo selecionado: {name}",
+      "formats": "PDF, PNG, JPG, XLSX, PPTX, DOCX até 25 MB",
+      "name": "Nome de exibição",
+      "namePlaceholder": "Nome de exibição opcional",
+      "success": "Documento enviado com sucesso.",
+      "title": "Enviar Documento",
+      "uploading": "Enviando..."
+    }
+  },
   "errors": {
     "auth": {
       "accountLocked": "Conta bloqueada por excesso de tentativas. Tente novamente em 15 minutos.",

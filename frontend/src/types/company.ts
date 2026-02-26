@@ -20,14 +20,40 @@ export interface ProfileTeamMember {
   order: number;
 }
 
+export type DocumentCategory =
+  | 'PITCH_DECK'
+  | 'FINANCIALS'
+  | 'LEGAL'
+  | 'PRODUCT'
+  | 'TEAM'
+  | 'OTHER';
+
 export interface ProfileDocument {
   id: string;
+  profileId: string;
   name: string;
-  category: string;
+  category: DocumentCategory;
+  fileKey: string;
   fileSize: number;
   mimeType: string;
+  pageCount: number | null;
+  thumbnailKey: string | null;
   order: number;
+  uploadedById: string;
+  uploadedAt: string;
   createdAt: string;
+  updatedAt: string;
+}
+
+export interface DocumentListResponse {
+  documents: ProfileDocument[];
+  totalStorage: number;
+  maxStorage: number;
+}
+
+export interface DocumentDownloadResponse {
+  downloadUrl: string;
+  expiresIn: number;
 }
 
 export interface CompanyProfile {

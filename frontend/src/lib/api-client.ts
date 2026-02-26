@@ -181,6 +181,47 @@ class ApiClient {
   async delete(path: string): Promise<void> {
     return this.request<void>(path, { method: 'DELETE' });
   }
+
+  /**
+   * Upload a file via multipart/form-data.
+   * Does NOT set Content-Type header — browser adds it with boundary.
+   */
+  async uploadFile<T>(path: string, formData: FormData): Promise<T> {
+    const headers: Record<string, string> = {
+      'Accept-Language': getLocale(),
+      'X-Request-Id': generateRequestId(),
+    };
+
+    const csrf = getCsrfToken();
+    if (csrf) {
+      headers['X-CSRF-Token'] = csrf;
+    }
+
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method: 'POST',
+      credentials: 'include',
+      headers,
+      body: formData,
+    });
+
+    if (res.status === 401) {
+      onUnauthorized?.();
+      throw new ApiError('AUTH_UNAUTHORIZED', 'errors.auth.unauthorized', 401);
+    }
+
+    const body = await res.json();
+    if (!body.success) {
+      throw new ApiError(
+        body.error.code,
+        body.error.messageKey,
+        res.status,
+        body.error.details,
+        body.error.validationErrors,
+      );
+    }
+
+    return body.data;
+  }
 }
 
 export const api = new ApiClient();

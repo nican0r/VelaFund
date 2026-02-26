@@ -150,7 +150,7 @@ const defaultProfile = {
   company: { logoUrl: 'https://s3.amazonaws.com/logo.png' },
   metrics: [{ id: 'm1', label: 'MRR', value: 'R$ 50k', format: 'CURRENCY', icon: null, order: 0 }],
   team: [{ id: 't1', name: 'Nelson', title: 'CEO', photoUrl: null, linkedinUrl: null, order: 0 }],
-  documents: [{ id: 'd1', name: 'Pitch Deck.pdf', category: 'PITCH', fileSize: 1024, mimeType: 'application/pdf', order: 0, createdAt: '2026-01-01' }],
+  documents: [{ id: 'd1', profileId: 'p1', name: 'Pitch Deck.pdf', category: 'PITCH_DECK' as const, fileKey: 'profiles/p1/documents/d1.pdf', fileSize: 1024, mimeType: 'application/pdf', pageCount: 10, thumbnailKey: null, order: 0, uploadedById: 'u1', uploadedAt: '2026-01-01', createdAt: '2026-01-01', updatedAt: '2026-01-01' }],
   litigation: null,
   createdAt: '2026-01-01',
   updatedAt: '2026-01-15',
@@ -418,7 +418,7 @@ describe('DashboardPage', () => {
           company: { logoUrl: 'https://logo.png' },
           metrics: [{ id: 'm1', label: 'MRR', value: '50k', format: 'CURRENCY', icon: null, order: 0 }],
           team: [{ id: 't1', name: 'Nelson', title: 'CEO', photoUrl: null, linkedinUrl: null, order: 0 }],
-          documents: [{ id: 'd1', name: 'Deck.pdf', category: 'PITCH', fileSize: 1024, mimeType: 'application/pdf', order: 0, createdAt: '2026-01-01' }],
+          documents: [{ id: 'd1', profileId: 'p1', name: 'Deck.pdf', category: 'PITCH_DECK' as const, fileKey: 'profiles/p1/documents/d1.pdf', fileSize: 1024, mimeType: 'application/pdf', pageCount: null, thumbnailKey: null, order: 0, uploadedById: 'u1', uploadedAt: '2026-01-01', createdAt: '2026-01-01', updatedAt: '2026-01-01' }],
         },
         user: { kycStatus: 'APPROVED' },
       });
