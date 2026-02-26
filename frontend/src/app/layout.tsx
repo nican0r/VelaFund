@@ -18,8 +18,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Navia - Cap Table Management',
-  description: 'Brazilian cap table management platform with on-chain record-keeping',
+  title: 'Navia - Investor-Ready Profiles for Brazilian Startups',
+  description: 'Help Brazilian startups raise investment with investor-ready company profiles, data rooms, and due diligence tools.',
 };
 
 export default async function RootLayout({

@@ -85,6 +85,83 @@ export interface CompanyProfile {
   updatedAt: string;
 }
 
+// Public profile types returned by GET /api/v1/profiles/:slug
+export interface PublicProfileMetric {
+  id: string;
+  label: string;
+  value: string;
+  format: 'NUMBER' | 'CURRENCY_BRL' | 'CURRENCY_USD' | 'PERCENTAGE' | 'TEXT';
+  icon: string | null;
+  order: number;
+}
+
+export interface PublicProfileTeamMember {
+  id: string;
+  name: string;
+  title: string;
+  photoUrl: string | null;
+  linkedinUrl: string | null;
+  order: number;
+}
+
+export interface PublicProfileDocument {
+  id: string;
+  name: string;
+  category: DocumentCategory;
+  fileSize: number;
+  mimeType: string;
+  pageCount: number | null;
+  order: number;
+}
+
+export interface LitigationSummary {
+  activeLawsuits: number;
+  historicalLawsuits: number;
+  activeAdministrative: number;
+  protests: number;
+  totalValueInDispute: string;
+  riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+}
+
+export interface PublicProfileLitigation {
+  status: 'PENDING' | 'COMPLETED' | 'FAILED';
+  fetchedAt: string | null;
+  summary: LitigationSummary | null;
+  lawsuits?: Array<{
+    processId: string;
+    court: string;
+    type: string;
+    value: string;
+    filingDate: string;
+    status: string;
+  }>;
+  protestData?: {
+    totalProtests: number;
+    protests: Array<unknown>;
+  };
+  error?: string;
+}
+
+export interface PublicProfile {
+  id: string;
+  slug: string;
+  companyName: string;
+  companyLogo: string | null;
+  headline: string | null;
+  description: string | null;
+  sector: string | null;
+  foundedYear: number | null;
+  website: string | null;
+  location: string | null;
+  metrics: PublicProfileMetric[];
+  team: PublicProfileTeamMember[];
+  documents: PublicProfileDocument[];
+  viewCount: number;
+  shareUrl: string;
+  publishedAt: string | null;
+  litigation: PublicProfileLitigation | null;
+}
+
 // Company types returned by GET /api/v1/companies
 export interface CompanyListItem {
   id: string;

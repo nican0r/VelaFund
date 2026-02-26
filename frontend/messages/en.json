@@ -575,6 +575,54 @@
     },
     "welcome": "Welcome to Navia"
   },
+  "publicProfile": {
+    "documents": {
+      "download": "Download"
+    },
+    "emailGate": {
+      "button": "View Profile",
+      "description": "This company profile requires your email address to view.",
+      "disclaimer": "Your email will be shared with the company.",
+      "invalidEmail": "Please enter a valid email address.",
+      "placeholder": "Your email address",
+      "title": "Email Required"
+    },
+    "error": {
+      "generic": "Something went wrong. Please try again."
+    },
+    "footer": {
+      "poweredBy": "Powered by"
+    },
+    "header": {
+      "website": "Website"
+    },
+    "litigation": {
+      "activeLawsuits": "active lawsuits",
+      "failed": "Litigation verification temporarily unavailable.",
+      "fetchedAt": "Verified on",
+      "noActive": "No active lawsuits found.",
+      "pending": "Litigation verification in progress...",
+      "riskLevel": "Risk Level"
+    },
+    "notFound": {
+      "description": "This company profile does not exist or is not available.",
+      "title": "Profile Not Found"
+    },
+    "passwordGate": {
+      "button": "View Profile",
+      "description": "This company profile is password-protected.",
+      "error": "Incorrect password. Please try again.",
+      "placeholder": "Enter password",
+      "title": "Password Required"
+    },
+    "sections": {
+      "about": "About",
+      "documents": "Documents",
+      "litigation": "Litigation Verification",
+      "metrics": "Key Metrics",
+      "team": "Team"
+    }
+  },
   "reports": {
     "description": "Ownership reports, dilution analysis, and data export",
     "dilution": {

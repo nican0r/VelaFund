@@ -10,7 +10,7 @@ export default function AuthGroupLayout({
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold tracking-tight text-navy-900">Navia</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Cap table management for Brazilian companies
+            Investor-readiness for Brazilian startups
           </p>
         </div>
 

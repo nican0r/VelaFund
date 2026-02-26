@@ -24,6 +24,7 @@ Each document follows the template defined in `.claude/rules/user-flow-documenta
 | [Settings](./settings.md) | ADMIN (full access: edit company, invite/manage members), all members (view) | Frontend Company Info tab + Members tab complete |
 | [Dashboard](./dashboard.md) | Authenticated user (any role with a company) | Frontend complete (welcome header, 4 stat cards, profile completeness, health card, quick actions, recent activity, 39 tests) |
 | [Navigation](./navigation.md) | Founders (any authenticated user with a company) | Frontend complete (desktop sidebar with collapse/expand, mobile sidebar with hamburger, 12 nav items) |
+| [Public Profile](./public-profile.md) | Public visitor (unauthenticated), Founder (share link) | Frontend complete (profile view, email gate, password gate, metrics, team, docs, litigation, 26 tests) |
 
 ---
 

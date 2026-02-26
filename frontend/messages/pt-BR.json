@@ -575,6 +575,54 @@
     },
     "welcome": "Bem-vindo ao Navia"
   },
+  "publicProfile": {
+    "documents": {
+      "download": "Baixar"
+    },
+    "emailGate": {
+      "button": "Ver Perfil",
+      "description": "Este perfil de empresa requer seu e-mail para visualização.",
+      "disclaimer": "Seu e-mail será compartilhado com a empresa.",
+      "invalidEmail": "Por favor, insira um e-mail válido.",
+      "placeholder": "Seu endereço de e-mail",
+      "title": "E-mail Necessário"
+    },
+    "error": {
+      "generic": "Algo deu errado. Por favor, tente novamente."
+    },
+    "footer": {
+      "poweredBy": "Powered by"
+    },
+    "header": {
+      "website": "Website"
+    },
+    "litigation": {
+      "activeLawsuits": "processos ativos",
+      "failed": "Verificação judicial temporariamente indisponível.",
+      "fetchedAt": "Consultado em",
+      "noActive": "Nenhum processo ativo encontrado.",
+      "pending": "Verificação judicial em andamento...",
+      "riskLevel": "Nível de Risco"
+    },
+    "notFound": {
+      "description": "Este perfil de empresa não existe ou não está disponível.",
+      "title": "Perfil Não Encontrado"
+    },
+    "passwordGate": {
+      "button": "Ver Perfil",
+      "description": "Este perfil de empresa é protegido por senha.",
+      "error": "Senha incorreta. Por favor, tente novamente.",
+      "placeholder": "Digite a senha",
+      "title": "Senha Necessária"
+    },
+    "sections": {
+      "about": "Sobre",
+      "documents": "Documentos",
+      "litigation": "Verificação Judicial",
+      "metrics": "Métricas",
+      "team": "Equipe"
+    }
+  },
   "reports": {
     "description": "Relatórios de participação, diluição e exportação de dados",
     "dilution": {
