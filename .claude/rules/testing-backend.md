@@ -34,6 +34,20 @@
 - **Pipes**: input validation, data transformation
 - **Auth**: Privy token verification, JWT validation, user creation on first login
 
+## Middleware / Guard / Interceptor Integration Testing
+
+When implementing or modifying **global** middleware, guards, or interceptors — anything registered via `app.use()` in `main.ts`, `APP_GUARD`, `APP_INTERCEPTOR`, or `APP_FILTER` in `AppModule` — unit testing the component in isolation is necessary but **NOT sufficient**.
+
+You MUST also verify the change against every critical user flow it intercepts:
+- **Authentication**: login (from cold start — no cookies), logout, page refresh with session
+- **Authorization**: access to company-scoped resources by each role
+- **CSRF**: first POST request in a session (no prior GET to establish cookie)
+- **Rate limiting**: does the tier apply correctly to the intended endpoints?
+
+**Why**: A middleware can pass all its own unit tests while breaking a flow it wasn't designed for. Example: CSRF middleware correctly rejects POSTs without a cookie, but the login endpoint is the first POST call — no GET has set the cookie yet, so login breaks. The middleware test passes; the login flow is broken.
+
+**How**: Either write E2E tests (`*.e2e-spec.ts`) that exercise the full NestJS app with all middleware, or manually verify each affected flow with both frontend and backend running. Document which flows you verified.
+
 ## Test Structure
 ```typescript
 describe('CompanyService', () => {

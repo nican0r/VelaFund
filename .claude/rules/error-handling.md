@@ -79,3 +79,21 @@ All external services (Privy, Verifik, Base RPC, S3, SES) must use:
 - **Rate limited (429)** → show warning toast with `retryAfter` from `details`
 - **TanStack Query**: Don't retry auth, validation, or 422 errors. Retry server errors up to 2 times.
 - **Error boundary**: Wrap pages to catch unhandled rendering errors with fallback UI
+
+## Frontend: No Silent Catch Blocks
+
+Every `catch` block that handles a **user-facing operation** (API calls, auth flows, form submissions, mutations) MUST provide observable feedback to the user:
+- A toast notification (via Sonner)
+- An inline error on a form field
+- A visible error state in the UI
+
+**Silent catch blocks that reset state without notification are bugs.** They create invisible failures that users cannot understand or report, and that developers cannot debug.
+
+Allowed exceptions:
+- Background refreshes where the stale data is still usable (e.g., `refreshUser()` — keeps current data on failure)
+- Fire-and-forget operations where the primary action already succeeded (e.g., audit log calls)
+
+Before committing, review every `catch` block in files you changed:
+- Does it show the user what went wrong?
+- Does it match the error path documented in `docs/user-flows/`?
+- If it calls `logout()` or resets critical state, does the user understand why?
