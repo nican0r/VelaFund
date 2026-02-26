@@ -709,3 +709,90 @@ export interface Transaction {
   createdAt: string;
   updatedAt: string;
 }
+
+// Report types returned by GET /api/v1/companies/:id/reports/*
+export interface OwnershipReportShareholder {
+  shareholderId: string;
+  name: string;
+  shareClassId: string;
+  shareClassName: string;
+  shares: string;
+  percentage: string;
+  fullyDilutedPercentage: string;
+}
+
+export interface OptionPoolSummary {
+  totalPool: string;
+  granted: string;
+  exercised: string;
+  vestedUnexercised: string;
+  unvested: string;
+  available: string;
+}
+
+export interface OwnershipReport {
+  companyId: string;
+  companyName: string;
+  generatedAt: string;
+  totalShares: string;
+  totalFullyDiluted: string;
+  shareholders: OwnershipReportShareholder[];
+  optionPoolSummary: OptionPoolSummary | null;
+}
+
+export interface DilutionDataPoint {
+  date: string;
+  totalShares: string;
+  fullyDilutedShares: string;
+  shareClasses: Array<{
+    shareClassId: string;
+    name: string;
+    shares: string;
+    percentage: string;
+  }>;
+}
+
+export interface DilutionReport {
+  companyId: string;
+  generatedAt: string;
+  dataPoints: DilutionDataPoint[];
+  giniCoefficient: string;
+  foreignOwnershipPercentage: string;
+}
+
+export type ExportFormat = 'pdf' | 'xlsx' | 'csv' | 'oct';
+export type ExportJobStatus = 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+
+export interface ExportJob {
+  jobId: string;
+  status: ExportJobStatus;
+  format: string | null;
+  downloadUrl: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+  completedAt: string | null;
+  errorCode: string | null;
+}
+
+export interface PortfolioHolding {
+  companyId: string;
+  companyName: string;
+  shareClassName: string;
+  shares: string;
+  ownershipPercentage: string;
+  totalInvested: string;
+  estimatedValue: string;
+  lastRoundPricePerShare: string;
+  roiMultiple: string;
+}
+
+export interface Portfolio {
+  userId: string;
+  generatedAt: string;
+  holdings: PortfolioHolding[];
+  totals: {
+    totalInvested: string;
+    totalEstimatedValue: string;
+    weightedRoiMultiple: string;
+  };
+}

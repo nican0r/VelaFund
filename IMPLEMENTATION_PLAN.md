@@ -1,6 +1,6 @@
-# Navia MVP — Implementation Plan v73.0
+# Navia MVP — Implementation Plan v74.0
 
-> **Generated**: 2026-02-26 | **Tests**: 3057 passing (1868 backend + 1189 frontend) | **Backend modules**: 22 of 23 built
+> **Generated**: 2026-02-26 | **Tests**: 3120 passing (1868 backend + 1252 frontend) | **Backend modules**: 22 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -666,6 +666,21 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 - [x] Sidebar already has Documents nav item (FileText icon) — verified
 - [x] 123 component tests (37 list + 36 wizard + 50 detail) — DONE
 
+### 4.15 Reports & Analytics Page ✅
+
+- [x] Report TypeScript types (OwnershipReport, OwnershipReportShareholder, OptionPoolSummary, DilutionReport, DilutionDataPoint, DilutionShareClassBreakdown, ExportJob, ExportFormat, ExportJobStatus, Portfolio, PortfolioHolding) in `types/company.ts` — DONE
+- [x] TanStack Query hooks (`use-reports.ts`): 6 hooks (useOwnershipReport with shareClassId/includeOptions filters, useDilutionReport with dateFrom/dateTo/granularity, useExportCapTable mutation, useExportJobStatus with 2s polling until COMPLETED/FAILED, useGenerateDueDiligence mutation, useDueDiligenceJobStatus with 2s polling) — DONE
+- [x] Reports i18n namespace (~80 keys PT-BR+EN): title, description, tabs, stats, ownership (table headers, filters, option pool labels), dilution (granularity options, date range, period, no data), export (format options, snapshot date, status messages, download), due diligence (date range, generate, status messages), empty/error/retry — DONE
+- [x] Reports page with 4-tab layout: Ownership, Dilution, Cap Table Export, Due Diligence — DONE
+- [x] 4 stat cards (Total Shares active/highlighted, Shareholders, Gini Coefficient, Foreign Ownership) with loading skeletons — DONE
+- [x] Ownership tab: share class filter dropdown (populated from useShareClasses), include options checkbox, summary stats (total shares/fully diluted), shareholders table (name, class, shares, ownership %, diluted %), option pool summary card (total/granted/exercised/vested/unvested/available), empty state — DONE
+- [x] Dilution tab: granularity selector (day/week/month), date range filters, summary metrics (Gini coefficient, foreign ownership %, data point count), data points table with share class columns, empty/loading/error states — DONE
+- [x] Export tab: format selector (PDF/XLSX/CSV/OCT), snapshot date input, export button with mutation, ExportStatusCard showing QUEUED/PROCESSING/COMPLETED/FAILED states with download link — DONE
+- [x] Due Diligence tab: date range filters, generate button with mutation, status card with polling, download link — DONE
+- [x] Sidebar navigation: BarChart3 icon nav item added to sidebar.tsx and mobile-sidebar.tsx — DONE
+- [x] Fixed audit logs routing bug: moved page from `app/dashboard/audit-logs/` to `app/(dashboard)/dashboard/audit-logs/` (was outside route group, missing DashboardLayout wrapper) — DONE
+- [x] 63 component tests (page header, no-company state, stat cards, tab navigation, ownership table/filters/option pool/empty/loading/error, dilution metrics/table/filters/empty/loading/error, export form/format selection/mutation/status cards, due diligence form/mutation/status cards, hook invocation, table headers) — DONE
+
 ### 4.16 Audit Logs Page ✅
 
 - [x] AuditLogEntry + HashChainVerification TypeScript types in `types/company.ts` — DONE
@@ -680,7 +695,7 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 - [x] Sidebar navigation: Shield icon nav item added to sidebar.tsx and mobile-sidebar.tsx — DONE
 - [x] 47 component tests (page header, stat cards, table content, expandable rows, filters, pagination, loading/error/empty/no-company states, hash chain verification, hook invocation, action badge colors, actor type display, resource type labels) — DONE
 
-### 4.17 Frontend Testing (37 test suites, 1189 tests)
+### 4.17 Frontend Testing (38 test suites, 1252 tests)
 
 - [x] Configure Jest + React Testing Library (infrastructure is in place: jest.config.ts, jest.setup.ts, dependencies installed)
 - [ ] Tests for all auth flows (login, logout, protected routes)

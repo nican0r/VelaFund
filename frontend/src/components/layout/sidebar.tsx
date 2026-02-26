@@ -14,6 +14,7 @@ import {
   FileText,
   Bell,
   Shield,
+  BarChart3,
   Settings,
   HelpCircle,
   LogOut,
@@ -41,6 +42,7 @@ const menuItems: NavItem[] = [
   { label: 'Options', href: '/dashboard/options', icon: Gift },
   { label: 'Documents', href: '/dashboard/documents', icon: FileText },
   { label: 'Notifications', href: '/dashboard/notifications', icon: Bell },
+  { label: 'Reports', href: '/dashboard/reports', icon: BarChart3 },
   { label: 'Audit Logs', href: '/dashboard/audit-logs', icon: Shield },
 ];
 

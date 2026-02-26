@@ -298,3 +298,59 @@ POSTCONDITION: Job is marked FAILED. User can retry by requesting a new export.
 **Depends on**: [Convertible Instruments](./convertible-instruments.md) — convertible data in due diligence CSV
 **Depends on**: [Document Generation](./document-generation.md) — document inventory in due diligence CSV
 **Complements**: [Exit Waterfall](./exit-waterfall.md) — waterfall at `/reports/waterfall`, analytics at `/reports/*`
+
+---
+
+## Frontend UI Flow
+
+### Reports Page Navigation
+
+```
+User navigates to /dashboard/reports
+  │
+  ├─ [no company selected] ─→ Empty state: "Select a company to view reports" with BarChart3 icon
+  │
+  └─ [company selected] ─→ Page renders with 4 stat cards + 4-tab layout
+        │
+        ├─ Stat Cards (always visible):
+        │     ├─ Total Shares (active/highlighted ocean-600)
+        │     ├─ Shareholders count
+        │     ├─ Gini Coefficient (from dilution report)
+        │     └─ Foreign Ownership % (from dilution report)
+        │
+        ├─ [Ownership tab — default] ─→ Share class filter + include options checkbox
+        │     │
+        │     ├─ [data loaded] ─→ Summary stats (total shares/fully diluted) + shareholders table + option pool summary
+        │     ├─ [no shareholders] ─→ Empty state with Users icon
+        │     ├─ [loading] ─→ Animated skeleton lines
+        │     └─ [error] ─→ AlertCircle icon + title text
+        │
+        ├─ [Dilution tab] ─→ Granularity selector (day/week/month) + date range inputs
+        │     │
+        │     ├─ [data loaded] ─→ Gini + foreign % + period count metrics + data points table with share class columns
+        │     ├─ [no data points] ─→ "No data points for the selected period" with TrendingUp icon
+        │     ├─ [loading] ─→ Animated skeleton bars
+        │     └─ [error] ─→ AlertCircle icon + title text
+        │
+        ├─ [Export tab] ─→ Format selector (PDF/XLSX/CSV/OCT) + snapshot date + Export button
+        │     │
+        │     ├─ [click Export] ─→ Mutation fires → button shows "Exporting..." spinner
+        │     │     │
+        │     │     ├─ [job QUEUED] ─→ Blue status card with spinner: "Export queued..."
+        │     │     ├─ [job PROCESSING] ─→ Blue status card with spinner: "Processing export..."
+        │     │     ├─ [job COMPLETED] ─→ Green status card: "Export ready!" + Download link
+        │     │     └─ [job FAILED] ─→ Red status card with error code
+        │     │
+        │     └─ [polling] ─→ useExportJobStatus polls every 2s until COMPLETED/FAILED
+        │
+        └─ [Due Diligence tab] ─→ Date range inputs + Generate button
+              │
+              ├─ [click Generate] ─→ Mutation fires → button shows "Generating..." spinner
+              │     │
+              │     ├─ [job QUEUED] ─→ Blue status card: "Queued..."
+              │     ├─ [job PROCESSING] ─→ Blue status card: "Generating..."
+              │     ├─ [job COMPLETED] ─→ Green status card: "Package ready!" + Download link
+              │     └─ [job FAILED] ─→ Red status card with error code
+              │
+              └─ [polling] ─→ useDueDiligenceJobStatus polls every 2s until COMPLETED/FAILED
+```
