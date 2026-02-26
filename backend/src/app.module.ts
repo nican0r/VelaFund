@@ -27,6 +27,7 @@ import { DocumentModule } from './document/document.module';
 import { CompanyProfileModule } from './company-profile/company-profile.module';
 import { ExitWaterfallModule } from './exit-waterfall/exit-waterfall.module';
 import { ReportsModule } from './reports/reports.module';
+import { ScheduledTasksModule } from './scheduled-tasks/scheduled-tasks.module';
 
 @Module({
   imports: [
@@ -77,6 +78,7 @@ import { ReportsModule } from './reports/reports.module';
     CompanyProfileModule,
     ExitWaterfallModule,
     ReportsModule,
+    ScheduledTasksModule,
   ],
   providers: [
     // Register ThrottlerGuard globally — rate limits apply to all endpoints.

@@ -48,6 +48,10 @@ pnpm prisma:studio                 # Open Prisma Studio GUI
 # Email templates
 # MJML templates in backend/templates/email/{templateName}/{locale}.mjml
 # EmailService compiles MJML → HTML and sends via SES
+
+# Scheduled tasks (@nestjs/schedule)
+# ScheduleModule.forRoot() in ScheduledTasksModule (imported by AppModule)
+# Daily audit hash chain at 00:05 UTC
 ```
 
 ### Frontend (@navia/frontend)
@@ -98,6 +102,7 @@ pnpm --filter @navia/backend prisma:generate
 | `backend/templates/email/` | MJML email templates (4 types × 2 locales) |
 | `frontend/messages/pt-BR.json` | Portuguese translations |
 | `frontend/messages/en.json` | English translations |
+| `backend/src/scheduled-tasks/scheduled-tasks.service.ts` | Cron jobs: daily audit hash chain (00:05 UTC) |
 
 ## Git Tags
 
