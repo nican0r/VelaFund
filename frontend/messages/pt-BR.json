@@ -24,6 +24,139 @@
     "select": "Selecione uma empresa",
     "title": "Suas empresas"
   },
+  "companyPage": {
+    "accessType": {
+      "emailGated": "Visitante informa e-mail antes de visualizar",
+      "label": "Tipo de Acesso",
+      "password": "Senha necessaria para visualizar",
+      "public": "Qualquer pessoa com o link pode visualizar"
+    },
+    "archive": {
+      "confirm": "Tem certeza que deseja arquivar este perfil? Ele nao estara mais acessivel.",
+      "success": "Perfil arquivado",
+      "title": "Arquivar Perfil"
+    },
+    "create": {
+      "button": "Criar Perfil",
+      "description": "Compartilhe informacoes sobre sua startup com investidores. Construa uma pagina profissional com suas metricas, equipe e documentos.",
+      "title": "Crie a pagina da sua empresa"
+    },
+    "empty": {
+      "description": "Voce precisa criar uma empresa antes de construir a pagina.",
+      "title": "Nenhuma empresa encontrada"
+    },
+    "info": {
+      "description": "Descricao da empresa",
+      "descriptionHelper": "{count}/5000 caracteres",
+      "descriptionPlaceholder": "Descreva sua empresa, missao e o que a torna unica...",
+      "foundedYear": "Ano de fundacao",
+      "foundedYearPlaceholder": "ex: 2020",
+      "headline": "Titulo",
+      "headlinePlaceholder": "Uma frase curta sobre sua empresa",
+      "location": "Localizacao",
+      "locationPlaceholder": "ex: Sao Paulo, SP",
+      "save": "Salvar Informacoes",
+      "saved": "Informacoes salvas com sucesso",
+      "sector": "Setor",
+      "sectorPlaceholder": "Selecione um setor",
+      "title": "Informacoes",
+      "website": "Website",
+      "websitePlaceholder": "https://suaempresa.com"
+    },
+    "metrics": {
+      "add": "Adicionar Metrica",
+      "empty": "Adicione metricas para destacar o progresso da sua empresa para investidores.",
+      "format": "Formato",
+      "formatOptions": {
+        "currencyBrl": "Moeda (BRL)",
+        "currencyUsd": "Moeda (USD)",
+        "number": "Numero",
+        "percentage": "Porcentagem",
+        "text": "Texto"
+      },
+      "icon": "Icone",
+      "label": "Rotulo",
+      "labelPlaceholder": "ex: MRR",
+      "maxReached": "Maximo de 6 metricas atingido",
+      "remove": "Remover metrica",
+      "save": "Salvar Metricas",
+      "saved": "Metricas salvas com sucesso",
+      "title": "Metricas",
+      "value": "Valor",
+      "valuePlaceholder": "ex: R$ 50.000"
+    },
+    "publish": {
+      "button": "Publicar",
+      "success": "Perfil publicado! Sua pagina esta no ar."
+    },
+    "sectors": {
+      "agritech": "Agritech",
+      "aiMl": "IA / ML",
+      "biotech": "Biotech",
+      "blockchainWeb3": "Blockchain / Web3",
+      "cleantech": "Cleantech",
+      "cybersecurity": "Ciberseguranca",
+      "ecommerce": "E-commerce",
+      "edtech": "Edtech",
+      "fashionBeauty": "Moda",
+      "fintech": "Fintech",
+      "foodBeverage": "Alimentos e Bebidas",
+      "gaming": "Gaming",
+      "hardware": "Hardware",
+      "healthtech": "Healthtech",
+      "hrtech": "HRtech",
+      "insurtech": "Insurtech",
+      "iot": "IoT",
+      "legaltech": "Legaltech",
+      "logistics": "Logistica",
+      "marketplace": "Marketplace",
+      "mediaEntertainment": "Midia e Entretenimento",
+      "other": "Outro",
+      "proptech": "Proptech",
+      "saas": "SaaS",
+      "socialImpact": "Impacto Social",
+      "travel": "Viagem e Turismo"
+    },
+    "share": {
+      "accessTypeLabel": "Quem pode ver seu perfil?",
+      "copySuccess": "Link copiado!",
+      "copyUrl": "Copiar link",
+      "customSlug": "URL personalizada",
+      "save": "Salvar URL",
+      "saved": "URL atualizada com sucesso",
+      "slugError": "Esta URL ja esta em uso",
+      "slugHelper": "Apenas letras minusculas, numeros e hifens (3-50 caracteres)",
+      "title": "Compartilhar",
+      "urlPrefix": "app.navia.com.br/p/"
+    },
+    "status": {
+      "archived": "Arquivado",
+      "draft": "Rascunho",
+      "published": "Publicado"
+    },
+    "subtitle": "Construa o perfil da sua empresa para investidores",
+    "team": {
+      "add": "Adicionar Membro",
+      "empty": "Adicione membros da equipe para gerar confianca com investidores.",
+      "linkedin": "URL do LinkedIn",
+      "linkedinPlaceholder": "https://linkedin.com/in/nome",
+      "maxReached": "Maximo de 10 membros atingido",
+      "name": "Nome",
+      "namePlaceholder": "Nome completo",
+      "photoUpload": "Enviar foto",
+      "remove": "Remover membro",
+      "save": "Salvar Equipe",
+      "saved": "Equipe salva com sucesso",
+      "title": "Equipe",
+      "titleField": "Cargo / Funcao",
+      "titlePlaceholder": "ex: CEO e Fundador"
+    },
+    "title": "Pagina da Empresa",
+    "unpublish": {
+      "button": "Despublicar",
+      "success": "Perfil despublicado"
+    }
+  },
   "dashboard": {
     "completeness": {
       "complete": "Seu perfil está pronto para investidores!",

@@ -24,6 +24,139 @@
     "select": "Select a company",
     "title": "Your companies"
   },
+  "companyPage": {
+    "accessType": {
+      "emailGated": "Visitors provide email before viewing",
+      "label": "Access Type",
+      "password": "Password required to view",
+      "public": "Anyone with the link can view"
+    },
+    "archive": {
+      "confirm": "Are you sure you want to archive this profile? It will no longer be accessible.",
+      "success": "Profile archived",
+      "title": "Archive Profile"
+    },
+    "create": {
+      "button": "Create Profile",
+      "description": "Share information about your startup with investors. Build a professional company page with your key metrics, team, and documents.",
+      "title": "Create your company page"
+    },
+    "empty": {
+      "description": "You need to create a company first before building your company page.",
+      "title": "No company found"
+    },
+    "info": {
+      "description": "Company description",
+      "descriptionHelper": "{count}/5000 characters",
+      "descriptionPlaceholder": "Describe your company, mission, and what makes it unique...",
+      "foundedYear": "Founded year",
+      "foundedYearPlaceholder": "e.g. 2020",
+      "headline": "Headline",
+      "headlinePlaceholder": "A short tagline for your company",
+      "location": "Location",
+      "locationPlaceholder": "e.g. Sao Paulo, SP",
+      "save": "Save Info",
+      "saved": "Info saved successfully",
+      "sector": "Sector",
+      "sectorPlaceholder": "Select a sector",
+      "title": "Company Info",
+      "website": "Website",
+      "websitePlaceholder": "https://yourcompany.com"
+    },
+    "metrics": {
+      "add": "Add Metric",
+      "empty": "Add key metrics to showcase your company's progress to investors.",
+      "format": "Format",
+      "formatOptions": {
+        "currencyBrl": "Currency (BRL)",
+        "currencyUsd": "Currency (USD)",
+        "number": "Number",
+        "percentage": "Percentage",
+        "text": "Text"
+      },
+      "icon": "Icon",
+      "label": "Label",
+      "labelPlaceholder": "e.g. MRR",
+      "maxReached": "Maximum of 6 metrics reached",
+      "remove": "Remove metric",
+      "save": "Save Metrics",
+      "saved": "Metrics saved successfully",
+      "title": "Metrics",
+      "value": "Value",
+      "valuePlaceholder": "e.g. R$ 50.000"
+    },
+    "publish": {
+      "button": "Publish",
+      "success": "Profile published! Your company page is now live."
+    },
+    "sectors": {
+      "agritech": "Agritech",
+      "aiMl": "AI / ML",
+      "biotech": "Biotech",
+      "blockchainWeb3": "Blockchain / Web3",
+      "cleantech": "Cleantech",
+      "cybersecurity": "Cybersecurity",
+      "ecommerce": "E-commerce",
+      "edtech": "Edtech",
+      "fashionBeauty": "Fashion",
+      "fintech": "Fintech",
+      "foodBeverage": "Food & Beverage",
+      "gaming": "Gaming",
+      "hardware": "Hardware",
+      "healthtech": "Healthtech",
+      "hrtech": "HRtech",
+      "insurtech": "Insurtech",
+      "iot": "IoT",
+      "legaltech": "Legaltech",
+      "logistics": "Logistics",
+      "marketplace": "Marketplace",
+      "mediaEntertainment": "Media & Entertainment",
+      "other": "Other",
+      "proptech": "Proptech",
+      "saas": "SaaS",
+      "socialImpact": "Social Impact",
+      "travel": "Travel"
+    },
+    "share": {
+      "accessTypeLabel": "Who can view your profile?",
+      "copySuccess": "Link copied!",
+      "copyUrl": "Copy link",
+      "customSlug": "Custom URL",
+      "save": "Save URL",
+      "saved": "URL updated successfully",
+      "slugError": "This URL is already taken",
+      "slugHelper": "Lowercase letters, numbers, and hyphens only (3-50 characters)",
+      "title": "Share",
+      "urlPrefix": "app.navia.com.br/p/"
+    },
+    "status": {
+      "archived": "Archived",
+      "draft": "Draft",
+      "published": "Published"
+    },
+    "subtitle": "Build your investor-ready company profile",
+    "team": {
+      "add": "Add Member",
+      "empty": "Add your team members to build trust with investors.",
+      "linkedin": "LinkedIn URL",
+      "linkedinPlaceholder": "https://linkedin.com/in/name",
+      "maxReached": "Maximum of 10 members reached",
+      "name": "Name",
+      "namePlaceholder": "Full name",
+      "photoUpload": "Upload photo",
+      "remove": "Remove member",
+      "save": "Save Team",
+      "saved": "Team saved successfully",
+      "title": "Team",
+      "titleField": "Title / Role",
+      "titlePlaceholder": "e.g. CEO & Founder"
+    },
+    "title": "Company Page",
+    "unpublish": {
+      "button": "Unpublish",
+      "success": "Profile unpublished"
+    }
+  },
   "dashboard": {
     "completeness": {
       "complete": "Your profile is ready for investors!",
