@@ -15,6 +15,10 @@
     "search": "Search",
     "yes": "Yes"
   },
+  "comingSoon": {
+    "description": "This feature is under development and will be available soon.",
+    "title": "Coming Soon"
+  },
   "companySwitcher": {
     "label": "Switch company",
     "select": "Select a company",
@@ -432,6 +436,29 @@
       "ownership": "Ownership"
     },
     "title": "Reports & Analytics"
+  },
+  "sidebar": {
+    "collapse": "Collapse",
+    "expand": "Expand sidebar",
+    "general": {
+      "help": "Help",
+      "notifications": "Notifications",
+      "settings": "Settings"
+    },
+    "generalLabel": "General",
+    "logout": "Log out",
+    "menu": {
+      "aiReports": "AI Reports",
+      "analytics": "Analytics",
+      "bankConnections": "Bank Connections",
+      "companyPage": "Company Page",
+      "dashboard": "Dashboard",
+      "dataroom": "Dataroom",
+      "investorQA": "Investor Q&A",
+      "investors": "Investors",
+      "updates": "Updates"
+    },
+    "menuLabel": "Menu"
   },
   "settings": {
     "company": {

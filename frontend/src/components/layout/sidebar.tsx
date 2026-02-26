@@ -2,34 +2,12 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import {
-  LayoutDashboard,
-  Bell,
-  Settings,
-  HelpCircle,
-  LogOut,
-  ChevronLeft,
-  ChevronRight,
-} from 'lucide-react';
+import { LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { SidebarCompanySwitcher } from '@/components/layout/company-switcher';
-
-interface NavItem {
-  label: string;
-  href: string;
-  icon: React.ElementType;
-}
-
-const menuItems: NavItem[] = [
-  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Notifications', href: '/dashboard/notifications', icon: Bell },
-];
-
-const generalItems: NavItem[] = [
-  { label: 'Settings', href: '/dashboard/settings', icon: Settings },
-  { label: 'Help', href: '/dashboard/help', icon: HelpCircle },
-];
+import { menuItems, generalItems, type NavItem } from '@/lib/sidebar-nav';
 
 interface SidebarProps {
   collapsed: boolean;
@@ -38,10 +16,12 @@ interface SidebarProps {
 
 function NavLink({
   item,
+  label,
   isActive,
   collapsed,
 }: {
   item: NavItem;
+  label: string;
   isActive: boolean;
   collapsed: boolean;
 }) {
@@ -57,14 +37,14 @@ function NavLink({
           : 'text-white/70 hover:bg-navy-950 hover:text-white/90',
         collapsed && 'justify-center px-0',
       )}
-      title={collapsed ? item.label : undefined}
+      title={collapsed ? label : undefined}
     >
       {/* Active indicator bar */}
       {isActive && (
         <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-sm bg-ocean-600" />
       )}
       <Icon className={cn('h-5 w-5 shrink-0', collapsed ? 'mx-auto' : '')} />
-      {!collapsed && <span className="truncate">{item.label}</span>}
+      {!collapsed && <span className="truncate">{label}</span>}
     </Link>
   );
 }
@@ -95,6 +75,7 @@ function getUserDisplayName(firstName: string | null, lastName: string | null, e
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const t = useTranslations('sidebar');
 
   const initials = getUserInitials(user?.firstName ?? null, user?.lastName ?? null, user?.email ?? null);
   const displayName = getUserDisplayName(user?.firstName ?? null, user?.lastName ?? null, user?.email ?? null);
@@ -137,13 +118,14 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         {/* MENU section */}
         {!collapsed && (
           <span className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.05em] text-white/60">
-            Menu
+            {t('menuLabel')}
           </span>
         )}
         {menuItems.map((item) => (
           <NavLink
             key={item.href}
             item={item}
+            label={t(item.labelKey)}
             isActive={isActive(item.href)}
             collapsed={collapsed}
           />
@@ -155,13 +137,14 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         {/* GENERAL section */}
         {!collapsed && (
           <span className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.05em] text-white/60">
-            General
+            {t('generalLabel')}
           </span>
         )}
         {generalItems.map((item) => (
           <NavLink
             key={item.href}
             item={item}
+            label={t(item.labelKey)}
             isActive={isActive(item.href)}
             collapsed={collapsed}
           />
@@ -176,14 +159,14 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
             'flex w-full items-center gap-x-2 px-5 py-3 text-sm text-white/60 transition-colors duration-150 hover:text-white/90',
             collapsed && 'justify-center px-0',
           )}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-label={collapsed ? t('expand') : t('collapse')}
         >
           {collapsed ? (
             <ChevronRight className="h-4 w-4" />
           ) : (
             <>
               <ChevronLeft className="h-4 w-4" />
-              <span>Collapse</span>
+              <span>{t('collapse')}</span>
             </>
           )}
         </button>
@@ -216,10 +199,10 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           <button
             onClick={logout}
             className="mt-2 flex w-full items-center gap-x-2 rounded-lg px-3 py-2 text-sm text-white/60 transition-colors duration-150 hover:bg-navy-950 hover:text-white/90"
-            aria-label="Log out"
+            aria-label={t('logout')}
           >
             <LogOut className="h-4 w-4" />
-            <span>Log out</span>
+            <span>{t('logout')}</span>
           </button>
         )}
       </div>

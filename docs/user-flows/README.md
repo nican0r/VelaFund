@@ -21,6 +21,7 @@ Each document follows the template defined in `.claude/rules/user-flow-documenta
 | [User Permissions](./user-permissions.md) | All roles (ADMIN, FINANCE, LEGAL, INVESTOR, EMPLOYEE) | Frontend spec complete |
 | [Notifications](./notifications.md) | All authenticated users (any role) | Backend + Frontend complete |
 | [Settings](./settings.md) | ADMIN (full access: edit company, invite/manage members), all members (view) | Frontend Company Info tab + Members tab complete |
+| [Navigation](./navigation.md) | Founders (any authenticated user with a company) | Frontend complete (desktop sidebar with collapse/expand, mobile sidebar with hamburger, 12 nav items) |
 
 ---
 

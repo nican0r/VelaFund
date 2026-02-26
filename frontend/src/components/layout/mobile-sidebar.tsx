@@ -2,34 +2,13 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { X } from 'lucide-react';
-import {
-  LayoutDashboard,
-  Bell,
-  Settings,
-  HelpCircle,
-  LogOut,
-} from 'lucide-react';
+import { X, LogOut } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { useEffect } from 'react';
 import { useAuth } from '@/lib/auth';
 import { SidebarCompanySwitcher } from '@/components/layout/company-switcher';
-
-interface NavItem {
-  label: string;
-  href: string;
-  icon: React.ElementType;
-}
-
-const menuItems: NavItem[] = [
-  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Notifications', href: '/dashboard/notifications', icon: Bell },
-];
-
-const generalItems: NavItem[] = [
-  { label: 'Settings', href: '/dashboard/settings', icon: Settings },
-  { label: 'Help', href: '/dashboard/help', icon: HelpCircle },
-];
+import { menuItems, generalItems, type NavItem } from '@/lib/sidebar-nav';
 
 interface MobileSidebarProps {
   open: boolean;
@@ -59,9 +38,31 @@ function getUserDisplayName(firstName: string | null, lastName: string | null, e
   return email || '';
 }
 
+function MobileNavLink({ item, label, isActive }: { item: NavItem; label: string; isActive: boolean }) {
+  const Icon = item.icon;
+  return (
+    <Link
+      href={item.href}
+      className={cn(
+        'relative flex h-10 items-center gap-x-1.5 rounded-lg px-3 text-sm font-medium transition-colors duration-150',
+        isActive
+          ? 'bg-navy-800 text-white'
+          : 'text-white/70 hover:bg-navy-950 hover:text-white/90',
+      )}
+    >
+      {isActive && (
+        <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-sm bg-ocean-600" />
+      )}
+      <Icon className="h-5 w-5 shrink-0" />
+      <span>{label}</span>
+    </Link>
+  );
+}
+
 export function MobileSidebar({ open, onClose }: MobileSidebarProps) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const t = useTranslations('sidebar');
 
   const initials = getUserInitials(user?.firstName ?? null, user?.lastName ?? null, user?.email ?? null);
   const displayName = getUserDisplayName(user?.firstName ?? null, user?.lastName ?? null, user?.email ?? null);
@@ -123,58 +124,30 @@ export function MobileSidebar({ open, onClose }: MobileSidebarProps) {
         {/* Navigation */}
         <nav className="flex flex-1 flex-col gap-y-1 overflow-y-auto px-3 py-4">
           <span className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.05em] text-white/60">
-            Menu
+            {t('menuLabel')}
           </span>
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const active = isActive(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  'relative flex h-10 items-center gap-x-1.5 rounded-lg px-3 text-sm font-medium transition-colors duration-150',
-                  active
-                    ? 'bg-navy-800 text-white'
-                    : 'text-white/70 hover:bg-navy-950 hover:text-white/90',
-                )}
-              >
-                {active && (
-                  <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-sm bg-ocean-600" />
-                )}
-                <Icon className="h-5 w-5 shrink-0" />
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
+          {menuItems.map((item) => (
+            <MobileNavLink
+              key={item.href}
+              item={item}
+              label={t(item.labelKey)}
+              isActive={isActive(item.href)}
+            />
+          ))}
 
           <div className="my-3 border-t border-white/10" />
 
           <span className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.05em] text-white/60">
-            General
+            {t('generalLabel')}
           </span>
-          {generalItems.map((item) => {
-            const Icon = item.icon;
-            const active = isActive(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  'relative flex h-10 items-center gap-x-1.5 rounded-lg px-3 text-sm font-medium transition-colors duration-150',
-                  active
-                    ? 'bg-navy-800 text-white'
-                    : 'text-white/70 hover:bg-navy-950 hover:text-white/90',
-                )}
-              >
-                {active && (
-                  <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-sm bg-ocean-600" />
-                )}
-                <Icon className="h-5 w-5 shrink-0" />
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
+          {generalItems.map((item) => (
+            <MobileNavLink
+              key={item.href}
+              item={item}
+              label={t(item.labelKey)}
+              isActive={isActive(item.href)}
+            />
+          ))}
         </nav>
 
         {/* User section */}
@@ -195,10 +168,10 @@ export function MobileSidebar({ open, onClose }: MobileSidebarProps) {
           <button
             onClick={logout}
             className="mt-2 flex w-full items-center gap-x-2 rounded-lg px-3 py-2 text-sm text-white/60 transition-colors duration-150 hover:bg-navy-950 hover:text-white/90"
-            aria-label="Log out"
+            aria-label={t('logout')}
           >
             <LogOut className="h-4 w-4" />
-            <span>Log out</span>
+            <span>{t('logout')}</span>
           </button>
         </div>
       </aside>

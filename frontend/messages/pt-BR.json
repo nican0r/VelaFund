@@ -15,6 +15,10 @@
     "search": "Buscar",
     "yes": "Sim"
   },
+  "comingSoon": {
+    "description": "Este recurso está em desenvolvimento e estará disponível em breve.",
+    "title": "Em Breve"
+  },
   "companySwitcher": {
     "label": "Trocar empresa",
     "select": "Selecione uma empresa",
@@ -432,6 +436,29 @@
       "ownership": "Participação"
     },
     "title": "Relatórios & Análises"
+  },
+  "sidebar": {
+    "collapse": "Recolher",
+    "expand": "Expandir menu lateral",
+    "general": {
+      "help": "Ajuda",
+      "notifications": "Notificações",
+      "settings": "Configurações"
+    },
+    "generalLabel": "Geral",
+    "logout": "Sair",
+    "menu": {
+      "aiReports": "Relatórios IA",
+      "analytics": "Analytics",
+      "bankConnections": "Conexões Bancárias",
+      "companyPage": "Página da Empresa",
+      "dashboard": "Painel",
+      "dataroom": "Dataroom",
+      "investorQA": "Q&A Investidores",
+      "investors": "Investidores",
+      "updates": "Atualizações"
+    },
+    "menuLabel": "Menu"
   },
   "settings": {
     "company": {
