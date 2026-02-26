@@ -662,6 +662,7 @@
       "fromShareholderRequired": "Acionista de origem é obrigatório para este tipo de transação",
       "insufficientShares": "Ações insuficientes para completar a transferência",
       "invalidQuantity": "Quantidade de ações deve ser maior que zero",
+      "lockupActive": "Ações estão em período de lock-up e não podem ser transferidas",
       "invalidStatusTransition": "Transição de status inválida para esta transação",
       "sameShareholder": "Acionista de origem e destino não podem ser o mesmo",
       "splitRatioRequired": "Proporção de desdobramento é obrigatória para split",

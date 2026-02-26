@@ -662,6 +662,7 @@
       "fromShareholderRequired": "Source shareholder is required for this transaction type",
       "insufficientShares": "Insufficient shares to complete the transfer",
       "invalidQuantity": "Share quantity must be greater than zero",
+      "lockupActive": "Shares are in a lock-up period and cannot be transferred",
       "invalidStatusTransition": "Invalid status transition for this transaction",
       "sameShareholder": "Source and destination shareholder cannot be the same",
       "splitRatioRequired": "Split ratio is required for split transactions",

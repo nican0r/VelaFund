@@ -1,6 +1,6 @@
-# Navia MVP — Implementation Plan v62.0
+# Navia MVP — Implementation Plan v63.0
 
-> **Generated**: 2026-02-26 | **Tests**: 2758 passing (1741 backend + 1017 frontend) | **Backend modules**: 22 of 23 built
+> **Generated**: 2026-02-26 | **Tests**: 2765 passing (1748 backend + 1017 frontend) | **Backend modules**: 22 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -153,7 +153,7 @@ Gaps in the 12 built modules, ordered by module.
 
 ### Transaction Module
 
-- [ ] Lock-up period enforcement — check ShareClass.lockUpPeriod before allowing transfers
+- [x] Lock-up period enforcement — DONE (v0.0.68): validateLockUpPeriod() in TransactionService checks ShareClass.lockUpPeriodMonths against Shareholding.createdAt before allowing TRANSFER. Throws TXN_LOCKUP_ACTIVE (422) with lockupExpiresAt in details. 7 tests.
 - [ ] ROFR (Direito de Preferência) — right of first refusal workflow for share transfers per `transactions.md`
 - [ ] Blockchain transaction submission on confirm (depends on P3 Blockchain module)
 - [ ] Dilution impact preview — show before/after ownership when creating issuance

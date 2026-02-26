@@ -55,11 +55,12 @@ ADMIN/FINANCE clicks "New Transaction"
   |     |
   |     |- [valid form: fromShareholderId + toShareholderId + shareClassId + quantity]
   |     |     |
-  |     |     |- [from != to + sufficient balance] -> 201 Created (DRAFT)
+  |     |     |- [from != to + lock-up expired/none + sufficient balance] -> 201 Created (DRAFT)
   |     |     |
   |     |     |- [fromShareholderId missing] -> 422 TXN_FROM_SHAREHOLDER_REQUIRED
   |     |     |- [toShareholderId missing] -> 422 TXN_TO_SHAREHOLDER_REQUIRED
   |     |     |- [from == to] -> 422 TXN_SAME_SHAREHOLDER
+  |     |     |- [lock-up period active] -> 422 TXN_LOCKUP_ACTIVE
   |     |     └- [insufficient balance] -> 422 TXN_INSUFFICIENT_SHARES
   |     |
   |     └- [invalid form] -> Client-side validation prevents submission
@@ -209,7 +210,7 @@ SIDE EFFECTS: Audit log (future: TRANSACTION_SUBMITTED via audit interceptor)
 ### Happy Path: Create Transfer Transaction
 
 ```
-PRECONDITION: Company is ACTIVE, share class exists, both shareholders exist, source has sufficient balance
+PRECONDITION: Company is ACTIVE, share class exists, both shareholders exist, source has sufficient balance, lock-up period (if any) has expired
 ACTOR: ADMIN or FINANCE member
 TRIGGER: User clicks "New Transaction" and selects type TRANSFER
 
@@ -239,6 +240,8 @@ TRIGGER: User clicks "New Transaction" and selects type TRANSFER
     -> IF same: return 422 TXN_SAME_SHAREHOLDER
 15. [Backend] Validates both shareholders exist in the company
     -> IF not found: return 404
+15b. [Backend] Validates lock-up period has expired for fromShareholder's holdings in the share class
+    -> IF lock-up active: return 422 TXN_LOCKUP_ACTIVE with lockupExpiresAt, shareClassName, lockUpPeriodMonths
 16. [Backend] Validates fromShareholder has sufficient balance in the share class
     -> IF insufficient: return 422 TXN_INSUFFICIENT_SHARES
 17. [Backend] Creates Transaction record with status = DRAFT
@@ -682,6 +685,27 @@ POSTCONDITION: No transaction created
 SIDE EFFECTS: None
 ```
 
+### Error Path: Lock-Up Period Active for Transfer
+
+```
+ACTOR: ADMIN or FINANCE member
+TRIGGER: Attempts to create a transfer where source shareholder's holdings are still in lock-up period
+
+1. [UI] User fills in transfer form: from-shareholder, to-shareholder, share class, quantity
+2. [UI] User clicks "Save as Draft"
+3. [Frontend] Sends POST /api/v1/companies/:companyId/transactions
+4. [Backend] Validates company ACTIVE, quantity > 0, shareholders exist, from != to
+5. [Backend] Queries fromShareholder's Shareholding in the specified share class, including ShareClass.lockUpPeriodMonths
+6. [Backend] Calculates lockupExpiresAt = Shareholding.createdAt + lockUpPeriodMonths months
+7. [Backend] Current date < lockupExpiresAt
+8. [Backend] Returns 422 with error code TXN_LOCKUP_ACTIVE
+   Body: { error: { code: "TXN_LOCKUP_ACTIVE", messageKey: "errors.txn.lockupActive", details: { lockupExpiresAt: "2027-01-15T00:00:00.000Z", shareClassName: "Quotas Ordinárias", lockUpPeriodMonths: 12, shareholderId: "uuid", shareClassId: "uuid" } } }
+9. [UI] Shows error toast using messageKey
+
+POSTCONDITION: No transaction created
+SIDE EFFECTS: None
+```
+
 ### Error Path: Exceeds Authorized Shares for Issuance
 
 ```
@@ -773,6 +797,7 @@ SIDE EFFECTS: None
 | 12 | From-shareholder required | TRANSFER/CANCELLATION/CONVERSION without fromShareholderId | Error | 422 TXN_FROM_SHAREHOLDER_REQUIRED |
 | 14 | Same shareholder | TRANSFER from == to | Error | 422 TXN_SAME_SHAREHOLDER |
 | 17 | Authorized shares | ISSUANCE totalIssued + qty > totalAuthorized | Error | 422 TXN_EXCEEDS_AUTHORIZED |
+| 15b | Lock-up period | TRANSFER with active lock-up on shareholding | Error | 422 TXN_LOCKUP_ACTIVE |
 | 16 | Sufficient balance | TRANSFER/CANCELLATION/CONVERSION insufficient holdings | Error | 422 TXN_INSUFFICIENT_SHARES |
 | 8 | To-share-class required | CONVERSION without toShareClassId | Error | 422 TXN_TO_SHARE_CLASS_REQUIRED |
 | 7 | Split ratio required | SPLIT without valid splitRatio | Error | 422 TXN_SPLIT_RATIO_REQUIRED |

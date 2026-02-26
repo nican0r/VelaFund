@@ -351,7 +351,11 @@ describe('TransactionService', () => {
       prisma.shareholder.findFirst
         .mockResolvedValueOnce(mockShareholder1) // from
         .mockResolvedValueOnce(mockShareholder2); // to
-      prisma.shareholding.findFirst.mockResolvedValue(mockShareholding);
+      // First call: lock-up check (no lock-up configured)
+      // Second call: sufficient shares check
+      prisma.shareholding.findFirst
+        .mockResolvedValueOnce({ ...mockShareholding, shareClass: { lockUpPeriodMonths: null, className: 'Quotas Ordinárias' } })
+        .mockResolvedValueOnce(mockShareholding);
       prisma.transaction.create.mockResolvedValue(
         mockTransaction({
           type: 'TRANSFER',
@@ -426,9 +430,253 @@ describe('TransactionService', () => {
       prisma.shareholder.findFirst
         .mockResolvedValueOnce(mockShareholder1)
         .mockResolvedValueOnce(mockShareholder2);
-      prisma.shareholding.findFirst.mockResolvedValue(mockShareholding);
+      // First call: lock-up check (no lock-up), Second call: sufficient shares check
+      prisma.shareholding.findFirst
+        .mockResolvedValueOnce({ ...mockShareholding, shareClass: { lockUpPeriodMonths: null, className: 'Quotas Ordinárias' } })
+        .mockResolvedValueOnce(mockShareholding);
 
       await expect(service.create('comp-1', dto, 'user-1')).rejects.toThrow(BusinessRuleException);
+    });
+
+    // LOCK-UP PERIOD enforcement
+    it('should throw TXN_LOCKUP_ACTIVE if shares are in lock-up period', async () => {
+      const dto: CreateTransactionDto = {
+        type: TransactionTypeDto.TRANSFER,
+        fromShareholderId: 'sh-1',
+        toShareholderId: 'sh-2',
+        shareClassId: 'sc-1',
+        quantity: '5000',
+      };
+
+      prisma.company.findUnique.mockResolvedValue(mockCompany);
+      prisma.shareClass.findFirst.mockResolvedValue(mockShareClass);
+      prisma.shareholder.findFirst
+        .mockResolvedValueOnce(mockShareholder1)
+        .mockResolvedValueOnce(mockShareholder2);
+
+      // Shareholding created recently (1 month ago) with 12-month lock-up
+      const recentDate = new Date();
+      recentDate.setMonth(recentDate.getMonth() - 1);
+      prisma.shareholding.findFirst.mockResolvedValueOnce({
+        ...mockShareholding,
+        createdAt: recentDate,
+        shareClass: { lockUpPeriodMonths: 12, className: 'Quotas Ordinárias' },
+      });
+
+      await expect(service.create('comp-1', dto, 'user-1')).rejects.toThrow(BusinessRuleException);
+      try {
+        await service.create('comp-1', dto, 'user-1');
+      } catch (e: any) {
+        // Reset mocks for second call
+      }
+    });
+
+    it('should include lockupExpiresAt in error details when lock-up is active', async () => {
+      const dto: CreateTransactionDto = {
+        type: TransactionTypeDto.TRANSFER,
+        fromShareholderId: 'sh-1',
+        toShareholderId: 'sh-2',
+        shareClassId: 'sc-1',
+        quantity: '5000',
+      };
+
+      prisma.company.findUnique.mockResolvedValue(mockCompany);
+      prisma.shareClass.findFirst.mockResolvedValue(mockShareClass);
+      prisma.shareholder.findFirst
+        .mockResolvedValueOnce(mockShareholder1)
+        .mockResolvedValueOnce(mockShareholder2);
+
+      // Shareholding created 3 months ago with 6-month lock-up (3 months remaining)
+      const threeMonthsAgo = new Date();
+      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+      prisma.shareholding.findFirst.mockResolvedValueOnce({
+        ...mockShareholding,
+        createdAt: threeMonthsAgo,
+        shareClass: { lockUpPeriodMonths: 6, className: 'Quotas Ordinárias' },
+      });
+
+      try {
+        await service.create('comp-1', dto, 'user-1');
+        fail('Should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(BusinessRuleException);
+        expect(e.code).toBe('TXN_LOCKUP_ACTIVE');
+        expect(e.messageKey).toBe('errors.txn.lockupActive');
+        expect(e.details).toBeDefined();
+        expect(e.details.lockupExpiresAt).toBeDefined();
+        expect(e.details.shareClassName).toBe('Quotas Ordinárias');
+        expect(e.details.lockUpPeriodMonths).toBe(6);
+      }
+    });
+
+    it('should allow TRANSFER when lock-up period has expired', async () => {
+      const dto: CreateTransactionDto = {
+        type: TransactionTypeDto.TRANSFER,
+        fromShareholderId: 'sh-1',
+        toShareholderId: 'sh-2',
+        shareClassId: 'sc-1',
+        quantity: '5000',
+      };
+
+      prisma.company.findUnique.mockResolvedValue(mockCompany);
+      prisma.shareClass.findFirst.mockResolvedValue(mockShareClass);
+      prisma.shareholder.findFirst
+        .mockResolvedValueOnce(mockShareholder1)
+        .mockResolvedValueOnce(mockShareholder2);
+
+      // Shareholding created 13 months ago with 12-month lock-up (expired)
+      const thirteenMonthsAgo = new Date();
+      thirteenMonthsAgo.setMonth(thirteenMonthsAgo.getMonth() - 13);
+      prisma.shareholding.findFirst
+        .mockResolvedValueOnce({
+          ...mockShareholding,
+          createdAt: thirteenMonthsAgo,
+          shareClass: { lockUpPeriodMonths: 12, className: 'Quotas Ordinárias' },
+        })
+        .mockResolvedValueOnce(mockShareholding); // sufficient shares check
+      prisma.transaction.create.mockResolvedValue(
+        mockTransaction({
+          type: 'TRANSFER',
+          fromShareholderId: 'sh-1',
+          toShareholderId: 'sh-2',
+          fromShareholder: { id: 'sh-1', name: 'João Silva', type: 'FOUNDER' },
+          toShareholder: { id: 'sh-2', name: 'Maria Santos', type: 'INVESTOR' },
+        }),
+      );
+
+      const result = await service.create('comp-1', dto, 'user-1');
+      expect(result.type).toBe('TRANSFER');
+    });
+
+    it('should allow TRANSFER when share class has no lock-up period (null)', async () => {
+      const dto: CreateTransactionDto = {
+        type: TransactionTypeDto.TRANSFER,
+        fromShareholderId: 'sh-1',
+        toShareholderId: 'sh-2',
+        shareClassId: 'sc-1',
+        quantity: '5000',
+      };
+
+      prisma.company.findUnique.mockResolvedValue(mockCompany);
+      prisma.shareClass.findFirst.mockResolvedValue(mockShareClass);
+      prisma.shareholder.findFirst
+        .mockResolvedValueOnce(mockShareholder1)
+        .mockResolvedValueOnce(mockShareholder2);
+      prisma.shareholding.findFirst
+        .mockResolvedValueOnce({
+          ...mockShareholding,
+          shareClass: { lockUpPeriodMonths: null, className: 'Quotas Ordinárias' },
+        })
+        .mockResolvedValueOnce(mockShareholding);
+      prisma.transaction.create.mockResolvedValue(
+        mockTransaction({
+          type: 'TRANSFER',
+          fromShareholderId: 'sh-1',
+          toShareholderId: 'sh-2',
+          fromShareholder: { id: 'sh-1', name: 'João Silva', type: 'FOUNDER' },
+          toShareholder: { id: 'sh-2', name: 'Maria Santos', type: 'INVESTOR' },
+        }),
+      );
+
+      const result = await service.create('comp-1', dto, 'user-1');
+      expect(result.type).toBe('TRANSFER');
+    });
+
+    it('should allow TRANSFER when lock-up period is 0', async () => {
+      const dto: CreateTransactionDto = {
+        type: TransactionTypeDto.TRANSFER,
+        fromShareholderId: 'sh-1',
+        toShareholderId: 'sh-2',
+        shareClassId: 'sc-1',
+        quantity: '5000',
+      };
+
+      prisma.company.findUnique.mockResolvedValue(mockCompany);
+      prisma.shareClass.findFirst.mockResolvedValue(mockShareClass);
+      prisma.shareholder.findFirst
+        .mockResolvedValueOnce(mockShareholder1)
+        .mockResolvedValueOnce(mockShareholder2);
+      prisma.shareholding.findFirst
+        .mockResolvedValueOnce({
+          ...mockShareholding,
+          shareClass: { lockUpPeriodMonths: 0, className: 'Quotas Ordinárias' },
+        })
+        .mockResolvedValueOnce(mockShareholding);
+      prisma.transaction.create.mockResolvedValue(
+        mockTransaction({
+          type: 'TRANSFER',
+          fromShareholderId: 'sh-1',
+          toShareholderId: 'sh-2',
+          fromShareholder: { id: 'sh-1', name: 'João Silva', type: 'FOUNDER' },
+          toShareholder: { id: 'sh-2', name: 'Maria Santos', type: 'INVESTOR' },
+        }),
+      );
+
+      const result = await service.create('comp-1', dto, 'user-1');
+      expect(result.type).toBe('TRANSFER');
+    });
+
+    it('should skip lock-up check when no shareholding exists', async () => {
+      const dto: CreateTransactionDto = {
+        type: TransactionTypeDto.TRANSFER,
+        fromShareholderId: 'sh-1',
+        toShareholderId: 'sh-2',
+        shareClassId: 'sc-1',
+        quantity: '5000',
+      };
+
+      prisma.company.findUnique.mockResolvedValue(mockCompany);
+      prisma.shareClass.findFirst.mockResolvedValue(mockShareClass);
+      prisma.shareholder.findFirst
+        .mockResolvedValueOnce(mockShareholder1)
+        .mockResolvedValueOnce(mockShareholder2);
+      // No shareholding found for lock-up check — will be caught by sufficient shares check
+      prisma.shareholding.findFirst
+        .mockResolvedValueOnce(null) // lock-up: no holding
+        .mockResolvedValueOnce(null); // sufficient shares: no holding → throws
+
+      await expect(service.create('comp-1', dto, 'user-1')).rejects.toThrow(BusinessRuleException);
+    });
+
+    it('should allow TRANSFER at exact lock-up expiry boundary', async () => {
+      const dto: CreateTransactionDto = {
+        type: TransactionTypeDto.TRANSFER,
+        fromShareholderId: 'sh-1',
+        toShareholderId: 'sh-2',
+        shareClassId: 'sc-1',
+        quantity: '5000',
+      };
+
+      prisma.company.findUnique.mockResolvedValue(mockCompany);
+      prisma.shareClass.findFirst.mockResolvedValue(mockShareClass);
+      prisma.shareholder.findFirst
+        .mockResolvedValueOnce(mockShareholder1)
+        .mockResolvedValueOnce(mockShareholder2);
+
+      // Shareholding created exactly 6 months ago with 6-month lock-up (just expired)
+      const exactlyExpired = new Date();
+      exactlyExpired.setMonth(exactlyExpired.getMonth() - 6);
+      // Subtract an additional millisecond to ensure we're past expiry
+      exactlyExpired.setTime(exactlyExpired.getTime() - 1);
+      prisma.shareholding.findFirst
+        .mockResolvedValueOnce({
+          ...mockShareholding,
+          createdAt: exactlyExpired,
+          shareClass: { lockUpPeriodMonths: 6, className: 'Quotas Ordinárias' },
+        })
+        .mockResolvedValueOnce(mockShareholding);
+      prisma.transaction.create.mockResolvedValue(
+        mockTransaction({
+          type: 'TRANSFER',
+          fromShareholderId: 'sh-1',
+          toShareholderId: 'sh-2',
+          fromShareholder: { id: 'sh-1', name: 'João Silva', type: 'FOUNDER' },
+          toShareholder: { id: 'sh-2', name: 'Maria Santos', type: 'INVESTOR' },
+        }),
+      );
+
+      const result = await service.create('comp-1', dto, 'user-1');
+      expect(result.type).toBe('TRANSFER');
     });
 
     // CANCELLATION validation

@@ -552,6 +552,9 @@ export class TransactionService {
     await this.validateShareholder(companyId, dto.fromShareholderId, 'from');
     await this.validateShareholder(companyId, dto.toShareholderId, 'to');
 
+    // Check lock-up period before allowing transfer
+    await this.validateLockUpPeriod(companyId, dto.fromShareholderId, dto.shareClassId);
+
     // Verify sufficient balance
     await this.validateSufficientShares(
       companyId,
@@ -643,6 +646,49 @@ export class TransactionService {
       throw new BusinessRuleException('TXN_INSUFFICIENT_SHARES', 'errors.txn.insufficientShares', {
         available: available.toString(),
         requested: quantity.toString(),
+        shareholderId,
+        shareClassId,
+      });
+    }
+  }
+
+  /**
+   * Validate that shares are not in a lock-up period.
+   *
+   * Lock-up period is defined on the ShareClass as `lockUpPeriodMonths`.
+   * The period starts from when the shareholding was created (createdAt)
+   * and expires after the specified number of months.
+   *
+   * Only applies to TRANSFER transactions — shares cannot be transferred
+   * while the lock-up period is active.
+   */
+  private async validateLockUpPeriod(
+    companyId: string,
+    shareholderId: string,
+    shareClassId: string,
+  ) {
+    const shareholding = await this.prisma.shareholding.findFirst({
+      where: { companyId, shareholderId, shareClassId },
+      include: {
+        shareClass: {
+          select: { lockUpPeriodMonths: true, className: true },
+        },
+      },
+    });
+
+    if (!shareholding) return; // No shares to transfer — will be caught by validateSufficientShares
+
+    const lockUpMonths = shareholding.shareClass.lockUpPeriodMonths;
+    if (!lockUpMonths || lockUpMonths <= 0) return; // No lock-up period configured
+
+    const lockupExpiresAt = new Date(shareholding.createdAt);
+    lockupExpiresAt.setMonth(lockupExpiresAt.getMonth() + lockUpMonths);
+
+    if (new Date() < lockupExpiresAt) {
+      throw new BusinessRuleException('TXN_LOCKUP_ACTIVE', 'errors.txn.lockupActive', {
+        lockupExpiresAt: lockupExpiresAt.toISOString(),
+        shareClassName: shareholding.shareClass.className,
+        lockUpPeriodMonths: lockUpMonths,
         shareholderId,
         shareClassId,
       });

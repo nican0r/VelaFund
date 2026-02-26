@@ -130,6 +130,10 @@ const MESSAGES: Record<string, Record<string, string>> = {
     'pt-BR': 'Proporção de desdobramento é obrigatória para split',
     en: 'Split ratio is required for split transactions',
   },
+  'errors.txn.lockupActive': {
+    'pt-BR': 'Ações estão em período de lock-up e não podem ser transferidas',
+    en: 'Shares are in a lock-up period and cannot be transferred',
+  },
   'errors.document.notFound': {
     'pt-BR': 'Documento não encontrado',
     en: 'Document not found',
