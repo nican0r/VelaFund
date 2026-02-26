@@ -558,6 +558,34 @@ export interface NotificationPreferences {
   updatedAt: string;
 }
 
+// Audit Log types returned by GET /api/v1/companies/:id/audit-logs
+export type ActorType = 'USER' | 'SYSTEM' | 'ADMIN';
+
+export interface AuditLogEntry {
+  id: string;
+  timestamp: string;
+  actorId: string | null;
+  actorType: ActorType;
+  actorName: string | null;
+  actorEmail: string | null;
+  action: string;
+  resourceType: string;
+  resourceId: string | null;
+  changes: {
+    before: Record<string, unknown> | null;
+    after: Record<string, unknown> | null;
+  } | null;
+  metadata: Record<string, unknown> | null;
+}
+
+export interface HashChainVerification {
+  dateRange: { from: string | null; to: string | null };
+  daysVerified: number;
+  daysValid: number;
+  daysInvalid: number;
+  status: 'VALID' | 'INVALID' | 'NO_DATA';
+}
+
 // Company member types returned by GET /api/v1/companies/:id/members
 export type MemberRole = 'ADMIN' | 'FINANCE' | 'LEGAL' | 'INVESTOR' | 'EMPLOYEE';
 export type MemberStatus = 'PENDING' | 'ACTIVE' | 'REMOVED';

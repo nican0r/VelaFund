@@ -742,3 +742,57 @@ Additionally, 7 services/processors use programmatic AuditLogService.log() for e
 - [Reports & Analytics](./reports-analytics.md) -- CAP_TABLE_EXPORTED, DATA_EXPORTED (@Auditable)
 - Self-referential -- AUDIT_LOG_VIEWED, AUDIT_LOG_INTEGRITY_VERIFIED (programmatic from AuditLogController)
 - System monitoring -- DLQ_WARNING_ALERT, DLQ_CRITICAL_ALERT (programmatic from ScheduledTasksService.monitorDeadLetterQueues())
+
+---
+
+## Frontend Audit Log Viewer (v0.0.78)
+
+### Page Structure
+
+The audit log viewer is a read-only page at `/dashboard/audit-logs` accessible to ADMIN and LEGAL roles. The frontend implementation includes:
+
+**Navigation**: Shield icon in sidebar and mobile sidebar under the Menu section (after Notifications).
+
+**Stat Cards** (4 cards):
+1. Total Events (active/highlighted with ocean-600 background) -- from `meta.total`
+2. Today's Events -- client-side filter on current date from loaded data
+3. User Actions -- count of entries with `actorType === 'USER'` in loaded data
+4. System Events -- count of entries with `actorType === 'SYSTEM'` in loaded data
+
+**Filters** (above table):
+- Action dropdown (~46 options from `ACTION_OPTIONS` const)
+- Resource type dropdown (~16 options from `RESOURCE_TYPE_OPTIONS` const)
+- Date from (date input)
+- Date to (date input)
+- Clear filters button (shown only when at least one filter is active)
+
+**Data Table** (expandable rows):
+- Columns: expand icon, Date/Time (pt-BR format with seconds), Actor (icon + name/type + masked email), Action (color-coded badge), Resource Type (translated label), Resource ID (truncated to 8 chars)
+- Click row to expand: shows Changes section (before/after JSON with color-coded labels) and Metadata section (IP, Request ID, Source, User Agent)
+- No changes recorded: shown for entries with null changes (e.g., auth events)
+
+**Hash Chain Verification Section**:
+- Verify button triggers `useVerifyHashChain` hook with `enabled` flag
+- Results display: Status (VALID=green ShieldCheck / INVALID=red ShieldAlert / NO_DATA=gray FileSearch), Days Verified, Days Valid, Days Invalid
+- Loading state: spinner + "Verifying..." button text
+
+**Action Badge Color Coding**:
+- Green (`bg-green-100 text-green-700`): CREATED, ISSUED, APPROVED, CONFIRMED, SUCCESS
+- Red (`bg-red-50 text-[#991B1B]`): LOGIN_FAILED, REJECTED, FAILED
+- Gray (`bg-gray-100 text-gray-600`): DELETED, CANCELLED, REMOVED
+- Blue (`bg-blue-50 text-ocean-600`): UPDATED, CHANGED
+- Cream (`bg-cream-100 text-cream-700`): SUBMITTED, OPENED, STARTED
+
+**States**: Loading (skeleton rows), Error (AlertCircle + retry), Empty (Shield icon + description + optional clear filters CTA), No Company (empty description)
+
+### TanStack Query Hooks (`use-audit-logs.ts`)
+- `useAuditLogs(companyId, params)` -- paginated list with 8 filter params, staleTime 30s
+- `useAuditLog(companyId, auditLogId)` -- single detail, staleTime 60s
+- `useVerifyHashChain(companyId, params, enabled)` -- integrity check, staleTime 5min, optional enabled flag
+
+### i18n
+- Namespace: `auditLogs.*` (~120 keys in both PT-BR and EN)
+- Sub-groups: title, description, stats, table, filters, actions (46 action labels), resourceTypes (16), actorType (3), changes, metadata, verify, empty, pagination, error
+
+### Tests
+- 47 component tests covering: page header, stat cards, table content, expandable rows, filters, pagination, loading/error/empty/no-company states, hash chain verification, hook invocation, action badge colors, actor type display, resource type labels

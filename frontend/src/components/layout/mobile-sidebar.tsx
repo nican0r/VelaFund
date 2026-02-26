@@ -14,6 +14,7 @@ import {
   Gift,
   FileText,
   Bell,
+  Shield,
   Settings,
   HelpCircle,
   LogOut,
@@ -40,6 +41,7 @@ const menuItems: NavItem[] = [
   { label: 'Options', href: '/dashboard/options', icon: Gift },
   { label: 'Documents', href: '/dashboard/documents', icon: FileText },
   { label: 'Notifications', href: '/dashboard/notifications', icon: Bell },
+  { label: 'Audit Logs', href: '/dashboard/audit-logs', icon: Shield },
 ];
 
 const generalItems: NavItem[] = [
