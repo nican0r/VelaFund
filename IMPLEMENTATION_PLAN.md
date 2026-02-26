@@ -1,6 +1,6 @@
-# Navia MVP — Implementation Plan v68.0
+# Navia MVP — Implementation Plan v69.0
 
-> **Generated**: 2026-02-26 | **Tests**: 2838 passing (1819 backend + 1019 frontend) | **Backend modules**: 22 of 23 built
+> **Generated**: 2026-02-26 | **Tests**: 2842 passing (1823 backend + 1019 frontend) | **Backend modules**: 22 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -61,7 +61,7 @@ These are prerequisites for many downstream features.
   - [x] Set `navia-csrf` cookie on GET requests — DONE (also HEAD/OPTIONS)
   - [x] Validate `X-CSRF-Token` header on POST/PUT/PATCH/DELETE — DONE (Bearer token exempt)
   - [x] Register in `main.ts` (currently only `RequestIdMiddleware` is registered) — DONE
-  - [ ] Update frontend API client to read and send CSRF token (currently missing)
+  - [x] Update frontend API client to read and send CSRF token — DONE: `getCsrfToken()` reads `navia-csrf` cookie, `X-CSRF-Token` header sent on POST/PUT/PATCH/DELETE. 4 CSRF-specific tests in api-client.test.ts.
 
 - [x] **redactPii() utility** — DONE: Created `common/utils/redact-pii.ts` with maskCpf (`***.***.***-XX`), maskCnpj (`**.***.****/****-XX`), maskEmail (`n***@domain.com`), maskWallet (`0x1234...abcd`), maskIp (/24 subnet), redactPii() deep object traversal, redactPiiFromString() for log messages. Field name detection for cpf/cnpj/email/wallet/ip/password/token/secret/bankAccount fields. Integrated with GlobalExceptionFilter (PII-safe unhandled exception logging). AuthService refactored from private methods to centralized utility. 57 new tests (822 total passing).
   - [x] Create `common/utils/redact-pii.ts` per `error-handling.md` — DONE
@@ -108,7 +108,7 @@ Gaps in the 12 built modules, ordered by module.
 - [x] ~~`/auth/refresh` endpoint~~ — REPLACED by Redis session store (v0.0.17). Sessions are managed server-side; no token refresh needed.
 - [x] ~~Inactivity timeout (2h)~~ — DONE in v0.0.17. SessionService.isInactive() checks lastActivityAt; AuthGuard destroys inactive sessions and returns 401 with `errors.auth.sessionExpired`.
 - [x] Move failed-attempt lockout from in-memory Map to Redis — DONE: Redis INCR with TTL-based auto-expiry (15-min lockout period). Graceful degradation: if Redis is unavailable or errors, falls back to in-memory Map with 10K IP cap. 8 new tests (968 total passing).
-- [ ] Duplicate wallet check — prevent two users from linking the same wallet address
+- [x] Duplicate wallet check — DONE (v0.0.74): Application-level wallet uniqueness enforcement in AuthService.login(). New user creation: throws ConflictException (AUTH_DUPLICATE_WALLET, 409) when wallet already linked to another account. Existing user wallet sync: silently skips update when wallet belongs to another user (same pattern as email sync). i18n messages in app-exception.ts + frontend pt-BR.json/en.json. 4 new tests (37 total auth service tests).
 - [ ] Privy API retry with exponential backoff (currently no retry on verify failure)
 - [x] Audit logging events: AUTH_LOGIN_SUCCESS, AUTH_LOGIN_FAILED, AUTH_LOGOUT — DONE: Programmatic AuditLogService.log() calls in AuthController (login success/failure + logout). Fire-and-forget pattern, PII-safe metadata (maskIp), 10 new controller tests (21 total). Auth events not company-scoped (no companyId).
 - [x] Onboarding wizard status tracking per `authentication.md` spec — DONE (v0.0.62): AuthProvider tracks needsOnboarding/isNewUser state. Step determined by user.firstName presence (null → Step 1, exists → Step 2). completeOnboarding() callback clears state and triggers redirect to /dashboard.
@@ -137,8 +137,8 @@ Gaps in the 12 built modules, ordered by module.
 
 ### Shareholder Module
 
-- [ ] `GET /companies/:companyId/shareholders/:id/transactions` — transaction history for specific shareholder
-- [ ] `GET /users/me/investments` — investor portfolio view across companies
+- [x] `GET /companies/:companyId/shareholders/:id/transactions` — ALREADY DONE: TransactionService.findAll() supports `shareholderId` query filter (OR on fromShareholderId/toShareholderId). Use `GET /companies/:companyId/transactions?shareholderId=X` instead of dedicated endpoint.
+- [x] `GET /users/me/investments` — ALREADY DONE (v0.0.34): PortfolioController at `GET /api/v1/users/me/reports/portfolio` returns investor holdings across all companies with ROI.
 - [x] Application-level CPF encryption — DONE via EncryptionService. CPF encrypted with KMS when available; CNPJ stays plaintext (public data). Blind index upgraded to HMAC-SHA256 with BLIND_INDEX_KEY.
 - [ ] Wallet address auto-link from Privy embedded wallet when shareholder accepts invite
 - [ ] Invite shareholder to platform endpoint — link external shareholder to User account

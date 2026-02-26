@@ -297,6 +297,218 @@ describe('AuthService', () => {
       });
     });
 
+    it('should throw conflict when wallet exists with different user on new user creation', async () => {
+      mockVerifyAccessToken.mockResolvedValue({
+        user_id: 'did:privy:new456',
+      });
+      mockGetUser.mockResolvedValue({
+        ...mockPrivyUser,
+        id: 'did:privy:new456',
+        linked_accounts: [
+          {
+            type: 'email' as const,
+            address: 'unique@example.com',
+            verified_at: Date.now(),
+            first_verified_at: null,
+            latest_verified_at: null,
+          },
+          {
+            type: 'wallet' as const,
+            address: '0x1234567890abcdef',
+            chain_type: 'ethereum' as const,
+            wallet_client_type: 'privy',
+            wallet_client: 'privy' as const,
+            connector_type: 'embedded' as const,
+            delegated: false,
+            imported: false,
+            recovery_method: 'privy' as const,
+            verified_at: Date.now(),
+            first_verified_at: null,
+            latest_verified_at: null,
+            wallet_index: 0,
+            chain_id: '1',
+            id: null,
+          },
+        ],
+      });
+
+      // No user by privyUserId
+      prisma.user.findUnique.mockResolvedValueOnce(null);
+      // No user by email
+      prisma.user.findUnique.mockResolvedValueOnce(null);
+      // Wallet already exists with different user
+      prisma.user.findUnique.mockResolvedValueOnce({
+        ...mockDbUser,
+        id: 'other-user-id',
+        walletAddress: '0x1234567890abcdef',
+      });
+
+      try {
+        await service.login('valid-token', '192.168.1.1');
+        fail('Expected ConflictException to be thrown');
+      } catch (e) {
+        expect(e).toBeInstanceOf(AppException);
+        expect((e as AppException).code).toBe('AUTH_DUPLICATE_WALLET');
+        expect((e as AppException).statusCode).toBe(HttpStatus.CONFLICT);
+      }
+    });
+
+    it('should create new user when wallet is null (no wallet linked)', async () => {
+      mockVerifyAccessToken.mockResolvedValue({
+        user_id: 'did:privy:nowallet',
+      });
+      mockGetUser.mockResolvedValue({
+        ...mockPrivyUser,
+        id: 'did:privy:nowallet',
+        linked_accounts: [
+          {
+            type: 'email' as const,
+            address: 'nowallet@example.com',
+            verified_at: Date.now(),
+            first_verified_at: null,
+            latest_verified_at: null,
+          },
+        ],
+      });
+
+      // No user by privyUserId
+      prisma.user.findUnique.mockResolvedValueOnce(null);
+      // No user by email
+      prisma.user.findUnique.mockResolvedValueOnce(null);
+
+      const newUser = {
+        ...mockDbUser,
+        id: 'nowallet-user-id',
+        privyUserId: 'did:privy:nowallet',
+        email: 'nowallet@example.com',
+        walletAddress: null,
+      };
+      prisma.user.create.mockResolvedValue(newUser);
+
+      const result = await service.login('valid-token', '192.168.1.1');
+
+      expect(result.isNewUser).toBe(true);
+      // Should NOT have been called a 3rd time for wallet check (wallet is null)
+      expect(prisma.user.findUnique).toHaveBeenCalledTimes(2);
+    });
+
+    it('should silently skip wallet sync when wallet belongs to another user', async () => {
+      mockVerifyAccessToken.mockResolvedValue({
+        user_id: 'did:privy:abc123',
+      });
+      mockGetUser.mockResolvedValue({
+        ...mockPrivyUser,
+        linked_accounts: [
+          {
+            type: 'email' as const,
+            address: 'test@example.com',
+            verified_at: Date.now(),
+            first_verified_at: null,
+            latest_verified_at: null,
+          },
+          {
+            type: 'wallet' as const,
+            address: '0xCONFLICTWALLET',
+            chain_type: 'ethereum' as const,
+            wallet_client_type: 'privy',
+            wallet_client: 'privy' as const,
+            connector_type: 'embedded' as const,
+            delegated: false,
+            imported: false,
+            recovery_method: 'privy' as const,
+            verified_at: Date.now(),
+            first_verified_at: null,
+            latest_verified_at: null,
+            wallet_index: 0,
+            chain_id: '1',
+            id: null,
+          },
+        ],
+      });
+
+      // User exists (existing user path)
+      prisma.user.findUnique.mockResolvedValueOnce(mockDbUser);
+      // Wallet conflict check: another user already owns this wallet
+      prisma.user.findUnique.mockResolvedValueOnce({
+        ...mockDbUser,
+        id: 'other-user-id',
+        walletAddress: '0xCONFLICTWALLET',
+      });
+
+      prisma.user.update.mockResolvedValue({
+        ...mockDbUser,
+        lastLoginAt: new Date(),
+        // walletAddress should NOT be updated
+      });
+
+      const result = await service.login('valid-token', '192.168.1.1');
+
+      // Login should succeed (not throw)
+      expect(result.user.id).toBe('user-uuid-1');
+      // Wallet should NOT be in the update data
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-uuid-1' },
+        data: expect.not.objectContaining({
+          walletAddress: '0xCONFLICTWALLET',
+        }),
+      });
+    });
+
+    it('should update wallet when it belongs to the same user (no conflict)', async () => {
+      mockVerifyAccessToken.mockResolvedValue({
+        user_id: 'did:privy:abc123',
+      });
+      mockGetUser.mockResolvedValue({
+        ...mockPrivyUser,
+        linked_accounts: [
+          {
+            type: 'email' as const,
+            address: 'test@example.com',
+            verified_at: Date.now(),
+            first_verified_at: null,
+            latest_verified_at: null,
+          },
+          {
+            type: 'wallet' as const,
+            address: '0xSAMEUSERWALLET',
+            chain_type: 'ethereum' as const,
+            wallet_client_type: 'privy',
+            wallet_client: 'privy' as const,
+            connector_type: 'embedded' as const,
+            delegated: false,
+            imported: false,
+            recovery_method: 'privy' as const,
+            verified_at: Date.now(),
+            first_verified_at: null,
+            latest_verified_at: null,
+            wallet_index: 0,
+            chain_id: '1',
+            id: null,
+          },
+        ],
+      });
+
+      // User exists (existing user path)
+      prisma.user.findUnique.mockResolvedValueOnce(mockDbUser);
+      // Wallet check: same user owns this wallet (or wallet is new)
+      prisma.user.findUnique.mockResolvedValueOnce(null);
+
+      prisma.user.update.mockResolvedValue({
+        ...mockDbUser,
+        walletAddress: '0xSAMEUSERWALLET',
+      });
+
+      const result = await service.login('valid-token', '192.168.1.1');
+
+      expect(result.user.id).toBe('user-uuid-1');
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-uuid-1' },
+        data: expect.objectContaining({
+          walletAddress: '0xSAMEUSERWALLET',
+        }),
+      });
+    });
+
     it('should throw conflict when email exists with different Privy ID', async () => {
       mockVerifyAccessToken.mockResolvedValue({
         user_id: 'did:privy:new123',

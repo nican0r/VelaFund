@@ -206,6 +206,10 @@ const MESSAGES: Record<string, Record<string, string>> = {
     'pt-BR': 'E-mail já registrado',
     en: 'Email already registered',
   },
+  'errors.auth.duplicateWallet': {
+    'pt-BR': 'Endereço de carteira já associado a outra conta',
+    en: 'Wallet address already linked to another account',
+  },
   'errors.company.cnpjDuplicate': {
     'pt-BR': 'CNPJ já cadastrado',
     en: 'CNPJ already registered',

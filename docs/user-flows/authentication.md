@@ -49,11 +49,17 @@ User opens Navia
               |     |
               |     +-- [no email on Privy user] --> 401 Unauthorized
               |     |
-              |     +-- [email exists with different Privy ID] --> 409 Conflict
+              |     +-- [email exists with different Privy ID] --> 409 Conflict (AUTH_DUPLICATE_EMAIL)
+              |     |
+              |     +-- [wallet exists with different user (new user)] --> 409 Conflict (AUTH_DUPLICATE_WALLET)
               |     |
               |     +-- [all checks pass] --> User found/created
               |           |
-              |           +-- [existing user] --> lastLoginAt updated, wallet synced
+              |           +-- [existing user] --> lastLoginAt updated
+              |           |     |
+              |           |     +-- [wallet changed + no conflict] --> wallet synced
+              |           |     +-- [wallet changed + belongs to another user] --> wallet sync silently skipped
+              |           |
               |           +-- [new user] --> User created in DB
               |
               |     --> Redis session created (64-char hex ID)
@@ -182,7 +188,7 @@ TRIGGER: User navigates to login page and clicks login button
     -> IF no email: return 401 AUTH_INVALID_TOKEN
 12. [Backend] Begins database transaction
 13. [Backend] Finds user by privyUserId in database
-14. [Backend] Updates lastLoginAt, syncs wallet if changed; checks email conflict before syncing email
+14. [Backend] Updates lastLoginAt; checks email conflict before syncing email; checks wallet conflict before syncing wallet (silently skips if wallet belongs to another user)
 15. [Backend] Commits transaction
 16. [Backend] Clears any failed login attempts for this IP
 17. [Backend] Creates Redis session via SessionService.createSession(userId, { ipAddress, userAgent })
@@ -210,8 +216,10 @@ Steps 1-12: Same as existing user login (through transaction begin)
 13. [Backend] No user found by privyUserId
 14. [Backend] Checks if email exists with different Privy ID
     -> IF exists: return 409 AUTH_DUPLICATE_EMAIL
-15. [Backend] Creates new user in database with Privy data (email, wallet, name from Google/Apple OAuth or email local part)
-16-21: Same as existing user login, with isNewUser: true
+15. [Backend] Checks if wallet address exists with different user (if wallet provided)
+    -> IF exists: return 409 AUTH_DUPLICATE_WALLET
+16. [Backend] Creates new user in database with Privy data (email, wallet, name from Google/Apple OAuth or email local part)
+17-22: Same as existing user login, with isNewUser: true
 
 POSTCONDITION: New user created in database, Redis session created, session ID stored in cookie
 SIDE EFFECTS: New User record created with kycStatus=NOT_STARTED, locale=pt-BR, Redis session created
@@ -366,7 +374,9 @@ POSTCONDITION: User authenticated, but without Redis session resilience
 | 13 | User lookup | No user with this privyUserId | Happy | Create new user (step 14-15) |
 | 13 | User lookup | User exists with this privyUserId | Happy | Update existing user |
 | 14 | Email uniqueness | Email exists with different privyUserId | Error | 409 AUTH_DUPLICATE_EMAIL |
+| 15 | Wallet uniqueness (new user) | Wallet address already linked to another user | Error | 409 AUTH_DUPLICATE_WALLET |
 | 14 | Email sync (existing user) | New email conflicts with another user | Skip | Email not synced, warning logged |
+| 14 | Wallet sync (existing user) | New wallet conflicts with another user | Skip | Wallet not synced, warning logged |
 | 17 | Redis session creation | Redis available | Happy | Session ID stored in cookie |
 | 17 | Redis session creation | Redis unavailable | Fallback | Privy token stored in cookie (legacy) |
 | Guard | Session lookup | Session found + active (<2h idle) | Happy | Touch session, load user |
@@ -382,7 +392,8 @@ POSTCONDITION: User authenticated, but without Redis session resilience
 |--------|-------|--------|-------|---------|
 | User | -- | -- (not exists) | Created | First login (new user) |
 | User | lastLoginAt | previous timestamp | now() | Every successful login |
-| User | walletAddress | old address | new address | Wallet changed in Privy |
+| User | walletAddress | old address | new address | Wallet changed in Privy (no conflict with other user) |
+| User | walletAddress | old address | old address (unchanged) | Wallet changed in Privy but belongs to another user (silently skipped) |
 | User | email | old email | new email | Email changed in Privy |
 | Redis session | -- | -- (not exists) | Created with userId, timestamps, metadata | Successful login (Redis available) |
 | Redis session | lastActivityAt | previous timestamp | now() | Any authenticated request (throttled: >60s gap) |

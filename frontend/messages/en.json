@@ -551,6 +551,7 @@
       "accountLocked": "Account locked due to too many attempts. Try again in 15 minutes.",
       "csrfInvalid": "Invalid CSRF token",
       "duplicateEmail": "This email is already associated with another account.",
+      "duplicateWallet": "Wallet address already linked to another account",
       "invalidToken": "Invalid authentication token",
       "loggedOut": "You have been logged out successfully.",
       "privyUnavailable": "Authentication service unavailable. Please try again.",

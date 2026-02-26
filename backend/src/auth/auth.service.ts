@@ -10,7 +10,7 @@ import {
   ConflictException,
 } from '../common/filters/app-exception';
 import { AuthenticatedUser } from './decorators/current-user.decorator';
-import { maskEmail, maskIp } from '../common/utils/redact-pii';
+import { maskEmail, maskIp, maskWallet } from '../common/utils/redact-pii';
 import { REDIS_CLIENT } from '../redis/redis.constants';
 
 export class AccountLockedException extends AppException {
@@ -169,6 +169,22 @@ export class AuthService {
           );
         }
 
+        // Check if wallet already exists with a different user
+        if (walletAddress) {
+          const existingByWallet = await tx.user.findUnique({
+            where: { walletAddress },
+          });
+          if (existingByWallet) {
+            this.logger.warn(
+              `Duplicate wallet detected: ${maskWallet(walletAddress)} already linked to another account`,
+            );
+            throw new ConflictException(
+              'AUTH_DUPLICATE_WALLET',
+              'errors.auth.duplicateWallet',
+            );
+          }
+        }
+
         // Create new user
         dbUser = await tx.user.create({
           data: {
@@ -189,7 +205,18 @@ export class AuthService {
         };
 
         if (walletAddress && walletAddress !== dbUser.walletAddress) {
-          emailUpdateData.walletAddress = walletAddress;
+          const existingWithWallet = await tx.user.findUnique({
+            where: { walletAddress },
+          });
+          if (existingWithWallet && existingWithWallet.id !== dbUser.id) {
+            this.logger.warn(
+              `Cannot sync wallet ${maskWallet(walletAddress)} — already linked to another account`,
+            );
+            // Silently skip wallet update (same pattern as email sync conflict at line 201)
+            // Don't throw — user can still log in, just wallet won't be updated
+          } else {
+            emailUpdateData.walletAddress = walletAddress;
+          }
         }
 
         if (email !== dbUser.email) {
