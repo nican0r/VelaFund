@@ -605,6 +605,54 @@ export interface CompanyDetail {
   updatedAt: string;
 }
 
+// Document types returned by GET /api/v1/companies/:id/documents
+export type DocumentStatus =
+  | 'DRAFT'
+  | 'GENERATED'
+  | 'PENDING_SIGNATURES'
+  | 'PARTIALLY_SIGNED'
+  | 'FULLY_SIGNED';
+
+export type DocumentTemplateType =
+  | 'SHAREHOLDER_AGREEMENT'
+  | 'MEETING_MINUTES'
+  | 'SHARE_CERTIFICATE'
+  | 'OPTION_LETTER'
+  | 'INVESTMENT_AGREEMENT';
+
+export interface DocumentTemplate {
+  id: string;
+  companyId: string;
+  name: string;
+  documentType: DocumentTemplateType;
+  content: string;
+  formSchema: Record<string, unknown> | null;
+  version: number;
+  isActive: boolean;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DocumentItem {
+  id: string;
+  companyId: string;
+  templateId: string | null;
+  title: string;
+  status: DocumentStatus;
+  formData: Record<string, unknown> | null;
+  s3Key: string | null;
+  contentHash: string | null;
+  blockchainTxHash: string | null;
+  locale: string;
+  generatedAt: string | null;
+  anchoredAt: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  template?: DocumentTemplate | null;
+}
+
 export interface Transaction {
   id: string;
   companyId: string;

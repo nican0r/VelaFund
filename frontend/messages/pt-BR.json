@@ -546,6 +546,135 @@
       "seriesC": "Série C"
     }
   },
+  "documents": {
+    "title": "Documentos",
+    "description": "Gerencie documentos legais e societários da empresa.",
+    "newDocument": "Novo Documento",
+    "upload": "Upload",
+    "empty": "Nenhum documento encontrado",
+    "emptyDescription": "Crie um novo documento a partir de um modelo ou faça upload de um arquivo.",
+    "table": {
+      "title": "Título",
+      "template": "Modelo",
+      "status": "Status",
+      "createdAt": "Criado em",
+      "generatedAt": "Gerado em",
+      "actions": "Ações"
+    },
+    "stats": {
+      "total": "Total",
+      "drafts": "Rascunhos",
+      "generated": "Gerados",
+      "pendingSignatures": "Pendentes"
+    },
+    "status": {
+      "DRAFT": "Rascunho",
+      "GENERATED": "Gerado",
+      "PENDING_SIGNATURES": "Pendente de Assinatura",
+      "PARTIALLY_SIGNED": "Parcialmente Assinado",
+      "FULLY_SIGNED": "Totalmente Assinado"
+    },
+    "type": {
+      "SHAREHOLDER_AGREEMENT": "Acordo de Acionistas",
+      "MEETING_MINUTES": "Ata de Assembleia",
+      "SHARE_CERTIFICATE": "Certificado de Ações",
+      "OPTION_LETTER": "Carta de Outorga",
+      "INVESTMENT_AGREEMENT": "Acordo de Investimento"
+    },
+    "filter": {
+      "allStatuses": "Todos os Status",
+      "allTypes": "Todos os Tipos",
+      "searchPlaceholder": "Buscar documentos..."
+    },
+    "actions": {
+      "view": "Visualizar",
+      "download": "Download",
+      "edit": "Editar",
+      "delete": "Excluir",
+      "generate": "Gerar PDF",
+      "preview": "Prévia"
+    },
+    "deleteDialog": {
+      "title": "Excluir Documento",
+      "description": "Tem certeza que deseja excluir este documento? Esta ação não pode ser desfeita.",
+      "confirm": "Excluir",
+      "cancel": "Cancelar",
+      "success": "Documento excluído com sucesso."
+    },
+    "wizard": {
+      "title": "Novo Documento",
+      "step1": "Selecionar Modelo",
+      "step2": "Preencher Dados",
+      "selectTemplate": "Escolha um modelo de documento",
+      "selectTemplateDescription": "Selecione o tipo de documento que deseja criar.",
+      "noTemplates": "Nenhum modelo disponível",
+      "formTitle": "Título do Documento",
+      "formTitlePlaceholder": "Ex: Acordo de Acionistas - Janeiro 2026",
+      "saveDraft": "Salvar Rascunho",
+      "generatePdf": "Gerar PDF",
+      "generating": "Gerando documento...",
+      "saving": "Salvando...",
+      "back": "Voltar",
+      "preview": "Prévia do Documento",
+      "previewEmpty": "Preencha os campos para visualizar a prévia.",
+      "draftSuccess": "Rascunho salvo com sucesso.",
+      "generateSuccess": "Documento gerado com sucesso.",
+      "formFields": "Campos do Formulário",
+      "requiredField": "Campo obrigatório"
+    },
+    "detail": {
+      "title": "Detalhes do Documento",
+      "back": "Voltar para Documentos",
+      "metadata": "Metadados",
+      "template": "Modelo",
+      "status": "Status",
+      "locale": "Idioma",
+      "createdAt": "Criado em",
+      "updatedAt": "Atualizado em",
+      "generatedAt": "Gerado em",
+      "contentHash": "Hash do Conteúdo",
+      "blockchainTxHash": "Hash Blockchain",
+      "download": "Download PDF",
+      "downloading": "Baixando...",
+      "preview": "Prévia",
+      "previewTitle": "Prévia do Documento",
+      "editDraft": "Editar Rascunho",
+      "generateFromDraft": "Gerar PDF",
+      "generating": "Gerando...",
+      "delete": "Excluir",
+      "noPreview": "Prévia não disponível para este documento.",
+      "notFound": "Documento não encontrado.",
+      "notFoundDescription": "O documento que você está procurando não existe ou foi excluído.",
+      "error": "Ocorreu um erro ao carregar este documento.",
+      "formData": "Dados do Formulário",
+      "noFormData": "Sem dados de formulário.",
+      "deleteSuccess": "Documento excluído com sucesso.",
+      "generateSuccess": "Documento gerado com sucesso.",
+      "downloadError": "Falha ao obter link de download."
+    },
+    "uploadDialog": {
+      "title": "Upload de Documento",
+      "description": "Envie um documento existente (PDF, PNG ou JPG, máx. 10 MB).",
+      "titleLabel": "Título",
+      "titlePlaceholder": "Ex: Contrato Social",
+      "fileLabel": "Arquivo",
+      "dropzone": "Clique ou arraste um arquivo aqui",
+      "dropzoneFormats": "PDF, PNG ou JPG (máx. 10 MB)",
+      "upload": "Fazer Upload",
+      "uploading": "Enviando...",
+      "cancel": "Cancelar",
+      "success": "Documento enviado com sucesso.",
+      "invalidType": "Tipo de arquivo não permitido. Use PDF, PNG ou JPG.",
+      "tooLarge": "Arquivo excede o tamanho máximo de 10 MB."
+    },
+    "pagination": {
+      "next": "Próxima",
+      "previous": "Anterior",
+      "page": "Página",
+      "of": "de",
+      "showing": "Mostrando {from}–{to} de {total}"
+    }
+  },
   "errors": {
     "auth": {
       "accountLocked": "Conta bloqueada por excesso de tentativas. Tente novamente em 15 minutos.",

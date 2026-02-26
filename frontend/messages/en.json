@@ -546,6 +546,135 @@
       "seriesC": "Series C"
     }
   },
+  "documents": {
+    "title": "Documents",
+    "description": "Manage legal and corporate documents.",
+    "newDocument": "New Document",
+    "upload": "Upload",
+    "empty": "No documents found",
+    "emptyDescription": "Create a new document from a template or upload a file.",
+    "table": {
+      "title": "Title",
+      "template": "Template",
+      "status": "Status",
+      "createdAt": "Created",
+      "generatedAt": "Generated",
+      "actions": "Actions"
+    },
+    "stats": {
+      "total": "Total",
+      "drafts": "Drafts",
+      "generated": "Generated",
+      "pendingSignatures": "Pending"
+    },
+    "status": {
+      "DRAFT": "Draft",
+      "GENERATED": "Generated",
+      "PENDING_SIGNATURES": "Pending Signatures",
+      "PARTIALLY_SIGNED": "Partially Signed",
+      "FULLY_SIGNED": "Fully Signed"
+    },
+    "type": {
+      "SHAREHOLDER_AGREEMENT": "Shareholder Agreement",
+      "MEETING_MINUTES": "Meeting Minutes",
+      "SHARE_CERTIFICATE": "Share Certificate",
+      "OPTION_LETTER": "Option Letter",
+      "INVESTMENT_AGREEMENT": "Investment Agreement"
+    },
+    "filter": {
+      "allStatuses": "All Statuses",
+      "allTypes": "All Types",
+      "searchPlaceholder": "Search documents..."
+    },
+    "actions": {
+      "view": "View",
+      "download": "Download",
+      "edit": "Edit",
+      "delete": "Delete",
+      "generate": "Generate PDF",
+      "preview": "Preview"
+    },
+    "deleteDialog": {
+      "title": "Delete Document",
+      "description": "Are you sure you want to delete this document? This action cannot be undone.",
+      "confirm": "Delete",
+      "cancel": "Cancel",
+      "success": "Document deleted successfully."
+    },
+    "wizard": {
+      "title": "New Document",
+      "step1": "Select Template",
+      "step2": "Fill Details",
+      "selectTemplate": "Choose a document template",
+      "selectTemplateDescription": "Select the type of document you want to create.",
+      "noTemplates": "No templates available",
+      "formTitle": "Document Title",
+      "formTitlePlaceholder": "e.g. Shareholder Agreement - January 2026",
+      "saveDraft": "Save Draft",
+      "generatePdf": "Generate PDF",
+      "generating": "Generating document...",
+      "saving": "Saving...",
+      "back": "Back",
+      "preview": "Document Preview",
+      "previewEmpty": "Fill in the fields to see a preview.",
+      "draftSuccess": "Draft saved successfully.",
+      "generateSuccess": "Document generated successfully.",
+      "formFields": "Form Fields",
+      "requiredField": "Required field"
+    },
+    "detail": {
+      "title": "Document Details",
+      "back": "Back to Documents",
+      "metadata": "Metadata",
+      "template": "Template",
+      "status": "Status",
+      "locale": "Language",
+      "createdAt": "Created",
+      "updatedAt": "Updated",
+      "generatedAt": "Generated",
+      "contentHash": "Content Hash",
+      "blockchainTxHash": "Blockchain Hash",
+      "download": "Download PDF",
+      "downloading": "Downloading...",
+      "preview": "Preview",
+      "previewTitle": "Document Preview",
+      "editDraft": "Edit Draft",
+      "generateFromDraft": "Generate PDF",
+      "generating": "Generating...",
+      "delete": "Delete",
+      "noPreview": "Preview not available for this document.",
+      "notFound": "Document not found.",
+      "notFoundDescription": "The document you are looking for does not exist or has been deleted.",
+      "error": "An error occurred loading this document.",
+      "formData": "Form Data",
+      "noFormData": "No form data.",
+      "deleteSuccess": "Document deleted successfully.",
+      "generateSuccess": "Document generated successfully.",
+      "downloadError": "Failed to get download link."
+    },
+    "uploadDialog": {
+      "title": "Upload Document",
+      "description": "Upload an existing document (PDF, PNG or JPG, max 10 MB).",
+      "titleLabel": "Title",
+      "titlePlaceholder": "e.g. Articles of Association",
+      "fileLabel": "File",
+      "dropzone": "Click or drag a file here",
+      "dropzoneFormats": "PDF, PNG or JPG (max 10 MB)",
+      "upload": "Upload",
+      "uploading": "Uploading...",
+      "cancel": "Cancel",
+      "success": "Document uploaded successfully.",
+      "invalidType": "File type not allowed. Use PDF, PNG or JPG.",
+      "tooLarge": "File exceeds the maximum size of 10 MB."
+    },
+    "pagination": {
+      "next": "Next",
+      "previous": "Previous",
+      "page": "Page",
+      "of": "of",
+      "showing": "Showing {from}–{to} of {total}"
+    }
+  },
   "errors": {
     "auth": {
       "accountLocked": "Account locked due to too many attempts. Try again in 15 minutes.",
