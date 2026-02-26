@@ -6,6 +6,7 @@
 **Related Flows**:
 - **Depends on**: [Authentication](./authentication.md) -- user must be logged in for management endpoints
 - **Depends on**: [Company Management](./company-management.md) -- company must exist and be ACTIVE
+- **Depends on**: [KYC Verification](./kyc-verification.md) -- ADMIN must have kycStatus APPROVED to publish a profile
 - **Feeds into**: Dataroom -- published profile serves as entry point for investor due diligence
 - **Triggers**: Audit log events (PROFILE_CREATED, PROFILE_UPDATED, PROFILE_PUBLISHED, PROFILE_UNPUBLISHED, PROFILE_ARCHIVED)
 
@@ -65,10 +66,19 @@ ADMIN navigates to Company Profile page
   |
   +-- Publish Profile: POST /api/v1/companies/:companyId/profile/publish
   |     |
-  |     +-- [ADMIN + DRAFT + BR-10 met] --> Profile status --> PUBLISHED
-  |     +-- [ADMIN + DRAFT + BR-10 not met] --> 422 PROFILE_INCOMPLETE { missingFields }
+  |     +-- [AuthGuard] No valid session/token --> 401 Unauthorized --> redirect to login
+  |     |
+  |     +-- [RolesGuard] User not ADMIN of this company --> 404 Not Found (prevents enumeration)
+  |     |
+  |     +-- [KycGatingGuard] user.kycStatus !== 'APPROVED'
+  |     |     +-- --> 403 Forbidden, code: KYC_REQUIRED, messageKey: errors.kyc.required
+  |     |     +-- --> Frontend shows toast: "Verificacao de identidade (KYC) e obrigatoria"
+  |     |
+  |     +-- [Service] Profile not found --> 404 Not Found
+  |     |
+  |     +-- [ADMIN + KYC APPROVED + DRAFT + BR-10 met] --> Profile status --> PUBLISHED
+  |     +-- [ADMIN + KYC APPROVED + DRAFT + BR-10 not met] --> 422 PROFILE_INCOMPLETE { missingFields }
   |     +-- [not DRAFT] --> 422 PROFILE_INVALID_STATUS_TRANSITION
-  |     +-- [not ADMIN] --> 404 (role guard)
   |
   +-- Unpublish Profile: POST /api/v1/companies/:companyId/profile/unpublish
   |     |
@@ -266,7 +276,7 @@ SIDE EFFECTS: None (photo is associated to team member on next team save)
 ### Happy Path: Publish Profile (BR-10)
 
 ```
-PRECONDITION: Profile exists in DRAFT status. User is ADMIN. Profile meets BR-10 completeness rule.
+PRECONDITION: Profile exists in DRAFT status. User is ADMIN with kycStatus APPROVED. Profile meets BR-10 completeness rule.
 ACTOR: ADMIN member
 TRIGGER: User clicks "Publish" button
 
@@ -274,25 +284,30 @@ TRIGGER: User clicks "Publish" button
 2. [UI] Publish button shows current status badge (DRAFT)
 3. [UI] User clicks "Publish"
 4. [Frontend] Sends POST /api/v1/companies/:companyId/profile/publish
-5. [Backend] AuthGuard + RolesGuard validate (ADMIN only)
-   -> IF not ADMIN: return 404
-6. [Backend] Validates profile status is DRAFT
+5. [Backend] AuthGuard validates session cookie
+   -> IF unauthenticated: return 401, frontend redirects to login
+6. [Backend] RolesGuard checks user is ADMIN member of this company
+   -> IF not ADMIN member: return 404 (prevents company enumeration)
+7. [Backend] KycGatingGuard checks user.kycStatus === 'APPROVED'
+   -> IF not APPROVED: return 403 KYC_REQUIRED, messageKey errors.kyc.required
+8. [Backend] Validates profile status is DRAFT
    -> IF not DRAFT: return 422 PROFILE_INVALID_STATUS_TRANSITION
-7. [Backend] Validates BR-10 completeness rule (minimum required fields for publishing):
+9. [Backend] Validates BR-10 completeness rule (minimum required fields for publishing):
    - Headline must be set
    - Description must be set
    - At least 1 team member
    - At least 1 metric
    - (other minimum content rules as defined by BR-10)
    -> IF incomplete: return 422 PROFILE_INCOMPLETE { missingFields: ["headline", "teamMembers", ...] }
-8. [Backend] Updates profile status to PUBLISHED, sets publishedAt timestamp
-9. [Backend] Returns 200 with updated profile
-10. [UI] Success toast: "Perfil publicado com sucesso"
-11. [UI] Status badge updates to PUBLISHED (green)
-12. [UI] Public URL displayed with copy-to-clipboard button: https://app.navia.com.br/profiles/{slug}
+10. [Backend] Updates profile status to PUBLISHED, sets publishedAt timestamp
+11. [Backend] AuditInterceptor queues PROFILE_PUBLISHED audit event (non-blocking)
+12. [Backend] Returns 200 with updated profile
+13. [UI] Success toast: "Perfil publicado com sucesso"
+14. [UI] Status badge updates to PUBLISHED (green)
+15. [UI] Public URL displayed with copy-to-clipboard button: https://app.navia.com.br/profiles/{slug}
 
 POSTCONDITION: Profile status = PUBLISHED, publicly accessible via slug URL
-SIDE EFFECTS: Audit log (PROFILE_PUBLISHED)
+SIDE EFFECTS: Audit log (PROFILE_PUBLISHED) queued via Bull
 ```
 
 ### Happy Path: View Public Profile (PUBLIC access)
@@ -514,19 +529,48 @@ ACTOR: ADMIN member
 POSTCONDITION: No duplicate profile created
 ```
 
+### Error Path: Publish Without KYC Approval
+
+```
+PRECONDITION: User is ADMIN of the company, but kycStatus is NOT_STARTED, IN_PROGRESS,
+PENDING_REVIEW, or REJECTED.
+ACTOR: ADMIN member
+TRIGGER: User clicks "Publish"
+
+1. [UI] User clicks "Publish" button on profile editor
+2. [Frontend] Sends POST /api/v1/companies/:companyId/profile/publish
+3. [Backend] AuthGuard passes (valid session)
+4. [Backend] RolesGuard passes (user is ADMIN of this company)
+5. [Backend] KycGatingGuard reads user.kycStatus from the attached request.user object
+   -> kycStatus is NOT_STARTED | IN_PROGRESS | PENDING_REVIEW | REJECTED
+6. [Backend] Returns 403 with:
+   {
+     "success": false,
+     "error": {
+       "code": "KYC_REQUIRED",
+       "messageKey": "errors.kyc.required"
+     }
+   }
+7. [Frontend] ApiError parsed from 403 response
+8. [UI] Error toast: "Verificacao de identidade (KYC) e obrigatoria para esta operacao"
+
+POSTCONDITION: Profile remains in its current status (DRAFT or PUBLISHED). No state change.
+```
+
 ### Error Path: Publish Empty/Incomplete Profile (BR-10)
 
 ```
 PRECONDITION: Profile is DRAFT but missing required content per BR-10 rule.
-ACTOR: ADMIN member
+ACTOR: ADMIN member with kycStatus APPROVED
 
 1. [UI] User clicks "Publish" on an incomplete profile
 2. [Frontend] Sends POST /api/v1/companies/:companyId/profile/publish
-3. [Backend] Validates BR-10 completeness
-4. [Backend] Returns 422 PROFILE_INCOMPLETE with { missingFields: ["headline", "description", "teamMembers"] }
-5. [Frontend] Maps missingFields to user-friendly list
-6. [UI] Error toast or inline alert: "Complete os seguintes campos antes de publicar: Titulo, Descricao, Equipe"
-7. [UI] Missing fields highlighted in the editor
+3. [Backend] AuthGuard, RolesGuard, and KycGatingGuard all pass
+4. [Backend] Validates BR-10 completeness
+5. [Backend] Returns 422 PROFILE_INCOMPLETE with { missingFields: ["headline", "description", "teamMembers"] }
+6. [Frontend] Maps missingFields to user-friendly list
+7. [UI] Error toast or inline alert: "Complete os seguintes campos antes de publicar: Titulo, Descricao, Equipe"
+8. [UI] Missing fields highlighted in the editor
 
 POSTCONDITION: Profile remains DRAFT
 ```
@@ -578,8 +622,12 @@ POSTCONDITION: Visitor cannot access profile without providing a valid email
 |---|---------------|-----------|------|---------|
 | 7 (create) | Company status | Not ACTIVE | Error | 422 PROFILE_COMPANY_NOT_ACTIVE |
 | 8 (create) | Profile existence | Already exists | Error | 409 PROFILE_ALREADY_EXISTS |
-| 6 (publish) | Profile status | Not DRAFT | Error | 422 PROFILE_INVALID_STATUS_TRANSITION |
-| 7 (publish) | BR-10 completeness | Missing required fields | Error | 422 PROFILE_INCOMPLETE { missingFields } |
+| 5 (publish) | Auth check | No valid session | Error | 401 Unauthorized |
+| 6 (publish) | Role check | Not company ADMIN | Error | 404 Not Found (prevents enumeration) |
+| 7 (publish) | KYC check | kycStatus !== APPROVED | Error | 403 KYC_REQUIRED |
+| 8 (publish) | Profile status | Not DRAFT | Error | 422 PROFILE_INVALID_STATUS_TRANSITION |
+| 9 (publish) | BR-10 completeness | Missing required fields | Error | 422 PROFILE_INCOMPLETE { missingFields } |
+| 9 (publish) | BR-10 completeness | All fields present | Happy | Profile published |
 | 7 (unpublish) | Profile status | Not PUBLISHED | Error | 422 PROFILE_INVALID_STATUS_TRANSITION |
 | 7 (archive) | Profile status | Already ARCHIVED | Error | 422 PROFILE_INVALID_STATUS_TRANSITION |
 | 11 (slug) | Slug uniqueness | Already taken | Error | 409 PROFILE_SLUG_DUPLICATE |
@@ -615,7 +663,8 @@ POSTCONDITION: Visitor cannot access profile without providing a valid email
                     +-----------+
                       |       |
              publish  |       | archive
-             (BR-10)  |       |
+          (KYC +      |       |
+           BR-10)     |       |
                       v       |
                     +-----------+     archive     +------------+
                     | PUBLISHED | --------------> |  ARCHIVED  |
@@ -626,24 +675,42 @@ POSTCONDITION: Visitor cannot access profile without providing a valid email
 
 ---
 
+## Guard Execution Order (Publish Endpoint)
+
+The guards execute in this fixed order on `POST /api/v1/companies/:companyId/profile/publish`:
+
+1. **ThrottlerGuard** (global `APP_GUARD`) — rate limiting. Applied before any business logic.
+2. **AuthGuard** (global `APP_GUARD`) — verifies the session cookie / Bearer token via Privy, attaches `request.user` (including `kycStatus`).
+3. **RolesGuard** (global `APP_GUARD`) — reads the `@Roles('ADMIN')` decorator, verifies the user is an ACTIVE ADMIN member of the requested company. Returns 404 on failure to prevent company ID enumeration.
+4. **KycGatingGuard** (per-route `@UseGuards(KycGatingGuard)`) — reads `request.user.kycStatus`. Returns 403 `KYC_REQUIRED` if status is not `APPROVED`. Only reached after the role check has passed.
+
+All other publish lifecycle logic (status validation, BR-10 completeness check) runs inside `CompanyProfileService.publish()` after all guards have passed.
+
+**Note**: The KycGatingGuard is applied only on the publish endpoint. Create, update, metrics, team, photo upload, unpublish, and archive operations do not require KYC approval.
+
+---
+
 ## By Role
 
-| Action | ADMIN | FINANCE | LEGAL | INVESTOR | EMPLOYEE | Public (unauthenticated) |
-|--------|-------|---------|-------|----------|----------|--------------------------|
-| Create profile | Yes | No (404) | No (404) | No (404) | No (404) | No (401) |
-| View profile (internal) | Yes | Yes | Yes | Yes | Yes | No (401) |
-| Update profile | Yes | Yes | No (404) | No (404) | No (404) | No (401) |
-| Update slug | Yes | No (404) | No (404) | No (404) | No (404) | No (401) |
-| Replace metrics | Yes | Yes | No (404) | No (404) | No (404) | No (401) |
-| Replace team | Yes | Yes | No (404) | No (404) | No (404) | No (401) |
-| Upload team photo | Yes | Yes | No (404) | No (404) | No (404) | No (401) |
-| Publish | Yes | No (404) | No (404) | No (404) | No (404) | No (401) |
-| Unpublish | Yes | No (404) | No (404) | No (404) | No (404) | No (401) |
-| Archive | Yes | No (404) | No (404) | No (404) | No (404) | No (401) |
-| View analytics | Yes | Yes | No (404) | No (404) | No (404) | No (401) |
-| View public profile | N/A | N/A | N/A | N/A | N/A | Yes (access rules apply) |
+| Action | ADMIN (KYC APPROVED) | ADMIN (KYC not APPROVED) | FINANCE | LEGAL | INVESTOR | EMPLOYEE | Public (unauthenticated) |
+|--------|----------------------|--------------------------|---------|-------|----------|----------|--------------------------|
+| Create profile | Yes | Yes | No (404) | No (404) | No (404) | No (404) | No (401) |
+| View profile (internal) | Yes | Yes | Yes | Yes | Yes | Yes | No (401) |
+| Update profile | Yes | Yes | Yes | No (404) | No (404) | No (404) | No (401) |
+| Update slug | Yes | Yes | No (404) | No (404) | No (404) | No (404) | No (401) |
+| Replace metrics | Yes | Yes | Yes | No (404) | No (404) | No (404) | No (401) |
+| Replace team | Yes | Yes | Yes | No (404) | No (404) | No (404) | No (401) |
+| Upload team photo | Yes | Yes | Yes | No (404) | No (404) | No (404) | No (401) |
+| Publish | Yes | No (403 KYC_REQUIRED) | No (404) | No (404) | No (404) | No (404) | No (401) |
+| Unpublish | Yes | Yes | No (404) | No (404) | No (404) | No (404) | No (401) |
+| Archive | Yes | Yes | No (404) | No (404) | No (404) | No (404) | No (401) |
+| View analytics | Yes | Yes | Yes | No (404) | No (404) | No (404) | No (401) |
+| View public profile | N/A | N/A | N/A | N/A | N/A | N/A | Yes (access rules apply) |
 
-Note: Non-members receive 404 (not 403) to prevent company enumeration per security.md.
+Notes:
+- Non-members receive 404 (not 403) to prevent company enumeration per security.md.
+- KYC approval is required **only for publishing**. All other ADMIN actions are available regardless of KYC status.
+- FINANCE members are not subject to the KycGatingGuard because they cannot publish.
 
 ---
 
@@ -655,7 +722,7 @@ Note: Non-members receive 404 (not 403) to prevent company enumeration per secur
 | GET | `/api/v1/companies/:companyId/profile` | Required | Any member | Get company profile |
 | PUT | `/api/v1/companies/:companyId/profile` | Required | ADMIN, FINANCE | Update company profile |
 | PUT | `/api/v1/companies/:companyId/profile/slug` | Required | ADMIN | Update profile slug |
-| POST | `/api/v1/companies/:companyId/profile/publish` | Required | ADMIN | Publish profile (BR-10) |
+| POST | `/api/v1/companies/:companyId/profile/publish` | Required | ADMIN (KYC APPROVED) | Publish profile (KycGatingGuard + BR-10) |
 | POST | `/api/v1/companies/:companyId/profile/unpublish` | Required | ADMIN | Unpublish profile |
 | POST | `/api/v1/companies/:companyId/profile/archive` | Required | ADMIN | Archive profile |
 | PUT | `/api/v1/companies/:companyId/profile/metrics` | Required | ADMIN, FINANCE | Replace profile metrics (max 6) |

@@ -9,6 +9,7 @@ import {
   HttpCode,
   HttpStatus,
   UseInterceptors,
+  UseGuards,
   UploadedFile,
   ParseFilePipe,
   MaxFileSizeValidator,
@@ -25,6 +26,7 @@ import { UpdateSlugDto } from './dto/update-slug.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser, AuthenticatedUser } from '../auth/decorators/current-user.decorator';
 import { Auditable } from '../audit-log/decorators/auditable.decorator';
+import { KycGatingGuard } from '../kyc/guards/kyc-gating.guard';
 
 @Controller('api/v1/companies/:companyId/profile')
 export class CompanyProfileController {
@@ -92,6 +94,7 @@ export class CompanyProfileController {
 
   @Post('publish')
   @Roles('ADMIN')
+  @UseGuards(KycGatingGuard)
   @Throttle({ write: { ttl: 60000, limit: 30 } })
   @Auditable({
     action: 'PROFILE_PUBLISHED',

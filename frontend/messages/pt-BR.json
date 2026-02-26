@@ -119,6 +119,7 @@
       "invalidStatus": "Status de verificação inválido para esta operação",
       "livenessCheckFailed": "Verificação de vivacidade falhou. Tente novamente.",
       "maxAttemptsExceeded": "Número máximo de tentativas excedido",
+      "required": "Verificação de identidade (KYC) é necessária para esta operação",
       "s3Unavailable": "Serviço de armazenamento indisponível. Tente novamente.",
       "stepOrderViolation": "Complete as etapas anteriores antes de prosseguir",
       "underReview": "Verificação KYC em análise",

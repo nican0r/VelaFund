@@ -8,6 +8,7 @@ import {
   BusinessRuleException,
   UnauthorizedException,
 } from '../common/filters/app-exception';
+import { KycGatingGuard } from '../kyc/guards/kyc-gating.guard';
 
 const mockUser = {
   id: 'user-1',
@@ -254,6 +255,15 @@ describe('CompanyProfileController & PublicProfileController', () => {
     // ─── POST /publish ──────────────────────────────────────────
 
     describe('publish', () => {
+      it('should have KycGatingGuard applied via @UseGuards decorator', () => {
+        const guards = Reflect.getMetadata(
+          '__guards__',
+          CompanyProfileController.prototype.publish,
+        );
+        expect(guards).toBeDefined();
+        expect(guards).toContain(KycGatingGuard);
+      });
+
       it('should publish the profile and return the result', async () => {
         mockService.publish.mockResolvedValue(mockPublishedProfile);
 

@@ -119,6 +119,7 @@
       "invalidStatus": "Invalid verification status for this operation",
       "livenessCheckFailed": "Liveness check failed. Please try again.",
       "maxAttemptsExceeded": "Maximum number of attempts exceeded",
+      "required": "Identity verification (KYC) is required for this operation",
       "s3Unavailable": "Storage service unavailable. Please try again.",
       "stepOrderViolation": "Complete the previous steps before proceeding",
       "underReview": "KYC verification under review",

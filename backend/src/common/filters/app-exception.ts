@@ -609,6 +609,10 @@ const MESSAGES: Record<string, Record<string, string>> = {
     en: 'Audit log not found',
   },
   // ─── KYC VERIFICATION MESSAGES ──────────────────────────────────────────
+  'errors.kyc.required': {
+    'pt-BR': 'Verificação de identidade (KYC) é necessária para esta operação',
+    en: 'Identity verification (KYC) is required for this operation',
+  },
   'errors.kyc.cpfInvalid': {
     'pt-BR': 'CPF inválido — dígitos verificadores incorretos',
     en: 'Invalid CPF — incorrect check digits',
