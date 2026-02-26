@@ -5,17 +5,7 @@ import Link from 'next/link';
 import { X } from 'lucide-react';
 import {
   LayoutDashboard,
-  Table2,
-  Users,
-  Layers,
-  ArrowLeftRight,
-  TrendingUp,
-  Repeat,
-  Gift,
-  FileText,
   Bell,
-  Shield,
-  BarChart3,
   Settings,
   HelpCircle,
   LogOut,
@@ -33,17 +23,7 @@ interface NavItem {
 
 const menuItems: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Cap Table', href: '/dashboard/cap-table', icon: Table2 },
-  { label: 'Shareholders', href: '/dashboard/shareholders', icon: Users },
-  { label: 'Share Classes', href: '/dashboard/share-classes', icon: Layers },
-  { label: 'Transactions', href: '/dashboard/transactions', icon: ArrowLeftRight },
-  { label: 'Funding Rounds', href: '/dashboard/funding-rounds', icon: TrendingUp },
-  { label: 'Convertibles', href: '/dashboard/convertibles', icon: Repeat },
-  { label: 'Options', href: '/dashboard/options', icon: Gift },
-  { label: 'Documents', href: '/dashboard/documents', icon: FileText },
   { label: 'Notifications', href: '/dashboard/notifications', icon: Bell },
-  { label: 'Reports', href: '/dashboard/reports', icon: BarChart3 },
-  { label: 'Audit Logs', href: '/dashboard/audit-logs', icon: Shield },
 ];
 
 const generalItems: NavItem[] = [

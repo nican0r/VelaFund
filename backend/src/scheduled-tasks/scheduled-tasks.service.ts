@@ -3,8 +3,6 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { AuditLogService } from '../audit-log/audit-log.service';
-import { ConvertibleService } from '../convertible/convertible.service';
-import { OptionPlanService } from '../option-plan/option-plan.service';
 
 /** Bull queue names to monitor for failed jobs. */
 const MONITORED_QUEUES = [
@@ -30,8 +28,6 @@ export class ScheduledTasksService {
 
   constructor(
     private readonly auditLogService: AuditLogService,
-    private readonly convertibleService: ConvertibleService,
-    private readonly optionPlanService: OptionPlanService,
     @InjectQueue('audit-log') private readonly auditLogQueue: Queue,
     @InjectQueue('notification') private readonly notificationQueue: Queue,
     @InjectQueue('company-setup') private readonly companySetupQueue: Queue,
@@ -71,63 +67,6 @@ export class ScheduledTasksService {
     } catch (error) {
       this.logger.error(
         `Failed to compute daily audit hash chain for ${yesterday}: ${error instanceof Error ? error.message : String(error)}`,
-        error instanceof Error ? error.stack : undefined,
-      );
-    }
-  }
-
-  /**
-   * Daily interest accrual for convertible instruments.
-   * Runs at 01:00 UTC daily to update the accruedInterest DB field
-   * for all OUTSTANDING convertible instruments.
-   *
-   * This keeps list views, summary aggregations, and report exports
-   * accurate without requiring on-the-fly calculation for each query.
-   * The interest breakdown and conversion endpoints still compute
-   * interest on-the-fly for real-time precision.
-   *
-   * If the update fails, the error is logged but does not crash the application.
-   * The on-the-fly calculation in findById/findAll serves as a fallback.
-   */
-  @Cron('0 0 1 * * *', { name: 'convertible-interest-accrual', timeZone: 'UTC' })
-  async accrueConvertibleInterest(): Promise<void> {
-    this.logger.log('Starting daily convertible interest accrual');
-
-    try {
-      const updatedCount = await this.convertibleService.updateAccruedInterestForAll();
-      this.logger.log(
-        `Daily convertible interest accrual completed: ${updatedCount} instruments updated`,
-      );
-    } catch (error) {
-      this.logger.error(
-        `Failed to accrue convertible interest: ${error instanceof Error ? error.message : String(error)}`,
-        error instanceof Error ? error.stack : undefined,
-      );
-    }
-  }
-
-  /**
-   * Daily auto-expiration of option grants past their expiration date.
-   * Runs at 02:00 UTC daily per option-plans spec.
-   *
-   * Finds all ACTIVE grants where expirationDate < today, transitions
-   * them to EXPIRED, returns unexercised options to the plan pool,
-   * cancels pending exercise requests, and fires audit + notification events.
-   *
-   * If the job fails, the error is logged but does not crash the application.
-   */
-  @Cron('0 0 2 * * *', { name: 'option-grant-expiration', timeZone: 'UTC' })
-  async expireOptionGrants(): Promise<void> {
-    this.logger.log('Starting daily option grant expiration check');
-
-    try {
-      const expiredCount = await this.optionPlanService.expireStaleGrants();
-      this.logger.log(
-        `Daily option grant expiration completed: ${expiredCount} grants expired`,
-      );
-    } catch (error) {
-      this.logger.error(
-        `Failed to expire option grants: ${error instanceof Error ? error.message : String(error)}`,
         error instanceof Error ? error.stack : undefined,
       );
     }

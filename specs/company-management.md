@@ -2,19 +2,21 @@
 
 **Topic of Concern**: Company creation, lifecycle management, and settings
 
-**One-Sentence Description**: The system manages Brazilian company entities (Ltda. and S.A.) with CNPJ validation, lifecycle state machine (DRAFT -> ACTIVE -> INACTIVE -> DISSOLVED), and company settings scoped through the creating user's embedded wallet as the on-chain admin.
+**One-Sentence Description**: The system manages Brazilian company entities (Ltda., S.A., and SAS) with CNPJ validation, lifecycle state machine (DRAFT -> ACTIVE -> INACTIVE -> DISSOLVED), company settings including Open Finance connections and AI processing configuration.
 
 ---
 
 ## Overview
 
-The Company entity is the root entity in Navia — every feature (shareholders, cap table, transactions, documents, option plans) is company-scoped. A company represents a Brazilian legal entity, either a Sociedade Limitada (Ltda.) or a Sociedade Anônima (S.A.), that uses the platform to manage its cap table with on-chain record-keeping.
+The Company entity is the root entity in Navia — every feature (financial data aggregation, AI document intelligence, reports) is company-scoped. A company represents a Brazilian legal entity that uses the platform to centralize financial visibility, automate document processing, and generate insights.
 
 ### Brazilian Entity Types
 
 **Sociedade Limitada (Ltda.)** is the most common business entity in Brazil, equivalent to an LLC. Members hold quotas (quotas sociais) with equal rights per quota. Governed by Articles 1.052-1.087 of the Brazilian Civil Code (Lei 10.406/2002).
 
 **Sociedade Anônima (S.A.)** is a corporation governed by Lei 6.404/1976 (Lei das S.A.). S.A. companies can be capital aberto (publicly traded) or capital fechado (privately held). They issue shares (acoes) that can be common (ordinarias - ON) or preferred (preferenciais - PN) with distinct rights.
+
+**Sociedade por Ações Simplificada (SAS)** is a simplified corporation type introduced by Lei Complementar 182/2021, designed for startups and small businesses. SAS companies have a simplified governance structure and lower bureaucratic requirements, making them popular for early-stage companies.
 
 ### Multi-Company Support
 
@@ -28,13 +30,12 @@ Company creation is asynchronous. When an admin submits the company creation for
 
 1. Company is created in `DRAFT` status with the provided CNPJ
 2. A Bull background job validates the CNPJ via Verifik against Receita Federal (see `company-cnpj-validation.md`)
-3. On success, company moves to `ACTIVE` and the OCP smart contract is deployed (see `company-blockchain-admin.md`)
+3. On success, company moves to `ACTIVE`
 4. On failure, admin is notified and can update the CNPJ and retry
 
 **Extracted specifications**:
 - **Membership, invitations, and role management** -> `company-membership.md`
 - **CNPJ validation via Verifik and Bull job** -> `company-cnpj-validation.md`
-- **Blockchain admin wallet and contract deployment** -> `company-blockchain-admin.md`
 
 ---
 
@@ -59,7 +60,7 @@ Company creation is asynchronous. When an admin submits the company creation for
 ### US-1: Create a New Company
 **As an** admin user with approved KYC
 **I want to** create a new company by providing its CNPJ and details
-**So that** I can start managing the company's cap table on the platform
+**So that** I can start managing the company's financial data on the platform
 
 ### US-2: Switch Between Companies
 > **Future Enhancement — not implemented for MVP (one company per user).** The MVP supports only one company per user. No company switcher is rendered.
@@ -76,7 +77,17 @@ Company creation is asynchronous. When an admin submits the company creation for
 ### US-4: Deactivate or Dissolve a Company
 **As an** admin user
 **I want to** deactivate or dissolve a company
-**So that** the company's data is preserved but no new transactions can occur
+**So that** the company's data is preserved but no new operations can occur
+
+### US-5: Configure Open Finance Connections
+**As an** admin user
+**I want to** connect my company's bank accounts via Open Finance
+**So that** the platform can automatically sync financial data
+
+### US-6: Configure AI Document Processing
+**As an** admin user
+**I want to** manage AI processing settings including token budget and auto-processing
+**So that** I can control how documents are processed and manage AI costs
 
 ---
 
@@ -94,19 +105,19 @@ Company creation is asynchronous. When an admin submits the company creation for
 
 ### FR-2: Company Lifecycle State Machine
 - System MUST enforce the following state transitions:
-  - `DRAFT` -> `ACTIVE` (on successful CNPJ validation + contract deployment)
+  - `DRAFT` -> `ACTIVE` (on successful CNPJ validation)
   - `ACTIVE` -> `INACTIVE` (admin action — temporarily suspends operations)
   - `INACTIVE` -> `ACTIVE` (admin re-activation)
-  - `ACTIVE` -> `DISSOLVED` (admin action — permanent, requires 0 active shareholders)
+  - `ACTIVE` -> `DISSOLVED` (admin action — permanent)
   - `INACTIVE` -> `DISSOLVED` (admin action — permanent)
-- `DRAFT` companies MUST NOT allow shareholder creation, transactions, or document generation
-- `INACTIVE` companies MUST block new transactions but allow read access
+- `DRAFT` companies MUST NOT allow financial data sync, document processing, or report generation
+- `INACTIVE` companies MUST block new operations but allow read access
 - `DISSOLVED` companies MUST be fully read-only (no writes except audit logs)
 
 ### FR-3: Multi-Company Support with URL Path Scoping
 > **Future Enhancement — the MVP enforces one company per user.** The URL path scoping is retained for API architecture forward-compatibility. The frontend reads the user's single company ID from the auth context and uses it in all API calls.
 
-- All company-scoped API endpoints MUST use the `:companyId` URL path parameter (e.g., `/api/v1/companies/:companyId/shareholders`)
+- All company-scoped API endpoints MUST use the `:companyId` URL path parameter (e.g., `/api/v1/companies/:companyId/documents`)
 - System MUST validate that the authenticated user is an active member of the specified company
 - System MUST return `404 Not Found` if the user is not a member of the specified company (prevents enumeration — see `security.md`)
 - System MUST scope all database queries to the company specified in the URL path via Prisma middleware
@@ -122,6 +133,20 @@ Company creation is asynchronous. When an admin submits the company creation for
 - Frontend MUST persist the last selected company in local storage
 - On login, frontend MUST restore the last selected company or default to the first company
 
+### FR-5: Open Finance Connection Settings
+- System MUST allow ADMIN users to view and manage connected bank accounts via Open Finance
+- System MUST store connection status and sync preferences per company
+- System MUST allow configuration of sync frequency (daily, weekly, manual)
+- System MUST display connection health status for each connected bank
+- Full Open Finance integration details are defined in `open-finance.md`
+
+### FR-6: AI Document Processing Settings
+- System MUST allow ADMIN users to configure AI token budget per company (monthly limit)
+- System MUST allow ADMIN users to enable/disable automatic document processing
+- System MUST display current token usage against the monthly budget
+- System MUST enforce token budget limits before processing new documents
+- Full AI document intelligence details are defined in `ai-document-intelligence.md`
+
 ---
 
 ## Data Models
@@ -132,7 +157,7 @@ Company creation is asynchronous. When an admin submits the company creation for
 interface Company {
   id: string;                          // UUID, primary key
   name: string;                        // Display name (may differ from razao social)
-  entityType: CompanyEntityType;       // LTDA | SA_CAPITAL_FECHADO | SA_CAPITAL_ABERTO
+  entityType: CompanyEntityType;       // LTDA | SA_CAPITAL_FECHADO | SA_CAPITAL_ABERTO | SAS
   cnpj: string;                        // XX.XXX.XXX/XXXX-XX (unique)
   description: string | null;          // Optional company description
   logoUrl: string | null;              // S3 URL for company logo
@@ -145,17 +170,21 @@ interface Company {
   cnpjValidatedAt: Date | null;
   cnpjData: CnpjData | null;          // Cached Receita Federal data (JSONB)
 
-  // OCT Metadata (JSONB — Open Cap Table standard metadata)
-  octMetadata: Record<string, any> | null;
-
   // Settings (embedded — no separate CompanySettings table)
   defaultCurrency: string;             // Default: "BRL"
   fiscalYearEnd: string;               // MM-DD format, default: "12-31"
   timezone: string;                    // Default: "America/Sao_Paulo"
   locale: string;                      // Default: "pt-BR"
 
-  // Smart Contract (see company-blockchain-admin.md)
-  contractAddress: string | null;      // OCP contract address (set after deployment)
+  // Open Finance Settings (see open-finance.md)
+  openFinanceSyncFrequency: SyncFrequency; // DAILY | WEEKLY | MANUAL, default: DAILY
+  openFinanceConnectedAt: Date | null;     // When first bank was connected, null if none
+
+  // AI Settings (see ai-document-intelligence.md)
+  aiTokenBudget: number;               // Monthly token limit, default: 100000
+  aiTokensUsed: number;                // Tokens consumed in current billing month, resets monthly
+  aiTokensResetAt: Date;               // When aiTokensUsed was last reset (start of current billing month)
+  autoProcessDocuments: boolean;        // Auto-process uploaded documents with AI, default: true
 
   // Audit
   createdById: string;                 // User ID of the creator
@@ -167,6 +196,7 @@ enum CompanyEntityType {
   LTDA = 'LTDA',
   SA_CAPITAL_FECHADO = 'SA_CAPITAL_FECHADO',
   SA_CAPITAL_ABERTO = 'SA_CAPITAL_ABERTO',
+  SAS = 'SAS',
 }
 
 enum CompanyStatus {
@@ -174,6 +204,12 @@ enum CompanyStatus {
   ACTIVE = 'ACTIVE',
   INACTIVE = 'INACTIVE',
   DISSOLVED = 'DISSOLVED',
+}
+
+enum SyncFrequency {
+  DAILY = 'DAILY',
+  WEEKLY = 'WEEKLY',
+  MANUAL = 'MANUAL',
 }
 ```
 
@@ -220,17 +256,20 @@ enum CompanyStatus {
     "status": "DRAFT",
     "cnpjValidatedAt": null,
     "cnpjData": null,
-    "contractAddress": null,
     "defaultCurrency": "BRL",
     "fiscalYearEnd": "12-31",
     "timezone": "America/Sao_Paulo",
     "locale": "pt-BR",
+    "openFinanceSyncFrequency": "DAILY",
+    "openFinanceConnectedAt": null,
+    "aiTokenBudget": 100000,
+    "aiTokensUsed": 0,
+    "autoProcessDocuments": true,
     "createdById": "user_xyz789",
     "createdAt": "2026-02-23T10:00:00Z",
     "updatedAt": "2026-02-23T10:00:00Z",
     "setupStatus": {
-      "cnpjValidation": "PENDING",
-      "contractDeployment": "PENDING"
+      "cnpjValidation": "PENDING"
     }
   }
 }
@@ -241,12 +280,11 @@ enum CompanyStatus {
 - `401 Unauthorized` — Missing or invalid auth token
 - `403 Forbidden` — User KYC not approved
 - `409 Conflict` — CNPJ already registered to another company
-- `422 Unprocessable Entity` — User has no wallet address
 - `422 Unprocessable Entity` — User has reached the 20-company membership limit
 
 **Validation Rules**:
 - `name`: required, 2-200 characters
-- `entityType`: required, one of `LTDA`, `SA_CAPITAL_FECHADO`, `SA_CAPITAL_ABERTO`
+- `entityType`: required, one of `LTDA`, `SA_CAPITAL_FECHADO`, `SA_CAPITAL_ABERTO`, `SAS`
 - `cnpj`: required, valid CNPJ format (XX.XXX.XXX/XXXX-XX), passes checksum validation
 - `description`: optional, max 2000 characters
 - `foundedDate`: optional, ISO 8601 date, must not be in the future
@@ -295,7 +333,7 @@ enum CompanyStatus {
 
 **Auth**: Required. User must be a member of the company (`:companyId` in URL path).
 
-**Response** (200 OK — ACTIVE company): Returns full Company entity with cnpjData and contractAddress.
+**Response** (200 OK — ACTIVE company): Returns full Company entity with cnpjData, Open Finance connection status, and AI settings.
 
 **Response** (200 OK — DRAFT company): Includes additional `setupStatus` object (see `company-cnpj-validation.md` for details).
 
@@ -321,6 +359,13 @@ enum CompanyStatus {
     "fiscalYearEnd": "03-31",
     "timezone": "America/Sao_Paulo",
     "locale": "pt-BR"
+  },
+  "openFinanceSettings": {
+    "syncFrequency": "WEEKLY"
+  },
+  "aiSettings": {
+    "aiTokenBudget": 200000,
+    "autoProcessDocuments": false
   }
 }
 ```
@@ -331,7 +376,7 @@ enum CompanyStatus {
 - `403 Forbidden` — User is a member but not ADMIN
 - `422 Unprocessable Entity` — Cannot update DISSOLVED company
 
-**Note**: `entityType` and `cnpj` cannot be changed after company has shareholders (see BR-5).
+**Note**: `entityType` and `cnpj` cannot be changed after company has been validated (see BR-5).
 
 ---
 
@@ -343,8 +388,7 @@ enum CompanyStatus {
 **Error Responses**:
 - `404 Not Found` — Company not found or user is not a member
 - `403 Forbidden` — User is a member but not ADMIN
-- `422 Unprocessable Entity` — Company has active shareholders (must remove all shareholders first)
-- `422 Unprocessable Entity` — Company has active funding rounds
+- `422 Unprocessable Entity` — Company has active Open Finance connections (must disconnect first)
 
 **Note**: Member management endpoints (invite, list, update role, remove) are defined in `company-membership.md`. Setup status polling endpoint is defined in `company-cnpj-validation.md`.
 
@@ -353,31 +397,31 @@ enum CompanyStatus {
 ## Lifecycle State Machine
 
 ```
-                    CNPJ validation +
-                    contract deployment
-  +---------+      succeeds             +---------+
-  |  DRAFT  | ----------------------->  |  ACTIVE |
-  +---------+                           +---------+
-                                         |       ^
-                                         |       |
-                              deactivate |       | re-activate
-                                         v       |
-                                        +-----------+
-                                        |  INACTIVE |
-                                        +-----------+
-                                         |
-                        dissolve         |     dissolve
-              ACTIVE -----------------> DISSOLVED <--- INACTIVE
-                                        (permanent, read-only)
+                    CNPJ validation
+                    succeeds
+  +---------+                          +---------+
+  |  DRAFT  | ---------------------->  |  ACTIVE |
+  +---------+                          +---------+
+                                        |       ^
+                                        |       |
+                             deactivate |       | re-activate
+                                        v       |
+                                       +-----------+
+                                       |  INACTIVE |
+                                       +-----------+
+                                        |
+                       dissolve         |     dissolve
+             ACTIVE -----------------> DISSOLVED <--- INACTIVE
+                                       (permanent, read-only)
 ```
 
 ### State Descriptions
 
 | State | Description | Allowed Operations |
 |-------|-------------|-------------------|
-| `DRAFT` | Company created, CNPJ validation in progress | Update company details, view setup status. No shareholders, transactions, or documents. |
-| `ACTIVE` | Company fully operational | All operations: shareholders, transactions, documents, cap table, etc. |
-| `INACTIVE` | Temporarily suspended | Read-only for data. No new transactions. Admin can re-activate. |
+| `DRAFT` | Company created, CNPJ validation in progress | Update company details, view setup status. No financial sync, document processing, or reports. |
+| `ACTIVE` | Company fully operational | All operations: Open Finance sync, document processing, AI analysis, reports, etc. |
+| `INACTIVE` | Temporarily suspended | Read-only for data. No new operations. Admin can re-activate. |
 | `DISSOLVED` | Permanently closed | Fully read-only. No writes except audit logs. Cannot transition back. |
 
 ---
@@ -392,7 +436,7 @@ PRECONDITION: User is authenticated and KYC approved
 1. User navigates to "Create Company" page
 2. User enters company details:
    - Company name
-   - Entity type (Ltda. or S.A.)
+   - Entity type (Ltda., S.A., or SAS)
    - CNPJ
    - Optional: description, founding date
 3. Frontend validates CNPJ format (client-side check digits)
@@ -400,7 +444,6 @@ PRECONDITION: User is authenticated and KYC approved
 5. Frontend sends POST /api/v1/companies
 6. Backend validates:
    - User has approved KYC
-   - User has a wallet address
    - CNPJ format is valid
    - CNPJ is not already registered
 7. Backend creates Company (status: DRAFT)
@@ -410,9 +453,9 @@ PRECONDITION: User is authenticated and KYC approved
 11. Frontend redirects to company dashboard with setup progress indicator
 12. Frontend polls GET /api/v1/companies/:id/setup-status every 3 seconds
 13. Frontend detects status change via polling
-14. Frontend shows "Company created successfully!" with contract address
+14. Frontend shows "Company created successfully!"
 
-POSTCONDITION: Company is ACTIVE, smart contract deployed, creator is ADMIN
+POSTCONDITION: Company is ACTIVE, creator is ADMIN
 ```
 
 ### Flow 2: Company Context Switching
@@ -444,9 +487,7 @@ PRECONDITION: Company is ACTIVE or INACTIVE, user is ADMIN
 
 1. Admin navigates to "Settings" -> "Company" -> "Dissolve Company"
 2. Frontend shows dissolution requirements:
-   - Zero active shareholders
-   - No active funding rounds
-   - No pending option exercises
+   - No active Open Finance connections
 3. If prerequisites NOT met:
    - Frontend shows which requirements are not met
    - Admin must resolve each before proceeding
@@ -470,29 +511,26 @@ POSTCONDITION: Company is DISSOLVED, all data read-only
 ## Business Rules
 
 ### BR-1: Company Dissolution Prerequisites
-- Company MUST have zero active shareholders before dissolution
-- All active funding rounds must be closed or cancelled
-- All pending option exercises must be resolved
+- Company MUST have all Open Finance connections disconnected before dissolution
 - DISSOLVED status is permanent — no transition back to ACTIVE
 
 ### BR-2: DISSOLVED Company Read-Only
 - DISSOLVED companies are fully read-only
-- No new transactions, shareholders, funding rounds, or documents can be created
+- No new document processing, financial sync, or reports can be generated
 - Existing data remains accessible for audit and compliance purposes
 - Audit logs can still be written
 
 ### BR-3: INACTIVE Company Restrictions
-- INACTIVE companies block new transactions (issuances, transfers, conversions)
+- INACTIVE companies block new operations (document processing, financial sync)
 - Read access is preserved for all members
-- Existing pending transactions are paused (not cancelled)
 - Admin can re-activate to resume operations
 
 ### BR-4: Company Creator Auto-Assignment
 - The user who creates a company is automatically assigned the ADMIN role (see `company-membership.md`)
 - A CompanyMember record with status `ACTIVE` is created during company creation
 
-### BR-5: Entity Type Immutability After Shareholders
-- `entityType` cannot be changed after the company has any shareholders
+### BR-5: Entity Type Immutability After Validation
+- `entityType` cannot be changed after company status moves to ACTIVE
 - `cnpj` cannot be changed after company status moves to ACTIVE
 - These fields can be updated while the company is in DRAFT status
 
@@ -503,19 +541,48 @@ POSTCONDITION: Company is DISSOLVED, all data read-only
 - Company creation and invitation acceptance MUST check this limit
 - REMOVED memberships do not count toward the limit
 
+### BR-7: AI Token Budget Enforcement
+- AI document processing MUST check available tokens before processing
+- If `aiTokensUsed >= aiTokenBudget`, processing requests are rejected with `COMPANY_AI_TOKEN_BUDGET_EXCEEDED`
+- Token usage resets on the first day of each billing month (based on `aiTokensResetAt`)
+- A background job resets `aiTokensUsed` to 0 and updates `aiTokensResetAt` on the first of each month
+- ADMIN users can increase the token budget at any time
+
+### BR-8: Open Finance Sync Frequency
+- Sync frequency controls how often the system pulls financial data from connected banks
+- `DAILY`: syncs at 02:00 UTC (midnight BRT)
+- `WEEKLY`: syncs every Monday at 02:00 UTC
+- `MANUAL`: no automatic sync; user must trigger manually
+- Default sync frequency for new companies is `DAILY`
+
 ---
 
 ## Edge Cases & Error Handling
 
-### EC-1: Company with Active Funding Round Cannot Be Dissolved
-**Scenario**: Admin tries to dissolve company while a funding round is OPEN.
+### EC-1: Company with Active Open Finance Connections Cannot Be Dissolved
+**Scenario**: Admin tries to dissolve company while bank accounts are connected.
 **Handling**:
-- Backend checks for active funding rounds before dissolution.
-- Returns `422 Unprocessable Entity` with error code `COMPANY_HAS_ACTIVE_ROUNDS` and messageKey `errors.company.hasActiveRounds`.
-- `details` field includes the active round IDs.
-- Admin must close or cancel all rounds first.
+- Backend checks for active Open Finance connections before dissolution.
+- Returns `422 Unprocessable Entity` with error code `COMPANY_HAS_ACTIVE_CONNECTIONS` and messageKey `errors.company.hasActiveConnections`.
+- `details` field includes the connected bank names.
+- Admin must disconnect all banks first.
 
-**Note**: CNPJ validation edge cases are documented in `company-cnpj-validation.md`. Membership edge cases (invitation expiry, last admin, duplicate invitations) are documented in `company-membership.md`. Blockchain edge cases (contract deployment failure, admin transfer) are documented in `company-blockchain-admin.md`.
+### EC-2: AI Token Budget Exceeded
+**Scenario**: Document uploaded with auto-processing enabled but token budget is exhausted.
+**Handling**:
+- Document is stored but not auto-processed.
+- Notification sent to ADMIN: "AI token budget exceeded. Document saved but not processed."
+- Returns upload success with `aiProcessingSkipped: true` in response.
+- ADMIN can increase budget and manually trigger processing.
+
+### EC-3: AI Token Budget Reset Race Condition
+**Scenario**: Multiple document processing requests arrive near the monthly reset boundary.
+**Handling**:
+- Token usage increment uses an atomic database operation (Prisma `$executeRaw` with `UPDATE ... SET tokens_used = tokens_used + $1 WHERE tokens_used + $1 <= token_budget`).
+- If the atomic check fails, processing is rejected.
+- Monthly reset job uses a transaction to set `aiTokensUsed = 0` and update `aiTokensResetAt`.
+
+**Note**: CNPJ validation edge cases are documented in `company-cnpj-validation.md`. Membership edge cases (invitation expiry, last admin, duplicate invitations) are documented in `company-membership.md`.
 
 ---
 
@@ -528,7 +595,16 @@ POSTCONDITION: Company is DISSOLVED, all data read-only
 - Cross-company data leakage MUST be prevented at the database query level
 - No API endpoint should return data from a company the user does not belong to
 
-**Note**: Invitation token security, admin role security, and blockchain admin security are documented in their respective extracted specifications.
+### SEC-2: Open Finance Connection Security
+- Bank connection tokens are encrypted at rest using AWS KMS (see `security.md`)
+- Connection tokens are never exposed in API responses — only connection status and bank name
+- Disconnect operations revoke tokens at the Open Finance provider and delete local copies
+
+### SEC-3: AI Token Budget Integrity
+- Token usage tracking uses atomic database operations to prevent race conditions
+- Token budget changes are audit-logged
+
+**Note**: Invitation token security and admin role security are documented in their respective extracted specifications.
 
 ---
 
@@ -552,18 +628,6 @@ export class CompanyService {
   ) {}
 
   async create(userId: string, dto: CreateCompanyDto) {
-    // Validate user has wallet address
-    const user = await this.prisma.user.findUniqueOrThrow({
-      where: { id: userId },
-    });
-    if (!user.walletAddress) {
-      throw new AppException(
-        'AUTH_NO_WALLET',
-        'errors.auth.noWallet',
-        HttpStatus.UNPROCESSABLE_ENTITY,
-      );
-    }
-
     // Check CNPJ uniqueness
     const existingCompany = await this.prisma.company.findUnique({
       where: { cnpj: dto.cnpj },
@@ -575,6 +639,10 @@ export class CompanyService {
         { cnpj: dto.cnpj },
       );
     }
+
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+    });
 
     // Create company + admin member in a transaction
     const company = await this.prisma.$transaction(async (tx) => {
@@ -590,6 +658,11 @@ export class CompanyService {
           fiscalYearEnd: dto.settings?.fiscalYearEnd ?? '12-31',
           timezone: dto.settings?.timezone ?? 'America/Sao_Paulo',
           locale: dto.settings?.locale ?? 'pt-BR',
+          openFinanceSyncFrequency: 'DAILY',
+          aiTokenBudget: 100000,
+          aiTokensUsed: 0,
+          aiTokensResetAt: new Date(),
+          autoProcessDocuments: true,
           createdById: userId,
         },
       });
@@ -615,7 +688,6 @@ export class CompanyService {
     await this.companySetupQueue.add('validate-cnpj', {
       companyId: company.id,
       cnpj: dto.cnpj,
-      creatorWalletAddress: user.walletAddress,
     });
 
     return company;
@@ -695,15 +767,10 @@ import { ClsService } from 'nestjs-cls';
 
 // Models that are company-scoped
 const COMPANY_SCOPED_MODELS = [
-  'Shareholder',
-  'ShareClass',
-  'Shareholding',
-  'Transaction',
-  'FundingRound',
-  'OptionPlan',
-  'OptionGrant',
   'Document',
   'Notification',
+  'OpenFinanceConnection',
+  'AiProcessingJob',
 ];
 
 /**
@@ -749,6 +816,67 @@ export function companyScopeExtension(cls: ClsService) {
 }
 ```
 
+### AI Token Budget Service
+
+```typescript
+// /backend/src/company/ai-token-budget.service.ts
+import { Injectable, HttpStatus } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { BusinessRuleException } from '../common/exceptions/app.exception';
+
+@Injectable()
+export class AiTokenBudgetService {
+  constructor(private prisma: PrismaService) {}
+
+  /**
+   * Atomically consume tokens from the company's AI budget.
+   * Throws if budget would be exceeded.
+   */
+  async consumeTokens(companyId: string, tokenCount: number): Promise<void> {
+    const result = await this.prisma.$executeRaw`
+      UPDATE companies
+      SET ai_tokens_used = ai_tokens_used + ${tokenCount}
+      WHERE id = ${companyId}
+        AND ai_tokens_used + ${tokenCount} <= ai_token_budget
+    `;
+
+    if (result === 0) {
+      throw new BusinessRuleException(
+        'COMPANY_AI_TOKEN_BUDGET_EXCEEDED',
+        'errors.company.aiTokenBudgetExceeded',
+        { companyId },
+      );
+    }
+  }
+
+  /**
+   * Get current token usage for a company.
+   */
+  async getTokenUsage(companyId: string): Promise<{
+    budget: number;
+    used: number;
+    remaining: number;
+    resetAt: Date;
+  }> {
+    const company = await this.prisma.company.findUniqueOrThrow({
+      where: { id: companyId },
+      select: {
+        aiTokenBudget: true,
+        aiTokensUsed: true,
+        aiTokensResetAt: true,
+      },
+    });
+
+    return {
+      budget: company.aiTokenBudget,
+      used: company.aiTokensUsed,
+      remaining: Math.max(0, company.aiTokenBudget - company.aiTokensUsed),
+      resetAt: company.aiTokensResetAt,
+    };
+  }
+}
+```
+
 ---
 
 ## Success Criteria
@@ -761,6 +889,7 @@ export function companyScopeExtension(cls: ClsService) {
 ### Accuracy
 - Zero cross-company data leakage (verified via integration tests)
 - Zero orphan companies (every company has at least one ADMIN)
+- AI token budget enforcement is atomic — no over-consumption
 
 ### User Experience
 - Company creation flow: < 5 steps
@@ -774,24 +903,24 @@ export function companyScopeExtension(cls: ClsService) {
 ### Internal Dependencies
 - **company-membership.md**: Member invitation, acceptance, role management, CompanyMember and InvitationToken entities
 - **company-cnpj-validation.md**: Async CNPJ validation via Verifik, Bull job, setup-status endpoint
-- **company-blockchain-admin.md**: Creator wallet as smart contract admin, contract deployment, ownership transfer
-- **authentication.md**: User entity with `walletAddress` field — used as smart contract admin
+- **authentication.md**: User entity with authentication — used for company creation
 - **user-permissions.md**: Role definitions (ADMIN, FINANCE, LEGAL, INVESTOR, EMPLOYEE) and permission matrix
-- **blockchain-integration.md**: OCP smart contract deployment during company setup
 - **notifications.md**: Email templates for status changes and member notifications
+- **open-finance.md**: Open Finance bank connection details, data models, sync pipeline
+- **ai-document-intelligence.md**: AI document processing pipeline, token usage tracking, model configuration
 
 ### External Dependencies
 - **Verifik**: CNPJ validation against Receita Federal (see `company-cnpj-validation.md`)
 - **AWS SES**: Status notification emails
-- **Bull (Redis-backed)**: Background job processing for CNPJ validation and contract deployment
-- **Base Network**: OCP smart contract deployment (see `company-blockchain-admin.md`)
+- **Bull (Redis-backed)**: Background job processing for CNPJ validation and monthly token reset
+- **Open Finance API**: Bank account connections and financial data sync (see `open-finance.md`)
 
 ---
 
 ## Resolved Design Decisions
 
-### RD-1: Smart Contract Admin Transfer — YES
-When the ADMIN role is transferred to another user, the on-chain smart contract owner MUST also transfer. See `company-blockchain-admin.md` for full details.
+### RD-1: Smart Contract Admin Transfer — REMOVED
+Blockchain integration has been removed from the platform. Company management no longer involves smart contract deployment or on-chain state.
 
 ### RD-2: CompanyKYC and CNPJ Validation — MERGED
 CNPJ validation during company creation and the KYC spec's CNPJ verification are merged into a single flow. See `company-cnpj-validation.md` for the canonical CNPJ validation path.
@@ -802,17 +931,26 @@ A user can create or belong to a maximum of **20 companies**. The limit applies 
 ### RD-4: INACTIVE to ACTIVE Re-Validation — NO
 Re-activating an INACTIVE company does NOT require re-validation of the CNPJ. The original validation is sufficient. Re-activation is instant.
 
-### RD-5: Multiple ADMINs and Smart Contract — CREATOR ONLY
-Only the company creator's wallet controls the smart contract. Other ADMIN users have platform-level permissions only. See `company-blockchain-admin.md` for full details.
+### RD-5: AI Token Budget Default — 100,000
+New companies start with a 100,000 token monthly budget. This is sufficient for approximately 50-100 document processing requests per month depending on document size. ADMIN users can increase or decrease the budget at any time.
 
 ### RD-6: Invitation Email Mismatch — ALLOWED
 Users CAN accept an invitation with a different email than it was sent to. See `company-membership.md` for full details.
+
+### RD-7: SAS Entity Type — ADDED
+The SAS (Sociedade por Acoes Simplificada) entity type has been added to support the growing number of startups using this simplified corporate structure introduced by Lei Complementar 182/2021.
 
 ---
 
 ## Related Specifications
 
-*Cross-references to be completed in Phase 5 of the spec alignment project.*
+- `company-membership.md` — Member invitation, acceptance, role management
+- `company-cnpj-validation.md` — Async CNPJ validation via Verifik
+- `open-finance.md` — Bank connections, financial data sync, Open Finance API integration
+- `ai-document-intelligence.md` — Document processing pipeline, AI model configuration, token tracking
+- `authentication.md` — User authentication and onboarding
+- `user-permissions.md` — RBAC roles and permission matrix
+- `notifications.md` — Email and in-app notification templates
 
 ---
 ---
@@ -846,7 +984,7 @@ This section defines the frontend architecture, components, user flows, UI state
 The company management frontend consists of two primary surfaces:
 
 1. **Onboarding Step 2** (`/onboarding`) -- Company creation as part of the onboarding wizard. This is the only place where a company is created in the MVP.
-2. **Company Settings** (`/dashboard/settings`) -- View and edit company information, access danger zone for dissolution.
+2. **Company Settings** (`/dashboard/settings`) -- View and edit company information, manage Open Finance connections and AI settings, access danger zone for dissolution.
 
 There is no standalone "Create Company" page, no company list page, and no company switcher in the MVP. The `GET /api/v1/companies` endpoint is used only by the `AuthContext` to resolve the user's single company on login.
 
@@ -869,7 +1007,7 @@ All company-scoped API calls use `companyId` from `AuthContext`:
 
 ```typescript
 const { companyId } = useAuth();
-// GET /api/v1/companies/{companyId}/shareholders
+// GET /api/v1/companies/{companyId}/documents
 ```
 
 ---
@@ -885,10 +1023,10 @@ const { companyId } = useAuth();
 
 ```
 /dashboard/settings
-  │
-  ├─ [not authenticated] ─→ redirect to /login
-  ├─ [authenticated, no company] ─→ redirect to /onboarding
-  └─ [authenticated, has company] ─→ render CompanySettingsPage
+  |
+  +-- [not authenticated] --> redirect to /login
+  +-- [authenticated, no company] --> redirect to /onboarding
+  +-- [authenticated, has company] --> render CompanySettingsPage
 ```
 
 ---
@@ -896,27 +1034,33 @@ const { companyId } = useAuth();
 ## Component Hierarchy
 
 ```
-app/(onboarding)/onboarding/page.tsx ─→ OnboardingWizard
-  ├─ OnboardingStepper
-  ├─ PersonalInfoStep (Step 1) ─→ defined in authentication.md
-  └─ CompanyCreationStep (Step 2)
-       ├─ EntityTypeSelector
-       └─ CNPJInput
+app/(onboarding)/onboarding/page.tsx --> OnboardingWizard
+  +-- OnboardingStepper
+  +-- PersonalInfoStep (Step 1) --> defined in authentication.md
+  +-- CompanyCreationStep (Step 2)
+       +-- EntityTypeSelector
+       +-- CNPJInput
 
-app/(dashboard)/settings/page.tsx ─→ CompanySettingsPage
-  ├─ SettingsTabs (vertical tab navigation)
-  ├─ CompanyInfoForm (tab: "Informacoes da Empresa")
-  │    ├─ EntityTypeSelector (read-only after shareholders exist)
-  │    └─ CNPJInput (always read-only)
-  ├─ MembersTabLink (tab: "Membros" — links to /dashboard/members)
-  ├─ NotificationsTab (tab: "Notificacoes")
-  └─ DangerZone
-       └─ CompanyDissolutionDialog
+app/(dashboard)/settings/page.tsx --> CompanySettingsPage
+  +-- SettingsTabs (vertical tab navigation)
+  +-- CompanyInfoForm (tab: "Informacoes da Empresa")
+  |    +-- EntityTypeSelector (read-only after validation)
+  |    +-- CNPJInput (always read-only)
+  +-- OpenFinanceSettingsTab (tab: "Open Finance")
+  |    +-- ConnectionsList
+  |    +-- SyncFrequencySelector
+  +-- AiSettingsTab (tab: "Inteligencia Artificial")
+  |    +-- TokenBudgetCard
+  |    +-- AutoProcessToggle
+  +-- MembersTabLink (tab: "Membros" — links to /dashboard/members)
+  +-- NotificationsTab (tab: "Notificacoes")
+  +-- DangerZone
+       +-- CompanyDissolutionDialog
 
-components/company/company-setup-progress.tsx ─→ CompanySetupProgress
-  └─ (rendered on /dashboard when company is in DRAFT status)
+components/company/company-setup-progress.tsx --> CompanySetupProgress
+  +-- (rendered on /dashboard when company is in DRAFT status)
 
-components/company/company-status-badge.tsx ─→ CompanyStatusBadge
+components/company/company-status-badge.tsx --> CompanyStatusBadge
 ```
 
 ### Component Registry
@@ -929,6 +1073,8 @@ components/company/company-status-badge.tsx ─→ CompanyStatusBadge
 | `CompanySetupProgress` | `components/company/company-setup-progress.tsx` | Post-creation async status card |
 | `CompanySettingsPage` | `app/(dashboard)/settings/page.tsx` | Full settings page |
 | `CompanyInfoForm` | `components/company/company-info-form.tsx` | Editable company info form |
+| `OpenFinanceSettingsTab` | `components/company/open-finance-settings-tab.tsx` | Open Finance connection management |
+| `AiSettingsTab` | `components/company/ai-settings-tab.tsx` | AI processing settings |
 | `CompanyStatusBadge` | `components/company/company-status-badge.tsx` | Status badge component |
 | `CompanyDissolutionDialog` | `components/company/company-dissolution-dialog.tsx` | Dissolution confirmation modal |
 
@@ -952,8 +1098,7 @@ interface CompanyCreationStepProps {
 +----------------------------------------------+
 |                                              |
 |   Sua Empresa                                |  <- h3 (20px, weight 600), navy-900
-|   Configure sua empresa para gerenciar       |  <- body (14px), gray-500, mb-24px
-|   o cap table                                |
+|   Configure sua empresa para comecar         |  <- body (14px), gray-500, mb-24px
 |                                              |
 |   Nome da Empresa *                          |  <- label: body-sm (13px), weight 500, gray-700
 |   +--------------------------------------+   |
@@ -974,6 +1119,11 @@ interface CompanyCreationStepProps {
 |   | ( ) S.A. Capital Aberto              |   |  <- radio card
 |   |     Sociedade anonima de capital     |   |
 |   |     aberto                           |   |
+|   +--------------------------------------+   |
+|   +--------------------------------------+   |
+|   | ( ) SAS                              |   |  <- radio card
+|   |     Sociedade por acoes              |   |
+|   |     simplificada                     |   |
 |   +--------------------------------------+   |
 |                                              |
 |   CNPJ *                                     |  <- label
@@ -1007,7 +1157,7 @@ interface CompanyCreationStepProps {
 | Field | Component | Required | Validation | Max Length |
 |-------|-----------|----------|------------|-----------|
 | `name` | Text input | Yes | Non-empty, 2-200 chars | 200 |
-| `entityType` | EntityTypeSelector | Yes | One of LTDA, SA_CLOSED, SA_OPEN | -- |
+| `entityType` | EntityTypeSelector | Yes | One of LTDA, SA_CLOSED, SA_OPEN, SAS | -- |
 | `cnpj` | CNPJInput | Yes | Format mask + Modulo 11 checksum (client), uniqueness (server) | 18 (formatted) |
 | `description` | Textarea | No | Max 2000 chars | 2000 |
 | `foundedDate` | Date picker | No | DD/MM/YYYY, must not be future | -- |
@@ -1017,7 +1167,7 @@ interface CompanyCreationStepProps {
 ```typescript
 const companyCreationSchema = z.object({
   name: z.string().min(2).max(200),
-  entityType: z.enum(['LTDA', 'SA_CAPITAL_FECHADO', 'SA_CAPITAL_ABERTO']),
+  entityType: z.enum(['LTDA', 'SA_CAPITAL_FECHADO', 'SA_CAPITAL_ABERTO', 'SAS']),
   cnpj: z.string().refine(isValidCNPJ, { message: 'errors.company.cnpjInvalid' }),
   description: z.string().max(2000).optional().or(z.literal('')),
   foundedDate: z.string().optional().refine(
@@ -1155,7 +1305,7 @@ interface EntityTypeSelectorProps {
 }
 ```
 
-**Visual Structure** (3 stacked radio cards):
+**Visual Structure** (4 stacked radio cards):
 ```
 +----------------------------------------------+
 | (*) Limitada (Ltda.)                          |  <- label: body (14px), weight 500
@@ -1171,6 +1321,11 @@ interface EntityTypeSelectorProps {
 | ( ) S.A. Capital Aberto                       |
 |     Sociedade anonima de capital aberto       |
 +----------------------------------------------+
+     gap: 8px
++----------------------------------------------+
+| ( ) SAS                                       |
+|     Sociedade por acoes simplificada          |
++----------------------------------------------+
 ```
 
 **Options**:
@@ -1180,6 +1335,7 @@ interface EntityTypeSelectorProps {
 | `LTDA` | `company.fields.entityType.ltda` | `company.fields.entityType.ltdaDescription` |
 | `SA_CAPITAL_FECHADO` | `company.fields.entityType.saClosed` | `company.fields.entityType.saClosedDescription` |
 | `SA_CAPITAL_ABERTO` | `company.fields.entityType.saOpen` | `company.fields.entityType.saOpenDescription` |
+| `SAS` | `company.fields.entityType.sas` | `company.fields.entityType.sasDescription` |
 
 **Radio Card Styling**:
 
@@ -1197,7 +1353,7 @@ interface EntityTypeSelectorProps {
 - Gap between cards: `8px`.
 - Error text below the entire group: `caption` (12px), `#DC2626`.
 
-**Read-Only Mode** (used in CompanySettingsPage when company has shareholders):
+**Read-Only Mode** (used in CompanySettingsPage when company is ACTIVE):
 - Selected card shows with `blue-50` bg but no hover effect.
 - Cursor: `default`.
 - Radio circle: filled but not interactive.
@@ -1225,7 +1381,6 @@ interface CompanySetupProgressProps {
 |  Configurando sua empresa...                 |  <- h4 (16px, weight 600), gray-800
 |                                              |
 |  [spinner] Validacao do CNPJ       Pendente  |  <- item row
-|  [spinner] Implantacao do Contrato Pendente  |  <- item row
 |                                              |
 +----------------------------------------------+
 ```
@@ -1258,21 +1413,19 @@ interface CompanySetupProgressProps {
 
 **Polling Behavior**:
 - Polls `GET /api/v1/companies/:companyId` every 5 seconds.
-- Extracts `setupStatus.cnpjValidation` and `setupStatus.contractDeployment` from response.
+- Extracts `setupStatus.cnpjValidation` from response.
 - Maps status values: `PENDING` -> Pending, `IN_PROGRESS` -> In Progress, `SUCCESS` -> Success, `FAILED` -> Failed.
-- Stops polling when all items are in terminal state (SUCCESS or FAILED).
+- Stops polling when item is in terminal state (SUCCESS or FAILED).
 - Uses TanStack Query with `refetchInterval: 5000` and `enabled: hasNonTerminalItem`.
 
 **Auto-Dismiss**:
-- When all items reach `SUCCESS`: show brief success animation (green check pulse), then auto-dismiss card after 3 seconds.
+- When item reaches `SUCCESS`: show brief success animation (green check pulse), then auto-dismiss card after 3 seconds.
 - Calls `onComplete()` callback (parent can trigger a refetch of company data).
 - After dismissal, the dashboard renders normally (company is now ACTIVE).
 
 **Failure Handling**:
-- When an item reaches `FAILED`: stop polling for that item, show retry button.
-- Retry button triggers:
-  - For CNPJ validation: `POST /api/v1/companies/:companyId/validate-cnpj` (defined in `company-cnpj-validation.md`)
-  - For contract deployment: `POST /api/v1/companies/:companyId/deploy-contract` (defined in `company-blockchain-admin.md`)
+- When item reaches `FAILED`: stop polling, show retry button.
+- Retry button triggers: `POST /api/v1/companies/:companyId/validate-cnpj` (defined in `company-cnpj-validation.md`)
 - After retry: item transitions back to `IN_PROGRESS`, polling resumes.
 
 ---
@@ -1297,8 +1450,13 @@ interface CompanySetupProgressProps {
 | Informacoes |  [CompanyInfoForm]                 |  <- active tab content
 | da Empresa  |                                    |
 |             |                                    |
-| Membros  -> |  (white card, radius-lg,           |
+| Open Finance|  (white card, radius-lg,           |
 |             |   padding 24px, shadow-sm)          |
+| Inteligencia|                                    |
+| Artificial  |                                    |
+|             |                                    |
+| Membros  -> |                                    |
+|             |                                    |
 | Notificacoes|                                    |
 |             |                                    |
 +-------------+                                    |
@@ -1322,6 +1480,8 @@ interface CompanySetupProgressProps {
 | Tab | i18n Key | Behavior |
 |-----|----------|----------|
 | Informacoes da Empresa | `company.settings.tabs.info` | Renders CompanyInfoForm |
+| Open Finance | `company.settings.tabs.openFinance` | Renders OpenFinanceSettingsTab |
+| Inteligencia Artificial | `company.settings.tabs.ai` | Renders AiSettingsTab |
 | Membros | `company.settings.tabs.members` | Links to `/dashboard/members` (navigate, not a tab panel) |
 | Notificacoes | `company.settings.tabs.notifications` | Renders notification preferences (future — placeholder in MVP) |
 
@@ -1386,7 +1546,7 @@ interface CompanyInfoFormProps {
 | Field | Component | Editable | Notes |
 |-------|-----------|----------|-------|
 | `name` | Text input | Yes (ADMIN) | Same validation as creation: 2-200 chars |
-| `entityType` | EntityTypeSelector | Conditional | Read-only if company has shareholders (BR-5) |
+| `entityType` | EntityTypeSelector | Conditional | Read-only if company is ACTIVE (BR-5) |
 | `cnpj` | CNPJInput | Never | Always read-only after creation. Display only. |
 | `description` | Textarea | Yes (ADMIN) | Max 2000 chars |
 | `foundedDate` | Date picker | Yes (ADMIN) | DD/MM/YYYY, must not be future |
@@ -1397,14 +1557,13 @@ interface CompanyInfoFormProps {
 |-------|---------|----------|
 | Status | CompanyStatusBadge | Top of form, next to company name |
 | CNPJ Validated At | Date string or "Pendente" | Below CNPJ field as helper text |
-| Contract Address | Truncated address with copy button, or "Pendente" | Below form, informational card |
 
 **Form Library**: React Hook Form with Zod resolver.
 
 ```typescript
 const companyUpdateSchema = z.object({
   name: z.string().min(2).max(200),
-  entityType: z.enum(['LTDA', 'SA_CAPITAL_FECHADO', 'SA_CAPITAL_ABERTO']).optional(),
+  entityType: z.enum(['LTDA', 'SA_CAPITAL_FECHADO', 'SA_CAPITAL_ABERTO', 'SAS']).optional(),
   description: z.string().max(2000).optional().or(z.literal('')),
   foundedDate: z.string().optional().refine(
     (val) => !val || !isFutureDate(val),
@@ -1417,7 +1576,7 @@ const companyUpdateSchema = z.object({
 
 1. On mount: pre-fills form with current company data.
 2. CNPJ field rendered with `readOnly` prop. Always shows the stored CNPJ.
-3. EntityType field: if company has shareholders (`hasShareholders` flag from API), render as read-only.
+3. EntityType field: if company is ACTIVE, render as read-only.
 4. Save button: disabled until form is dirty (values differ from original).
 5. On save:
    - Client-side validation via Zod.
@@ -1435,7 +1594,103 @@ const companyUpdateSchema = z.object({
 
 ---
 
-### 7. CompanyStatusBadge
+### 7. OpenFinanceSettingsTab
+
+**File**: `components/company/open-finance-settings-tab.tsx`
+
+**Props**:
+```typescript
+interface OpenFinanceSettingsTabProps {
+  company: Company;
+  isAdmin: boolean;
+}
+```
+
+**Visual Structure**:
+```
++----------------------------------------------+
+|  Conexoes Open Finance                       |  <- h4, gray-800
+|  Gerencie suas conexoes bancarias            |  <- body-sm, gray-500
+|                                              |
+|  +--------------------------------------+    |
+|  | Banco do Brasil    Conectado  [Desc] |    |  <- connection row
+|  | Ultimo sync: 26/02/2026 02:00       |    |
+|  +--------------------------------------+    |
+|  +--------------------------------------+    |
+|  | Itau              Conectado  [Desc]  |    |
+|  | Ultimo sync: 26/02/2026 02:00       |    |
+|  +--------------------------------------+    |
+|                                              |
+|  [+ Conectar Banco]                          |  <- Primary button (ADMIN only)
+|                                              |
+|  Frequencia de Sincronizacao                 |  <- label
+|  +--------------------------------------+    |
+|  | [v] Diaria                           |    |  <- select dropdown
+|  +--------------------------------------+    |
+|                                              |
++----------------------------------------------+
+```
+
+**Behavior**:
+- Lists all connected bank accounts with status and last sync time.
+- "Connect Bank" button opens the Open Finance authorization flow (see `open-finance.md`).
+- Sync frequency dropdown allows ADMIN to change between DAILY, WEEKLY, MANUAL.
+- Non-ADMIN users see read-only list with no connect/disconnect buttons.
+- Disconnect button removes the connection after confirmation dialog.
+
+---
+
+### 8. AiSettingsTab
+
+**File**: `components/company/ai-settings-tab.tsx`
+
+**Props**:
+```typescript
+interface AiSettingsTabProps {
+  company: Company;
+  isAdmin: boolean;
+}
+```
+
+**Visual Structure**:
+```
++----------------------------------------------+
+|  Inteligencia Artificial                     |  <- h4, gray-800
+|  Configure o processamento automatico        |  <- body-sm, gray-500
+|  de documentos                               |
+|                                              |
+|  Orcamento Mensal de Tokens                  |  <- label
+|  +--------------------------------------+    |
+|  |  75.000 / 100.000 tokens            |    |  <- progress bar + text
+|  |  [=========>          ] 75%          |    |  <- blue-600 fill on gray-200
+|  +--------------------------------------+    |
+|  Renova em 01/03/2026                        |  <- caption, gray-500
+|                                              |
+|  Limite Mensal                               |  <- label
+|  +--------------------------------------+    |
+|  | 100000                               |    |  <- number input (ADMIN only)
+|  +--------------------------------------+    |
+|                                              |
+|  Processamento Automatico                    |  <- label
+|  +--------------------------------------+    |
+|  | [x] Processar documentos             |    |  <- toggle/checkbox
+|  |     automaticamente ao fazer upload  |    |
+|  +--------------------------------------+    |
+|                                              |
++----------------------------------------------+
+```
+
+**Behavior**:
+- Displays current token usage as a progress bar.
+- Progress bar color: `blue-600` when < 80%, `cream-600` when 80-95%, `#DC2626` when > 95%.
+- Token budget input allows ADMIN to change the monthly limit (minimum: 10000, maximum: 1000000).
+- Auto-process toggle controls whether uploaded documents are automatically processed with AI.
+- Non-ADMIN users see read-only display with no editable controls.
+- Changes are saved via `PUT /api/v1/companies/:companyId` with `aiSettings` payload.
+
+---
+
+### 9. CompanyStatusBadge
 
 **File**: `components/company/company-status-badge.tsx`
 
@@ -1463,7 +1718,7 @@ interface CompanyStatusBadgeProps {
 
 ---
 
-### 8. CompanyDissolutionDialog
+### 10. CompanyDissolutionDialog
 
 **File**: `components/company/company-dissolution-dialog.tsx`
 
@@ -1513,10 +1768,7 @@ interface CompanyDissolutionDialogProps {
    - Show blockers list instead of confirmation input.
    - Each blocker: icon + description text.
    - Blocker types:
-     - `ACTIVE_SHAREHOLDERS`: "Existem X acionistas ativos" (with count)
-     - `ACTIVE_FUNDING_ROUNDS`: "Existem X rodadas de investimento ativas" (with count)
-     - `PENDING_OPTION_EXERCISES`: "Existem X exercicios de opcoes pendentes" (with count)
-     - `PENDING_TRANSACTIONS`: "Existem X transacoes pendentes" (with count)
+     - `ACTIVE_CONNECTIONS`: "Existem X conexoes Open Finance ativas" (with count)
    - "Dissolver" button is hidden. Only "Fechar" / "Close" button shown.
 3. **If no blockers** (`canDissolve: true`):
    - Show confirmation input.
@@ -1602,7 +1854,7 @@ TRIGGER: Step 1 completion
 15. [Backend] Checks CNPJ uniqueness
     -> IF duplicate: return 409 COMPANY_CNPJ_DUPLICATE
 16. [Backend] Creates Company (DRAFT) + CompanyMember (ADMIN) in transaction
-17. [Backend] Queues async CNPJ validation + contract deployment via Bull
+17. [Backend] Queues async CNPJ validation via Bull
 18. [Backend] Returns 201 with company data including setupStatus
 19. [Frontend] On 201:
     - AuthContext updates: hasCompany = true, companyId = response.data.id
@@ -1611,7 +1863,7 @@ TRIGGER: Step 1 completion
 20. [UI] Dashboard renders with CompanySetupProgress card at the top
 
 POSTCONDITION: Company exists in DRAFT, user is ADMIN, async validation in progress
-SIDE EFFECTS: Audit log (COMPANY_CREATED), CNPJ validation job queued, contract deployment job queued
+SIDE EFFECTS: Audit log (COMPANY_CREATED), CNPJ validation job queued
 ```
 
 **Error Recovery**:
@@ -1636,17 +1888,10 @@ Company created in DRAFT status, user on /dashboard
   |     |     |     +-- CNPJ item shows green check
   |     |     |
   |     |     +-- [setupStatus.cnpjValidation = FAILED]
-  |     |     |     +-- CNPJ item shows red X + "Tentar novamente" button
-  |     |     |     +-- [user clicks retry] --> POST /validate-cnpj --> item back to IN_PROGRESS
-  |     |     |
-  |     |     +-- [setupStatus.contractDeployment = SUCCESS]
-  |     |     |     +-- Contract item shows green check
-  |     |     |
-  |     |     +-- [setupStatus.contractDeployment = FAILED]
-  |     |           +-- Contract item shows red X + "Tentar novamente" button
-  |     |           +-- [user clicks retry] --> POST /deploy-contract --> item back to IN_PROGRESS
+  |     |           +-- CNPJ item shows red X + "Tentar novamente" button
+  |     |           +-- [user clicks retry] --> POST /validate-cnpj --> item back to IN_PROGRESS
   |     |
-  |     +-- [all items SUCCESS] --> success animation --> card auto-dismisses after 3s
+  |     +-- [item SUCCESS] --> success animation --> card auto-dismisses after 3s
   |           +-- Company status now ACTIVE
   |           +-- Dashboard refreshes with full company data
 ```
@@ -1658,36 +1903,31 @@ PRECONDITION: Company in DRAFT, CompanySetupProgress visible on dashboard
 ACTOR: System (automatic) + User (retry only)
 TRIGGER: Dashboard mount with DRAFT company
 
-1.  [UI] CompanySetupProgress renders with items in "Pendente" state
+1.  [UI] CompanySetupProgress renders with CNPJ validation item in "Pendente" state
 2.  [Frontend] TanStack Query starts polling GET /api/v1/companies/:companyId (refetchInterval: 5000ms)
 3.  [Backend] Returns company with setupStatus object:
-    { cnpjValidation: 'PENDING' | 'IN_PROGRESS' | 'SUCCESS' | 'FAILED',
-      contractDeployment: 'PENDING' | 'IN_PROGRESS' | 'SUCCESS' | 'FAILED' }
-4.  [Frontend] Maps each status value to the corresponding UI state (icon + text)
+    { cnpjValidation: 'PENDING' | 'IN_PROGRESS' | 'SUCCESS' | 'FAILED' }
+4.  [Frontend] Maps status value to the corresponding UI state (icon + text)
 5.  [System] Verifik CNPJ validation completes in background (see company-cnpj-validation.md)
-    -> IF success: setupStatus.cnpjValidation = SUCCESS, company moves toward ACTIVE
+    -> IF success: setupStatus.cnpjValidation = SUCCESS, company moves to ACTIVE
     -> IF failure: setupStatus.cnpjValidation = FAILED
 6.  [Frontend] Next poll picks up status change, updates UI
-7.  [System] Smart contract deployment completes in background (see company-blockchain-admin.md)
-    -> IF success: setupStatus.contractDeployment = SUCCESS
-    -> IF failure: setupStatus.contractDeployment = FAILED
-8.  [Frontend] Next poll picks up status change, updates UI
-9.  [Frontend] When all items are in terminal state (SUCCESS or FAILED): stop polling
+7.  [Frontend] When item is in terminal state (SUCCESS or FAILED): stop polling
 
-IF all items SUCCESS:
-10. [UI] Brief success animation (green check pulse on card)
-11. [UI] Card auto-dismisses after 3 seconds
-12. [Frontend] Invalidates company query cache, triggers refetch
-13. [UI] Dashboard renders with full ACTIVE company data
+IF item SUCCESS:
+8.  [UI] Brief success animation (green check pulse on card)
+9.  [UI] Card auto-dismisses after 3 seconds
+10. [Frontend] Invalidates company query cache, triggers refetch
+11. [UI] Dashboard renders with full ACTIVE company data
 
-IF any item FAILED:
-10. [UI] Failed item shows red X icon + "Tentar novamente" ghost button
-11. [UI] User clicks retry button
-12. [Frontend] POST /api/v1/companies/:companyId/validate-cnpj (or /deploy-contract)
-13. [UI] Item transitions to "Em andamento" (IN_PROGRESS), polling resumes
+IF item FAILED:
+8.  [UI] Failed item shows red X icon + "Tentar novamente" ghost button
+9.  [UI] User clicks retry button
+10. [Frontend] POST /api/v1/companies/:companyId/validate-cnpj
+11. [UI] Item transitions to "Em andamento" (IN_PROGRESS), polling resumes
 
-POSTCONDITION: Company is ACTIVE (happy path) or has setup failures displayed
-SIDE EFFECTS: Audit logs for each setup step
+POSTCONDITION: Company is ACTIVE (happy path) or has setup failure displayed
+SIDE EFFECTS: Audit logs for setup step
 ```
 
 ---
@@ -1732,7 +1972,7 @@ TRIGGER: User navigates to /dashboard/settings
 5.  [UI] IF ADMIN: render editable form with CompanyInfoForm
 6.  [UI] CompanyInfoForm renders:
     - Name: pre-filled text input
-    - Entity Type: EntityTypeSelector (read-only if hasShareholders)
+    - Entity Type: EntityTypeSelector (read-only if company is ACTIVE)
     - CNPJ: CNPJInput (always read-only)
     - Description: pre-filled textarea
     - Founded Date: pre-filled date picker
@@ -1747,9 +1987,9 @@ TRIGGER: User navigates to /dashboard/settings
 13. [Backend] AuthGuard + CompanyGuard + RolesGuard validate request
     -> IF not member: return 404
     -> IF not ADMIN: return 404 (anti-enumeration)
-14. [Backend] Validates update (not DISSOLVED, entityType immutability if has shareholders)
+14. [Backend] Validates update (not DISSOLVED, entityType immutability)
     -> IF DISSOLVED: return 422 COMPANY_CANNOT_UPDATE_DISSOLVED
-    -> IF entityType change with shareholders: return 422 COMPANY_ENTITY_TYPE_LOCKED
+    -> IF entityType change when ACTIVE: return 422 COMPANY_ENTITY_TYPE_LOCKED
 15. [Backend] Updates company, returns 200 with updated data
 16. [Frontend] On 200:
     - Success toast: "Empresa atualizada com sucesso" (i18n: company.settings.saved)
@@ -1808,10 +2048,7 @@ TRIGGER: User clicks "Dissolver Empresa" button in settings danger zone
 3.  [UI] CompanyDissolutionDialog opens with loading state
 4.  [Frontend] GET /api/v1/companies/:companyId/dissolution-prerequisites
 5.  [Backend] Checks:
-    - Active shareholders count
-    - Active funding rounds count
-    - Pending option exercises count
-    - Pending transactions count
+    - Active Open Finance connections count
 6.  [Backend] Returns { canDissolve: boolean, blockers: DissolutionBlocker[] }
 
 IF blockers exist:
@@ -1820,7 +2057,7 @@ IF blockers exist:
     - "Resolve estes itens antes de dissolver a empresa" message
     - Only "Fechar" button in footer
 8a. [UI] User clicks "Fechar" to close dialog
-9a. User must resolve each blocker (close rounds, cancel exercises, etc.) before retrying
+9a. User must resolve each blocker (disconnect banks, etc.) before retrying
 
 IF no blockers:
 7b. [UI] Dialog shows confirmation section:
@@ -1846,7 +2083,7 @@ IF no blockers:
     - Note: Since MVP is one company per user, the user will see a dissolved state on their dashboard
 
 POSTCONDITION: Company status = DISSOLVED, all data read-only
-SIDE EFFECTS: Audit log (COMPANY_STATUS_CHANGED), notification emails to all members, blockchain status update
+SIDE EFFECTS: Audit log (COMPANY_STATUS_CHANGED), notification emails to all members
 ```
 
 ---
@@ -1868,14 +2105,12 @@ SIDE EFFECTS: Audit log (COMPANY_STATUS_CHANGED), notification emails to all mem
 
 ### CompanySetupProgress States
 
-| Component State | CNPJ Validation Item | Contract Deployment Item | Card Behavior |
-|----------------|---------------------|-------------------------|---------------|
-| Initial | Pending (gray spinner) | Pending (gray spinner) | Polling active |
-| Validating | In Progress (blue spinner) | Pending (gray spinner) | Polling active |
-| CNPJ Done | Success (green check) | In Progress (blue spinner) | Polling active |
-| All Done | Success (green check) | Success (green check) | Stop polling, success animation, auto-dismiss 3s |
-| CNPJ Failed | Failed (red X + retry) | Pending (gray spinner) | Polling stopped for CNPJ, continues for contract |
-| Both Failed | Failed (red X + retry) | Failed (red X + retry) | Polling stopped entirely |
+| Component State | CNPJ Validation Item | Card Behavior |
+|----------------|---------------------|---------------|
+| Initial | Pending (gray spinner) | Polling active |
+| Validating | In Progress (blue spinner) | Polling active |
+| Done | Success (green check) | Stop polling, success animation, auto-dismiss 3s |
+| Failed | Failed (red X + retry) | Polling stopped |
 
 **Auto-dismiss animation**: Card border briefly flashes `green-600`, then fades out with `opacity: 0` + `height: 0` transition over 300ms.
 
@@ -1916,8 +2151,8 @@ SIDE EFFECTS: Audit log (COMPANY_STATUS_CHANGED), notification emails to all mem
 | `COMPANY_CANNOT_UPDATE_DISSOLVED` | 422 | Error toast: i18n `errors.company.cannotUpdateDissolved` |
 | `COMPANY_ENTITY_TYPE_LOCKED` | 422 | Error toast: i18n `errors.company.entityTypeLocked` |
 | `COMPANY_DISSOLUTION_BLOCKED` | 422 | Show blockers list in dialog: i18n `errors.company.dissolutionBlocked` |
-| `COMPANY_HAS_ACTIVE_SHAREHOLDERS` | 422 | Blocker item in dialog: i18n `errors.company.hasActiveShareholders` |
-| `COMPANY_HAS_ACTIVE_ROUNDS` | 422 | Blocker item in dialog: i18n `errors.company.hasActiveRounds` |
+| `COMPANY_HAS_ACTIVE_CONNECTIONS` | 422 | Blocker item in dialog: i18n `errors.company.hasActiveConnections` |
+| `COMPANY_AI_TOKEN_BUDGET_EXCEEDED` | 422 | Error toast: i18n `errors.company.aiTokenBudgetExceeded` |
 | `COMPANY_FUTURE_DATE` | 422 | Field error on foundedDate: i18n `errors.company.futureDate` |
 | `COMPANY_MEMBERSHIP_LIMIT` | 422 | Error toast: i18n `errors.company.membershipLimit` |
 | `VAL_INVALID_INPUT` | 400 | Map validationErrors array to form fields via `applyServerErrors()` |
@@ -1952,6 +2187,7 @@ const companyKeys = {
   all: ['company'] as const,
   detail: (companyId: string) => ['company', companyId] as const,
   prerequisites: (companyId: string) => ['company', companyId, 'dissolution-prerequisites'] as const,
+  tokenUsage: (companyId: string) => ['company', companyId, 'token-usage'] as const,
 };
 ```
 
@@ -2009,7 +2245,7 @@ function useCreateCompany() {
 
 #### useUpdateCompany
 
-Used by CompanyInfoForm.
+Used by CompanyInfoForm, OpenFinanceSettingsTab, and AiSettingsTab.
 
 ```typescript
 function useUpdateCompany(companyId: string) {
@@ -2057,6 +2293,21 @@ function useDissolutionPrerequisites(companyId: string, enabled: boolean) {
       ),
     enabled,  // Only fetch when dialog is opened
     staleTime: 0,  // Always refetch when dialog opens
+  });
+}
+```
+
+#### useTokenUsage
+
+Used by AiSettingsTab to display current token usage.
+
+```typescript
+function useTokenUsage(companyId: string) {
+  return useQuery({
+    queryKey: companyKeys.tokenUsage(companyId),
+    queryFn: () =>
+      api.get<TokenUsage>(`/api/v1/companies/${companyId}/ai/token-usage`),
+    staleTime: 60_000,  // 1 minute
   });
 }
 ```
@@ -2139,7 +2390,7 @@ These keys are also listed in `authentication.md` since CompanyCreationStep is p
 | Key | PT-BR | EN |
 |-----|-------|-----|
 | `onboarding.companyCreation.title` | Sua Empresa | Your Company |
-| `onboarding.companyCreation.subtitle` | Configure sua empresa para gerenciar o cap table | Set up your company to manage the cap table |
+| `onboarding.companyCreation.subtitle` | Configure sua empresa para comecar | Set up your company to get started |
 | `onboarding.companyCreation.submit` | Criar Empresa | Create Company |
 
 ### company namespace
@@ -2155,6 +2406,8 @@ These keys are also listed in `authentication.md` since CompanyCreationStep is p
 | `company.fields.entityType.saClosedDescription` | Sociedade anonima de capital fechado | Privately held corporation |
 | `company.fields.entityType.saOpen` | S.A. Capital Aberto | Publicly Traded Corporation |
 | `company.fields.entityType.saOpenDescription` | Sociedade anonima de capital aberto | Publicly traded corporation |
+| `company.fields.entityType.sas` | SAS | SAS |
+| `company.fields.entityType.sasDescription` | Sociedade por acoes simplificada | Simplified joint-stock company |
 | `company.fields.cnpj` | CNPJ | CNPJ |
 | `company.fields.cnpjHelper` | Sera validado automaticamente | Will be validated automatically |
 | `company.fields.cnpjReadOnly` | CNPJ nao pode ser alterado apos a criacao | CNPJ cannot be changed after creation |
@@ -2165,6 +2418,8 @@ These keys are also listed in `authentication.md` since CompanyCreationStep is p
 | `company.settings.title` | Configuracoes da Empresa | Company Settings |
 | `company.settings.subtitle` | Gerencie as informacoes da sua empresa | Manage your company information |
 | `company.settings.tabs.info` | Informacoes da Empresa | Company Info |
+| `company.settings.tabs.openFinance` | Open Finance | Open Finance |
+| `company.settings.tabs.ai` | Inteligencia Artificial | Artificial Intelligence |
 | `company.settings.tabs.members` | Membros | Members |
 | `company.settings.tabs.notifications` | Notificacoes | Notifications |
 | `company.settings.save` | Salvar | Save |
@@ -2177,7 +2432,6 @@ These keys are also listed in `authentication.md` since CompanyCreationStep is p
 | `company.settings.dangerZone.resolveFirst` | Resolva estes itens antes de dissolver a empresa | Resolve these items before dissolving the company |
 | `company.setup.title` | Configurando sua empresa... | Setting up your company... |
 | `company.setup.cnpjValidation` | Validacao do CNPJ | CNPJ Validation |
-| `company.setup.contractDeployment` | Implantacao do Contrato | Contract Deployment |
 | `company.setup.pending` | Pendente | Pending |
 | `company.setup.inProgress` | Em andamento | In progress |
 | `company.setup.success` | Concluido | Complete |
@@ -2193,10 +2447,27 @@ These keys are also listed in `authentication.md` since CompanyCreationStep is p
 | `company.dissolution.cancelButton` | Cancelar | Cancel |
 | `company.dissolution.confirmButton` | Dissolver | Dissolve |
 | `company.dissolution.closeButton` | Fechar | Close |
-| `company.dissolution.blockers.activeShareholders` | Existem {count} acionistas ativos | There are {count} active shareholders |
-| `company.dissolution.blockers.activeRounds` | Existem {count} rodadas de investimento ativas | There are {count} active funding rounds |
-| `company.dissolution.blockers.pendingExercises` | Existem {count} exercicios de opcoes pendentes | There are {count} pending option exercises |
-| `company.dissolution.blockers.pendingTransactions` | Existem {count} transacoes pendentes | There are {count} pending transactions |
+| `company.dissolution.blockers.activeConnections` | Existem {count} conexoes Open Finance ativas | There are {count} active Open Finance connections |
+| `company.openFinance.title` | Conexoes Open Finance | Open Finance Connections |
+| `company.openFinance.subtitle` | Gerencie suas conexoes bancarias | Manage your bank connections |
+| `company.openFinance.connectBank` | Conectar Banco | Connect Bank |
+| `company.openFinance.disconnect` | Desconectar | Disconnect |
+| `company.openFinance.lastSync` | Ultimo sync: {date} | Last sync: {date} |
+| `company.openFinance.connected` | Conectado | Connected |
+| `company.openFinance.disconnected` | Desconectado | Disconnected |
+| `company.openFinance.syncFrequency` | Frequencia de Sincronizacao | Sync Frequency |
+| `company.openFinance.syncFrequency.daily` | Diaria | Daily |
+| `company.openFinance.syncFrequency.weekly` | Semanal | Weekly |
+| `company.openFinance.syncFrequency.manual` | Manual | Manual |
+| `company.ai.title` | Inteligencia Artificial | Artificial Intelligence |
+| `company.ai.subtitle` | Configure o processamento automatico de documentos | Configure automatic document processing |
+| `company.ai.tokenBudget` | Orcamento Mensal de Tokens | Monthly Token Budget |
+| `company.ai.tokensUsed` | {used} / {budget} tokens | {used} / {budget} tokens |
+| `company.ai.tokensRemaining` | {remaining} tokens restantes | {remaining} tokens remaining |
+| `company.ai.resetDate` | Renova em {date} | Resets on {date} |
+| `company.ai.monthlyLimit` | Limite Mensal | Monthly Limit |
+| `company.ai.autoProcess` | Processamento Automatico | Automatic Processing |
+| `company.ai.autoProcessDescription` | Processar documentos automaticamente ao fazer upload | Automatically process documents when uploaded |
 
 ### errors namespace (company-related)
 
@@ -2206,12 +2477,13 @@ These keys are also listed in `authentication.md` since CompanyCreationStep is p
 | `errors.company.cnpjInvalid` | CNPJ invalido | Invalid CNPJ |
 | `errors.company.notFound` | Empresa nao encontrada | Company not found |
 | `errors.company.cannotUpdateDissolved` | Nao e possivel atualizar uma empresa dissolvida | Cannot update a dissolved company |
-| `errors.company.entityTypeLocked` | Tipo de entidade nao pode ser alterado apos adicionar acionistas | Entity type cannot be changed after adding shareholders |
+| `errors.company.entityTypeLocked` | Tipo de entidade nao pode ser alterado apos a validacao | Entity type cannot be changed after validation |
 | `errors.company.dissolutionBlocked` | Existem pendencias que impedem a dissolucao | There are pending items blocking dissolution |
-| `errors.company.hasActiveShareholders` | A empresa possui acionistas ativos | The company has active shareholders |
-| `errors.company.hasActiveRounds` | A empresa possui rodadas de investimento ativas | The company has active funding rounds |
+| `errors.company.hasActiveConnections` | A empresa possui conexoes Open Finance ativas | The company has active Open Finance connections |
 | `errors.company.futureDate` | Data de fundacao nao pode ser no futuro | Founded date cannot be in the future |
 | `errors.company.membershipLimit` | Limite de empresas atingido | Company membership limit reached |
+| `errors.company.aiTokenBudgetExceeded` | Orcamento de tokens de IA excedido | AI token budget exceeded |
+| `errors.company.aiTokenBudgetInvalid` | Orcamento de tokens deve ser entre 10.000 e 1.000.000 | Token budget must be between 10,000 and 1,000,000 |
 
 ---
 
@@ -2219,22 +2491,26 @@ These keys are also listed in `authentication.md` since CompanyCreationStep is p
 
 ### Functional
 
-- [ ] CompanyCreationStep validates all fields (name length, entityType selection, CNPJ Modulo 11 checksum, optional date not in future)
+- [ ] CompanyCreationStep validates all fields (name length, entityType selection including SAS, CNPJ Modulo 11 checksum, optional date not in future)
 - [ ] CompanyCreationStep submits to POST /api/v1/companies and handles 201, 400, 409, 422, and 5xx responses
 - [ ] CNPJ duplicate (409) maps to inline error on CNPJ field
 - [ ] Validation errors (400) map to correct form fields via applyServerErrors()
 - [ ] CNPJInput auto-masks as XX.XXX.XXX/XXXX-XX while typing
 - [ ] CNPJInput validates Modulo 11 checksum on blur
 - [ ] CNPJInput accepts pasted raw digits or formatted strings
-- [ ] EntityTypeSelector renders 3 radio cards with correct labels and descriptions
+- [ ] EntityTypeSelector renders 4 radio cards (LTDA, SA Fechado, SA Aberto, SAS) with correct labels and descriptions
 - [ ] CompanySetupProgress renders on dashboard when company is DRAFT
-- [ ] CompanySetupProgress polls every 5 seconds and stops when all items are terminal
-- [ ] CompanySetupProgress auto-dismisses after all items succeed
-- [ ] CompanySetupProgress shows retry buttons on failure
-- [ ] CompanySettingsPage renders with tabbed navigation (Company Info, Members link, Notifications)
+- [ ] CompanySetupProgress polls every 5 seconds and stops when item is terminal
+- [ ] CompanySetupProgress auto-dismisses after item succeeds
+- [ ] CompanySetupProgress shows retry button on failure
+- [ ] CompanySettingsPage renders with tabbed navigation (Company Info, Open Finance, AI, Members link, Notifications)
+- [ ] OpenFinanceSettingsTab displays connected banks with status and last sync time
+- [ ] OpenFinanceSettingsTab allows ADMIN to change sync frequency
+- [ ] AiSettingsTab displays token usage progress bar with correct color thresholds
+- [ ] AiSettingsTab allows ADMIN to change token budget and auto-process toggle
 - [ ] CompanyInfoForm pre-fills with current company data
 - [ ] CompanyInfoForm CNPJ field is always read-only
-- [ ] CompanyInfoForm EntityType is read-only when company has shareholders
+- [ ] CompanyInfoForm EntityType is read-only when company is ACTIVE
 - [ ] CompanyInfoForm save button disabled until form is dirty
 - [ ] CompanyInfoForm submits PUT /api/v1/companies/:companyId and handles all error responses
 - [ ] CompanyDissolutionDialog fetches prerequisites before showing confirmation

@@ -10,22 +10,13 @@ import { HealthModule } from './health/health.module';
 import { AuthModule } from './auth/auth.module';
 import { CompanyModule } from './company/company.module';
 import { MemberModule } from './member/member.module';
-import { ShareClassModule } from './share-class/share-class.module';
-import { ShareholderModule } from './shareholder/shareholder.module';
-import { CapTableModule } from './cap-table/cap-table.module';
-import { TransactionModule } from './transaction/transaction.module';
-import { FundingRoundModule } from './funding-round/funding-round.module';
-import { OptionPlanModule } from './option-plan/option-plan.module';
-import { ConvertibleModule } from './convertible/convertible.module';
 import { NotificationModule } from './notification/notification.module';
 import { AuditLogModule } from './audit-log/audit-log.module';
 import { AwsModule } from './aws/aws.module';
 import { EncryptionModule } from './encryption/encryption.module';
 import { EmailModule } from './email/email.module';
 import { KycModule } from './kyc/kyc.module';
-import { DocumentModule } from './document/document.module';
 import { CompanyProfileModule } from './company-profile/company-profile.module';
-import { ExitWaterfallModule } from './exit-waterfall/exit-waterfall.module';
 import { ReportsModule } from './reports/reports.module';
 import { ScheduledTasksModule } from './scheduled-tasks/scheduled-tasks.module';
 
@@ -64,19 +55,10 @@ import { ScheduledTasksModule } from './scheduled-tasks/scheduled-tasks.module';
     AuthModule,
     CompanyModule,
     MemberModule,
-    ShareClassModule,
-    ShareholderModule,
-    CapTableModule,
-    TransactionModule,
-    FundingRoundModule,
-    OptionPlanModule,
-    ConvertibleModule,
     NotificationModule,
     AuditLogModule,
     KycModule,
-    DocumentModule,
     CompanyProfileModule,
-    ExitWaterfallModule,
     ReportsModule,
     ScheduledTasksModule,
   ],

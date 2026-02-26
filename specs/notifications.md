@@ -2,7 +2,7 @@
 
 **Topic of Concern**: In-app notification system for key events (MVP); email delivery deferred to post-MVP
 
-**One-Sentence Description**: The system creates in-app notifications for important events like signature requests, transaction confirmations, and vesting milestones, displayed via a bell icon dropdown and a dedicated notifications page.
+**One-Sentence Description**: The system creates in-app notifications for important events like AI report completions, Open Finance sync results, investor Q&A activity, and KYC status changes, displayed via a bell icon dropdown and a dedicated notifications page.
 
 ---
 
@@ -16,37 +16,405 @@ Navia uses an in-app notification system to alert users of important events. Not
 
 ## Notification Events
 
-### Document Events
-- Document signature request sent
-- Document fully signed
-- Document declined by signer
+### AI & Processing Events
+- AI report generation completed
+- Document AI processing completed
+- Document AI processing failed
 
-### Transaction Events
-- Share issuance completed
-- Share transfer completed
-- Transaction failed (alert admin)
+### Open Finance Events
+- Bank data sync completed
+- Bank data sync failed
+- Bank consent expiring (7-day warning)
 
-### Cap Table Events
-- Major dilution event (> 10% for any shareholder)
-- New shareholder added
-- Shareholder removed
+### Investor Relations Events
+- Investor Q&A question received (notify founder)
+- Company update posted (notify investors)
+- Investor access granted to a company
 
-### Option Events
-- Option grant created
-- Vesting milestone reached (cliff, 25%, 50%, 75%, 100%)
-- Option exercise request submitted
-- Option exercise completed (shares issued)
-- Options expiring soon (30-day warning)
+### Financial Events
+- Monthly financial snapshot computed
 
 ### KYC Events
-- KYC verification completed
+- KYC verification approved
 - KYC verification rejected (with reason)
 - KYC resubmission required
 
-### Funding Round Events
-- Invited to participate in funding round
-- Round closing soon
-- Round closed
+### Company & Data Events
+- Company data enrichment completed (BigDataCorp)
+- Company created
+- Company profile published
+
+### Member Events
+- Member invited to company
+- Member accepted invitation
+- Member removed from company
+- Member role changed
+
+### Document Events
+- Document uploaded
+
+### Security Events
+- Login from new device
+- Account locked
+
+---
+
+## Notification Event Catalog
+
+### AI & Processing Events
+
+| Action | Resource Type | Actor Type | When Triggered |
+|--------|-------------|-----------|---------------|
+| `AI_REPORT_READY` | Report | SYSTEM | AI report generation completes successfully |
+| `AI_PROCESSING_COMPLETE` | Document | SYSTEM | Document AI processing finishes (OCR, extraction, classification) |
+| `AI_PROCESSING_FAILED` | Document | SYSTEM | Document AI processing fails after retries |
+
+**Payload for `AI_REPORT_READY`**:
+```json
+{
+  "notificationType": "AI_REPORT_READY",
+  "relatedEntityType": "Report",
+  "relatedEntityId": "uuid-of-report",
+  "companyId": "uuid-of-company",
+  "metadata": {
+    "reportType": "financial_analysis",
+    "reportTitle": "Analise Financeira - Fev 2026",
+    "generatedAt": "2026-02-26T14:30:00.000Z"
+  }
+}
+```
+
+**Payload for `AI_PROCESSING_COMPLETE`**:
+```json
+{
+  "notificationType": "AI_PROCESSING_COMPLETE",
+  "relatedEntityType": "Document",
+  "relatedEntityId": "uuid-of-document",
+  "companyId": "uuid-of-company",
+  "metadata": {
+    "documentName": "Balanco_2025.pdf",
+    "processingType": "ocr_extraction",
+    "extractedFields": 42
+  }
+}
+```
+
+**Payload for `AI_PROCESSING_FAILED`**:
+```json
+{
+  "notificationType": "AI_PROCESSING_FAILED",
+  "relatedEntityType": "Document",
+  "relatedEntityId": "uuid-of-document",
+  "companyId": "uuid-of-company",
+  "metadata": {
+    "documentName": "Contrato_Social.pdf",
+    "processingType": "ocr_extraction",
+    "failureReason": "unreadable_document",
+    "retriesExhausted": true
+  }
+}
+```
+
+### Open Finance Events
+
+| Action | Resource Type | Actor Type | When Triggered |
+|--------|-------------|-----------|---------------|
+| `OPEN_FINANCE_SYNC_COMPLETE` | OpenFinanceConnection | SYSTEM | Bank data sync completes successfully |
+| `OPEN_FINANCE_SYNC_FAILED` | OpenFinanceConnection | SYSTEM | Bank data sync fails after retries |
+| `OPEN_FINANCE_CONSENT_EXPIRING` | OpenFinanceConnection | SYSTEM | 7 days before bank consent expires |
+
+**Payload for `OPEN_FINANCE_SYNC_COMPLETE`**:
+```json
+{
+  "notificationType": "OPEN_FINANCE_SYNC_COMPLETE",
+  "relatedEntityType": "OpenFinanceConnection",
+  "relatedEntityId": "uuid-of-connection",
+  "companyId": "uuid-of-company",
+  "metadata": {
+    "bankName": "Banco do Brasil",
+    "accountsSync": 3,
+    "transactionsSync": 147,
+    "syncPeriod": "2026-01-01/2026-02-26"
+  }
+}
+```
+
+**Payload for `OPEN_FINANCE_SYNC_FAILED`**:
+```json
+{
+  "notificationType": "OPEN_FINANCE_SYNC_FAILED",
+  "relatedEntityType": "OpenFinanceConnection",
+  "relatedEntityId": "uuid-of-connection",
+  "companyId": "uuid-of-company",
+  "metadata": {
+    "bankName": "Itau",
+    "failureReason": "bank_unavailable",
+    "lastSuccessfulSync": "2026-02-20T08:00:00.000Z"
+  }
+}
+```
+
+**Payload for `OPEN_FINANCE_CONSENT_EXPIRING`**:
+```json
+{
+  "notificationType": "OPEN_FINANCE_CONSENT_EXPIRING",
+  "relatedEntityType": "OpenFinanceConnection",
+  "relatedEntityId": "uuid-of-connection",
+  "companyId": "uuid-of-company",
+  "metadata": {
+    "bankName": "Nubank",
+    "expiresAt": "2026-03-05T00:00:00.000Z",
+    "daysUntilExpiry": 7
+  }
+}
+```
+
+### Investor Relations Events
+
+| Action | Resource Type | Actor Type | When Triggered |
+|--------|-------------|-----------|---------------|
+| `INVESTOR_QA_RECEIVED` | InvestorQuestion | USER | An investor submits a question (notifies founder/admin) |
+| `COMPANY_UPDATE_POSTED` | CompanyUpdate | USER | Founder posts a company update (notifies investors) |
+| `INVESTOR_ACCESS_GRANTED` | CompanyMember | USER | Investor is granted access to view a company |
+
+**Payload for `INVESTOR_QA_RECEIVED`**:
+```json
+{
+  "notificationType": "INVESTOR_QA_RECEIVED",
+  "relatedEntityType": "InvestorQuestion",
+  "relatedEntityId": "uuid-of-question",
+  "companyId": "uuid-of-company",
+  "metadata": {
+    "investorName": "Maria Santos",
+    "questionPreview": "Qual a projecao de receita para o Q2?",
+    "askedAt": "2026-02-26T10:15:00.000Z"
+  }
+}
+```
+
+**Payload for `COMPANY_UPDATE_POSTED`**:
+```json
+{
+  "notificationType": "COMPANY_UPDATE_POSTED",
+  "relatedEntityType": "CompanyUpdate",
+  "relatedEntityId": "uuid-of-update",
+  "companyId": "uuid-of-company",
+  "metadata": {
+    "companyName": "Acme Ltda.",
+    "updateTitle": "Resultado Mensal - Janeiro 2026",
+    "postedBy": "Nelson Pereira"
+  }
+}
+```
+
+**Payload for `INVESTOR_ACCESS_GRANTED`**:
+```json
+{
+  "notificationType": "INVESTOR_ACCESS_GRANTED",
+  "relatedEntityType": "CompanyMember",
+  "relatedEntityId": "uuid-of-membership",
+  "companyId": "uuid-of-company",
+  "metadata": {
+    "companyName": "Acme Ltda.",
+    "accessLevel": "INVESTOR",
+    "grantedBy": "Nelson Pereira"
+  }
+}
+```
+
+### Financial Events
+
+| Action | Resource Type | Actor Type | When Triggered |
+|--------|-------------|-----------|---------------|
+| `FINANCIAL_SNAPSHOT_READY` | FinancialSnapshot | SYSTEM | Monthly financial snapshot computation completes |
+
+**Payload for `FINANCIAL_SNAPSHOT_READY`**:
+```json
+{
+  "notificationType": "FINANCIAL_SNAPSHOT_READY",
+  "relatedEntityType": "FinancialSnapshot",
+  "relatedEntityId": "uuid-of-snapshot",
+  "companyId": "uuid-of-company",
+  "metadata": {
+    "period": "2026-01",
+    "revenue": "125000.00",
+    "netIncome": "32000.00",
+    "currency": "BRL"
+  }
+}
+```
+
+### KYC Events
+
+| Action | Resource Type | Actor Type | When Triggered |
+|--------|-------------|-----------|---------------|
+| `KYC_APPROVED` | KYCVerification | SYSTEM | KYC verification is approved |
+| `KYC_REJECTED` | KYCVerification | SYSTEM | KYC verification is rejected |
+| `KYC_RESUBMISSION_REQUIRED` | KYCVerification | SYSTEM | KYC needs resubmission (document quality, mismatch, etc.) |
+
+**Payload for `KYC_APPROVED`**:
+```json
+{
+  "notificationType": "KYC_APPROVED",
+  "relatedEntityType": "KYCVerification",
+  "relatedEntityId": "uuid-of-verification",
+  "companyId": null,
+  "metadata": {
+    "verificationType": "individual",
+    "approvedAt": "2026-02-26T14:00:00.000Z"
+  }
+}
+```
+
+**Payload for `KYC_REJECTED`**:
+```json
+{
+  "notificationType": "KYC_REJECTED",
+  "relatedEntityType": "KYCVerification",
+  "relatedEntityId": "uuid-of-verification",
+  "companyId": null,
+  "metadata": {
+    "verificationType": "individual",
+    "rejectionReason": "document_expired",
+    "rejectedAt": "2026-02-26T14:00:00.000Z"
+  }
+}
+```
+
+**Payload for `KYC_RESUBMISSION_REQUIRED`**:
+```json
+{
+  "notificationType": "KYC_RESUBMISSION_REQUIRED",
+  "relatedEntityType": "KYCVerification",
+  "relatedEntityId": "uuid-of-verification",
+  "companyId": null,
+  "metadata": {
+    "verificationType": "individual",
+    "reason": "document_unreadable",
+    "requiredDocuments": ["identity_front", "identity_back"]
+  }
+}
+```
+
+### Company & Data Events
+
+| Action | Resource Type | Actor Type | When Triggered |
+|--------|-------------|-----------|---------------|
+| `COMPANY_DATA_ENRICHED` | Company | SYSTEM | BigDataCorp data enrichment completes for a company |
+| `COMPANY_CREATED` | Company | USER | A new company is created |
+| `PROFILE_PUBLISHED` | Company | USER | Company profile is published to investors |
+
+**Payload for `COMPANY_DATA_ENRICHED`**:
+```json
+{
+  "notificationType": "COMPANY_DATA_ENRICHED",
+  "relatedEntityType": "Company",
+  "relatedEntityId": "uuid-of-company",
+  "companyId": "uuid-of-company",
+  "metadata": {
+    "enrichmentSource": "bigdatacorp",
+    "fieldsUpdated": ["revenue", "employeeCount", "industry", "foundedDate"],
+    "enrichedAt": "2026-02-26T08:00:00.000Z"
+  }
+}
+```
+
+**Payload for `COMPANY_CREATED`**:
+```json
+{
+  "notificationType": "COMPANY_CREATED",
+  "relatedEntityType": "Company",
+  "relatedEntityId": "uuid-of-company",
+  "companyId": "uuid-of-company",
+  "metadata": {
+    "companyName": "Acme Ltda.",
+    "cnpj": "12.345.678/0001-90"
+  }
+}
+```
+
+### Member Events
+
+| Action | Resource Type | Actor Type | When Triggered |
+|--------|-------------|-----------|---------------|
+| `MEMBER_INVITED` | CompanyMember | USER | A member is invited to join a company |
+| `MEMBER_ACCEPTED` | CompanyMember | USER | An invited member accepts the invitation |
+| `MEMBER_REMOVED` | CompanyMember | USER | A member is removed from a company |
+| `ROLE_CHANGED` | CompanyMember | USER | A member's role is changed |
+
+**Payload for `MEMBER_INVITED`**:
+```json
+{
+  "notificationType": "MEMBER_INVITED",
+  "relatedEntityType": "CompanyMember",
+  "relatedEntityId": "uuid-of-membership",
+  "companyId": "uuid-of-company",
+  "metadata": {
+    "companyName": "Acme Ltda.",
+    "invitedBy": "Nelson Pereira",
+    "role": "INVESTOR"
+  }
+}
+```
+
+**Payload for `ROLE_CHANGED`**:
+```json
+{
+  "notificationType": "ROLE_CHANGED",
+  "relatedEntityType": "CompanyMember",
+  "relatedEntityId": "uuid-of-membership",
+  "companyId": "uuid-of-company",
+  "metadata": {
+    "companyName": "Acme Ltda.",
+    "previousRole": "INVESTOR",
+    "newRole": "ADMIN",
+    "changedBy": "Nelson Pereira"
+  }
+}
+```
+
+### Document Events
+
+| Action | Resource Type | Actor Type | When Triggered |
+|--------|-------------|-----------|---------------|
+| `DOCUMENT_UPLOADED` | Document | USER | A document is uploaded to a company |
+
+**Payload for `DOCUMENT_UPLOADED`**:
+```json
+{
+  "notificationType": "DOCUMENT_UPLOADED",
+  "relatedEntityType": "Document",
+  "relatedEntityId": "uuid-of-document",
+  "companyId": "uuid-of-company",
+  "metadata": {
+    "documentName": "Balanco_2025.pdf",
+    "uploadedBy": "Nelson Pereira",
+    "documentType": "financial_statement"
+  }
+}
+```
+
+### Security Events
+
+| Action | Resource Type | Actor Type | When Triggered |
+|--------|-------------|-----------|---------------|
+| `LOGIN_NEW_DEVICE` | User | SYSTEM | Login detected from a new device or location |
+| `ACCOUNT_LOCKED` | User | SYSTEM | Account locked after failed login attempts |
+
+**Payload for `LOGIN_NEW_DEVICE`**:
+```json
+{
+  "notificationType": "LOGIN_NEW_DEVICE",
+  "relatedEntityType": "User",
+  "relatedEntityId": "uuid-of-user",
+  "companyId": null,
+  "metadata": {
+    "ipAddress": "192.168.1.0/24",
+    "userAgent": "Mozilla/5.0...",
+    "location": "Sao Paulo, BR"
+  }
+}
+```
 
 ---
 
@@ -67,7 +435,7 @@ Navia uses an in-app notification system to alert users of important events. Not
 
 ### FR-3: User Preferences
 - Users can configure notification preferences
-- Categories: transactions, documents, options, security
+- Categories: ai_processing, open_finance, investor_relations, financial, documents, security
 - Cannot disable critical security notifications
 
 ### FR-4: Background Processing
@@ -83,7 +451,7 @@ Navia uses an in-app notification system to alert users of important events. Not
 interface Notification {
   id: string;
   user_id: string;
-  notification_type: string;         // "SIGNATURE_REQUEST", "TRANSACTION_CONFIRMED", etc.
+  notification_type: string;         // "AI_REPORT_READY", "KYC_APPROVED", etc.
 
   // Content
   subject: string;
@@ -100,7 +468,7 @@ interface Notification {
   read_at: Date | null;
 
   // Metadata
-  related_entity_type: string | null;  // "Document", "Transaction", etc.
+  related_entity_type: string | null;  // "Report", "Document", "Company", etc.
   related_entity_id: string | null;
 
   created_at: Date;
@@ -110,10 +478,11 @@ interface UserNotificationPreferences {
   user_id: string;
   email_notifications: boolean;     // MVP: ignored (no email delivery). Retained for post-MVP.
   categories: {
-    transactions: boolean;
+    ai_processing: boolean;
+    open_finance: boolean;
+    investor_relations: boolean;
+    financial: boolean;
     documents: boolean;
-    options: boolean;
-    funding_rounds: boolean;
     security: boolean;              // Always true (cannot disable)
   };
   updated_at: Date;
@@ -134,8 +503,8 @@ List the authenticated user's notifications with pagination.
 |-----------|------|---------|-------------|
 | `page` | integer | 1 | Page number |
 | `limit` | integer | 20 | Items per page (max 100) |
-| `read` | boolean | — | Filter by read status |
-| `notificationType` | string | — | Filter by type (e.g., `SIGNATURE_REQUEST`) |
+| `read` | boolean | --- | Filter by read status |
+| `notificationType` | string | --- | Filter by type (e.g., `AI_REPORT_READY`) |
 | `sort` | string | `-createdAt` | Sort field |
 
 **Response** (200 OK):
@@ -145,13 +514,13 @@ List the authenticated user's notifications with pagination.
   "data": [
     {
       "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-      "notificationType": "SIGNATURE_REQUEST",
-      "subject": "[Navia] Contrato de Acionistas requer sua assinatura",
-      "status": "SENT",
+      "notificationType": "AI_REPORT_READY",
+      "subject": "[Navia] Relatorio de IA pronto",
+      "status": "PENDING",
       "read": false,
-      "relatedEntityType": "Document",
+      "relatedEntityType": "Report",
       "relatedEntityId": "d4e5f6a7-b8c9-0123-def4-567890abcdef",
-      "createdAt": "2026-02-23T10:00:00.000Z"
+      "createdAt": "2026-02-26T10:00:00.000Z"
     }
   ],
   "meta": {
@@ -173,16 +542,16 @@ Get a single notification detail.
   "success": true,
   "data": {
     "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-    "notificationType": "SIGNATURE_REQUEST",
-    "subject": "[Navia] Contrato de Acionistas requer sua assinatura",
-    "bodyText": "Acme Ltda. solicitou sua assinatura no documento: Contrato de Acionistas...",
-    "status": "SENT",
-    "sentAt": "2026-02-23T10:00:05.000Z",
+    "notificationType": "INVESTOR_QA_RECEIVED",
+    "subject": "[Navia] Nova pergunta de investidor",
+    "bodyText": "Maria Santos enviou uma pergunta sobre Acme Ltda...",
+    "status": "PENDING",
+    "sentAt": null,
     "read": false,
     "readAt": null,
-    "relatedEntityType": "Document",
+    "relatedEntityType": "InvestorQuestion",
     "relatedEntityId": "d4e5f6a7-b8c9-0123-def4-567890abcdef",
-    "createdAt": "2026-02-23T10:00:00.000Z"
+    "createdAt": "2026-02-26T10:00:00.000Z"
   }
 }
 ```
@@ -198,7 +567,7 @@ Mark a notification as read.
   "data": {
     "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     "read": true,
-    "readAt": "2026-02-23T12:30:00.000Z"
+    "readAt": "2026-02-26T12:30:00.000Z"
   }
 }
 ```
@@ -214,9 +583,11 @@ Get the authenticated user's notification preferences.
   "data": {
     "emailNotifications": true,
     "categories": {
-      "transactions": true,
+      "aiProcessing": true,
+      "openFinance": true,
+      "investorRelations": true,
+      "financial": true,
       "documents": true,
-      "options": true,
       "security": true
     },
     "updatedAt": "2026-01-15T08:00:00.000Z"
@@ -233,9 +604,11 @@ Update notification preferences.
 {
   "emailNotifications": true,
   "categories": {
-    "transactions": true,
-    "documents": false,
-    "options": true
+    "aiProcessing": true,
+    "openFinance": false,
+    "investorRelations": true,
+    "financial": true,
+    "documents": false
   }
 }
 ```
@@ -247,12 +620,14 @@ Update notification preferences.
   "data": {
     "emailNotifications": true,
     "categories": {
-      "transactions": true,
+      "aiProcessing": true,
+      "openFinance": false,
+      "investorRelations": true,
+      "financial": true,
       "documents": false,
-      "options": true,
       "security": true
     },
-    "updatedAt": "2026-02-23T14:00:00.000Z"
+    "updatedAt": "2026-02-26T14:00:00.000Z"
   }
 }
 ```
@@ -270,13 +645,16 @@ Email templates are stored per locale following the project i18n conventions:
 ```
 templates/
   email/
-    signature-request/
+    ai-report-ready/
       pt-BR.mjml
       en.mjml
-    transaction-confirmed/
+    open-finance-sync-complete/
       pt-BR.mjml
       en.mjml
-    vesting-milestone/
+    investor-qa-received/
+      pt-BR.mjml
+      en.mjml
+    kyc-approved/
       pt-BR.mjml
       en.mjml
     ...
@@ -284,50 +662,45 @@ templates/
 
 The system selects the template language based on `User.locale`. If the user's locale is not set or the template is missing for that locale, the system falls back to `pt-BR`.
 
-### Template: Signature Request
+### Template: AI Report Ready
 ```
-Subject (PT-BR): [Navia] Contrato de Acionistas requer sua assinatura
-Subject (EN): [Navia] Shareholder Agreement requires your signature
+Subject (PT-BR): [Navia] Seu relatorio de IA esta pronto
+Subject (EN): [Navia] Your AI report is ready
 
 Hi {{user_name}},
 
-{{company_name}} has requested your signature on:
-  Document: {{document_title}}
-  Your role: {{signer_role}}
+Your AI report for {{company_name}} is ready:
+  Report: {{report_title}}
+  Type: {{report_type}}
 
-Click here to review and sign: {{signature_url}}
-
-This request expires in 30 days.
+Click here to view: {{report_url}}
 ```
 
-### Template: Transaction Confirmed
+### Template: Open Finance Sync Complete
 ```
-Subject (PT-BR): [Navia] Transação confirmada na blockchain
-Subject (EN): [Navia] Transaction confirmed on blockchain
+Subject (PT-BR): [Navia] Sincronizacao bancaria concluida
+Subject (EN): [Navia] Bank sync completed
 
 Hi {{user_name}},
 
-Your transaction has been confirmed on Base Network:
-  Type: {{transaction_type}}
-  Shares: {{quantity}}
-  Share Class: {{share_class}}
+Your bank data sync for {{company_name}} has completed:
+  Bank: {{bank_name}}
+  Accounts synced: {{accounts_count}}
+  Transactions synced: {{transactions_count}}
 
-View on Basescan: {{blockchain_url}}
+View your financial data: {{dashboard_url}}
 ```
 
-### Template: Vesting Milestone
+### Template: KYC Approved
 ```
-Subject (PT-BR): [Navia] Marco de vesting alcançado
-Subject (EN): [Navia] Vesting milestone reached
+Subject (PT-BR): [Navia] Verificacao KYC aprovada
+Subject (EN): [Navia] KYC verification approved
 
 Hi {{user_name}},
 
-A vesting milestone has been reached for your option grant at {{company_name}}:
-  Options vested: {{vested_quantity}}
-  Total vested: {{total_vested}} of {{total_granted}}
-  Vesting percentage: {{vesting_percentage}}%
+Your identity verification has been approved. You now have full access to all Navia features.
 
-View your options: {{options_url}}
+View your account: {{settings_url}}
 ```
 
 ---
@@ -346,7 +719,7 @@ View your options: {{options_url}}
   "success": false,
   "error": {
     "code": "NOTIFICATION_NOT_FOUND",
-    "message": "Notificação não encontrada",
+    "message": "Notificacao nao encontrada",
     "messageKey": "errors.notification.notFound"
   }
 }
@@ -359,7 +732,7 @@ View your options: {{options_url}}
 ### BR-1: Critical Notifications
 - Security notifications cannot be disabled
 - KYC status changes always sent
-- Payment confirmations always sent
+- AI processing failure notifications always sent
 
 ### BR-2: Rate Limiting
 - Max 50 emails per user per day
@@ -383,7 +756,7 @@ View your options: {{options_url}}
 **Handling**: Fall back to `pt-BR` for all email templates and subject lines.
 
 ### EC-2: Bulk Notification Trigger
-**Scenario**: A round close triggers notifications to 50+ investors simultaneously.
+**Scenario**: A company update is posted and triggers notifications to 50+ investors simultaneously.
 **Handling**: All notifications are queued individually in Bull. The queue processes them with rate limiting to avoid SES throttling. Delivery may be staggered over several minutes.
 
 ### EC-3: Email Bounce
@@ -393,6 +766,14 @@ View your options: {{options_url}}
 ### EC-4: Notification for Deleted User
 **Scenario**: A system event triggers a notification for a user who has requested account deletion (in grace period).
 **Handling**: Skip sending the notification. Users in the deletion grace period do not receive new notifications.
+
+### EC-5: AI Processing Fails Repeatedly
+**Scenario**: Document AI processing fails, triggering `AI_PROCESSING_FAILED`. User re-uploads and it fails again.
+**Handling**: Each failure creates a separate notification. After 3 failures for the same document, include metadata suggesting the user contact support.
+
+### EC-6: Open Finance Consent Expires Without Renewal
+**Scenario**: The `OPEN_FINANCE_CONSENT_EXPIRING` notification was sent 7 days before expiry, but the user did not renew.
+**Handling**: When consent actually expires, the next sync attempt will fail and trigger `OPEN_FINANCE_SYNC_FAILED` with `failureReason: "consent_expired"`.
 
 ---
 
@@ -404,7 +785,7 @@ View your options: {{options_url}}
 - **Bell icon dropdown**: Top bar bell with unread count badge, dropdown showing last 5 unread notifications
 - **Notifications page**: `/notifications` with full list, filters (read/unread, type), and pagination
 - **Mark as read**: Individual and bulk "mark all as read"
-- **Notification preferences**: Users can toggle categories (transactions, documents, options) on/off via settings
+- **Notification preferences**: Users can toggle categories (AI processing, Open Finance, investor relations, financial, documents) on/off via settings
 - **Critical notifications**: Security and KYC notifications cannot be disabled
 - **Background processing**: Notification creation via Bull queue (non-blocking)
 - **Retry on failure**: 3 retries with exponential backoff for failed notification creation
@@ -428,7 +809,7 @@ The `Notification` model retains email-related fields (`subject`, `bodyHtml`, `b
 - `status` is always `PENDING` (no email delivery means no `SENT`/`FAILED`/`BOUNCED`)
 - `sentAt` is always `null`
 - `failedReason` is always `null`
-- `bodyHtml` and `bodyText` are not rendered in the UI — the frontend uses `notificationType` + `relatedEntityType` to determine the display message via i18n keys
+- `bodyHtml` and `bodyText` are not rendered in the UI --- the frontend uses `notificationType` + `relatedEntityType` to determine the display message via i18n keys
 
 ---
 
@@ -450,31 +831,31 @@ The bell icon lives in the top bar (dashboard shell) and provides quick access t
 #### Layout
 
 ```
-┌───────────────────────────────────────────────┐
-│  🔔(3)                                        │  ← Bell icon with unread count badge
-└───────────────────────────────────────────────┘
-        │
-        ▼ (click to open popover)
-┌───────────────────────────────────────────────┐
-│  Notifications                     Mark all ← │  ← Header: h4, "Mark all" ghost button
-│───────────────────────────────────────────────│
-│  🔵 📄 Contrato requer assinatura       2m   │  ← Unread: blue-50 bg, ocean-600 dot
-│        Acme Ltda.                             │     body-sm gray-500 company name
-│───────────────────────────────────────────────│
-│  🔵 💰 Ações emitidas com sucesso       15m  │  ← Unread
-│        TechCorp                               │
-│───────────────────────────────────────────────│
-│     ✅ Vesting milestone alcançado       1h   │  ← Read: white bg, no dot
-│        Acme Ltda.                             │
-│───────────────────────────────────────────────│
-│     🔔 Rodada fechada com sucesso        3h   │  ← Read
-│        TechCorp                               │
-│───────────────────────────────────────────────│
-│     📋 KYC verificação aprovada          1d   │  ← Read
-│        —                                      │
-│───────────────────────────────────────────────│
-│          View All Notifications →              │  ← Ghost link to /notifications
-└───────────────────────────────────────────────┘
++-----------------------------------------------+
+|  bell(3)                                       |  <- Bell icon with unread count badge
++-----------------------------------------------+
+        |
+        v (click to open popover)
++-----------------------------------------------+
+|  Notifications                     Mark all <- |  <- Header: h4, "Mark all" ghost button
+|-----------------------------------------------|
+|  * brain Relatorio de IA pronto          2m   |  <- Unread: blue-50 bg, ocean-600 dot
+|        Acme Ltda.                              |     body-sm gray-500 company name
+|-----------------------------------------------|
+|  * bank Sincronizacao bancaria OK        15m  |  <- Unread
+|        TechCorp                                |
+|-----------------------------------------------|
+|    check KYC verificacao aprovada         1h   |  <- Read: white bg, no dot
+|        ---                                     |
+|-----------------------------------------------|
+|    msg  Pergunta de investidor            3h   |  <- Read
+|        Acme Ltda.                              |
+|-----------------------------------------------|
+|    bell Atualizacao da empresa            1d   |  <- Read
+|        TechCorp                                |
+|-----------------------------------------------|
+|          View All Notifications ->             |  <- Ghost link to /notifications
++-----------------------------------------------+
 ```
 
 #### Behavior
@@ -495,12 +876,14 @@ When a notification is clicked, navigate to the related entity based on `related
 
 | relatedEntityType | Navigation Target |
 |-------------------|-------------------|
+| `Report` | `/companies/:companyId/reports/:id` |
 | `Document` | `/companies/:companyId/documents/:id` |
-| `Transaction` | `/companies/:companyId/transactions/:id` |
-| `OptionGrant` | `/companies/:companyId/option-grants/:id` |
-| `OptionExerciseRequest` | `/companies/:companyId/option-grants` (list view) |
-| `FundingRound` | `/companies/:companyId/funding-rounds/:id` |
-| `Shareholder` | `/companies/:companyId/shareholders/:id` |
+| `OpenFinanceConnection` | `/companies/:companyId/settings/open-finance` |
+| `InvestorQuestion` | `/companies/:companyId/investor-relations/qa/:id` |
+| `CompanyUpdate` | `/companies/:companyId/updates/:id` |
+| `CompanyMember` | `/companies/:companyId/settings/members` |
+| `FinancialSnapshot` | `/companies/:companyId/financials/:period` |
+| `Company` | `/companies/:companyId` |
 | `KYCVerification` | `/settings` (KYC section) |
 | `User` | `/settings` (profile section) |
 | `null` | No navigation (notification only) |
@@ -512,30 +895,30 @@ When a notification is clicked, navigate to the related entity based on `related
 #### Layout
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│  h1: Notifications                              [Mark All Read]  │
-│  body-sm: View and manage your notifications                     │
-├──────────────────────────────────────────────────────────────────┤
-│  Filters: [All ▾] [All Types ▾]                     🔍 Search   │
-│           read/unread   notification type                        │
-├──────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  ┌────────────────────────────────────────────────────────────┐  │
-│  │ 🔵 📄 Contrato de Acionistas requer sua assinatura   2m  │  │  ← Unread item
-│  │      Acme Ltda.                                           │  │
-│  ├────────────────────────────────────────────────────────────┤  │
-│  │ 🔵 💰 10.000 ações ON emitidas com sucesso          15m  │  │
-│  │      TechCorp                                             │  │
-│  ├────────────────────────────────────────────────────────────┤  │
-│  │    ✅ Vesting milestone: 50% alcançado                1h  │  │  ← Read item
-│  │      Acme Ltda.                                           │  │
-│  ├────────────────────────────────────────────────────────────┤  │
-│  │    🔔 Rodada Series A fechada                         3h  │  │
-│  │      TechCorp                                             │  │
-│  └────────────────────────────────────────────────────────────┘  │
-│                                                                  │
-│  Showing 1-20 of 42                         < 1 2 3 >            │
-└──────────────────────────────────────────────────────────────────┘
++------------------------------------------------------------------+
+|  h1: Notifications                              [Mark All Read]  |
+|  body-sm: View and manage your notifications                     |
+|------------------------------------------------------------------|
+|  Filters: [All v] [All Types v]                     search       |
+|           read/unread   notification type                        |
+|------------------------------------------------------------------|
+|                                                                  |
+|  +------------------------------------------------------------+ |
+|  | * brain Relatorio de IA pronto para analise             2m  | |  <- Unread item
+|  |      Acme Ltda.                                             | |
+|  |------------------------------------------------------------| |
+|  | * bank Sincronizacao bancaria concluida                15m  | |
+|  |      TechCorp                                               | |
+|  |------------------------------------------------------------| |
+|  |   check KYC verificacao aprovada                        1h  | |  <- Read item
+|  |      ---                                                    | |
+|  |------------------------------------------------------------| |
+|  |   msg  Nova pergunta de investidor                      3h  | |
+|  |      Acme Ltda.                                             | |
+|  +------------------------------------------------------------+ |
+|                                                                  |
+|  Showing 1-20 of 42                         < 1 2 3 >           |
++------------------------------------------------------------------+
 ```
 
 #### Filters
@@ -543,7 +926,7 @@ When a notification is clicked, navigate to the related entity based on `related
 | Filter | Type | Options |
 |--------|------|---------|
 | Read status | Select dropdown | All, Unread only, Read only |
-| Notification type | Select dropdown | All Types, Documents, Transactions, Options, Funding Rounds, KYC, Security |
+| Notification type | Select dropdown | All Types, AI & Processing, Open Finance, Investor Relations, Financial, Documents, KYC, Security |
 | Search | Text input | Free-text search on notification subject/description |
 
 #### Behavior
@@ -561,30 +944,33 @@ Located within the `/settings` page, under a "Notifications" tab or section.
 #### Layout
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│  h3: Notification Preferences                                │
-│  body-sm: Choose which notifications you want to receive     │
-│                                                              │
-│  ┌────────────────────────────────────────────────────────┐  │
-│  │  📄 Documents                                   [ON]  │  │  ← Toggle switch
-│  │  body-sm: Signature requests, document completions     │  │
-│  ├────────────────────────────────────────────────────────┤  │
-│  │  💰 Transactions                                [ON]  │  │
-│  │  body-sm: Share issuances, transfers, confirmations    │  │
-│  ├────────────────────────────────────────────────────────┤  │
-│  │  📈 Options                                     [ON]  │  │
-│  │  body-sm: Grants, vesting milestones, exercises        │  │
-│  ├────────────────────────────────────────────────────────┤  │
-│  │  🏦 Funding Rounds                              [ON]  │  │
-│  │  body-sm: Round invitations, commitments, closings     │  │
-│  ├────────────────────────────────────────────────────────┤  │
-│  │  🔒 Security                              [ON] 🔒     │  │  ← Always on, disabled toggle
-│  │  body-sm: Login alerts, KYC updates                    │  │
-│  │  caption: Security notifications cannot be disabled    │  │
-│  └────────────────────────────────────────────────────────┘  │
-│                                                              │
-│  [Save Preferences]                                          │
-└──────────────────────────────────────────────────────────────┘
++--------------------------------------------------------------+
+|  h3: Notification Preferences                                |
+|  body-sm: Choose which notifications you want to receive     |
+|                                                              |
+|  +--------------------------------------------------------+ |
+|  |  brain AI & Processing                            [ON]  | |  <- Toggle switch
+|  |  body-sm: AI reports, document processing results        | |
+|  |--------------------------------------------------------| |
+|  |  bank Open Finance                                [ON]  | |
+|  |  body-sm: Bank syncs, consent expiration warnings        | |
+|  |--------------------------------------------------------| |
+|  |  users Investor Relations                         [ON]  | |
+|  |  body-sm: Q&A questions, company updates, access grants  | |
+|  |--------------------------------------------------------| |
+|  |  chart Financial                                  [ON]  | |
+|  |  body-sm: Monthly snapshots, financial summaries          | |
+|  |--------------------------------------------------------| |
+|  |  file Documents                                   [ON]  | |
+|  |  body-sm: Document uploads, processing completions        | |
+|  |--------------------------------------------------------| |
+|  |  lock Security                              [ON] lock   | |  <- Always on, disabled toggle
+|  |  body-sm: Login alerts, KYC updates                       | |
+|  |  caption: Security notifications cannot be disabled       | |
+|  +--------------------------------------------------------+ |
+|                                                              |
+|  [Save Preferences]                                          |
++--------------------------------------------------------------+
 ```
 
 #### Behavior
@@ -599,35 +985,35 @@ Located within the `/settings` page, under a "Notifications" tab or section.
 
 ```
 DashboardShell
-  └─ TopBar
-       └─ NotificationBell
-            ├─ BellIconButton (with badge)
-            └─ NotificationDropdown (Popover)
-                 ├─ NotificationDropdownHeader ("Notifications" + "Mark all")
-                 ├─ NotificationDropdownList
-                 │    └─ NotificationDropdownItem (x5 max)
-                 ├─ NotificationDropdownEmpty
-                 └─ NotificationDropdownFooter ("View All" link)
+  +- TopBar
+       +- NotificationBell
+            +- BellIconButton (with badge)
+            +- NotificationDropdown (Popover)
+                 +- NotificationDropdownHeader ("Notifications" + "Mark all")
+                 +- NotificationDropdownList
+                 |    +- NotificationDropdownItem (x5 max)
+                 +- NotificationDropdownEmpty
+                 +- NotificationDropdownFooter ("View All" link)
 
 NotificationsPage (/notifications)
-  ├─ PageHeader ("Notifications" + "Mark All Read" button)
-  ├─ NotificationFilters
-  │    ├─ ReadStatusSelect
-  │    ├─ NotificationTypeSelect
-  │    └─ SearchInput
-  ├─ NotificationList
-  │    └─ NotificationListItem (repeated)
-  ├─ NotificationListEmpty
-  ├─ NotificationListSkeleton
-  └─ Pagination
+  +- PageHeader ("Notifications" + "Mark All Read" button)
+  +- NotificationFilters
+  |    +- ReadStatusSelect
+  |    +- NotificationTypeSelect
+  |    +- SearchInput
+  +- NotificationList
+  |    +- NotificationListItem (repeated)
+  +- NotificationListEmpty
+  +- NotificationListSkeleton
+  +- Pagination
 
-SettingsPage (/settings) → Notifications Tab
-  └─ NotificationPreferences
-       ├─ PreferenceCategoryRow (repeated per category)
-       │    ├─ CategoryIcon
-       │    ├─ CategoryLabel + Description
-       │    └─ Switch (toggle)
-       └─ SaveButton
+SettingsPage (/settings) -> Notifications Tab
+  +- NotificationPreferences
+       +- PreferenceCategoryRow (repeated per category)
+       |    +- CategoryIcon
+       |    +- CategoryLabel + Description
+       |    +- Switch (toggle)
+       +- SaveButton
 ```
 
 ### State Management (TanStack Query)
@@ -797,27 +1183,29 @@ All loading skeletons use `gray-200` pulsing rectangles per the design system.
 
 | notificationType | Icon (Lucide) | Icon Color |
 |------------------|---------------|------------|
-| `SIGNATURE_REQUEST` | `FileSignature` | `ocean-600` |
-| `DOCUMENT_SIGNED` | `FileCheck` | `green-700` |
-| `DOCUMENT_FULLY_SIGNED` | `FileCheck2` | `green-700` |
-| `DOCUMENT_DECLINED` | `FileX` | `destructive` |
-| `SHARES_ISSUED` | `TrendingUp` | `green-700` |
-| `SHARES_TRANSFERRED` | `ArrowLeftRight` | `ocean-600` |
-| `TRANSACTION_FAILED` | `AlertTriangle` | `destructive` |
-| `OPTION_GRANTED` | `Gift` | `ocean-600` |
-| `VESTING_MILESTONE` | `Target` | `green-700` |
-| `OPTION_EXERCISE_REQUESTED` | `Hand` | `cream-700` |
-| `OPTION_EXERCISE_COMPLETED` | `CheckCircle` | `green-700` |
-| `OPTIONS_EXPIRING` | `Clock` | `cream-700` |
-| `KYC_COMPLETED` | `ShieldCheck` | `green-700` |
+| `AI_REPORT_READY` | `Brain` | `ocean-600` |
+| `AI_PROCESSING_COMPLETE` | `FileCheck` | `green-700` |
+| `AI_PROCESSING_FAILED` | `FileX` | `destructive` |
+| `OPEN_FINANCE_SYNC_COMPLETE` | `Landmark` | `green-700` |
+| `OPEN_FINANCE_SYNC_FAILED` | `AlertTriangle` | `destructive` |
+| `OPEN_FINANCE_CONSENT_EXPIRING` | `Clock` | `cream-700` |
+| `INVESTOR_QA_RECEIVED` | `MessageCircleQuestion` | `ocean-600` |
+| `COMPANY_UPDATE_POSTED` | `Megaphone` | `ocean-600` |
+| `INVESTOR_ACCESS_GRANTED` | `UserCheck` | `green-700` |
+| `FINANCIAL_SNAPSHOT_READY` | `BarChart3` | `ocean-600` |
+| `KYC_APPROVED` | `ShieldCheck` | `green-700` |
 | `KYC_REJECTED` | `ShieldX` | `destructive` |
-| `KYC_RESUBMISSION` | `ShieldAlert` | `cream-700` |
-| `ROUND_INVITATION` | `Mail` | `ocean-600` |
-| `ROUND_CLOSING_SOON` | `Timer` | `cream-700` |
-| `ROUND_CLOSED` | `CheckCircle2` | `green-700` |
-| `SHAREHOLDER_ADDED` | `UserPlus` | `ocean-600` |
-| `SHAREHOLDER_REMOVED` | `UserMinus` | `destructive` |
-| `DILUTION_EVENT` | `AlertCircle` | `cream-700` |
+| `KYC_RESUBMISSION_REQUIRED` | `ShieldAlert` | `cream-700` |
+| `COMPANY_DATA_ENRICHED` | `DatabaseZap` | `ocean-600` |
+| `COMPANY_CREATED` | `Building2` | `ocean-600` |
+| `PROFILE_PUBLISHED` | `Globe` | `green-700` |
+| `MEMBER_INVITED` | `Mail` | `ocean-600` |
+| `MEMBER_ACCEPTED` | `UserCheck` | `green-700` |
+| `MEMBER_REMOVED` | `UserMinus` | `destructive` |
+| `ROLE_CHANGED` | `UserCog` | `cream-700` |
+| `DOCUMENT_UPLOADED` | `FileUp` | `ocean-600` |
+| `LOGIN_NEW_DEVICE` | `MonitorSmartphone` | `cream-700` |
+| `ACCOUNT_LOCKED` | `Lock` | `destructive` |
 | (fallback) | `Bell` | `gray-500` |
 
 #### Read/Unread Styling
@@ -834,9 +1222,9 @@ All loading skeletons use `gray-200` pulsing rectangles per the design system.
 #### Notification Item Structure
 
 ```
-┌─[dot]─[icon]──[title text]─────────────────[timestamp]─┐
-│              [company name / context]                    │
-└─────────────────────────────────────────────────────────┘
++-[dot]-[icon]--[title text]-----------------[timestamp]-+
+|              [company name / context]                   |
++---------------------------------------------------------+
 ```
 
 - **Dot**: 8px circle, `ocean-600`, only for unread items. Hidden for read items.
@@ -871,54 +1259,57 @@ All notification UI strings must be added to both `messages/pt-BR.json` and `mes
 ```json
 {
   "notifications": {
-    "title": "Notificações / Notifications",
-    "description": "Veja e gerencie suas notificações / View and manage your notifications",
+    "title": "Notificacoes / Notifications",
+    "description": "Veja e gerencie suas notificacoes / View and manage your notifications",
     "markAllRead": "Marcar todas como lidas / Mark all as read",
-    "markAllReadSuccess": "Todas as notificações foram marcadas como lidas / All notifications marked as read",
-    "viewAll": "Ver todas as notificações / View all notifications",
-    "empty": "Nenhuma notificação / No notifications",
-    "emptyDescription": "Quando eventos importantes acontecerem, você verá aqui. / When important events happen, you'll see them here.",
-    "emptyFiltered": "Nenhuma notificação encontrada com esses filtros / No notifications match your filters",
+    "markAllReadSuccess": "Todas as notificacoes foram marcadas como lidas / All notifications marked as read",
+    "viewAll": "Ver todas as notificacoes / View all notifications",
+    "empty": "Nenhuma notificacao / No notifications",
+    "emptyDescription": "Quando eventos importantes acontecerem, voce vera aqui. / When important events happen, you'll see them here.",
+    "emptyFiltered": "Nenhuma notificacao encontrada com esses filtros / No notifications match your filters",
     "clearFilters": "Limpar filtros / Clear filters",
-    "loadError": "Falha ao carregar notificações / Failed to load notifications",
+    "loadError": "Falha ao carregar notificacoes / Failed to load notifications",
     "retry": "Tentar novamente / Retry",
 
     "filters": {
       "all": "Todas / All",
-      "unreadOnly": "Apenas não lidas / Unread only",
+      "unreadOnly": "Apenas nao lidas / Unread only",
       "readOnly": "Apenas lidas / Read only",
       "allTypes": "Todos os tipos / All types",
+      "aiProcessing": "IA & Processamento / AI & Processing",
+      "openFinance": "Open Finance",
+      "investorRelations": "Relacoes com Investidores / Investor Relations",
+      "financial": "Financeiro / Financial",
       "documents": "Documentos / Documents",
-      "transactions": "Transações / Transactions",
-      "options": "Opções / Options",
-      "fundingRounds": "Rodadas / Funding Rounds",
       "kyc": "KYC",
-      "security": "Segurança / Security",
-      "search": "Buscar notificações... / Search notifications..."
+      "security": "Seguranca / Security",
+      "search": "Buscar notificacoes... / Search notifications..."
     },
 
     "types": {
-      "SIGNATURE_REQUEST": "Contrato requer sua assinatura / Document requires your signature",
-      "DOCUMENT_SIGNED": "Documento assinado / Document signed",
-      "DOCUMENT_FULLY_SIGNED": "Documento totalmente assinado / Document fully signed",
-      "DOCUMENT_DECLINED": "Assinatura recusada / Signature declined",
-      "SHARES_ISSUED": "{quantity} ações {shareClass} emitidas / {quantity} {shareClass} shares issued",
-      "SHARES_TRANSFERRED": "Ações transferidas / Shares transferred",
-      "TRANSACTION_FAILED": "Transação falhou / Transaction failed",
-      "OPTION_GRANTED": "Opções concedidas / Options granted",
-      "VESTING_MILESTONE": "Marco de vesting: {percentage}% alcançado / Vesting milestone: {percentage}% reached",
-      "OPTION_EXERCISE_REQUESTED": "Exercício de opções solicitado / Option exercise requested",
-      "OPTION_EXERCISE_COMPLETED": "Exercício de opções concluído / Option exercise completed",
-      "OPTIONS_EXPIRING": "Opções expiram em {days} dias / Options expiring in {days} days",
-      "KYC_COMPLETED": "Verificação KYC aprovada / KYC verification approved",
-      "KYC_REJECTED": "Verificação KYC rejeitada / KYC verification rejected",
-      "KYC_RESUBMISSION": "Reenvio de KYC necessário / KYC resubmission required",
-      "ROUND_INVITATION": "Convite para rodada de investimento / Funding round invitation",
-      "ROUND_CLOSING_SOON": "Rodada fecha em breve / Round closing soon",
-      "ROUND_CLOSED": "Rodada encerrada / Round closed",
-      "SHAREHOLDER_ADDED": "Novo acionista adicionado / New shareholder added",
-      "SHAREHOLDER_REMOVED": "Acionista removido / Shareholder removed",
-      "DILUTION_EVENT": "Evento de diluição significativo / Significant dilution event"
+      "AI_REPORT_READY": "Relatorio de IA pronto / AI report ready",
+      "AI_PROCESSING_COMPLETE": "Processamento de documento concluido / Document processing complete",
+      "AI_PROCESSING_FAILED": "Processamento de documento falhou / Document processing failed",
+      "OPEN_FINANCE_SYNC_COMPLETE": "Sincronizacao bancaria concluida / Bank sync completed",
+      "OPEN_FINANCE_SYNC_FAILED": "Sincronizacao bancaria falhou / Bank sync failed",
+      "OPEN_FINANCE_CONSENT_EXPIRING": "Consentimento bancario expira em {days} dias / Bank consent expires in {days} days",
+      "INVESTOR_QA_RECEIVED": "Nova pergunta de {investorName} / New question from {investorName}",
+      "COMPANY_UPDATE_POSTED": "{companyName} publicou uma atualizacao / {companyName} posted an update",
+      "INVESTOR_ACCESS_GRANTED": "Acesso concedido a {companyName} / Access granted to {companyName}",
+      "FINANCIAL_SNAPSHOT_READY": "Snapshot financeiro de {period} pronto / Financial snapshot for {period} ready",
+      "KYC_APPROVED": "Verificacao KYC aprovada / KYC verification approved",
+      "KYC_REJECTED": "Verificacao KYC rejeitada / KYC verification rejected",
+      "KYC_RESUBMISSION_REQUIRED": "Reenvio de KYC necessario / KYC resubmission required",
+      "COMPANY_DATA_ENRICHED": "Dados da empresa enriquecidos / Company data enriched",
+      "COMPANY_CREATED": "Empresa criada com sucesso / Company created successfully",
+      "PROFILE_PUBLISHED": "Perfil da empresa publicado / Company profile published",
+      "MEMBER_INVITED": "Voce foi convidado para {companyName} / You were invited to {companyName}",
+      "MEMBER_ACCEPTED": "{memberName} aceitou o convite / {memberName} accepted the invitation",
+      "MEMBER_REMOVED": "Membro removido de {companyName} / Member removed from {companyName}",
+      "ROLE_CHANGED": "Sua funcao foi alterada para {newRole} / Your role was changed to {newRole}",
+      "DOCUMENT_UPLOADED": "Documento enviado: {documentName} / Document uploaded: {documentName}",
+      "LOGIN_NEW_DEVICE": "Login detectado de novo dispositivo / Login detected from new device",
+      "ACCOUNT_LOCKED": "Conta bloqueada por tentativas de login / Account locked due to login attempts"
     },
 
     "time": {
@@ -929,27 +1320,75 @@ All notification UI strings must be added to both `messages/pt-BR.json` and `mes
     },
 
     "preferences": {
-      "title": "Preferências de Notificação / Notification Preferences",
-      "description": "Escolha quais notificações você deseja receber / Choose which notifications you want to receive",
+      "title": "Preferencias de Notificacao / Notification Preferences",
+      "description": "Escolha quais notificacoes voce deseja receber / Choose which notifications you want to receive",
+      "aiProcessing": "IA & Processamento / AI & Processing",
+      "aiProcessingDescription": "Relatorios de IA, resultados de processamento de documentos / AI reports, document processing results",
+      "openFinance": "Open Finance",
+      "openFinanceDescription": "Sincronizacoes bancarias, avisos de expiracao de consentimento / Bank syncs, consent expiration warnings",
+      "investorRelations": "Relacoes com Investidores / Investor Relations",
+      "investorRelationsDescription": "Perguntas de Q&A, atualizacoes da empresa, concessoes de acesso / Q&A questions, company updates, access grants",
+      "financial": "Financeiro / Financial",
+      "financialDescription": "Snapshots mensais, resumos financeiros / Monthly snapshots, financial summaries",
       "documents": "Documentos / Documents",
-      "documentsDescription": "Solicitações de assinatura, documentos finalizados / Signature requests, document completions",
-      "transactions": "Transações / Transactions",
-      "transactionsDescription": "Emissões de ações, transferências, confirmações / Share issuances, transfers, confirmations",
-      "options": "Opções / Options",
-      "optionsDescription": "Concessões, marcos de vesting, exercícios / Grants, vesting milestones, exercises",
-      "fundingRounds": "Rodadas de Investimento / Funding Rounds",
-      "fundingRoundsDescription": "Convites, compromissos, encerramentos / Invitations, commitments, closings",
-      "security": "Segurança / Security",
-      "securityDescription": "Alertas de login, atualizações de KYC / Login alerts, KYC updates",
-      "securityLocked": "Notificações de segurança não podem ser desativadas / Security notifications cannot be disabled",
-      "save": "Salvar Preferências / Save Preferences",
-      "saveSuccess": "Preferências atualizadas com sucesso / Preferences updated successfully"
+      "documentsDescription": "Uploads de documentos, conclusoes de processamento / Document uploads, processing completions",
+      "security": "Seguranca / Security",
+      "securityDescription": "Alertas de login, atualizacoes de KYC / Login alerts, KYC updates",
+      "securityLocked": "Notificacoes de seguranca nao podem ser desativadas / Security notifications cannot be disabled",
+      "save": "Salvar Preferencias / Save Preferences",
+      "saveSuccess": "Preferencias atualizadas com sucesso / Preferences updated successfully"
     }
   }
 }
 ```
 
-**Note**: The above shows `PT-BR / EN` side by side for reference. In the actual JSON files, each locale file contains only its own language values. Interpolation variables (e.g., `{quantity}`, `{percentage}`) use `next-intl` ICU message syntax.
+**Note**: The above shows `PT-BR / EN` side by side for reference. In the actual JSON files, each locale file contains only its own language values. Interpolation variables (e.g., `{investorName}`, `{companyName}`, `{days}`) use `next-intl` ICU message syntax.
+
+### Backend messageKeys for New Notification Types
+
+All new notification types have corresponding i18n messageKeys for backend error responses and notification content:
+
+| Notification Type | messageKey (title) | messageKey (description) |
+|---|---|---|
+| `AI_REPORT_READY` | `notifications.types.AI_REPORT_READY` | `notifications.descriptions.aiReportReady` |
+| `AI_PROCESSING_COMPLETE` | `notifications.types.AI_PROCESSING_COMPLETE` | `notifications.descriptions.aiProcessingComplete` |
+| `AI_PROCESSING_FAILED` | `notifications.types.AI_PROCESSING_FAILED` | `notifications.descriptions.aiProcessingFailed` |
+| `OPEN_FINANCE_SYNC_COMPLETE` | `notifications.types.OPEN_FINANCE_SYNC_COMPLETE` | `notifications.descriptions.openFinanceSyncComplete` |
+| `OPEN_FINANCE_SYNC_FAILED` | `notifications.types.OPEN_FINANCE_SYNC_FAILED` | `notifications.descriptions.openFinanceSyncFailed` |
+| `OPEN_FINANCE_CONSENT_EXPIRING` | `notifications.types.OPEN_FINANCE_CONSENT_EXPIRING` | `notifications.descriptions.openFinanceConsentExpiring` |
+| `INVESTOR_QA_RECEIVED` | `notifications.types.INVESTOR_QA_RECEIVED` | `notifications.descriptions.investorQaReceived` |
+| `COMPANY_UPDATE_POSTED` | `notifications.types.COMPANY_UPDATE_POSTED` | `notifications.descriptions.companyUpdatePosted` |
+| `INVESTOR_ACCESS_GRANTED` | `notifications.types.INVESTOR_ACCESS_GRANTED` | `notifications.descriptions.investorAccessGranted` |
+| `FINANCIAL_SNAPSHOT_READY` | `notifications.types.FINANCIAL_SNAPSHOT_READY` | `notifications.descriptions.financialSnapshotReady` |
+| `KYC_APPROVED` | `notifications.types.KYC_APPROVED` | `notifications.descriptions.kycApproved` |
+| `KYC_REJECTED` | `notifications.types.KYC_REJECTED` | `notifications.descriptions.kycRejected` |
+| `KYC_RESUBMISSION_REQUIRED` | `notifications.types.KYC_RESUBMISSION_REQUIRED` | `notifications.descriptions.kycResubmissionRequired` |
+| `COMPANY_DATA_ENRICHED` | `notifications.types.COMPANY_DATA_ENRICHED` | `notifications.descriptions.companyDataEnriched` |
+
+### Description i18n Keys (PT-BR / EN)
+
+```json
+{
+  "notifications": {
+    "descriptions": {
+      "aiReportReady": "Seu relatorio {reportTitle} para {companyName} esta pronto para visualizacao / Your report {reportTitle} for {companyName} is ready to view",
+      "aiProcessingComplete": "O documento {documentName} foi processado com sucesso / Document {documentName} was processed successfully",
+      "aiProcessingFailed": "O processamento do documento {documentName} falhou. Tente novamente. / Document {documentName} processing failed. Please try again.",
+      "openFinanceSyncComplete": "Sincronizacao com {bankName} concluida: {transactionsSync} transacoes importadas / Sync with {bankName} complete: {transactionsSync} transactions imported",
+      "openFinanceSyncFailed": "Sincronizacao com {bankName} falhou. Verifique sua conexao bancaria. / Sync with {bankName} failed. Check your bank connection.",
+      "openFinanceConsentExpiring": "Seu consentimento com {bankName} expira em {daysUntilExpiry} dias. Renove para continuar sincronizando. / Your consent with {bankName} expires in {daysUntilExpiry} days. Renew to continue syncing.",
+      "investorQaReceived": "{investorName} enviou uma pergunta sobre {companyName} / {investorName} asked a question about {companyName}",
+      "companyUpdatePosted": "{companyName} publicou: {updateTitle} / {companyName} posted: {updateTitle}",
+      "investorAccessGranted": "Voce recebeu acesso de {accessLevel} a {companyName} / You were granted {accessLevel} access to {companyName}",
+      "financialSnapshotReady": "O snapshot financeiro de {period} para {companyName} esta disponivel / The financial snapshot for {period} at {companyName} is available",
+      "kycApproved": "Sua verificacao de identidade foi aprovada. Acesso completo liberado. / Your identity verification was approved. Full access granted.",
+      "kycRejected": "Sua verificacao de identidade foi rejeitada. Motivo: {rejectionReason} / Your identity verification was rejected. Reason: {rejectionReason}",
+      "kycResubmissionRequired": "Reenvio necessario para sua verificacao KYC. Motivo: {reason} / Resubmission needed for your KYC verification. Reason: {reason}",
+      "companyDataEnriched": "Dados de {companyName} foram enriquecidos com {fieldsCount} novos campos / {companyName} data was enriched with {fieldsCount} new fields"
+    }
+  }
+}
+```
 
 ---
 
@@ -1109,7 +1548,7 @@ interface NotificationListSkeletonProps {
 
 **shadcn/ui**: `Card`, `Switch`, `Button`, `Label`
 
-**Lucide icons**: `FileText`, `TrendingUp`, `Target`, `Landmark`, `Shield`, `Lock`
+**Lucide icons**: `Brain`, `Landmark`, `Users`, `BarChart3`, `FileText`, `Shield`, `Lock`
 
 **Hooks**: `useNotificationPreferences()`, `useUpdatePreferences()`
 
@@ -1174,10 +1613,11 @@ interface NotificationFilters {
 
 interface NotificationPreferences {
   categories: {
-    transactions: boolean;
+    aiProcessing: boolean;
+    openFinance: boolean;
+    investorRelations: boolean;
+    financial: boolean;
     documents: boolean;
-    options: boolean;
-    fundingRounds: boolean;
     security: boolean; // always true
   };
   updatedAt: string;
@@ -1185,11 +1625,12 @@ interface NotificationPreferences {
 
 interface UpdatePreferencesDto {
   categories: {
-    transactions?: boolean;
+    aiProcessing?: boolean;
+    openFinance?: boolean;
+    investorRelations?: boolean;
+    financial?: boolean;
     documents?: boolean;
-    options?: boolean;
-    fundingRounds?: boolean;
-    // security is omitted — backend ignores it
+    // security is omitted -- backend ignores it
   };
 }
 ```
@@ -1200,12 +1641,7 @@ interface UpdatePreferencesDto {
 
 | Specification | Relationship |
 |---------------|-------------|
-| [document-signatures.md](./document-signatures.md) | Signature request and document completion notification triggers |
-| [transactions.md](./transactions.md) | Transaction confirmation, approval, and failure notification triggers |
-| [option-plans.md](./option-plans.md) | Vesting milestone and option grant notification triggers |
-| [option-exercises.md](./option-exercises.md) | Exercise request, payment confirmation, and share issuance notifications |
-| [company-membership.md](./company-membership.md) | Member invitation and role change notification triggers |
-| [funding-rounds.md](./funding-rounds.md) | Round invitation, commitment confirmation, and closing notifications |
+| [company-membership.md](./company-membership.md) | Member invitation, acceptance, removal, and role change notification triggers |
 | [authentication.md](./authentication.md) | Login from new device and security-related notifications |
 | [api-standards.md](../.claude/rules/api-standards.md) | API response envelope, pagination, and URL conventions for notification endpoints |
 | [error-handling.md](../.claude/rules/error-handling.md) | Error codes for notification delivery failures and preference updates |

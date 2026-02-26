@@ -2,7 +2,7 @@
 
 **Topic of Concern**: Member invitation, acceptance, role management, and membership lifecycle
 
-**One-Sentence Description**: The system manages company team membership through email-based invitations with token-based acceptance, role-based access control (ADMIN, FINANCE, LEGAL, INVESTOR, EMPLOYEE), and enforcement of membership constraints including the last-admin rule and per-user company limits.
+**One-Sentence Description**: The system manages company team membership through email-based invitations with token-based acceptance, role-based access control (ADMIN, FINANCE, LEGAL, INVESTOR, INVESTOR_VIEWER, EMPLOYEE), and enforcement of membership constraints including the last-admin rule and per-user company limits.
 
 ---
 
@@ -21,6 +21,7 @@ Key constraints:
 - `user-permissions.md` — Role definitions and full permission matrix
 - `authentication.md` — User entity, Privy JWT, embedded wallets
 - `company-blockchain-admin.md` — On-chain ownership transfer when ADMIN role changes
+- `investor-portal.md` — Investor portal, InvestorAccess model, and investor-specific invitation flow
 
 ---
 
@@ -32,10 +33,11 @@ Key constraints:
 4. [API Endpoints](#api-endpoints)
 5. [User Flows](#user-flows)
 6. [Business Rules](#business-rules)
-7. [Edge Cases & Error Handling](#edge-cases--error-handling)
-8. [Security Considerations](#security-considerations)
-9. [Technical Implementation](#technical-implementation)
-10. [Success Criteria](#success-criteria)
+7. [Investor Invitation Flow](#investor-invitation-flow)
+8. [Edge Cases & Error Handling](#edge-cases--error-handling)
+9. [Security Considerations](#security-considerations)
+10. [Technical Implementation](#technical-implementation)
+11. [Success Criteria](#success-criteria)
 
 ---
 
@@ -81,7 +83,7 @@ Key constraints:
 - System MUST support re-sending an invitation (generates a new token, invalidates the old one)
 
 ### FR-2: Role-Based Membership
-- System MUST support the following roles: `ADMIN`, `FINANCE`, `LEGAL`, `INVESTOR`, `EMPLOYEE`
+- System MUST support the following roles: `ADMIN`, `FINANCE`, `LEGAL`, `INVESTOR`, `INVESTOR_VIEWER`, `EMPLOYEE`
 - Role definitions and permission matrices are defined in `user-permissions.md`
 - System MUST allow ADMIN users to change any member's role
 - System MUST enforce that at least one ADMIN exists per company at all times
@@ -106,7 +108,7 @@ interface CompanyMember {
   companyId: string;                   // Foreign key to Company
   userId: string | null;               // Foreign key to User (null for pending invitations)
   email: string;                       // Invitation email (used for matching on acceptance)
-  role: CompanyMemberRole;             // ADMIN | FINANCE | LEGAL | INVESTOR | EMPLOYEE
+  role: CompanyMemberRole;             // ADMIN | FINANCE | LEGAL | INVESTOR | INVESTOR_VIEWER | EMPLOYEE
 
   // Optional fine-grained permission overrides
   permissions: {
@@ -142,6 +144,7 @@ enum CompanyMemberRole {
   FINANCE = 'FINANCE',
   LEGAL = 'LEGAL',
   INVESTOR = 'INVESTOR',
+  INVESTOR_VIEWER = 'INVESTOR_VIEWER',
   EMPLOYEE = 'EMPLOYEE',
 }
 
@@ -155,6 +158,15 @@ enum CompanyMemberStatus {
 // - (companyId, userId) WHERE status = 'ACTIVE' — one active membership per user per company
 // - (companyId, email) WHERE status = 'PENDING' — one pending invitation per email per company
 ```
+
+### INVESTOR_VIEWER Role
+
+The `INVESTOR_VIEWER` role is designed for investors who need platform login access to view their investment details within the company dashboard. Key characteristics:
+
+- **Read-only access**: Can view the cap table, their own shareholdings, funding round details, and company documents shared with investors. Cannot create, edit, or approve any records.
+- **Relationship to InvestorAccess**: Investors are primarily managed via the `InvestorAccess` model (see `investor-portal.md`), which provides email-based access to a lightweight investor portal without requiring platform registration. The `INVESTOR_VIEWER` role is an **optional upgrade** for investors who want (or are given) full platform login access.
+- **Permission matrix**: Defined in `user-permissions.md`. Permissions are a subset of the existing `INVESTOR` role, focused on viewing rather than participation.
+- **Assignment**: An ADMIN can assign the `INVESTOR_VIEWER` role via the standard member invitation flow, or convert an existing `INVESTOR` member to `INVESTOR_VIEWER` via role change.
 
 ### InvitationToken Entity
 
@@ -425,7 +437,7 @@ PRECONDITION: Company is ACTIVE, user is ADMIN
 1. Admin navigates to "Team" -> "Invite Member"
 2. Admin enters:
    - Invitee email
-   - Role (ADMIN, FINANCE, LEGAL, INVESTOR, EMPLOYEE)
+   - Role (ADMIN, FINANCE, LEGAL, INVESTOR, INVESTOR_VIEWER, EMPLOYEE)
    - Optional: personal message
 3. Admin clicks "Send Invitation"
 4. Frontend sends POST /api/v1/companies/:companyId/members/invite
@@ -505,6 +517,36 @@ POSTCONDITION: New member has ACTIVE status, can access company data per role
 - The acceptance endpoint does NOT check email match — any authenticated user with a valid token can accept
 - The CompanyMember record is updated with the accepting user's ID and email
 - An audit log entry records the original invitation email and the accepting user's email for traceability
+
+---
+
+## Investor Invitation Flow
+
+Investors who need access to company data are primarily managed through the **InvestorAccess** model, which provides a lightweight, email-based portal that does not require platform registration or a CompanyMember record. See `investor-portal.md` for the full specification.
+
+### InvestorAccess vs. CompanyMember (INVESTOR_VIEWER)
+
+| Aspect | InvestorAccess (Investor Portal) | CompanyMember (INVESTOR_VIEWER) |
+|--------|----------------------------------|----------------------------------|
+| **Access method** | Email-based magic link, no platform account required | Platform login via Privy (requires registration) |
+| **Invitation flow** | Separate flow via `POST /api/v1/companies/:companyId/investor-access/invite` (see `investor-portal.md`) | Standard member invitation flow via `POST /api/v1/companies/:companyId/members/invite` |
+| **Portal** | Lightweight investor portal with limited views | Full platform dashboard with role-based permissions |
+| **Use case** | External investors who only need to view their holdings and documents | Investors who are actively involved and need platform features (notifications, settings, etc.) |
+| **Data model** | `InvestorAccess` entity (see `investor-portal.md`) | `CompanyMember` entity with role `INVESTOR_VIEWER` |
+| **Token expiry** | Configurable per company (see `investor-portal.md`) | 7-day invitation token, then permanent platform access |
+
+### When to Use Each
+
+- **InvestorAccess (default for investors)**: Use for most investors. They receive an email with a magic link to view their investment summary, cap table position, and shared documents. No Navia account needed.
+- **CompanyMember with INVESTOR_VIEWER role**: Use when an investor needs or requests platform login access -- for example, to receive in-app notifications, manage their profile, or access features beyond what the lightweight portal provides. An ADMIN invites them via the standard member invitation flow with the `INVESTOR_VIEWER` role.
+
+### Overlap Handling
+
+An investor may have both an `InvestorAccess` record (for the portal) and a `CompanyMember` record (for platform access). These are independent:
+- The `InvestorAccess` record is tied to an email address and does not require a User account.
+- The `CompanyMember` record is tied to a User account after invitation acceptance.
+- If an investor with an `InvestorAccess` record is later invited as a `CompanyMember`, both records coexist. The investor can use either access method.
+- Removing the `CompanyMember` record does not affect the `InvestorAccess` portal access, and vice versa.
 
 ---
 
@@ -754,10 +796,11 @@ export class CompanyMemberService {
 
 ### Internal Dependencies
 - **company-management.md**: Company entity and lifecycle — membership is scoped to a company
-- **user-permissions.md**: Role definitions (ADMIN, FINANCE, LEGAL, INVESTOR, EMPLOYEE) and permission matrix
+- **user-permissions.md**: Role definitions (ADMIN, FINANCE, LEGAL, INVESTOR, INVESTOR_VIEWER, EMPLOYEE) and permission matrix
 - **authentication.md**: User entity with email and walletAddress fields
 - **company-blockchain-admin.md**: On-chain ownership transfer triggered by ADMIN role transfer
 - **notifications.md**: Email templates for invitations and member notifications
+- **investor-portal.md**: InvestorAccess model and investor-specific invitation flow (separate from CompanyMember invitations)
 
 ### External Dependencies
 - **AWS SES**: Invitation emails and status notification emails
@@ -768,7 +811,8 @@ export class CompanyMemberService {
 
 ## Related Specifications
 
-*Cross-references to be completed in Phase 5 of the spec alignment project.*
+- `investor-portal.md` — Investor portal access model, magic link authentication, and lightweight investor views
+- `user-permissions.md` — Full permission matrix including INVESTOR_VIEWER role capabilities
 
 ---
 
@@ -924,6 +968,7 @@ export function useMembers(companyId: string, params?: {
 | `FINANCE` | Financeiro | Gestao financeira e relatorios |
 | `LEGAL` | Juridico | Documentos legais e compliance |
 | `INVESTOR` | Investidor | Visualizacao de investimentos proprios |
+| `INVESTOR_VIEWER` | Investidor (somente visualizacao) | Acesso de leitura a informacoes de investimento |
 | `EMPLOYEE` | Colaborador | Visualizacao de opcoes e documentos proprios |
 
 **Submit**: `POST /api/v1/companies/:companyId/members/invite` with `{ email, role, message }`.
@@ -977,13 +1022,14 @@ export function useInviteMember(companyId: string) {
 | FINANCE | `blue-50` (#EAF5FA) | `blue-600` (#1B6B93) |
 | LEGAL | `green-100` (#E8F5E4) | `green-700` (#6BAF5E) |
 | INVESTOR | `cream-100` (#FAF4E3) | `cream-700` (#C4A44E) |
+| INVESTOR_VIEWER | `cream-50` (#FDFAF1) | `cream-700` (#C4A44E) |
 | EMPLOYEE | `gray-100` (#F3F4F6) | `gray-600` (#4B5563) |
 
 **Props**:
 
 ```typescript
 interface RoleBadgeProps {
-  role: 'ADMIN' | 'FINANCE' | 'LEGAL' | 'INVESTOR' | 'EMPLOYEE';
+  role: 'ADMIN' | 'FINANCE' | 'LEGAL' | 'INVESTOR' | 'INVESTOR_VIEWER' | 'EMPLOYEE';
 }
 ```
 
@@ -997,7 +1043,7 @@ interface RoleBadgeProps {
 
 **Behavior**:
 - Trigger: Clicking the `RoleBadge` in the table row (only when current user is ADMIN and target is not self)
-- Dropdown shows all 5 roles with descriptions (same as InviteMemberModal role dropdown)
+- Dropdown shows all 6 roles with descriptions (same as InviteMemberModal role dropdown)
 - On select: Confirmation dialog opens before submitting
 
 **Confirmation Dialog**:
@@ -1421,7 +1467,7 @@ ACTOR: ADMIN
 TRIGGER: Clicks role badge of another member in the table
 
 1. [UI] ADMIN clicks on a RoleBadge in another member's row
-2. [UI] RoleChangeDropdown opens showing 5 role options with descriptions
+2. [UI] RoleChangeDropdown opens showing 6 role options with descriptions
 3. [UI] Admin selects new role
 4. [UI] Confirmation dialog: "Alterar o papel de {name} de {oldRole} para {newRole}?"
 5. [UI] Admin clicks "Confirmar"
@@ -1726,6 +1772,8 @@ All user-facing strings must be added to both `messages/pt-BR.json` and `message
 | `members.role.legalDescription` | Documentos legais e compliance | Legal documents and compliance |
 | `members.role.investor` | Investidor | Investor |
 | `members.role.investorDescription` | Visualizacao de investimentos proprios | View own investments |
+| `members.role.investorViewer` | Investidor (somente visualizacao) | Investor (view only) |
+| `members.role.investorViewerDescription` | Acesso de leitura a informacoes de investimento | Read-only access to investment information |
 | `members.role.employee` | Colaborador | Employee |
 | `members.role.employeeDescription` | Visualizacao de opcoes e documentos proprios | View own options and documents |
 

@@ -2,15 +2,17 @@
 
 **Topic of Concern**: Identity verification using Verifik for Brazilian regulatory compliance
 
-**One-Sentence Description**: The system verifies user identities through Verifik using CPF validation, document verification, facial recognition, and AML screening.
+**One-Sentence Description**: The system verifies startup founder identities during onboarding through Verifik using CPF validation, document verification, facial recognition, and AML screening.
 
 ---
 
 ## Overview
 
-Navia integrates with Verifik, an AI-powered identity verification platform specialized for Latin American markets, to comply with Brazilian KYC/AML regulations (BCB Circular 3.978/2020 and Resolução BCB 119/2021). The system performs multi-level verification including CPF validation against government databases, document authentication, facial biometric matching, liveness detection, and AML screening against PEP and sanctions lists.
+Navia integrates with Verifik, an AI-powered identity verification platform specialized for Latin American markets, to comply with Brazilian KYC/AML regulations (BCB Circular 3.978/2020 and Resolucao BCB 119/2021). The system performs multi-level verification including CPF validation against government databases, document authentication, facial biometric matching, liveness detection, and AML screening against PEP and sanctions lists.
 
 **Regulatory Context**: Brazilian fintech platforms handling financial instruments must verify customer identities using CPF cross-checks with Receita Federal, facial recognition, and AML screening. Brazil has 5x higher deepfake fraud rates than the US, making liveness detection critical.
+
+**Who must complete KYC**: Startup founders during onboarding. KYC is a mandatory step between personal info collection and company creation. Founders cannot create a company or access platform features without approved KYC.
 
 > **Note**: Company-level CNPJ validation is covered in [company-cnpj-validation.md](./company-cnpj-validation.md). This spec focuses on personal identity verification (CPF, documents, facial recognition, AML).
 
@@ -18,55 +20,48 @@ Navia integrates with Verifik, an AI-powered identity verification platform spec
 
 ## User Stories
 
-### US-1: Admin User KYC (Limited Access)
-**As an** admin user who just signed up
-**I want to** access the dashboard and view settings before completing KYC
-**So that** I can explore the platform while preparing my identity documents
+### US-1: Founder KYC During Onboarding
+**As a** startup founder who just signed up
+**I want to** complete identity verification as part of the onboarding flow
+**So that** I can create my company and manage my cap table
 
-**But** I cannot create a cap table until KYC is approved
-
-### US-2: Admin KYC Before Cap Table Creation
-**As an** admin user ready to create my first cap table
-**I want to** complete CPF verification, document upload, and facial recognition
-**So that** I can create a compliant cap table for my company
-
-### US-3: Investor/Employee Immediate KYC
-**As an** investor or employee user who just signed up
-**I want to** be immediately redirected to KYC verification
-**So that** I can complete compliance requirements before accessing the platform
-
-### US-4: CPF Validation
-**As a** user completing KYC
+### US-2: CPF Validation
+**As a** founder completing KYC
 **I want to** enter my CPF and date of birth for instant validation
 **So that** the system can verify my identity against government records
 
-### US-5: Document Upload
-**As a** user completing KYC
-**I want to** upload my identity document (RG, CNH, or RNE)
+### US-3: Document Upload
+**As a** founder completing KYC
+**I want to** upload my identity document (RG, CNH, or Passport)
 **So that** the system can extract and verify my identity information via OCR
 
-### US-6: Facial Recognition
-**As a** user completing KYC
+### US-4: Facial Recognition
+**As a** founder completing KYC
 **I want to** take a selfie for facial recognition
 **So that** the system can verify I am the person in the identity document
 
-### US-7: KYC Status Visibility
-**As a** user who submitted KYC
+### US-5: KYC Status Visibility
+**As a** founder who submitted KYC
 **I want to** see the verification status and any rejection reasons
 **So that** I can take corrective action if needed
+
+### US-6: KYC Retry After Rejection
+**As a** founder whose KYC was rejected
+**I want to** retry the verification with corrected documents
+**So that** I can complete onboarding and start using the platform
 
 ---
 
 ## Functional Requirements
 
-### FR-1: KYC Timing by User Type
-- Admin users MUST be able to access dashboard after signup without KYC
-- Admin users MUST complete KYC before creating a cap table
-- Investor users MUST complete KYC immediately after signup before platform access
-- Employee users MUST complete KYC immediately after signup before platform access
+### FR-1: KYC Timing
+- Founders MUST complete KYC during onboarding, after personal info and before company creation
+- The onboarding flow is: Personal Info -> KYC Verification -> Company Setup -> Done
+- KYC cannot be skipped -- it is mandatory for all founders
+- Founders cannot proceed to company creation until KYC status = "approved"
 
-### FR-2: Verification Levels
-- All users MUST complete Standard verification level:
+### FR-2: Verification Steps
+- All founders MUST complete Standard verification level:
   - CPF validation against Receita Federal database
   - Identity document upload and OCR extraction
   - Facial recognition with liveness detection
@@ -79,7 +74,7 @@ Navia integrates with Verifik, an AI-powered identity verification platform spec
 - System MUST store certified CPF data returned by Verifik
 
 ### FR-4: Document Verification
-- System MUST accept: RG (Registro Geral), CNH (Driver's License), RNE (Foreign ID)
+- System MUST accept: RG (Registro Geral), CNH (Driver's License), Passport
 - System MUST perform OCR extraction of document data
 - System MUST validate document authenticity (detect tampering)
 - System MUST compare extracted data with CPF validation results
@@ -133,7 +128,7 @@ interface KYCVerification {
   };
 
   // Document Verification
-  documentType: 'RG' | 'CNH' | 'RNE';
+  documentType: 'RG' | 'CNH' | 'PASSPORT';
   documentNumber: string;
   documentVerified: boolean;
   documentVerifiedAt: Date | null;
@@ -245,9 +240,9 @@ enum KYCStatus {
 ```
 
 **Error Responses**:
-- `400 Bad Request` — Invalid CPF format (`KYC_CPF_INVALID`, messageKey: `errors.kyc.cpfInvalid`)
-- `404 Not Found` — CPF not found in Receita Federal database (`KYC_CPF_NOT_FOUND`, messageKey: `errors.kyc.cpfNotFound`)
-- `422 Unprocessable Entity` — Date of birth mismatch (`KYC_CPF_DOB_MISMATCH`, messageKey: `errors.kyc.cpfDobMismatch`)
+- `400 Bad Request` -- Invalid CPF format (`KYC_CPF_INVALID`, messageKey: `errors.kyc.cpfInvalid`)
+- `404 Not Found` -- CPF not found in Receita Federal database (`KYC_CPF_NOT_FOUND`, messageKey: `errors.kyc.cpfNotFound`)
+- `422 Unprocessable Entity` -- Date of birth mismatch (`KYC_CPF_DOB_MISMATCH`, messageKey: `errors.kyc.cpfDobMismatch`)
 
 ---
 
@@ -256,7 +251,7 @@ enum KYCStatus {
 
 **Request**: `multipart/form-data`
 ```
-documentType: "RG" | "CNH" | "RNE"
+documentType: "RG" | "CNH" | "PASSPORT"
 documentNumber: "string"
 file: <image file>
 ```
@@ -279,9 +274,9 @@ file: <image file>
 ```
 
 **Error Responses**:
-- `400 Bad Request` — Invalid file type, only JPG, PNG, PDF accepted (`KYC_DOCUMENT_INVALID`, messageKey: `errors.kyc.documentInvalid`)
-- `413 Payload Too Large` — File exceeds 10MB
-- `422 Unprocessable Entity` — Document unreadable or tampered (`KYC_DOCUMENT_INVALID`, messageKey: `errors.kyc.documentInvalid`)
+- `400 Bad Request` -- Invalid file type, only JPG, PNG, PDF accepted (`KYC_DOCUMENT_INVALID`, messageKey: `errors.kyc.documentInvalid`)
+- `413 Payload Too Large` -- File exceeds 10MB
+- `422 Unprocessable Entity` -- Document unreadable or tampered (`KYC_DOCUMENT_INVALID`, messageKey: `errors.kyc.documentInvalid`)
 
 ---
 
@@ -307,9 +302,9 @@ selfie: <image file>
 ```
 
 **Error Responses**:
-- `400 Bad Request` — Invalid image format (`KYC_DOCUMENT_INVALID`, messageKey: `errors.kyc.documentInvalid`)
-- `422 Unprocessable Entity` — Liveness check failed, deepfake detected (`KYC_LIVENESS_CHECK_FAILED`, messageKey: `errors.kyc.livenessCheckFailed`)
-- `422 Unprocessable Entity` — Face match score below threshold, < 85% (`KYC_FACE_MATCH_FAILED`, messageKey: `errors.kyc.faceMatchFailed`)
+- `400 Bad Request` -- Invalid image format (`KYC_DOCUMENT_INVALID`, messageKey: `errors.kyc.documentInvalid`)
+- `422 Unprocessable Entity` -- Liveness check failed, deepfake detected (`KYC_LIVENESS_CHECK_FAILED`, messageKey: `errors.kyc.livenessCheckFailed`)
+- `422 Unprocessable Entity` -- Face match score below threshold, < 85% (`KYC_FACE_MATCH_FAILED`, messageKey: `errors.kyc.faceMatchFailed`)
 
 ---
 
@@ -324,7 +319,6 @@ selfie: <image file>
   "success": true,
   "data": {
     "status": "in_progress",
-    "verificationLevel": "none",
     "completedSteps": ["cpf", "document"],
     "remainingSteps": ["facial", "aml"],
     "attemptCount": 1,
@@ -360,10 +354,11 @@ selfie: <image file>
 
 ## Business Rules
 
-### BR-1: KYC Gating by User Type
-- Admin users can access dashboard immediately after signup
-- Admin users CANNOT create cap table until KYC status = "approved"
-- Investor/Employee users CANNOT access any dashboard feature until KYC status = "approved"
+### BR-1: KYC Timing
+- KYC is required during onboarding for all startup founders
+- Onboarding flow: Personal Info -> KYC -> Company Setup -> Done
+- KYC cannot be skipped -- founders must complete it to proceed
+- Founders cannot create a company until KYC status = "approved"
 
 ### BR-2: Verification Order
 - CPF verification MUST be completed first
@@ -379,12 +374,12 @@ selfie: <image file>
 ### BR-4: Data Matching Requirements
 - Name on CPF MUST match name on identity document (fuzzy matching allowed)
 - Date of birth on CPF MUST match document
-- Face match score MUST be ≥ 85%
-- Liveness score MUST be ≥ 80%
+- Face match score MUST be >= 85%
+- Liveness score MUST be >= 80%
 
-### BR-5: Admin CPF Prerequisite
-- Admin user's personal CPF must be verified before company creation
-- One company can have multiple verified admins
+### BR-5: Founder CPF Prerequisite
+- Founder's personal CPF must be verified before company creation
+- One company can have multiple verified founders/admins
 
 ### BR-6: High-Risk Handling
 - Users with aml_risk_score = "HIGH" are flagged for manual review
@@ -394,108 +389,87 @@ selfie: <image file>
 ### BR-7: Data Retention
 - KYC documents stored for 5 years minimum (Brazilian compliance)
 - Users can request data deletion after 5-year retention period
-- Encrypted documents stored in AWS S3 São Paulo region (LGPD compliance)
+- Encrypted documents stored in AWS S3 Sao Paulo region (LGPD compliance)
 
 ---
 
 ## User Flows
 
-### Flow 1: Admin User KYC (Before Cap Table Creation)
+### Flow 1: Founder KYC During Onboarding (Happy Path)
 
 ```
-PRECONDITION: Admin user is logged in, has not completed KYC
+PRECONDITION: Founder completed Personal Info step, KYC not started
+ACTOR: Startup founder
 
-1. Admin navigates to "Create Cap Table" page
-2. System checks KYC status = "not_started"
-3. System displays KYC requirement modal
-4. Admin clicks "Start KYC Verification"
-5. System redirects to /kyc/verification
-6. System shows Step 1: CPF Verification
-7. Admin enters CPF and date of birth
-8. System calls POST /api/v1/kyc/verify-cpf
-9. Verifik validates CPF against Receita Federal (< 3 seconds)
-10. System displays CPF validated ✓
-11. System shows Step 2: Document Upload
-12. Admin selects document type (RG/CNH/RNE)
-13. Admin uploads document photo
-14. System calls POST /api/v1/kyc/upload-document
-15. Verifik performs OCR and validation (< 5 seconds)
-16. System displays document validated ✓
-17. System shows Step 3: Facial Recognition
-18. Admin clicks "Take Selfie"
-19. Browser requests camera permission
-20. Admin captures selfie
-21. System calls POST /api/v1/kyc/verify-face
-22. Verifik performs liveness detection and face matching (< 5 seconds)
-23. System displays facial verification complete ✓
-24. System automatically triggers AML screening (background)
-25. System shows "Verification Complete" message
-26. System updates KYC status = "approved"
-27. System redirects to cap table creation form
-28. Admin can now create cap table
+1. Founder completes Personal Info step in onboarding wizard
+2. Onboarding wizard advances to KYC step
+3. System calls POST /api/v1/kyc/start
+4. System shows Step 1: CPF Verification
+5. Founder enters CPF and date of birth
+6. System calls POST /api/v1/kyc/verify-cpf
+7. Verifik validates CPF against Receita Federal (< 3 seconds)
+8. System displays CPF validated, auto-fills full name from Verifik response
+9. System shows Step 2: Document Upload
+10. Founder selects document type (RG/CNH/Passport)
+11. Founder uploads document photo(s)
+12. System calls POST /api/v1/kyc/upload-document
+13. Verifik performs OCR and validation (< 5 seconds)
+14. System displays document validated
+15. System shows Step 3: Facial Recognition
+16. Founder clicks "Take Selfie"
+17. Browser requests camera permission
+18. Founder captures selfie
+19. System calls POST /api/v1/kyc/verify-face
+20. Verifik performs liveness detection and face matching (< 5 seconds)
+21. System displays facial verification complete
+22. System automatically triggers AML screening (background)
+23. System shows "Verification Complete" message
+24. System updates KYC status = "approved" (or "pending_review" if AML flags)
+25. Onboarding wizard auto-advances to Company Setup step
+26. Founder can now create their company
 
-For CNPJ validation flow, see [company-cnpj-validation.md](./company-cnpj-validation.md)
-
-POSTCONDITION: Admin KYC approved, cap table creation enabled
+POSTCONDITION: Founder KYC approved, company creation step enabled
 ```
 
-### Flow 2: Investor User KYC (Immediate After Signup)
+### Flow 2: KYC Rejection and Resubmission
 
 ```
-PRECONDITION: Investor just completed Privy authentication
-
-1. System creates user account
-2. System detects user role = "investor"
-3. System immediately redirects to /kyc/verification (cannot skip)
-4. System shows KYC requirement explanation
-5. User clicks "Start Verification"
-6. [Steps 6-25 same as Admin Flow above]
-26. System updates KYC status = "approved"
-27. System displays "Verification Complete! Welcome to Navia"
-28. System redirects to investor dashboard
-29. User can now access platform features
-
-POSTCONDITION: Investor KYC approved, full platform access granted
-```
-
-### Flow 3: KYC Rejection and Resubmission
-
-```
-PRECONDITION: User submitted KYC, face match score = 72% (below 85% threshold)
+PRECONDITION: Founder submitted KYC, face match score = 72% (below 85% threshold)
 
 1. System sets KYC status = "rejected"
 2. System sets rejection_reason = "Facial recognition: Match score below threshold (72%). Please ensure good lighting and clear photo."
-3. System sends email notification to user
-4. User logs in and sees KYC status banner
-5. User clicks "Retry Verification"
+3. System sends email notification to founder
+4. Founder returns to onboarding and sees KYC rejection status
+5. Founder clicks "Retry Verification"
 6. System checks attempt_count < 3 (currently 1)
 7. System increments attempt_count = 2
-8. System resets to facial recognition step
-9. User retakes selfie with better lighting
+8. System resets to the failed step (facial recognition)
+9. Founder retakes selfie with better lighting
 10. System reprocesses facial recognition
-11. Face match score = 91% ✓
+11. Face match score = 91%
 12. System updates status = "approved"
-13. User gains platform access
+13. Onboarding advances to Company Setup
 
 POSTCONDITION: KYC approved on second attempt
 ```
 
-### Flow 4: High-Risk AML Screening
+### Flow 3: High-Risk AML Screening
 
 ```
-PRECONDITION: User completed all KYC steps, AML screening running
+PRECONDITION: Founder completed all KYC steps, AML screening running
 
 1. Verifik AML screening detects PEP match
 2. System receives webhook: { is_pep: true, risk_score: "HIGH" }
 3. System sets KYC status = "pending_review"
 4. System notifies compliance team via email
-5. Compliance team reviews PEP details
-6. Compliance team marks verification as approved (PEP not automatically rejected in Brazil)
-7. System updates status = "approved"
-8. User receives email notification
-9. User can now access platform
+5. Founder sees "Under Review" status in onboarding
+6. Compliance team reviews PEP details
+7. Compliance team marks verification as approved (PEP not automatically rejected in Brazil)
+8. System updates status = "approved"
+9. Founder receives email notification
+10. Founder can resume onboarding and create company
 
-POSTCONDITION: High-risk user manually approved by compliance team
+POSTCONDITION: High-risk founder manually approved by compliance team
 ```
 
 ---
@@ -522,10 +496,10 @@ POSTCONDITION: High-risk user manually approved by compliance team
 - Return `422 Unprocessable Entity` with error code `KYC_LIVENESS_CHECK_FAILED` and messageKey `errors.kyc.livenessCheckFailed`. Frontend resolves the messageKey to prompt removing face coverings.
 
 ### EC-4: CPF/Document Name Mismatch
-**Scenario**: CPF name = "João da Silva", Document name = "João Silva"
+**Scenario**: CPF name = "Joao da Silva", Document name = "Joao Silva"
 **Handling**:
 - Use fuzzy matching with 90% similarity threshold
-- If match ≥ 90%, approve
+- If match >= 90%, approve
 - If match < 90%, flag for manual review
 
 ### EC-5: Minor User (Under 18)
@@ -561,8 +535,8 @@ POSTCONDITION: High-risk user manually approved by compliance team
 
 ### Internal Dependencies
 - **Authentication**: KYC flow requires authenticated user session
-- **Cap Table Management**: Cap table creation is gated by KYC approval
-- **Shareholder Registry**: Shareholder records inherit verified CPF data
+- **Onboarding**: KYC is step 2 of the onboarding wizard (after Personal Info, before Company Setup)
+- **Company Management**: Company creation is gated by KYC approval
 - **Notifications**: KYC status changes trigger email notifications
 
 ### External Dependencies
@@ -749,143 +723,6 @@ export class KYCApprovedGuard implements CanActivate {
 }
 ```
 
-### Frontend KYC Flow Component
-
-```typescript
-// /frontend/src/app/(dashboard)/kyc/page.tsx
-
-'use client';
-
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useMutation } from '@tanstack/react-query';
-import { useTranslations } from 'next-intl';
-import { api } from '@/lib/api-client';
-import { useErrorToast } from '@/hooks/use-error-toast';
-
-// Types for each KYC step
-interface VerifyCpfDto {
-  cpf: string;
-  dateOfBirth: string;
-}
-
-interface CpfVerificationResult {
-  verified: boolean;
-  cpfData: {
-    fullName: string;
-    dateOfBirth: string;
-    cpfStatus: 'active' | 'inactive';
-  };
-  verifikSignature: string;
-}
-
-interface DocumentUploadResult {
-  verified: boolean;
-  extractedData: {
-    fullName: string;
-    documentNumber: string;
-    issueDate: string;
-    expiryDate: string;
-  };
-  documentUrl: string;
-}
-
-interface FaceVerificationResult {
-  verified: boolean;
-  faceMatchScore: number;
-  livenessScore: number;
-  selfieUrl: string;
-}
-
-type KYCStep = 'cpf' | 'document' | 'facial' | 'complete';
-
-export default function KYCVerificationPage() {
-  const [step, setStep] = useState<KYCStep>('cpf');
-  const [cpfData, setCpfData] = useState<CpfVerificationResult | null>(null);
-  const router = useRouter();
-  const t = useTranslations('kyc');
-  const { showError } = useErrorToast();
-
-  const verifyCpf = useMutation({
-    mutationFn: (data: VerifyCpfDto) =>
-      api.post<CpfVerificationResult>('/api/v1/kyc/verify-cpf', data),
-    onSuccess: (data) => {
-      setCpfData(data);
-      setStep('document');
-    },
-    onError: (error) => {
-      showError(error);
-    },
-  });
-
-  const uploadDocument = useMutation({
-    mutationFn: ({ file, docType, docNumber }: { file: File; docType: string; docNumber: string }) => {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('documentType', docType);
-      formData.append('documentNumber', docNumber);
-      return api.postFormData<DocumentUploadResult>('/api/v1/kyc/upload-document', formData);
-    },
-    onSuccess: () => {
-      setStep('facial');
-    },
-    onError: (error) => {
-      showError(error);
-    },
-  });
-
-  const verifyFace = useMutation({
-    mutationFn: (selfieBlob: Blob) => {
-      const formData = new FormData();
-      formData.append('selfie', selfieBlob);
-      return api.postFormData<FaceVerificationResult>('/api/v1/kyc/verify-face', formData);
-    },
-    onSuccess: (result) => {
-      if (result.verified && result.faceMatchScore >= 85) {
-        setStep('complete');
-        setTimeout(() => router.push('/dashboard'), 3000);
-      } else {
-        showError({
-          messageKey: 'errors.kyc.faceMatchFailed',
-          details: { score: result.faceMatchScore },
-        });
-      }
-    },
-    onError: (error) => {
-      showError(error);
-    },
-  });
-
-  return (
-    <div className="kyc-container">
-      <h1>{t('title')}</h1>
-      {step === 'cpf' && (
-        <CPFVerificationStep
-          onSubmit={(cpf, dob) => verifyCpf.mutate({ cpf, dateOfBirth: dob })}
-          isLoading={verifyCpf.isPending}
-        />
-      )}
-      {step === 'document' && (
-        <DocumentUploadStep
-          onSubmit={(file, docType, docNumber) =>
-            uploadDocument.mutate({ file, docType, docNumber })
-          }
-          cpfData={cpfData}
-          isLoading={uploadDocument.isPending}
-        />
-      )}
-      {step === 'facial' && (
-        <FacialRecognitionStep
-          onSubmit={(selfieBlob) => verifyFace.mutate(selfieBlob)}
-          isLoading={verifyFace.isPending}
-        />
-      )}
-      {step === 'complete' && <VerificationCompleteMessage />}
-    </div>
-  );
-}
-```
-
 ---
 
 ## Security Considerations
@@ -908,14 +745,14 @@ export default function KYCVerificationPage() {
 - Reject webhooks older than 5 minutes (replay attack prevention)
 
 ### SEC-4: Rate Limiting
-- Limit KYC submission attempts: 3 per user lifetime
+- Limit KYC submission attempts: 3 per step per 24 hours
 - Limit API calls: 10 per minute per user
 - Implement CAPTCHA after 2 failed verification attempts
 
 ### SEC-5: LGPD Compliance
 - Obtain explicit consent before collecting KYC data
 - Provide data deletion mechanism (after 5-year retention)
-- Store data in AWS São Paulo region
+- Store data in AWS Sao Paulo region
 - Implement data access logs for audit trail
 
 ---
@@ -935,7 +772,7 @@ export default function KYCVerificationPage() {
 - Liveness detection spoofing prevention > 99%
 
 ### Compliance
-- 100% of users complete KYC before critical operations
+- 100% of founders complete KYC before company creation
 - Zero unauthorized access to KYC-gated features
 - Zero data breaches or PII leaks
 - 100% LGPD compliance
@@ -950,21 +787,18 @@ export default function KYCVerificationPage() {
 
 ## Open Questions
 
-1. Should we implement progressive KYC levels (Basic → Standard → Enhanced)?
-2. What is the manual review SLA for high-risk users?
-3. Should we support KYC for minors (under 18) with guardian consent?
-4. How do we handle users with foreign documents (non-Brazilian)?
-5. Should we implement KYC expiration (re-verification after X years)?
+1. What is the manual review SLA for high-risk users?
+2. Should we support KYC for minors (under 18) with guardian consent?
+3. How do we handle users with foreign documents (non-Brazilian)?
+4. Should we implement KYC expiration (re-verification after X years)?
 
 ---
 
 ## Future Enhancements
 
 - **Video KYC**: Live video call verification for high-value transactions
-- **Batch KYC**: Bulk shareholder verification for companies migrating cap tables
 - **Enhanced Due Diligence (EDD)**: Additional checks for high-risk users
 - **International KYC**: Support for non-Brazilian identity documents
-- **KYC API for Partners**: Allow partner platforms to leverage Navia KYC
 - **AI Fraud Detection**: Machine learning models to detect sophisticated fraud attempts
 
 ---
@@ -973,12 +807,9 @@ export default function KYCVerificationPage() {
 
 | Specification | Relationship |
 |---------------|-------------|
-| [authentication.md](./authentication.md) | KYC requires authenticated user; user entity links to KYC verification records |
-| [shareholder-registry.md](./shareholder-registry.md) | Shareholders require KYC verification based on type (admin, investor, employee) |
-| [company-management.md](./company-management.md) | Company admins must complete KYC to activate company features |
+| [authentication.md](./authentication.md) | KYC requires authenticated user; KYC status stored on User entity; onboarding flow integrates KYC step |
+| [company-management.md](./company-management.md) | Company creation is gated by KYC approval |
 | [company-cnpj-validation.md](./company-cnpj-validation.md) | Covers all CNPJ validation (company-level verification via Verifik); this spec defers to it for CNPJ flows |
-| [option-exercises.md](./option-exercises.md) | Employees may need KYC before exercising options |
-| [funding-rounds.md](./funding-rounds.md) | Investors need KYC before committing to rounds |
 | [api-standards.md](../.claude/rules/api-standards.md) | KYC endpoints follow `/api/v1/kyc/*` global path pattern |
 | [error-handling.md](../.claude/rules/error-handling.md) | Error codes: `KYC_REQUIRED`, `KYC_CPF_INVALID`, `KYC_CPF_NOT_FOUND`, `KYC_CPF_DOB_MISMATCH`, `KYC_DOCUMENT_INVALID`, `KYC_DOCUMENT_EXPIRED`, `KYC_FACE_MATCH_FAILED`, `KYC_LIVENESS_CHECK_FAILED`, `KYC_AML_HIGH_RISK`, `KYC_PEP_DETECTED`, `KYC_SANCTIONS_MATCH`, `KYC_MAX_ATTEMPTS_EXCEEDED`, `KYC_VERIFIK_UNAVAILABLE` |
 | [security.md](../.claude/rules/security.md) | PII handling for CPF, biometric data; KYC document encryption via AWS KMS; LGPD consent for KYC data collection |
@@ -988,91 +819,113 @@ export default function KYCVerificationPage() {
 
 # Frontend Specification
 
-> The sections below define the frontend architecture, component specifications, feature gating, user flows, UI states, and i18n keys for the KYC verification feature. The backend specification above remains the source of truth for API contracts, data models, and business rules.
+> The sections below define the frontend architecture, component specifications, user flows, UI states, and i18n keys for the KYC verification feature. The backend specification above remains the source of truth for API contracts, data models, and business rules.
+>
+> **Build status**: Backend is 100% done. Frontend is 0% built. This section is the blueprint for frontend implementation.
 
 ---
 
 ## Frontend Architecture
 
+### Integration with Onboarding Flow
+
+KYC is embedded in the onboarding wizard as step 2 of 3:
+
+```
+Onboarding Wizard
+  Step 1: Personal Info       (existing -- built)
+  Step 2: KYC Verification    (THIS SPEC -- not built)
+  Step 3: Company Setup       (existing -- built)
+```
+
+The onboarding wizard (`OnboardingWizard` in `app/(onboarding)/onboarding/page.tsx`) manages the overall step state. When step 1 (Personal Info) completes, the wizard advances to step 2 (KYC), which renders the KYC sub-wizard internally. When KYC is approved, the onboarding wizard advances to step 3 (Company Setup).
+
+Additionally, a standalone KYC status page exists for users who return after submitting KYC (e.g., while AML review is pending).
+
 ### Page Routes
 
 | Route | Description | Layout | Auth Required |
 |-------|-------------|--------|---------------|
-| `/kyc` | KYC wizard (full-page, progress stepper) | Outside dashboard shell, centered layout | Yes |
-| `/kyc/status` | KYC status page (post-submission) | Outside dashboard shell, centered layout | Yes |
-
-Both routes use a dedicated KYC layout: full-page, `gray-50` background, centered content card. They are outside the dashboard shell (no sidebar) but require authentication.
+| `/onboarding` | Onboarding wizard (KYC is step 2 within this wizard) | Auth layout (centered card, gray-50 bg) | Yes |
+| `/kyc/status` | KYC status page (post-submission, for returning users) | Auth layout (centered card, gray-50 bg) | Yes |
 
 ### Component Tree
 
 ```
+app/(onboarding)/
+  onboarding/
+    page.tsx                          -- OnboardingWizard (existing, add KYC step)
+
 app/(kyc)/
-  layout.tsx                          ← KYC layout (centered, no sidebar)
-  kyc/
-    page.tsx                          ← KYCWizard container
+  layout.tsx                          -- KYC layout (centered, no sidebar)
   kyc/status/
-    page.tsx                          ← KYCStatusPage
+    page.tsx                          -- KYCStatusPage
 
 components/kyc/
-  kyc-progress-stepper.tsx            ← Visual step indicator
-  cpf-verification-step.tsx           ← Step 1: CPF input + validation
-  document-upload-step.tsx            ← Step 2: Document type + file upload
-  facial-recognition-step.tsx         ← Step 3: Camera + liveness + selfie
-  kyc-completion-step.tsx             ← Step 4: Success message
-  kyc-status-banner.tsx               ← Persistent banner on dashboard pages
-  kyc-status-badge.tsx                ← Small badge for profile/settings
-  kyc-blocked-overlay.tsx             ← Overlay on KYC-gated pages
-  kyc-gate.tsx                        ← Wrapper component for KYC-gated content
+  kyc-verification-step.tsx           -- KYC sub-wizard container (step 2 of onboarding)
+  kyc-progress-stepper.tsx            -- Visual step indicator for KYC sub-steps
+  cpf-verification-step.tsx           -- Sub-step 1: CPF input + validation
+  document-upload-step.tsx            -- Sub-step 2: Document type + file upload
+  facial-recognition-step.tsx         -- Sub-step 3: Camera + liveness + selfie
+  kyc-completion-step.tsx             -- Sub-step 4: Processing/success state
+  kyc-status-banner.tsx               -- Persistent banner on dashboard pages (for pending/rejected)
+  kyc-status-badge.tsx                -- Small badge for profile/settings
+  kyc-status-card.tsx                 -- Card for /kyc/status page
 
 components/ui/
-  cpf-input.tsx                       ← Reusable masked CPF input
+  cpf-input.tsx                       -- Reusable masked CPF input
 ```
 
-### Component Specifications
+---
 
-#### 1. `KYCWizard` — Container managing entire KYC flow
+## Component Specifications
 
-- **File**: `app/(kyc)/kyc/page.tsx`
-- **Layout**: Centered content, max-w `640px`, white bg card, `shadow-md`, `radius-lg`, padding `32px`
-- **Manages step state**: CPF -> Document Upload -> Facial Recognition -> Complete
-- **Progress stepper at top** (KYCProgressStepper)
-- **Auto-advances** on step completion
-- **Can resume** at last incomplete step if user returns (calls `GET /api/v1/kyc/status` on mount)
+### 1. `KYCVerificationStep` -- KYC Sub-Wizard (Onboarding Step 2)
+
+- **File**: `components/kyc/kyc-verification-step.tsx`
+- **Role**: Container for the entire KYC flow, rendered as step 2 within the `OnboardingWizard`
+- **Props**: `onSuccess: () => void` (called when KYC is approved, advances onboarding to step 3)
+- **Layout**: Rendered within the onboarding card, no separate card wrapping needed
+- **Manages sub-step state**: CPF -> Document Upload -> Facial Recognition -> Processing/Complete
+- **Progress stepper** (KYCProgressStepper) shows KYC-specific sub-steps
+- **Auto-advances** on sub-step completion
+- **Can resume** at last incomplete sub-step if user returns (calls `GET /api/v1/kyc/status` on mount)
 - **State**:
   ```typescript
-  type KYCStep = 'cpf' | 'document' | 'facial' | 'complete';
+  type KYCSubStep = 'cpf' | 'document' | 'facial' | 'processing';
 
-  interface KYCWizardState {
-    currentStep: KYCStep;
+  interface KYCVerificationStepState {
+    currentSubStep: KYCSubStep;
     cpfVerified: boolean;
+    cpfData: CpfVerificationResult | null;
     documentUploaded: boolean;
     faceVerified: boolean;
   }
   ```
-- **On mount**: calls `GET /api/v1/kyc/status` to determine `completedSteps` and resumes at the first incomplete step. If status is `APPROVED`, redirects to `/dashboard`. If status is `IN_REVIEW`, redirects to `/kyc/status`.
+- **On mount**: calls `GET /api/v1/kyc/status` to determine `completedSteps` and resumes at the first incomplete sub-step. If status is `APPROVED`, calls `onSuccess()` immediately. If status is `PENDING_REVIEW`, shows processing/waiting state.
 
-#### 2. `KYCProgressStepper` — Visual step indicator
+### 2. `KYCProgressStepper` -- Visual step indicator for KYC sub-steps
 
 - **File**: `components/kyc/kyc-progress-stepper.tsx`
-- **Props**: `currentStep: KYCStep`, `completedSteps: KYCStep[]`
-- **4 steps**: "CPF" -> "Documento" -> "Reconhecimento Facial" -> "Concluido"
-- **Visual pattern** (same as OnboardingStepper from auth spec):
+- **Props**: `currentStep: KYCSubStep`, `completedSteps: KYCSubStep[]`
+- **4 sub-steps**: "CPF" -> "Documento" -> "Reconhecimento Facial" -> "Concluido"
+- **Visual pattern** (same as OnboardingStepper):
   - **Active**: `blue-600` circle with step number, `navy-900` label text
   - **Complete**: `green-600` circle with check icon (Lucide `Check`), `gray-500` label text
   - **Future**: `gray-300` circle with step number, `gray-400` label text
 - **Connector lines** between steps: `gray-200` default, `green-600` when preceding step is complete
 - **Responsive**: horizontal on desktop (>= `md`), vertical on mobile
 
-#### 3. `CPFVerificationStep` — Step 1: CPF input
+### 3. `CPFVerificationStep` -- Sub-step 1: CPF input
 
 - **File**: `components/kyc/cpf-verification-step.tsx`
-- **Props**: `onSuccess: () => void`, `isLoading: boolean`
+- **Props**: `onSuccess: (cpfData: CpfVerificationResult) => void`
 - **Fields**:
-  - `fullName`: text input, required, placeholder "Nome completo como no documento"
   - `cpf`: CPFInput component (masked XXX.XXX.XXX-XX), required, client-side Modulo 11 validation
   - `dateOfBirth`: date input (DD/MM/YYYY format), required, must be in the past, user must be 18+
-- **Submit**: `POST /api/v1/kyc/verify-cpf` with `{ cpf, dateOfBirth, fullName }`
-- **On success**: calls `onSuccess()` to advance to Step 2
+  - `fullName`: text input, auto-filled from Verifik response on success (read-only after CPF verification), placeholder "Preenchido automaticamente apos verificacao do CPF"
+- **Submit**: `POST /api/v1/kyc/verify-cpf` with `{ cpf, dateOfBirth }`
+- **On success**: auto-fills `fullName` from `cpfData.fullName`, calls `onSuccess(cpfData)` to advance to sub-step 2
 - **Error handling**:
   - `KYC_CPF_MISMATCH` (422): inline error "Os dados informados nao correspondem ao CPF"
   - `KYC_CPF_DUPLICATE` / `KYC_CPF_ALREADY_USED` (409): inline error "Este CPF ja esta associado a outra conta"
@@ -1081,7 +934,7 @@ components/ui/
   - `KYC_VERIFIK_UNAVAILABLE` (502): error toast "Servico de verificacao indisponivel. Tente novamente."
 - **Client-side validation**: CPF Modulo 11 checksum runs on blur, date of birth validates age >= 18
 
-#### 4. `CPFInput` — Reusable masked CPF input
+### 4. `CPFInput` -- Reusable masked CPF input
 
 - **File**: `components/ui/cpf-input.tsx`
 - **Props**: extends standard input props, adds `onValidChange: (isValid: boolean) => void`
@@ -1090,10 +943,10 @@ components/ui/
 - **Styling**: same as standard input (design-system.md section 6.4)
 - **Helper text**: "Digite o CPF -- sera formatado automaticamente"
 
-#### 5. `DocumentUploadStep` — Step 2: Document upload
+### 5. `DocumentUploadStep` -- Sub-step 2: Document upload
 
 - **File**: `components/kyc/document-upload-step.tsx`
-- **Props**: `onSuccess: () => void`, `isLoading: boolean`
+- **Props**: `onSuccess: () => void`
 - **Document type selector**: radio group (card style)
   - RG (Registro Geral) -- requires front + back
   - CNH (Carteira Nacional de Habilitacao) -- requires front + back
@@ -1104,9 +957,15 @@ components/ui/
   - Shows file preview after selection (image thumbnail for images, file icon for PDF)
   - Separate upload areas for front and back (when applicable)
   - Labels: "Frente do documento" / "Verso do documento"
+- **Camera capture option**: button "Usar camera" to capture document photo directly (mobile-friendly)
+  - Opens device camera via `navigator.mediaDevices.getUserMedia`
+  - Shows live viewfinder with document outline overlay
+  - Capture button takes photo
+  - Preview with "Refazer" or "Usar esta foto" buttons
+- **Image preview with retake**: after capture/upload, shows thumbnail with option to retake or remove
 - **Submit**: `POST /api/v1/kyc/upload-document` (multipart/form-data)
 - **Progress bar** during upload: 4px height, `blue-600` fill, `radius-full`
-- **On success**: green check animation + calls `onSuccess()` to advance to Step 3
+- **On success**: green check animation + calls `onSuccess()` to advance to sub-step 3
 - **Error handling**:
   - Client-side: file type validation, file size validation (< 10 MB)
   - `KYC_DOCUMENT_INVALID` (422): inline error "Documento nao pode ser verificado"
@@ -1115,10 +974,10 @@ components/ui/
   - `KYC_FILE_TOO_LARGE` (400): inline error "Arquivo excede o tamanho maximo de 10 MB"
   - `KYC_FILE_INVALID_FORMAT` (400): inline error "Formato nao suportado. Use PDF, PNG, JPG ou JPEG."
 
-#### 6. `FacialRecognitionStep` — Step 3: Selfie / liveness check
+### 6. `FacialRecognitionStep` -- Sub-step 3: Selfie / liveness check
 
 - **File**: `components/kyc/facial-recognition-step.tsx`
-- **Props**: `onSuccess: () => void`, `isLoading: boolean`
+- **Props**: `onSuccess: () => void`
 - **Flow**:
   1. Request camera permission (browser prompt via `navigator.mediaDevices.getUserMedia`)
   2. Show live camera feed in a circular frame (280px diameter)
@@ -1128,7 +987,7 @@ components/ui/
   6. Show captured image for review: "Ficou bom?"
   7. "Refazer" (ghost button) or "Enviar" (primary button)
 - **Submit**: `POST /api/v1/kyc/verify-face` with captured image as Blob
-- **On success**: calls `onSuccess()` to advance to Step 4 (completion)
+- **On success**: calls `onSuccess()` to advance to sub-step 4 (processing/completion)
 - **Camera states**:
   - Permission Request: browser permission dialog pending
   - Permission Denied: error card with instructions to enable camera in browser settings
@@ -1144,34 +1003,87 @@ components/ui/
   - `KYC_FACE_MISMATCH` (422): "O rosto nao corresponde ao documento enviado."
   - Network error: error toast + retry
 
-#### 7. `KYCCompletionStep` — Step 4: Success / Submission complete
+### 7. `KYCCompletionStep` -- Sub-step 4: Processing / Success state
 
 - **File**: `components/kyc/kyc-completion-step.tsx`
-- **Shows**: success illustration (green check icon, 64px), celebration visual
-- **Title**: "Verificacao Enviada!" (h2, `navy-900`)
-- **Subtitle**: "Estamos analisando seus dados. Voce recebera uma notificacao quando a verificacao for concluida." (body, `gray-500`)
-- **Button**: "Ir para o Dashboard" (primary, size lg, full width) -> navigates to `/dashboard`
-- **Status**: KYC is now `IN_REVIEW` (not yet `APPROVED`)
+- **Props**: `onSuccess: () => void` (called when KYC is approved)
+- **Two modes**:
 
-#### 8. `KYCStatusBanner` — Persistent banner on dashboard pages
+  **Processing mode** (AML screening running):
+  - Animated spinner/processing indicator (Lucide `Loader2`, spinning, 48px, `blue-600`)
+  - Title: "Analisando seus dados..." (h2, `navy-900`)
+  - Subtitle: "A verificacao AML esta em andamento. Isso pode levar alguns segundos." (body, `gray-500`)
+  - Polls `GET /api/v1/kyc/status` every 3 seconds
+  - When status changes to `APPROVED`: switches to success mode
+  - When status changes to `REJECTED`: shows failure state with reason and retry option
+  - When status stays `PENDING_REVIEW` for > 30 seconds: shows "longer than expected" message
+
+  **Success mode** (KYC approved):
+  - Success illustration: Lucide `CheckCircle2`, 64px, `green-600`
+  - Title: "Identidade Verificada!" (h2, `navy-900`)
+  - Subtitle: "Sua verificacao foi aprovada. Vamos configurar sua empresa." (body, `gray-500`)
+  - Button: "Continuar" (primary, size lg, full width) -> calls `onSuccess()` to advance onboarding to Company Setup
+  - Auto-advances after 3 seconds if user doesn't click
+
+  **Failure mode** (KYC rejected):
+  - Error illustration: Lucide `XCircle`, 64px, `#DC2626`
+  - Title: "Verificacao Nao Aprovada" (h2, `navy-900`)
+  - Subtitle: rejection reason from API (body, `gray-500`)
+  - Button: "Tentar Novamente" (primary, size lg, full width) -> resets KYC sub-wizard to first failed step
+  - "Entrar em contato com o suporte" link (ghost, body-sm)
+
+  **Pending review mode** (manual review needed, e.g., PEP flagged):
+  - Info illustration: Lucide `Clock`, 48px, `blue-600`
+  - Title: "Em Analise" (h2, `navy-900`)
+  - Subtitle: "Sua verificacao requer analise adicional. Voce recebera um e-mail quando for concluida." (body, `gray-500`)
+  - Button: "Ir para o Dashboard" (primary, size lg, full width) -> navigates to `/dashboard` (limited access)
+
+### 8. `KYCStatusPage` -- Standalone status page for returning users
+
+- **File**: `app/(kyc)/kyc/status/page.tsx`
+- **Purpose**: For users who return to the platform while KYC is pending review or after rejection
+- **On mount**: calls `GET /api/v1/kyc/status`
+- **Renders**: `KYCStatusCard` within centered layout
+- **Redirect logic**:
+  - If `APPROVED`: redirect to `/dashboard`
+  - If `NOT_STARTED` or `IN_PROGRESS`: redirect to `/onboarding`
+  - If `REJECTED` with `canResubmit`: show retry option that navigates to `/onboarding`
+  - If `PENDING_REVIEW`: show waiting state
+
+### 9. `KYCStatusCard` -- Status display card
+
+- **File**: `components/kyc/kyc-status-card.tsx`
+- **Props**: `status: KYCStatus`, `rejectionReason?: string`, `canResubmit?: boolean`, `attemptCount?: number`
+- **Used in**: `/kyc/status` page
+- **Visual states**:
+
+  | Status | Icon | Title | Subtitle | Action |
+  |--------|------|-------|----------|--------|
+  | `PENDING_REVIEW` | `Clock` (blue-600, 48px) | "Verificacao em Analise" | "Estamos analisando seus dados..." | None (auto-polls) |
+  | `APPROVED` | `CheckCircle2` (green-600, 48px) | "Identidade Verificada" | "Sua verificacao foi aprovada." | "Ir para o Dashboard" |
+  | `REJECTED` (can retry) | `XCircle` (#DC2626, 48px) | "Verificacao Recusada" | rejection reason | "Tentar Novamente" |
+  | `REJECTED` (max attempts) | `XCircle` (#DC2626, 48px) | "Verificacao Recusada" | "Tentativas esgotadas." | "Contatar Suporte" |
+
+### 10. `KYCStatusBanner` -- Persistent banner on dashboard pages
 
 - **File**: `components/kyc/kyc-status-banner.tsx`
 - **Props**: `kycStatus: KYCStatus`, `rejectionReason?: string`, `onDismiss: () => void`
 - **Shown at**: top of dashboard content area (below page header) when KYC is not `APPROVED`
+- **Purpose**: For users who reached the dashboard with pending KYC (e.g., after PEP review redirected them to dashboard)
 - **States**:
 
   | KYC Status | Background | Text Color | Left Border | Message | Action |
   |------------|-----------|------------|-------------|---------|--------|
   | `NOT_STARTED` | `cream-100` | `cream-700` | 3px `cream-700` | "Complete a verificacao de identidade para acessar todos os recursos" | "Iniciar Verificacao" (primary sm) |
   | `IN_PROGRESS` | `blue-50` | `blue-600` | 3px `blue-600` | "Verificacao em andamento. Complete as etapas restantes." | "Continuar" (primary sm) |
-  | `IN_REVIEW` | `blue-50` | `blue-600` | 3px `blue-600` | "Sua verificacao esta sendo analisada. Voce sera notificado em breve." | None |
+  | `PENDING_REVIEW` | `blue-50` | `blue-600` | 3px `blue-600` | "Sua verificacao esta sendo analisada. Voce sera notificado em breve." | None |
   | `REJECTED` | `#FEE2E2` | `#991B1B` | 3px `#991B1B` | "Verificacao recusada: {reason}. Tente novamente." | "Refazer Verificacao" (destructive sm) |
   | `APPROVED` | (hidden) | -- | -- | -- | -- |
 
 - **Dismissible**: user can close the banner for the session via ghost X button, reappears on next login
 - **Banner hidden** when KYC status is `APPROVED`
 
-#### 9. `KYCStatusBadge` — Small badge showing KYC status
+### 11. `KYCStatusBadge` -- Small badge showing KYC status
 
 - **File**: `components/kyc/kyc-status-badge.tsx`
 - **Props**: `status: KYCStatus`
@@ -1182,227 +1094,160 @@ components/ui/
   |--------|-----------|------|---------------|------------|
   | `NOT_STARTED` | `gray-100` | `gray-600` | "Nao iniciado" | "Not started" |
   | `IN_PROGRESS` | `cream-100` | `cream-700` | "Em andamento" | "In progress" |
-  | `IN_REVIEW` | `blue-50` | `blue-600` | "Em analise" | "Under review" |
+  | `PENDING_REVIEW` | `blue-50` | `blue-600` | "Em analise" | "Under review" |
   | `APPROVED` | `green-100` | `green-700` | "Verificado" | "Verified" |
   | `REJECTED` | `#FEE2E2` | `#991B1B` | "Recusado" | "Rejected" |
 
 - **Size**: caption (12px), weight 500, padding `2px 8px`, `radius-full`
 
-#### 10. `KYCBlockedOverlay` — Overlay on blocked features
-
-- **File**: `components/kyc/kyc-blocked-overlay.tsx`
-- **Props**: `kycStatus: KYCStatus`
-- **Used on**: pages that require KYC (cap table, transactions, shareholders, funding rounds, option plans)
-- **Visual**:
-  - Position: absolute, covers entire page content area
-  - Background: white at 80% opacity
-  - `backdrop-filter: blur(4px)` on the page content behind
-  - Center card: max-w `400px`, white bg, `shadow-lg`, `radius-lg`, padding `32px`
-  - Lock icon: Lucide `Lock`, 48px, `gray-400`
-  - Title: h3, `navy-900`, "Verificacao de identidade necessaria"
-  - Subtitle: body, `gray-500`, "Complete a verificacao KYC para acessar este recurso"
-  - Button: Primary, "Iniciar Verificacao" (if `NOT_STARTED` or `REJECTED`) or "Continuar Verificacao" (if `IN_PROGRESS`) -> navigates to `/kyc`
-  - If `IN_REVIEW`: no button, show "Sua verificacao esta em analise" instead
-
 ---
 
-## KYC Feature Gating
+## Onboarding Integration
 
-### Features BLOCKED Without KYC (require `APPROVED` status)
+### Modified Onboarding Wizard
 
-| Route | Feature | Behavior |
-|-------|---------|----------|
-| `/dashboard/cap-table` | Cap table management | Full page blocked with `KYCBlockedOverlay` |
-| `/dashboard/shareholders` | Shareholder management | Full page blocked with `KYCBlockedOverlay` |
-| `/dashboard/transactions` | Transactions | Full page blocked with `KYCBlockedOverlay` |
-| `/dashboard/investments` | Funding rounds | Full page blocked with `KYCBlockedOverlay` |
-| `/dashboard/options` | Option plans | Full page blocked with `KYCBlockedOverlay` |
+The existing `OnboardingWizard` must be updated to include KYC as step 2:
 
-### Features ALLOWED Without KYC
-
-| Route | Feature | Notes |
-|-------|---------|-------|
-| `/dashboard` | Dashboard | View only; action buttons for KYC-gated features are hidden or disabled |
-| `/dashboard/settings` | Company settings | Full access |
-| `/dashboard/members` | Member management | Full access |
-| `/dashboard/documents` | Documents | View only |
-| `/profile` | Profile settings | Full access |
-
-### Implementation Pattern
-
-**Option A: Inline check in page component**
-
-```tsx
-import { useAuth } from '@/hooks/use-auth';
-import { KYCBlockedOverlay } from '@/components/kyc/kyc-blocked-overlay';
-
-function ShareholdersPage() {
-  const { kycStatus } = useAuth();
-
-  if (kycStatus !== 'APPROVED') {
-    return <KYCBlockedOverlay kycStatus={kycStatus} />;
-  }
-
-  return <ShareholdersContent />;
-}
+```
+Onboarding Stepper:
+  Step 1: "Suas Informacoes" (Personal Info)     -- existing
+  Step 2: "Verificacao KYC" (KYC Verification)   -- NEW
+  Step 3: "Sua Empresa" (Company Setup)           -- existing
 ```
 
-**Option B: `KYCGate` wrapper component**
+**OnboardingStepper** updates:
+- Add third step label: `onboarding.stepper.step2` = "Verificacao KYC" / "KYC Verification"
+- Rename old step 2 to step 3: `onboarding.stepper.step3` = "Sua Empresa" / "Your Company"
 
-```tsx
-// components/kyc/kyc-gate.tsx
-import { useAuth } from '@/hooks/use-auth';
-import { KYCBlockedOverlay } from './kyc-blocked-overlay';
-
-interface KYCGateProps {
-  children: React.ReactNode;
-  fallback?: React.ReactNode;
-}
-
-export function KYCGate({ children, fallback }: KYCGateProps) {
-  const { kycStatus } = useAuth();
-
-  if (kycStatus !== 'APPROVED') {
-    return fallback ?? <KYCBlockedOverlay kycStatus={kycStatus} />;
-  }
-
-  return <>{children}</>;
-}
-
-// Usage in page:
-export default function ShareholdersPage() {
-  return (
-    <KYCGate>
-      <ShareholdersContent />
-    </KYCGate>
-  );
-}
+**OnboardingWizard** state changes:
+```typescript
+type OnboardingStep = 'personalInfo' | 'kyc' | 'companySetup';
 ```
 
-**Option B is preferred** for consistency. Use `KYCGate` in all KYC-gated page components.
+**Flow**:
+1. Step 1 (Personal Info) completes -> wizard advances to Step 2 (KYC)
+2. Step 2 renders `KYCVerificationStep` component
+3. `KYCVerificationStep` manages its own 4 sub-steps internally (CPF, Document, Facial, Processing)
+4. When KYC is approved, `KYCVerificationStep` calls `onSuccess()`
+5. Wizard advances to Step 3 (Company Setup)
 
-### Dashboard Action Button Gating
-
-On the dashboard page, action buttons that lead to KYC-gated features should be visually disabled when KYC is not approved:
-
-```tsx
-// In dashboard quick actions card
-<Button
-  variant="primary"
-  disabled={kycStatus !== 'APPROVED'}
-  onClick={() => router.push('/dashboard/transactions')}
->
-  {t('dashboard.quickActions.newTransaction')}
-</Button>
-```
-
-When disabled, show a tooltip: "Complete a verificacao KYC para usar este recurso".
+**Resume logic** on wizard mount:
+- If user has personal info but KYC is `NOT_STARTED` or `IN_PROGRESS` -> resume at Step 2 (KYC)
+- If user has personal info and KYC is `APPROVED` but no company -> resume at Step 3 (Company Setup)
+- If user has personal info and KYC is `PENDING_REVIEW` -> show Step 2 with processing/waiting state
+- If user has personal info and KYC is `REJECTED` -> show Step 2 with retry option
 
 ---
 
 ## Frontend User Flows
 
-### Flow 1: Happy Path -- Full KYC Completion
+### Flow 1: Happy Path -- Full KYC Completion During Onboarding
 
 ```
-User clicks "Iniciar Verificacao" from KYCStatusBanner
+Founder completes Personal Info step
   |
-  +-- [navigates to /kyc] --> KYCWizard renders
+  +-- Onboarding wizard advances to Step 2 (KYC)
   |     |
-  |     +-- [GET /api/v1/kyc/status] --> determines starting step
+  |     +-- KYCVerificationStep mounts
+  |     |     +-- [GET /api/v1/kyc/status] --> determines starting sub-step
   |     |     |
-  |     |     +-- [no completed steps] --> Step 1 (CPF)
-  |     |     +-- [CPF done] --> Step 2 (Document)
-  |     |     +-- [CPF + Document done] --> Step 3 (Facial)
-  |     |     +-- [status = APPROVED] --> redirect to /dashboard
-  |     |     +-- [status = IN_REVIEW] --> redirect to /kyc/status
+  |     |     +-- [no completed steps] --> Sub-step 1 (CPF)
+  |     |     +-- [CPF done] --> Sub-step 2 (Document)
+  |     |     +-- [CPF + Document done] --> Sub-step 3 (Facial)
+  |     |     +-- [status = APPROVED] --> call onSuccess() immediately
+  |     |     +-- [status = PENDING_REVIEW] --> show processing state
   |     |
-  |     +-- Step 1: CPF Verification
-  |     |     +-- [fills CPF + DOB + name] --> POST /api/v1/kyc/verify-cpf
-  |     |     |     +-- [success] --> advance to Step 2
+  |     +-- Sub-step 1: CPF Verification
+  |     |     +-- [fills CPF + DOB] --> POST /api/v1/kyc/verify-cpf
+  |     |     |     +-- [success] --> auto-fill name, advance to Sub-step 2
   |     |     |     +-- [KYC_CPF_MISMATCH] --> inline error, retry
   |     |     |     +-- [KYC_CPF_DUPLICATE] --> inline error, contact support
   |     |     |     +-- [KYC_CPF_NOT_FOUND] --> inline error, retry
   |     |     |     +-- [KYC_VERIFIK_UNAVAILABLE] --> error toast, retry
   |     |     +-- [client-side CPF invalid] --> inline error on blur
   |     |
-  |     +-- Step 2: Document Upload
+  |     +-- Sub-step 2: Document Upload
   |     |     +-- [selects doc type] --> shows upload area(s)
-  |     |     +-- [uploads front] --> progress bar --> preview
-  |     |     +-- [uploads back (if RG/CNH)] --> progress bar --> preview
+  |     |     +-- [uploads/captures front image] --> preview with retake
+  |     |     +-- [uploads/captures back image (if RG/CNH)] --> preview with retake
   |     |     +-- [clicks "Enviar Documentos"] --> POST /api/v1/kyc/upload-document
-  |     |           +-- [success] --> advance to Step 3
+  |     |           +-- [success] --> advance to Sub-step 3
   |     |           +-- [KYC_DOCUMENT_INVALID] --> inline error, retry
   |     |           +-- [KYC_DOCUMENT_UNREADABLE] --> inline error, tips, retry
   |     |           +-- [KYC_DOCUMENT_EXPIRED] --> inline error
   |     |           +-- [file too large / wrong format] --> client-side inline error
   |     |
-  |     +-- Step 3: Facial Recognition
+  |     +-- Sub-step 3: Facial Recognition
   |     |     +-- [camera granted] --> live feed shows
   |     |     +-- [follows liveness instructions] --> auto-capture
   |     |     +-- [reviews photo] --> "Enviar" or "Refazer"
   |     |     +-- [submits] --> POST /api/v1/kyc/verify-face
-  |     |           +-- [success] --> advance to Step 4
+  |     |           +-- [success] --> advance to Sub-step 4
   |     |           +-- [KYC_LIVENESS_FAILED] --> guidance, retry
   |     |           +-- [KYC_FACE_MISMATCH] --> error, retry
   |     |
-  |     +-- Step 4: Completion
-  |           +-- [shows success message] --> KYC status = IN_REVIEW
-  |           +-- [clicks "Ir para Dashboard"] --> redirect to /dashboard
-  |                 +-- KYCStatusBanner shows "Em analise"
+  |     +-- Sub-step 4: Processing / Completion
+  |           +-- [shows processing spinner while AML runs]
+  |           +-- [polls GET /api/v1/kyc/status every 3s]
+  |           +-- [status = APPROVED] --> success state --> auto-advance
+  |           +-- [status = REJECTED] --> failure state --> retry option
+  |           +-- [status = PENDING_REVIEW > 30s] --> "taking longer" message
+  |
+  +-- KYCVerificationStep calls onSuccess()
+  +-- Onboarding wizard advances to Step 3 (Company Setup)
 ```
 
 **Step-by-step (detailed):**
 
 ```
-PRECONDITION: User is authenticated, KYC status is NOT_STARTED or REJECTED
-ACTOR: Authenticated user
-TRIGGER: User clicks "Iniciar Verificacao" on KYCStatusBanner or navigates to /kyc
+PRECONDITION: Founder is authenticated, completed Personal Info, KYC not started
+ACTOR: Startup founder
+TRIGGER: Onboarding wizard advances to Step 2 after Personal Info completion
 
-1.  [UI] Navigates to /kyc route
-2.  [Frontend] KYCWizard mounts, sends GET /api/v1/kyc/status
+1.  [UI] OnboardingWizard renders Step 2: KYCVerificationStep
+2.  [Frontend] KYCVerificationStep mounts, sends GET /api/v1/kyc/status
 3.  [Backend] Returns completedSteps and current status
-4.  [UI] KYCWizard renders at first incomplete step
-    --> IF all steps complete and status = APPROVED: redirect to /dashboard
-    --> IF status = IN_REVIEW: redirect to /kyc/status
+4.  [UI] KYCVerificationStep renders at first incomplete sub-step
+    --> IF all steps complete and status = APPROVED: call onSuccess() immediately
+    --> IF status = PENDING_REVIEW: show processing/waiting state
 5.  [UI] KYCProgressStepper renders: CPF [active] --> Documento --> Reconhecimento Facial --> Concluido
-6.  [UI] CPFVerificationStep renders with fullName, CPF, and dateOfBirth fields
-7.  [UI] User enters full name
-8.  [UI] User enters CPF (auto-masked to XXX.XXX.XXX-XX)
-9.  [Frontend] On CPF blur: validates Modulo 11 checksum
+6.  [UI] CPFVerificationStep renders with CPF and dateOfBirth fields
+7.  [UI] Founder enters CPF (auto-masked to XXX.XXX.XXX-XX)
+8.  [Frontend] On CPF blur: validates Modulo 11 checksum
     --> IF invalid: shows "CPF invalido" inline error, STOP
-10. [UI] User enters date of birth (DD/MM/YYYY)
-11. [Frontend] Validates date is in the past and age >= 18
+9.  [UI] Founder enters date of birth (DD/MM/YYYY)
+10. [Frontend] Validates date is in the past and age >= 18
     --> IF under 18: shows "Voce deve ter 18 anos ou mais" inline error, STOP
-12. [UI] User clicks "Verificar CPF"
-13. [Frontend] Sends POST /api/v1/kyc/verify-cpf with { cpf, dateOfBirth, fullName }
-14. [UI] Button shows loading spinner, fields disabled
-15. [Backend] Validates CPF format
+11. [UI] Founder clicks "Verificar CPF"
+12. [Frontend] Sends POST /api/v1/kyc/verify-cpf with { cpf, dateOfBirth }
+13. [UI] Button shows loading spinner, fields disabled
+14. [Backend] Validates CPF format
     --> IF invalid format: return 400 KYC_CPF_INVALID
-16. [Backend] Calls Verifik to validate CPF against Receita Federal
+15. [Backend] Calls Verifik to validate CPF against Receita Federal
     --> IF Verifik unavailable: return 502 KYC_VERIFIK_UNAVAILABLE
     --> IF CPF not found: return 404 KYC_CPF_NOT_FOUND
-17. [Backend] Checks dateOfBirth matches CPF registry
+16. [Backend] Checks dateOfBirth matches CPF registry
     --> IF mismatch: return 422 KYC_CPF_DOB_MISMATCH / KYC_CPF_MISMATCH
-18. [Backend] Checks CPF blind index for duplicates
+17. [Backend] Checks CPF blind index for duplicates
     --> IF duplicate: return 409 KYC_CPF_DUPLICATE
-19. [Backend] Stores encrypted CPF, updates KYC status to IN_PROGRESS
-20. [Backend] Returns 200 with verified CPF data
-21. [Backend] Queues audit event: KYC_CPF_VERIFIED
-22. [UI] Step 1 shows green check, stepper updates
-23. [UI] Auto-advances to Step 2 (DocumentUploadStep)
+18. [Backend] Stores encrypted CPF, updates KYC status to IN_PROGRESS
+19. [Backend] Returns 200 with verified CPF data (including fullName)
+20. [Backend] Queues audit event: KYC_CPF_VERIFIED
+21. [UI] Auto-fills fullName field from Verifik response (read-only)
+22. [UI] Sub-step 1 shows green check, stepper updates
+23. [UI] Auto-advances to Sub-step 2 (DocumentUploadStep)
 24. [UI] Stepper: CPF [complete check] --> Documento [active] --> ...
 25. [UI] DocumentUploadStep renders with document type radio cards
-26. [UI] User selects document type (RG, CNH, or Passport)
-27. [UI] Upload area for front side appears: dashed border, drag-and-drop zone
-28. [UI] User drags file or clicks "Selecionar arquivo"
+26. [UI] Founder selects document type (RG, CNH, or Passport)
+27. [UI] Upload area for front side appears: dashed border, drag-and-drop zone + camera option
+28. [UI] Founder uploads file or captures with camera
 29. [Frontend] Validates file type (PDF/PNG/JPG/JPEG) and size (< 10 MB)
-    --> IF invalid type: shows "Formato nao suportado. Use PDF, PNG, JPG ou JPEG." inline error
+    --> IF invalid type: shows "Formato nao suportado" inline error
     --> IF too large: shows "Arquivo excede o tamanho maximo de 10 MB" inline error
-30. [UI] File preview shows (thumbnail for images, file icon for PDF) + file name + size + "Remover" link
-31. [UI] If RG/CNH: second upload area for back side appears with "Verso do documento" label
-32. [UI] User uploads back side (same validation as step 29-30)
-33. [UI] User clicks "Enviar Documentos"
+30. [UI] Image preview shows with retake/remove option
+31. [UI] If RG/CNH: second upload area for back side with "Verso do documento" label
+32. [UI] Founder uploads/captures back side (same validation)
+33. [UI] Founder clicks "Enviar Documentos"
 34. [Frontend] Sends POST /api/v1/kyc/upload-document (multipart/form-data)
 35. [UI] Upload progress bar appears (blue-600 fill)
 36. [Backend] Receives files, validates MIME type + magic bytes
@@ -1413,8 +1258,8 @@ TRIGGER: User clicks "Iniciar Verificacao" on KYCStatusBanner or navigates to /k
     --> IF document expired: return 422 KYC_DOCUMENT_EXPIRED
 40. [Backend] Returns 200 with extracted document data
 41. [Backend] Queues audit event: KYC_DOCUMENT_UPLOADED
-42. [UI] Step 2 shows green check, stepper updates
-43. [UI] Auto-advances to Step 3 (FacialRecognitionStep)
+42. [UI] Sub-step 2 shows green check, stepper updates
+43. [UI] Auto-advances to Sub-step 3 (FacialRecognitionStep)
 44. [UI] Stepper: CPF [check] --> Documento [check] --> Reconhecimento Facial [active] --> ...
 45. [UI] FacialRecognitionStep renders, requests camera permission
 46. [UI] Browser camera permission dialog appears
@@ -1422,41 +1267,42 @@ TRIGGER: User clicks "Iniciar Verificacao" on KYCStatusBanner or navigates to /k
 47. [UI] Live camera feed in 280px circular frame
 48. [UI] Instruction text: "Posicione seu rosto no centro do circulo"
 49. [UI] Liveness instructions cycle: "Vire a cabeca para a esquerda", "Vire a cabeca para a direita", "Sorria"
-50. [UI] Auto-capture when conditions met, or user clicks "Capturar"
+50. [UI] Auto-capture when conditions met, or founder clicks "Capturar"
 51. [UI] Review screen: captured photo in circle frame
 52. [UI] "Ficou bom?" with "Refazer" (ghost) and "Enviar" (primary) buttons
     --> IF "Refazer": return to camera feed (step 47)
-53. [UI] User clicks "Enviar"
+53. [UI] Founder clicks "Enviar"
 54. [Frontend] Sends POST /api/v1/kyc/verify-face with captured image as Blob
 55. [UI] Spinner overlay on captured photo
 56. [Backend] Processes facial recognition + liveness check via Verifik
     --> IF liveness fail: return 422 KYC_LIVENESS_CHECK_FAILED
     --> IF face doesn't match document (< 85%): return 422 KYC_FACE_MATCH_FAILED
-57. [Backend] Updates KYC status to PENDING_REVIEW (IN_REVIEW)
+57. [Backend] Updates KYC status to PENDING_REVIEW
 58. [Backend] Triggers AML screening asynchronously
 59. [Backend] Returns 200 with face match and liveness scores
 60. [Backend] Queues audit events: KYC_FACE_VERIFIED, KYC_AML_SCREENED (async)
-61. [UI] Step 3 shows green check, stepper updates
-62. [UI] Auto-advances to Step 4 (KYCCompletionStep)
-63. [UI] Success illustration (green check, 64px) + "Verificacao Enviada!" title
-64. [UI] Subtitle: "Estamos analisando seus dados. Voce recebera uma notificacao quando a verificacao for concluida."
-65. [UI] "Ir para o Dashboard" primary button
-66. [UI] User clicks "Ir para o Dashboard"
-67. [UI] Redirect to /dashboard
-68. [UI] KYCStatusBanner shows "Sua verificacao esta sendo analisada" (IN_REVIEW state)
+61. [UI] Sub-step 3 shows green check, stepper updates
+62. [UI] Auto-advances to Sub-step 4 (KYCCompletionStep -- processing mode)
+63. [UI] Processing spinner + "Analisando seus dados..."
+64. [Frontend] Polls GET /api/v1/kyc/status every 3 seconds
+65. [Backend] AML screening completes, status updates to APPROVED
+66. [UI] Switches to success mode: "Identidade Verificada!" + green check
+67. [UI] "Continuar" button (or auto-advance after 3 seconds)
+68. [Frontend] KYCVerificationStep calls onSuccess()
+69. [UI] OnboardingWizard advances to Step 3 (Company Setup)
 
-POSTCONDITION: KYC status = IN_REVIEW (PENDING_REVIEW)
+POSTCONDITION: KYC status = APPROVED, onboarding proceeds to Company Setup
 SIDE EFFECTS:
-  - Audit logs: KYC_STARTED, KYC_CPF_VERIFIED, KYC_DOCUMENT_UPLOADED, KYC_FACE_VERIFIED, KYC_AML_SCREENED
+  - Audit logs: KYC_STARTED, KYC_CPF_VERIFIED, KYC_DOCUMENT_UPLOADED, KYC_FACE_VERIFIED, KYC_AML_SCREENED, KYC_APPROVED
   - Verifik API calls: CPF validation, document OCR, facial recognition, AML screening
   - S3 uploads: document images (encrypted), selfie (encrypted)
-  - Email: user receives notification when review is complete
+  - Email: founder receives notification on approval
 ```
 
 ### Flow 2: CPF Verification Failure
 
 ```
-User enters CPF data that fails validation
+Founder enters CPF data that fails validation
   |
   +-- [client-side] CPF Modulo 11 invalid --> "CPF invalido" inline error
   |
@@ -1467,14 +1313,14 @@ User enters CPF data that fails validation
   |     +-- KYC_CPF_DUPLICATE (409) --> inline error: "CPF ja associado a outra conta"
   |     +-- KYC_VERIFIK_UNAVAILABLE (502) --> error toast + retry
   |
-  +-- User corrects data and retries
+  +-- Founder corrects data and retries
         --> OR contacts support (for duplicate CPF)
 ```
 
 ### Flow 3: Document Upload Failure
 
 ```
-User attempts to upload document
+Founder attempts to upload document
   |
   +-- [client-side] file too large --> "Arquivo excede o tamanho maximo de 10 MB"
   +-- [client-side] wrong format --> "Formato nao suportado. Use PDF, PNG, JPG ou JPEG"
@@ -1483,13 +1329,13 @@ User attempts to upload document
   +-- [server] KYC_DOCUMENT_UNREADABLE --> inline error "Documento ilegivel. Tente uma foto mais nitida."
   +-- [server] KYC_DOCUMENT_EXPIRED --> inline error "Documento expirado"
   |
-  +-- User corrects issue and retries
+  +-- Founder uploads clearer photo or different document and retries
 ```
 
 ### Flow 4: Facial Recognition Failure
 
 ```
-Facial recognition step
+Facial recognition sub-step
   |
   +-- [camera denied] --> error card: "Acesso a camera necessario" + browser instructions
   +-- [face not detected] --> "Rosto nao detectado. Posicione-se no centro do circulo."
@@ -1497,95 +1343,82 @@ Facial recognition step
   +-- [KYC_FACE_MISMATCH (422)] --> "O rosto nao corresponde ao documento enviado."
   +-- [network error] --> error toast + retry
   |
-  +-- User retries (can retake photo unlimited times within the step)
+  +-- Founder retries (can retake photo unlimited times within the sub-step)
 ```
 
 ### Flow 5: KYC Rejection and Resubmission
 
 ```
-KYC submitted, status = IN_REVIEW
+KYC submitted, processing complete, status = REJECTED
   |
-  +-- [Backend: KYC approved] --> notification email sent
-  |     +-- [user refreshes/navigates] --> KYCStatusBanner disappears, features unlocked
+  +-- [KYCCompletionStep shows failure mode]
+  |     +-- Shows rejection reason
+  |     +-- "Tentar Novamente" button
+  |           +-- [Backend checks attemptCount < 3] --> resets to first failed sub-step
+  |           +-- [Backend checks attemptCount >= 3] --> blocked, contact support message
   |
-  +-- [Backend: KYC rejected] --> notification email with reason
-  |     +-- [user sees KYCStatusBanner] --> "Recusado: [reason]" + "Refazer Verificacao"
-  |           +-- [clicks "Refazer"] --> navigates to /kyc
-  |                 +-- [Backend checks attemptCount < 3] --> allowed to restart
-  |                 +-- [Backend checks attemptCount >= 3] --> blocked, contact support
-  |
-  +-- [Backend: still reviewing] --> "Em analise" banner, no action required
+  +-- [Alternatively, founder returns later]
+  |     +-- Navigates to /onboarding
+  |     +-- OnboardingWizard resumes at KYC step
+  |     +-- KYCVerificationStep detects REJECTED status
+  |     +-- Shows retry option
 ```
 
-**Step-by-step (rejection path):**
+### Flow 6: KYC Pending Review (Manual Review Required)
 
 ```
-PRECONDITION: KYC status = REJECTED, attemptCount < 3
-ACTOR: Authenticated user
-TRIGGER: User clicks "Refazer Verificacao" on KYCStatusBanner
-
-1. [UI] Navigates to /kyc
-2. [Frontend] GET /api/v1/kyc/status
-3. [Backend] Returns status = REJECTED, canResubmit = true
-4. [UI] KYCWizard starts from Step 1 (all steps must be redone)
-5. [Steps 6-67 same as Happy Path Flow 1]
-6. [Backend] Increments attemptCount
-
-POSTCONDITION: KYC resubmitted, status = IN_REVIEW, attemptCount incremented
-```
-
-### Flow 6: Resume Incomplete KYC
-
-```
-User started KYC but left mid-flow
+KYC submitted, AML flags PEP match, status = PENDING_REVIEW
   |
-  +-- [returns to /kyc or clicks "Continuar" on banner]
-  |     +-- GET /api/v1/kyc/status
+  +-- [KYCCompletionStep shows pending review mode]
+  |     +-- "Em Analise" title
+  |     +-- "Sua verificacao requer analise adicional..."
+  |     +-- "Ir para o Dashboard" button --> limited dashboard access
+  |
+  +-- [Founder on dashboard]
+  |     +-- KYCStatusBanner shows "Sua verificacao esta sendo analisada"
+  |     +-- Company creation is blocked
+  |
+  +-- [Later: compliance team approves]
+  |     +-- Email notification sent to founder
+  |     +-- Founder returns, KYCStatusBanner disappears
+  |     +-- Founder can resume onboarding to create company
+```
+
+### Flow 7: Resume Incomplete KYC
+
+```
+Founder started KYC but left mid-flow
+  |
+  +-- [returns to /onboarding or /kyc/status]
+  |     +-- OnboardingWizard detects KYC step is current
+  |     +-- KYCVerificationStep mounts, calls GET /api/v1/kyc/status
   |           |
-  |           +-- [completedSteps: []] --> resume at Step 1 (CPF)
-  |           +-- [completedSteps: ["cpf"]] --> resume at Step 2 (Document)
-  |           +-- [completedSteps: ["cpf", "document"]] --> resume at Step 3 (Facial)
-  |           +-- [completedSteps: ["cpf", "document", "facial"]] --> Step 4 (Complete)
-  |           +-- [status = APPROVED] --> redirect to /dashboard
-  |           +-- [status = IN_REVIEW] --> redirect to /kyc/status
-```
-
-### Flow 7: KYC-Blocked Feature Access
-
-```
-User navigates to a KYC-gated page (e.g., /dashboard/shareholders)
-  |
-  +-- [KYCGate checks kycStatus]
-  |     |
-  |     +-- [status != APPROVED] --> KYCBlockedOverlay renders
-  |     |     |
-  |     |     +-- [page content visible but blurred behind overlay]
-  |     |     +-- [centered message: "Verificacao de identidade necessaria"]
-  |     |     +-- [status = NOT_STARTED or REJECTED] --> "Iniciar Verificacao" button --> /kyc
-  |     |     +-- [status = IN_PROGRESS] --> "Continuar Verificacao" button --> /kyc
-  |     |     +-- [status = IN_REVIEW] --> "Sua verificacao esta em analise" (no button)
-  |     |
-  |     +-- [status == APPROVED] --> page renders normally
+  |           +-- [completedSteps: []] --> resume at Sub-step 1 (CPF)
+  |           +-- [completedSteps: ["cpf"]] --> resume at Sub-step 2 (Document)
+  |           +-- [completedSteps: ["cpf", "document"]] --> resume at Sub-step 3 (Facial)
+  |           +-- [completedSteps: ["cpf", "document", "facial"]] --> Sub-step 4 (Processing)
+  |           +-- [status = APPROVED] --> call onSuccess(), advance to Company Setup
+  |           +-- [status = PENDING_REVIEW] --> show processing/waiting state
 ```
 
 ---
 
 ## UI States & Error Handling
 
-### KYCWizard States per Step
+### KYCVerificationStep States per Sub-Step
 
-| Step | Idle | Loading | Success | Error |
-|------|------|---------|---------|-------|
-| CPF | Form ready, fields enabled | Spinner on button, fields disabled | Green check on step, auto-advance | Red error text inline below field |
+| Sub-Step | Idle | Loading | Success | Error |
+|----------|------|---------|---------|-------|
+| CPF | Form ready, fields enabled | Spinner on button, fields disabled | Green check on step, name auto-filled, auto-advance | Red error text inline below field |
 | Document | Upload area ready, radio cards enabled | Upload progress bar, submit disabled | Thumbnails with green check overlay | Error message below upload area + retry |
 | Facial | Camera request pending | Camera active, instructions cycling | Photo captured, review screen | Error message + guidance tips + retry |
-| Complete | -- | -- | Success illustration + message | -- |
+| Processing | Spinner + "Analisando..." | Polling for status | Success illustration + "Verificada!" | Failure with retry option |
 
 ### Camera Step States
 
 | State | Visual | Trigger |
 |-------|--------|---------|
-| Permission Request | Browser permission dialog | Step 3 mount |
+| Permission Request | Browser permission dialog | Sub-step 3 mount |
 | Permission Denied | Error card: "Acesso a camera necessario" + instructions | User denies camera |
 | Camera Active | Live video feed in circular frame + instruction text | Permission granted |
 | Capturing | Instruction overlay: "Vire a cabeca..." | Liveness check sequence |
@@ -1599,7 +1432,7 @@ User navigates to a KYC-gated page (e.g., /dashboard/shareholders)
 |------------|-------------|---------|--------|
 | `NOT_STARTED` | `cream-100` bg, `cream-700` text, 3px `cream-700` left border | "Complete a verificacao de identidade para acessar todos os recursos" | "Iniciar Verificacao" (primary sm) |
 | `IN_PROGRESS` | `blue-50` bg, `blue-600` text, 3px `blue-600` left border | "Verificacao em andamento. Complete as etapas restantes." | "Continuar" (primary sm) |
-| `IN_REVIEW` | `blue-50` bg, `blue-600` text, 3px `blue-600` left border | "Sua verificacao esta sendo analisada. Voce sera notificado em breve." | None |
+| `PENDING_REVIEW` | `blue-50` bg, `blue-600` text, 3px `blue-600` left border | "Sua verificacao esta sendo analisada. Voce sera notificado em breve." | None |
 | `REJECTED` | `#FEE2E2` bg, `#991B1B` text, 3px `#991B1B` left border | "Verificacao recusada: {reason}. Tente novamente." | "Refazer Verificacao" (destructive sm) |
 | `APPROVED` | (hidden -- banner not rendered) | -- | -- |
 
@@ -1617,7 +1450,7 @@ User navigates to a KYC-gated page (e.g., /dashboard/shareholders)
 | `KYC_LIVENESS_CHECK_FAILED` | 422 | Inline error + retry: "Verificacao de vivacidade falhou. Tente novamente." |
 | `KYC_FACE_MATCH_FAILED` / `KYC_FACE_MISMATCH` | 422 | Inline error: "O rosto nao corresponde ao documento enviado" |
 | `KYC_ALREADY_APPROVED` | 409 | Redirect to /dashboard + success toast: "KYC ja aprovado" |
-| `KYC_UNDER_REVIEW` | 409 | Redirect to /kyc/status |
+| `KYC_UNDER_REVIEW` | 409 | Show processing/waiting state |
 | `KYC_FILE_TOO_LARGE` | 400 | Inline error: "Arquivo excede o tamanho maximo de 10 MB" |
 | `KYC_FILE_INVALID_FORMAT` | 400 | Inline error: "Formato nao suportado. Use PDF, PNG, JPG ou JPEG." |
 | `KYC_MAX_ATTEMPTS_EXCEEDED` | 422 | Error card: "Numero maximo de tentativas excedido. Entre em contato com o suporte." |
@@ -1627,16 +1460,14 @@ User navigates to a KYC-gated page (e.g., /dashboard/shareholders)
 
 ## Component Visual Specifications
 
-### KYCWizard Visual Spec
+### KYCVerificationStep Visual Spec (within onboarding card)
 
 | Property | Value |
 |----------|-------|
-| Layout | Full page, `gray-50` background, centered content |
-| Card | max-w `640px`, white bg, `shadow-md`, `radius-lg` (12px), padding `32px` |
-| Header | Navia logo (small, 32px height) + "Verificacao de Identidade" title (`h2`, `navy-900`) |
-| Stepper | At top of card, 4 steps, horizontal layout (see KYCProgressStepper) |
-| Content area | Below stepper, step-specific content |
-| Navigation | Linear flow only -- no back button. Steps can only go forward. |
+| Layout | Rendered inside the OnboardingWizard card (inherits card styling) |
+| KYC sub-stepper | At top of KYC content area, 4 sub-steps, horizontal layout |
+| Content area | Below sub-stepper, sub-step-specific content |
+| Navigation | Linear flow only -- no back button. Sub-steps can only go forward. |
 
 ### CPFVerificationStep Visual Spec
 
@@ -1644,9 +1475,9 @@ User navigates to a KYC-gated page (e.g., /dashboard/shareholders)
 |----------|-------|
 | Title | `h3`, "Verificacao de CPF" |
 | Subtitle | `body-sm`, `gray-500`, "Informe seus dados para verificacao" |
-| Field: fullName | Standard text input, label "Nome Completo", helper text "Como aparece nos seus documentos" |
 | Field: CPF | CPFInput component, label "CPF", helper text "Digite o CPF -- sera formatado automaticamente" |
 | Field: dateOfBirth | Date input, label "Data de Nascimento", format DD/MM/YYYY |
+| Field: fullName | Text input, label "Nome Completo", read-only, placeholder "Preenchido automaticamente apos verificacao do CPF", helper text "Nome retornado pela Receita Federal" |
 | Submit button | Primary variant, full width, "Verificar CPF" |
 | Field spacing | `20px` (5) between fields |
 | Error display | `caption` (12px), `#DC2626`, `4px` margin-top below the errored field |
@@ -1661,8 +1492,9 @@ User navigates to a KYC-gated page (e.g., /dashboard/shareholders)
 | Upload area | Dashed `gray-300` border, `200px` height, `gray-50` bg, `radius-md` |
 | Upload icon | Lucide `CloudUpload`, 48px, `gray-400` |
 | Upload text | "Arraste o arquivo ou clique para selecionar" (`body-sm`, `gray-500`) |
+| Camera button | "Usar camera" secondary button below upload area (Lucide `Camera`, 16px) |
 | Format text | "PDF, PNG, JPG ou JPEG -- max 10 MB" (`caption`, `gray-400`) |
-| File preview | Image thumbnail (160px width) or PDF file icon + file name + size + "Remover" link (`blue-600`, `body-sm`) |
+| File preview | Image thumbnail (160px width) or PDF file icon + file name + size + "Remover" / "Refazer" links (`blue-600`, `body-sm`) |
 | Progress bar | 4px height, `blue-600` fill, `gray-200` track, `radius-full` |
 | Front/back labels | `body-sm`, weight 500, `gray-700` |
 | Submit button | Primary variant, full width, "Enviar Documentos" |
@@ -1687,10 +1519,19 @@ User navigates to a KYC-gated page (e.g., /dashboard/shareholders)
 | Property | Value |
 |----------|-------|
 | Layout | Centered content within card |
-| Icon | Lucide `CheckCircle2`, 64px, `green-600` |
-| Title | `h2`, `navy-900`, "Verificacao Enviada!" |
-| Subtitle | `body`, `gray-500`, max-w 400px, "Estamos analisando seus dados..." |
-| Button | Primary variant, size `lg`, full width, "Ir para o Dashboard" |
+| Processing icon | Lucide `Loader2` (spinning), 48px, `blue-600` |
+| Processing title | `h2`, `navy-900`, "Analisando seus dados..." |
+| Processing subtitle | `body`, `gray-500`, "A verificacao AML esta em andamento..." |
+| Success icon | Lucide `CheckCircle2`, 64px, `green-600` |
+| Success title | `h2`, `navy-900`, "Identidade Verificada!" |
+| Success subtitle | `body`, `gray-500`, max-w 400px, "Sua verificacao foi aprovada. Vamos configurar sua empresa." |
+| Success button | Primary variant, size `lg`, full width, "Continuar" |
+| Failure icon | Lucide `XCircle`, 64px, `#DC2626` |
+| Failure title | `h2`, `navy-900`, "Verificacao Nao Aprovada" |
+| Failure button | Primary variant, size `lg`, full width, "Tentar Novamente" |
+| Pending icon | Lucide `Clock`, 48px, `blue-600` |
+| Pending title | `h2`, `navy-900`, "Em Analise" |
+| Pending button | Primary variant, size `lg`, full width, "Ir para o Dashboard" |
 | Spacing | 24px between icon and title, 12px between title and subtitle, 32px between subtitle and button |
 
 ### KYCStatusBanner Visual Spec
@@ -1708,20 +1549,6 @@ User navigates to a KYC-gated page (e.g., /dashboard/shareholders)
 | Action button | Size `sm`, variant per state (see states table) |
 | Close button | Ghost variant, Lucide `X`, 16px, `gray-400` |
 
-### KYCBlockedOverlay Visual Spec
-
-| Property | Value |
-|----------|-------|
-| Position | `position: absolute`, covers entire page content area (`inset: 0`) |
-| Background | `rgba(255, 255, 255, 0.8)` (white at 80% opacity) |
-| Backdrop filter | `blur(4px)` on content behind |
-| Center card | max-w `400px`, white bg, `shadow-lg`, `radius-lg` (12px), padding `32px` |
-| Lock icon | Lucide `Lock`, 48px, `gray-400`, centered |
-| Title | `h3`, `navy-900`, centered, "Verificacao de identidade necessaria" |
-| Subtitle | `body`, `gray-500`, centered, max-w 320px |
-| Button | Primary variant, full width, centered below subtitle |
-| Spacing | 16px between icon and title, 8px between title and subtitle, 24px between subtitle and button |
-
 ---
 
 ## TanStack Query Integration
@@ -1735,7 +1562,6 @@ import { api } from '@/lib/api-client';
 
 interface KYCStatusResponse {
   status: KYCStatus;
-  verificationLevel: string;
   completedSteps: string[];
   remainingSteps: string[];
   attemptCount: number;
@@ -1753,15 +1579,46 @@ export function useKYCStatus() {
 ```
 
 ```typescript
+// hooks/use-kyc-status-polling.ts
+// Variant with polling for the processing/completion step
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api-client';
+
+export function useKYCStatusPolling(enabled: boolean) {
+  return useQuery({
+    queryKey: ['kyc', 'status'],
+    queryFn: () => api.get<KYCStatusResponse>('/api/v1/kyc/status'),
+    refetchInterval: enabled ? 3_000 : false, // Poll every 3 seconds when enabled
+    staleTime: 0, // Always refetch when polling
+  });
+}
+```
+
+```typescript
 // hooks/use-verify-cpf.ts
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+interface VerifyCPFInput {
+  cpf: string;
+  dateOfBirth: string;
+}
+
+interface CpfVerificationResult {
+  verified: boolean;
+  cpfData: {
+    fullName: string;
+    dateOfBirth: string;
+    cpfStatus: 'active' | 'inactive';
+  };
+  verifikSignature: string;
+}
 
 export function useVerifyCPF() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: { cpf: string; dateOfBirth: string; fullName: string }) =>
-      api.post('/api/v1/kyc/verify-cpf', data),
+    mutationFn: (data: VerifyCPFInput) =>
+      api.post<CpfVerificationResult>('/api/v1/kyc/verify-cpf', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['kyc', 'status'] });
     },
@@ -1771,6 +1628,8 @@ export function useVerifyCPF() {
 
 ```typescript
 // hooks/use-upload-document.ts
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+
 export function useUploadDocument() {
   const queryClient = useQueryClient();
 
@@ -1786,12 +1645,37 @@ export function useUploadDocument() {
 
 ```typescript
 // hooks/use-verify-face.ts
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+interface FaceVerificationResult {
+  verified: boolean;
+  faceMatchScore: number;
+  livenessScore: number;
+  selfieUrl: string;
+}
+
 export function useVerifyFace() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (formData: FormData) =>
-      api.postFormData('/api/v1/kyc/verify-face', formData),
+      api.postFormData<FaceVerificationResult>('/api/v1/kyc/verify-face', formData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['kyc', 'status'] });
+    },
+  });
+}
+```
+
+```typescript
+// hooks/use-start-kyc.ts
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+
+export function useStartKYC() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => api.post('/api/v1/kyc/start', {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['kyc', 'status'] });
     },
@@ -1821,7 +1705,15 @@ const kycMutationOptions = {
 
 All user-facing strings use translation keys resolved via `next-intl`. Keys follow the `kyc.*` namespace.
 
-### KYC Wizard Keys
+### Onboarding Stepper Keys (updated)
+
+| Key | PT-BR | EN |
+|-----|-------|-----|
+| `onboarding.stepper.step1` | Suas Informacoes | Your Info |
+| `onboarding.stepper.step2` | Verificacao KYC | KYC Verification |
+| `onboarding.stepper.step3` | Sua Empresa | Your Company |
+
+### KYC Sub-Wizard Keys
 
 | Key | PT-BR | EN |
 |-----|-------|-----|
@@ -1841,7 +1733,8 @@ All user-facing strings use translation keys resolved via `next-intl`. Keys foll
 | `kyc.cpf.fieldHelper` | Digite o CPF -- sera formatado automaticamente | Enter CPF -- it will be formatted automatically |
 | `kyc.cpf.dateOfBirth` | Data de Nascimento | Date of Birth |
 | `kyc.cpf.fullName` | Nome Completo | Full Name |
-| `kyc.cpf.fullNameHelper` | Como aparece nos seus documentos | As it appears on your documents |
+| `kyc.cpf.fullNamePlaceholder` | Preenchido automaticamente apos verificacao do CPF | Auto-filled after CPF verification |
+| `kyc.cpf.fullNameHelper` | Nome retornado pela Receita Federal | Name returned by Receita Federal |
 | `kyc.cpf.submit` | Verificar CPF | Verify CPF |
 
 ### Document Step Keys
@@ -1857,8 +1750,11 @@ All user-facing strings use translation keys resolved via `next-intl`. Keys foll
 | `kyc.document.front` | Frente do documento | Front of document |
 | `kyc.document.back` | Verso do documento | Back of document |
 | `kyc.document.dragDrop` | Arraste o arquivo ou clique para selecionar | Drag file or click to select |
+| `kyc.document.useCamera` | Usar camera | Use camera |
 | `kyc.document.formats` | PDF, PNG, JPG ou JPEG -- max 10 MB | PDF, PNG, JPG or JPEG -- max 10 MB |
 | `kyc.document.remove` | Remover | Remove |
+| `kyc.document.retake` | Refazer | Retake |
+| `kyc.document.usePhoto` | Usar esta foto | Use this photo |
 | `kyc.document.submit` | Enviar Documentos | Submit Documents |
 
 ### Facial Recognition Step Keys
@@ -1877,14 +1773,24 @@ All user-facing strings use translation keys resolved via `next-intl`. Keys foll
 | `kyc.facial.submit` | Enviar | Submit |
 | `kyc.facial.cameraRequired` | Acesso a camera necessario | Camera access required |
 | `kyc.facial.cameraInstructions` | Habilite o acesso a camera nas configuracoes do navegador | Enable camera access in your browser settings |
+| `kyc.facial.faceNotDetected` | Rosto nao detectado. Posicione-se no centro do circulo. | Face not detected. Position yourself in the center of the circle. |
 
 ### Completion Step Keys
 
 | Key | PT-BR | EN |
 |-----|-------|-----|
-| `kyc.complete.title` | Verificacao Enviada! | Verification Submitted! |
-| `kyc.complete.subtitle` | Estamos analisando seus dados. Voce recebera uma notificacao quando a verificacao for concluida. | We're analyzing your data. You'll receive a notification when verification is complete. |
-| `kyc.complete.goToDashboard` | Ir para o Dashboard | Go to Dashboard |
+| `kyc.processing.title` | Analisando seus dados... | Analyzing your data... |
+| `kyc.processing.subtitle` | A verificacao AML esta em andamento. Isso pode levar alguns segundos. | AML verification is in progress. This may take a few seconds. |
+| `kyc.processing.delayed` | A verificacao esta demorando mais que o esperado. Aguarde... | Verification is taking longer than expected. Please wait... |
+| `kyc.complete.title` | Identidade Verificada! | Identity Verified! |
+| `kyc.complete.subtitle` | Sua verificacao foi aprovada. Vamos configurar sua empresa. | Your verification has been approved. Let's set up your company. |
+| `kyc.complete.continue` | Continuar | Continue |
+| `kyc.failure.title` | Verificacao Nao Aprovada | Verification Not Approved |
+| `kyc.failure.retry` | Tentar Novamente | Try Again |
+| `kyc.failure.contactSupport` | Entrar em contato com o suporte | Contact support |
+| `kyc.pending.title` | Em Analise | Under Review |
+| `kyc.pending.subtitle` | Sua verificacao requer analise adicional. Voce recebera um e-mail quando for concluida. | Your verification requires additional review. You'll receive an email when it's complete. |
+| `kyc.pending.goToDashboard` | Ir para o Dashboard | Go to Dashboard |
 
 ### Status Banner Keys
 
@@ -1898,15 +1804,19 @@ All user-facing strings use translation keys resolved via `next-intl`. Keys foll
 | `kyc.banner.rejected` | Verificacao recusada: {reason}. Tente novamente. | Verification rejected: {reason}. Please try again. |
 | `kyc.banner.rejectedAction` | Refazer Verificacao | Redo Verification |
 
-### Blocked Overlay Keys
+### Status Page Keys
 
 | Key | PT-BR | EN |
 |-----|-------|-----|
-| `kyc.blocked.title` | Verificacao de identidade necessaria | Identity verification required |
-| `kyc.blocked.subtitle` | Complete a verificacao KYC para acessar este recurso | Complete KYC verification to access this feature |
-| `kyc.blocked.startAction` | Iniciar Verificacao | Start Verification |
-| `kyc.blocked.continueAction` | Continuar Verificacao | Continue Verification |
-| `kyc.blocked.inReview` | Sua verificacao esta em analise | Your verification is under review |
+| `kyc.statusPage.pendingTitle` | Verificacao em Analise | Verification Under Review |
+| `kyc.statusPage.pendingSubtitle` | Estamos analisando seus dados. Voce recebera uma notificacao quando a verificacao for concluida. | We're analyzing your data. You'll receive a notification when verification is complete. |
+| `kyc.statusPage.approvedTitle` | Identidade Verificada | Identity Verified |
+| `kyc.statusPage.approvedSubtitle` | Sua verificacao foi aprovada. | Your verification has been approved. |
+| `kyc.statusPage.approvedAction` | Ir para o Dashboard | Go to Dashboard |
+| `kyc.statusPage.rejectedTitle` | Verificacao Recusada | Verification Rejected |
+| `kyc.statusPage.rejectedRetry` | Tentar Novamente | Try Again |
+| `kyc.statusPage.maxAttempts` | Tentativas esgotadas. Entre em contato com o suporte. | Attempts exhausted. Please contact support. |
+| `kyc.statusPage.contactSupport` | Contatar Suporte | Contact Support |
 
 ### Status Badge Keys
 

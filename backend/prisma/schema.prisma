@@ -428,6 +428,7 @@ model ProfileView {
 // CAP TABLE CORE
 // =============================================================================
 
+// ARCHIVED — from cap table implementation
 model ShareClass {
   id                            String    @id @default(uuid())
   companyId                     String    @map("company_id")
@@ -461,6 +462,7 @@ model ShareClass {
   @@map("share_classes")
 }
 
+// ARCHIVED — from cap table implementation
 enum ShareClassType {
   QUOTA
   COMMON_SHARES
@@ -469,6 +471,7 @@ enum ShareClassType {
   @@map("share_class_type")
 }
 
+// ARCHIVED — from cap table implementation
 enum AntiDilutionType {
   FULL_RATCHET
   WEIGHTED_AVERAGE
@@ -476,6 +479,7 @@ enum AntiDilutionType {
   @@map("anti_dilution_type")
 }
 
+// ARCHIVED — from cap table implementation
 model Shareholder {
   id                String            @id @default(uuid())
   companyId         String            @map("company_id")
@@ -514,6 +518,7 @@ model Shareholder {
   @@map("shareholders")
 }
 
+// ARCHIVED — from cap table implementation
 enum ShareholderType {
   FOUNDER
   INVESTOR
@@ -524,6 +529,7 @@ enum ShareholderType {
   @@map("shareholder_type")
 }
 
+// ARCHIVED — from cap table implementation
 enum ShareholderStatus {
   ACTIVE
   INACTIVE
@@ -532,6 +538,7 @@ enum ShareholderStatus {
   @@map("shareholder_status")
 }
 
+// ARCHIVED — from cap table implementation
 model BeneficialOwner {
   id            String   @id @default(uuid())
   shareholderId String   @map("shareholder_id")
@@ -547,6 +554,7 @@ model BeneficialOwner {
   @@map("beneficial_owners")
 }
 
+// ARCHIVED — from cap table implementation
 model Shareholding {
   id             String   @id @default(uuid())
   companyId      String   @map("company_id")
@@ -569,6 +577,7 @@ model Shareholding {
   @@map("shareholdings")
 }
 
+// ARCHIVED — from cap table implementation
 model CapTableSnapshot {
   id          String   @id @default(uuid())
   companyId   String   @map("company_id")
@@ -588,6 +597,7 @@ model CapTableSnapshot {
 // TRANSACTIONS
 // =============================================================================
 
+// ARCHIVED — from cap table implementation
 model Transaction {
   id                   String            @id @default(uuid())
   companyId            String            @map("company_id")
@@ -623,6 +633,7 @@ model Transaction {
   @@map("transactions")
 }
 
+// ARCHIVED — from cap table implementation
 enum TransactionType {
   ISSUANCE
   TRANSFER
@@ -633,6 +644,7 @@ enum TransactionType {
   @@map("transaction_type")
 }
 
+// ARCHIVED — from cap table implementation
 enum TransactionStatus {
   DRAFT
   PENDING_APPROVAL
@@ -644,6 +656,7 @@ enum TransactionStatus {
   @@map("transaction_status")
 }
 
+// ARCHIVED — from cap table implementation
 model BlockchainTransaction {
   id              String                    @id @default(uuid())
   transactionId   String                    @map("transaction_id")
@@ -668,6 +681,7 @@ model BlockchainTransaction {
   @@map("blockchain_transactions")
 }
 
+// ARCHIVED — from cap table implementation
 enum BlockchainTransactionStatus {
   PENDING
   SUBMITTED
@@ -681,6 +695,7 @@ enum BlockchainTransactionStatus {
 // FUNDING ROUNDS
 // =============================================================================
 
+// ARCHIVED — from cap table implementation
 model FundingRound {
   id                    String             @id @default(uuid())
   companyId             String             @map("company_id")
@@ -712,6 +727,7 @@ model FundingRound {
   @@map("funding_rounds")
 }
 
+// ARCHIVED — from cap table implementation
 enum RoundType {
   PRE_SEED
   SEED
@@ -724,6 +740,7 @@ enum RoundType {
   @@map("round_type")
 }
 
+// ARCHIVED — from cap table implementation
 enum FundingRoundStatus {
   DRAFT
   OPEN
@@ -734,6 +751,7 @@ enum FundingRoundStatus {
   @@map("funding_round_status")
 }
 
+// ARCHIVED — from cap table implementation
 model RoundCommitment {
   id                 String                  @id @default(uuid())
   roundId            String                  @map("round_id")
@@ -756,6 +774,7 @@ model RoundCommitment {
   @@map("round_commitments")
 }
 
+// ARCHIVED — from cap table implementation
 enum CommitmentPaymentStatus {
   PENDING
   RECEIVED
@@ -765,6 +784,7 @@ enum CommitmentPaymentStatus {
   @@map("commitment_payment_status")
 }
 
+// ARCHIVED — from cap table implementation
 model RoundClose {
   id         String   @id @default(uuid())
   roundId    String   @map("round_id")
@@ -784,6 +804,7 @@ model RoundClose {
 // CONVERTIBLE INSTRUMENTS
 // =============================================================================
 
+// ARCHIVED — from cap table implementation
 model ConvertibleInstrument {
   id                          String                @id @default(uuid())
   companyId                   String                @map("company_id")
@@ -821,6 +842,7 @@ model ConvertibleInstrument {
   @@map("convertible_instruments")
 }
 
+// ARCHIVED — from cap table implementation
 enum InstrumentType {
   MUTUO_CONVERSIVEL
   INVESTIMENTO_ANJO
@@ -830,6 +852,7 @@ enum InstrumentType {
   @@map("instrument_type")
 }
 
+// ARCHIVED — from cap table implementation
 enum ConvertibleStatus {
   OUTSTANDING
   CONVERTED
@@ -840,6 +863,7 @@ enum ConvertibleStatus {
   @@map("convertible_status")
 }
 
+// ARCHIVED — from cap table implementation
 enum InterestType {
   SIMPLE
   COMPOUND
@@ -847,6 +871,7 @@ enum InterestType {
   @@map("interest_type")
 }
 
+// ARCHIVED — from cap table implementation
 enum ConversionTrigger {
   QUALIFIED_FINANCING
   MATURITY
@@ -860,6 +885,7 @@ enum ConversionTrigger {
 // OPTION PLANS & GRANTS
 // =============================================================================
 
+// ARCHIVED — from cap table implementation
 model OptionPlan {
   id               String           @id @default(uuid())
   companyId        String           @map("company_id")
@@ -887,6 +913,7 @@ model OptionPlan {
   @@map("option_plans")
 }
 
+// ARCHIVED — from cap table implementation
 enum OptionPlanStatus {
   ACTIVE
   CLOSED
@@ -894,6 +921,7 @@ enum OptionPlanStatus {
   @@map("option_plan_status")
 }
 
+// ARCHIVED — from cap table implementation
 enum TerminationPolicy {
   FORFEITURE
   ACCELERATION
@@ -902,6 +930,7 @@ enum TerminationPolicy {
   @@map("termination_policy")
 }
 
+// ARCHIVED — from cap table implementation
 model OptionGrant {
   id                 String            @id @default(uuid())
   companyId          String            @map("company_id")
@@ -937,6 +966,7 @@ model OptionGrant {
   @@map("option_grants")
 }
 
+// ARCHIVED — from cap table implementation
 enum OptionGrantStatus {
   ACTIVE
   EXERCISED
@@ -946,6 +976,7 @@ enum OptionGrantStatus {
   @@map("option_grant_status")
 }
 
+// ARCHIVED — from cap table implementation
 enum VestingFrequency {
   MONTHLY
   QUARTERLY
@@ -954,6 +985,7 @@ enum VestingFrequency {
   @@map("vesting_frequency")
 }
 
+// ARCHIVED — from cap table implementation
 model OptionExerciseRequest {
   id                String                @id @default(uuid())
   grantId           String                @map("grant_id")
@@ -976,6 +1008,7 @@ model OptionExerciseRequest {
   @@map("option_exercise_requests")
 }
 
+// ARCHIVED — from cap table implementation
 enum ExerciseRequestStatus {
   PENDING_PAYMENT
   PAYMENT_CONFIRMED
@@ -990,6 +1023,7 @@ enum ExerciseRequestStatus {
 // DOCUMENTS & SIGNATURES
 // =============================================================================
 
+// ARCHIVED — from cap table implementation
 model DocumentTemplate {
   id             String              @id @default(uuid())
   companyId      String              @map("company_id")
@@ -1011,6 +1045,7 @@ model DocumentTemplate {
   @@map("document_templates")
 }
 
+// ARCHIVED — from cap table implementation
 enum DocumentTemplateType {
   SHAREHOLDER_AGREEMENT
   MEETING_MINUTES
@@ -1021,6 +1056,7 @@ enum DocumentTemplateType {
   @@map("document_template_type")
 }
 
+// ARCHIVED — from cap table implementation
 model Document {
   id            String         @id @default(uuid())
   companyId     String         @map("company_id")
@@ -1047,6 +1083,7 @@ model Document {
   @@map("documents")
 }
 
+// ARCHIVED — from cap table implementation
 enum DocumentStatus {
   DRAFT
   GENERATED
@@ -1057,6 +1094,7 @@ enum DocumentStatus {
   @@map("document_status")
 }
 
+// ARCHIVED — from cap table implementation
 model DocumentSigner {
   id              String             @id @default(uuid())
   documentId      String             @map("document_id")
@@ -1084,6 +1122,7 @@ model DocumentSigner {
   @@map("document_signers")
 }
 
+// ARCHIVED — from cap table implementation
 enum SignerRole {
   SHAREHOLDER
   DIRECTOR
@@ -1093,6 +1132,7 @@ enum SignerRole {
   @@map("signer_role")
 }
 
+// ARCHIVED — from cap table implementation
 enum DocumentSignerStatus {
   PENDING
   SIGNED
@@ -1250,6 +1290,7 @@ model AuditHashChain {
 // EXIT WATERFALL SCENARIOS
 // =============================================================================
 
+// ARCHIVED — from cap table implementation
 model WaterfallScenario {
   id                  String   @id @default(uuid())
   companyId           String   @map("company_id")

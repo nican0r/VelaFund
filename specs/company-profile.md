@@ -25,7 +25,7 @@ The profile is **opt-in** — companies start with no profile. An ADMIN explicit
 - **company-management.md**: The profile reads the company's `name`, `logoUrl`, `foundedDate`, and `entityType` from the Company entity as defaults, but all profile fields are independently editable.
 - **company-dataroom.md**: Dataroom document management is specified separately. Documents are uploaded files (PDFs, images) stored in a separate S3 prefix.
 - **company-litigation-verification.md**: Automatic litigation check via BigDataCorp is specified separately. Litigation fields on CompanyProfile are system-managed and immutable.
-- **reports-analytics.md**: The due diligence package export is an auto-generated ZIP of cap table data. The dataroom is a manually curated set of documents chosen by the founder.
+- **reports-analytics.md**: The due diligence package export is an auto-generated ZIP of company data. The dataroom is a manually curated set of documents chosen by the founder.
 - **user-permissions.md**: Only ADMIN and FINANCE roles can edit the profile. The shared link provides read-only access to external viewers without a Navia account.
 
 ---
@@ -176,6 +176,46 @@ The profile is **opt-in** — companies start with no profile. An ADMIN explicit
 - Visiting a shared link for a DRAFT or ARCHIVED profile returns a "Profile not available" page
 - System MUST provide a preview mode that renders the profile as external viewers would see it, without publishing
 
+### FR-8: AI Summary
+- System MUST provide an AI-generated summary of the company based on profile data, dataroom documents, and financial data
+- The `aiSummary` field stores the generated text (plain text, max 5000 characters)
+- The AI summary can be manually edited by the founder after generation
+- **Generation trigger endpoint**: `POST /api/v1/companies/:companyId/profile/generate-summary`
+  - Queues an async job that analyzes profile content, dataroom documents, and financial highlights
+  - Returns `202 Accepted` with a job ID; the frontend polls or receives a WebSocket notification when complete
+- **Auto-regeneration**: When documents are uploaded/deleted in the dataroom or financial highlights change, the system marks the summary as stale (a `summaryStale` flag tracked in application state, not persisted)
+  - The UI displays a "Summary may be outdated — Regenerate" indicator when stale
+  - Auto-regeneration does NOT happen automatically; the founder must click "Regenerate"
+- See [ai-document-intelligence.md](./ai-document-intelligence.md) for AI processing pipeline implementation details
+
+### FR-9: Financial Highlights
+- System MUST display financial metrics populated from Open Finance snapshots
+- The `financialHighlights` JSON field stores the following structure:
+  ```json
+  {
+    "totalBalance": "150000.00",
+    "monthlyRevenue": "45000.00",
+    "monthlyExpenses": "38000.00",
+    "burnRate": "38000.00",
+    "runway": 4,
+    "mrrEstimate": "42000.00",
+    "lastUpdated": "2026-02-15T10:30:00.000Z"
+  }
+  ```
+- Financial highlights are **read-only** on the profile — populated automatically from Open Finance snapshots
+- All monetary values are stored as strings (decimal precision) and formatted using Brazilian number formatting (see i18n.md)
+- Financial highlights are visible to investors with `VIEW_FINANCIALS` or `FULL` access level on the investor portal
+- The profile editor displays a read-only view of financial metrics with a link to Open Finance settings
+- If no Open Finance connection exists, the Financial Highlights tab shows an empty state prompting the user to connect
+- See [open-finance.md](./open-finance.md) for data source details and connection flow
+
+### FR-10: Profile Settings
+- System MUST allow ADMIN users to configure:
+  - **Investor update frequency**: how often investor updates are sent — `WEEKLY`, `BIWEEKLY`, `MONTHLY` (default), or `QUARTERLY`
+  - **Auto-process with AI**: toggle for automatic AI processing of newly uploaded dataroom documents (default: `true`)
+- Settings are persisted on the CompanyProfile entity
+- Changes to settings are audit-logged
+
 ---
 
 ## Data Models
@@ -208,11 +248,34 @@ interface CompanyProfile {
   litigationFetchedAt: Date | null;     // When data was last fetched
   litigationError: string | null;       // Error message if FAILED
 
+  // AI & Financial
+  aiSummary: string | null;            // AI-generated company summary
+  financialHighlights: FinancialHighlights | null; // From Open Finance snapshots
+  investorUpdateFrequency: InvestorUpdateFrequency; // WEEKLY | BIWEEKLY | MONTHLY | QUARTERLY
+  autoProcessWithAI: boolean;          // Whether to auto-process uploaded documents with AI
+
   // Timestamps
   publishedAt: Date | null;            // When first published
   archivedAt: Date | null;             // When archived
   createdAt: Date;
   updatedAt: Date;
+}
+
+interface FinancialHighlights {
+  totalBalance: string;                // Decimal as string, e.g., "150000.00"
+  monthlyRevenue: string;              // Decimal as string
+  monthlyExpenses: string;             // Decimal as string
+  burnRate: string;                    // Decimal as string
+  runway: number;                      // Months of runway remaining
+  mrrEstimate: string;                 // Decimal as string
+  lastUpdated: string;                 // ISO 8601 datetime
+}
+
+enum InvestorUpdateFrequency {
+  WEEKLY = 'WEEKLY',
+  BIWEEKLY = 'BIWEEKLY',
+  MONTHLY = 'MONTHLY',
+  QUARTERLY = 'QUARTERLY',
 }
 
 enum ProfileStatus {
@@ -337,6 +400,12 @@ model CompanyProfile {
   litigationFetchedAt DateTime?          @map("litigation_fetched_at")
   litigationError     String?            @map("litigation_error")
 
+  // AI & Financial
+  aiSummary          String?  @map("ai_summary") @db.Text // AI-generated company summary
+  financialHighlights Json?   @map("financial_highlights") // From Open Finance snapshots
+  investorUpdateFrequency InvestorUpdateFrequency @default(MONTHLY) @map("investor_update_frequency")
+  autoProcessWithAI  Boolean  @default(true) @map("auto_process_with_ai")
+
   publishedAt    DateTime?           @map("published_at")
   archivedAt     DateTime?           @map("archived_at")
   createdAt      DateTime            @default(now()) @map("created_at")
@@ -451,6 +520,13 @@ enum MetricFormat {
   CURRENCY_USD
   PERCENTAGE
   TEXT
+}
+
+enum InvestorUpdateFrequency {
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  QUARTERLY
 }
 ```
 
@@ -1266,7 +1342,7 @@ Add a "Profile" (`Perfil`) item in the sidebar under company navigation, positio
 │  h1: Perfil da Empresa        [Preview] [Publish/Draft] │
 │  Status badge: DRAFT / PUBLISHED / ARCHIVED              │
 ├─────────────────────────────────────────────────────────┤
-│  Tabs: [Informacoes] [Metricas] [Equipe] [Documentos] [Compartilhar] [Analytics] │
+│  Tabs: [Info] [Metricas] [Equipe] [AI Summary] [Financeiro] [Documentos] [Compartilhar] [Analytics] [Config] │
 ├─────────────────────────────────────────────────────────┤
 │  Tab Content Area                                        │
 │  (renders the active tab component)                      │
@@ -1285,11 +1361,23 @@ Add a "Profile" (`Perfil`) item in the sidebar under company navigation, positio
   - "Unpublish" button: Secondary variant — shown when status is PUBLISHED
   - "Archive" button: Destructive variant — shown in a "more actions" dropdown (three-dot menu)
 
+**Completeness Score**:
+- Display a circular progress indicator showing profile completeness as a percentage
+- Completeness is calculated based on how many profile sections have content:
+  - Info fields filled (headline, description, sector, etc.)
+  - At least 1 key metric added
+  - At least 1 team member added
+  - AI summary generated
+  - Financial highlights connected
+  - At least 1 dataroom document uploaded
+- Formula: `(filledSections / totalSections) * 100`, rounded to nearest integer
+- Displayed as a small circular progress badge next to the page title
+
 **Tab Bar**:
 - Uses shadcn/ui `Tabs` component
-- Six tabs: Informacoes, Metricas, Equipe, Documentos, Compartilhar, Analytics
-- Default active tab: Informacoes
-- Tab state is persisted in the URL query parameter `?tab=info|metrics|team|documents|share|analytics`
+- Nine tabs: Info, Metricas, Equipe, AI Summary, Financeiro, Documentos, Compartilhar, Analytics, Config
+- Default active tab: Info
+- Tab state is persisted in the URL query parameter `?tab=info|metrics|team|ai-summary|financials|documents|share|analytics|settings`
 
 **Empty State (No Profile Exists)**:
 - When `GET /api/v1/companies/:companyId/profile` returns 404, display an empty state instead of the editor:
@@ -1600,6 +1688,142 @@ Below the "Add Metric" button, show a row of template chips:
 - If no viewers: show "Nenhum visualizador registrado" empty state
 
 **Data Source**: `GET /api/v1/companies/:companyId/profile/analytics?period={period}`
+
+### Tab: AI Summary
+
+**Component**: `ProfileAISummaryTab`
+
+**Layout**:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Resumo por IA                                           │
+│  body-sm: "Resumo gerado automaticamente com base no     │
+│  perfil, documentos e dados financeiros da empresa"       │
+├─────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────┐    │
+│  │ AI-generated summary text displayed here.        │    │
+│  │ Editable textarea when in edit mode.             │    │
+│  │                                                   │    │
+│  │ [Edit] [Regenerate]                               │    │
+│  └─────────────────────────────────────────────────┘    │
+│                                                          │
+│  Stale indicator (when applicable):                      │
+│  ⚠ "Resumo pode estar desatualizado — Regenerar"         │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Summary Display**:
+- Shows the `aiSummary` text in a read-only card when not editing
+- "Edit" button (ghost variant) switches to textarea mode for manual editing
+- "Regenerate" button (secondary variant) triggers `POST /api/v1/companies/:companyId/profile/generate-summary`
+- Regenerate button shows a loading spinner while the async job is in progress
+- On successful regeneration, the new summary replaces the current one
+
+**Stale Indicator**:
+- Displayed as a `cream-100` bg banner with `cream-700` text and a warning icon
+- Shown when documents have been added/removed or financial highlights have changed since the last generation
+- Clicking "Regenerar" in the banner triggers the same regeneration endpoint
+
+**Empty State**:
+- When no summary exists yet:
+  - Icon: `sparkles` (Lucide), 48px, `gray-300`
+  - Title: "Gere um resumo da sua empresa"
+  - Description: "Use IA para criar um resumo profissional baseado nos dados do seu perfil"
+  - CTA: "Gerar Resumo" (primary button)
+
+**Edit Mode**:
+- Textarea with same styling as the description field (4 rows min, auto-expand, max 5000 chars)
+- "Salvar" and "Cancelar" buttons below the textarea
+- Save sends `PUT /api/v1/companies/:companyId/profile` with `{ aiSummary: "..." }`
+
+### Tab: Financeiro (Financial Highlights)
+
+**Component**: `ProfileFinancialsTab`
+
+**Layout**:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Destaques Financeiros                                   │
+│  body-sm: "Metricas financeiras do Open Finance"         │
+│  Last updated: 15/02/2026 10:30                          │
+├─────────────────────────────────────────────────────────┤
+│  ┌────────────┐ ┌────────────┐ ┌────────────┐           │
+│  │ Saldo Total│ │ Receita    │ │ Despesas   │           │
+│  │ R$ 150.000 │ │ R$ 45.000  │ │ R$ 38.000  │           │
+│  └────────────┘ └────────────┘ └────────────┘           │
+│  ┌────────────┐ ┌────────────┐ ┌────────────┐           │
+│  │ Burn Rate  │ │ Runway     │ │ MRR Est.   │           │
+│  │ R$ 38.000  │ │ 4 meses   │ │ R$ 42.000  │           │
+│  └────────────┘ └────────────┘ └────────────┘           │
+├─────────────────────────────────────────────────────────┤
+│  ℹ "Dados atualizados automaticamente via Open Finance"  │
+│  [Configurar Open Finance →]                              │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Financial Metric Cards**:
+- 6 stat cards in a 3x2 grid (following design-system.md stat card pattern)
+- All monetary values formatted as BRL using Brazilian number formatting (R$ X.XXX,XX)
+- Runway displayed as "{N} meses" (months)
+- Cards are read-only — no edit capability
+- "Last updated" timestamp formatted as dd/MM/yyyy HH:mm per i18n.md
+
+**Empty State (No Open Finance Connection)**:
+- Icon: `landmark` (Lucide), 48px, `gray-300`
+- Title: "Conecte seus dados financeiros"
+- Description: "Integre via Open Finance para exibir metricas financeiras automaticamente"
+- CTA: "Configurar Open Finance" (primary button) — navigates to Open Finance settings
+
+**Info Banner**:
+- `blue-50` bg, `blue-600` text, info icon
+- Text: "Dados atualizados automaticamente via Open Finance"
+- Link: "Configurar Open Finance" navigates to the Open Finance settings page
+
+### Tab: Config (Settings)
+
+**Component**: `ProfileSettingsTab`
+
+**Layout**:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Configuracoes do Perfil                                 │
+├─────────────────────────────────────────────────────────┤
+│  Frequencia de atualizacao para investidores             │
+│  body-sm: "Define com que frequencia investidores        │
+│  recebem atualizacoes sobre a empresa"                   │
+│  ┌───────────────────────────────┐                       │
+│  │ ○ Semanal                      │                       │
+│  │ ○ Quinzenal                    │                       │
+│  │ ● Mensal (padrao)              │                       │
+│  │ ○ Trimestral                   │                       │
+│  └───────────────────────────────┘                       │
+├─────────────────────────────────────────────────────────┤
+│  Processamento automatico com IA                         │
+│  body-sm: "Processar automaticamente novos documentos    │
+│  enviados ao dataroom com inteligencia artificial"        │
+│  [Toggle: ON]                                             │
+├─────────────────────────────────────────────────────────┤
+│  [Salvar Configuracoes]                                   │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Investor Update Frequency**:
+- Radio button group with 4 options: Semanal, Quinzenal, Mensal, Trimestral
+- Default: Mensal (MONTHLY)
+- Maps to `investorUpdateFrequency` enum
+
+**Auto-Process with AI Toggle**:
+- shadcn/ui `Switch` component
+- Default: ON (true)
+- Maps to `autoProcessWithAI` boolean
+- When enabled, newly uploaded dataroom documents are automatically queued for AI processing
+
+**Save Behavior**:
+- "Salvar Configuracoes" button at the bottom
+- Sends `PUT /api/v1/companies/:companyId/profile` with `{ investorUpdateFrequency: "...", autoProcessWithAI: true/false }`
 
 ### Public Profile Page (`/p/:slug`)
 
@@ -2713,7 +2937,7 @@ export class ProfileController {
 ## Security Considerations
 
 ### SEC-1: Public Profile Data Exposure
-- Public profiles expose only curated data — never internal company data (cap table, transactions, shareholder details)
+- Public profiles expose only curated data — never internal company data (financial details, member information, internal settings)
 - Profile data is explicitly entered by the ADMIN; no automatic leakage of internal data
 - Document downloads use pre-signed URLs with 15-minute expiry
 
@@ -2764,11 +2988,12 @@ export class ProfileController {
 | [company-litigation-verification.md](./company-litigation-verification.md) | Automatic litigation check via BigDataCorp — immutable litigation data on profile |
 | [company-management.md](./company-management.md) | Profile reads company name, logo, founding date, entity type as defaults |
 | [company-cnpj-validation.md](./company-cnpj-validation.md) | Profile uses the already-validated CNPJ for BigDataCorp litigation lookup |
-| [document-generation.md](./document-generation.md) | Dataroom documents are separate from generated legal documents; different storage prefix |
+| [company-data-enrichment.md](./company-data-enrichment.md) | Company data enrichment via CNPJ and external sources |
+| [ai-document-intelligence.md](./ai-document-intelligence.md) | AI processing of documents and summary generation for company profiles |
+| [investor-portal.md](./investor-portal.md) | Investor access to company profiles and investor update distribution |
+| [open-finance.md](./open-finance.md) | Open Finance integration — source of financial highlights data on profile |
 | [reports-analytics.md](./reports-analytics.md) | Due diligence package (auto-generated ZIP) is distinct from dataroom (manually curated) |
 | [user-permissions.md](./user-permissions.md) | Only ADMIN and FINANCE roles can edit profile; shared link provides read-only external access |
-| [shareholder-registry.md](./shareholder-registry.md) | Profile can display founding team members who may also be shareholders |
-| [funding-rounds.md](./funding-rounds.md) | Profile shared with prospective investors during fundraising process |
 | [api-standards.md](../.claude/rules/api-standards.md) | API endpoints follow `/api/v1/companies/:companyId/profile` pattern with envelope responses |
 | [error-handling.md](../.claude/rules/error-handling.md) | Error codes for profile not found, invalid share link, access denied |
 | [security.md](../.claude/rules/security.md) | Access controls on shared links; S3 storage for dataroom documents |

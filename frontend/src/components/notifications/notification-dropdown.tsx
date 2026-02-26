@@ -35,7 +35,7 @@ function getNotificationIcon(type: NotificationType): string {
   return iconMap[type] || 'bg-gray-100 text-gray-600';
 }
 
-function formatRelativeTime(dateStr: string, t: (key: string, values?: Record<string, unknown>) => string): string {
+function formatRelativeTime(dateStr: string, t: (key: string, values?: Record<string, string | number | Date>) => string): string {
   const now = new Date();
   const date = new Date(dateStr);
   const diffMs = now.getTime() - date.getTime();
@@ -165,7 +165,7 @@ function NotificationItem({
 }: {
   notification: Notification;
   onMarkAsRead: (id: string) => void;
-  t: (key: string, values?: Record<string, unknown>) => string;
+  t: (key: string, values?: Record<string, string | number | Date>) => string;
 }) {
   const iconClass = getNotificationIcon(notification.notificationType);
   const timeStr = formatRelativeTime(notification.createdAt, t);

@@ -3,34 +3,58 @@
 This directory contains user flow documentation for every feature in the Navia platform.
 Each document follows the template defined in `.claude/rules/user-flow-documentation.md`.
 
-## Flows
+---
+
+## Active Flows
 
 | Flow | Actors | Status |
 |------|--------|--------|
 | [Authentication](./authentication.md) | Unauthenticated user, Authenticated user | Backend complete, Frontend spec complete |
-| [Onboarding](./onboarding.md) | Authenticated user (new or incomplete onboarding) | Frontend complete (2-step wizard: PersonalInfo → CompanyCreation, 22 tests) |
-| [Company Management](./company-management.md) | Authenticated user, ADMIN member | Backend complete, Frontend spec complete |
-| [Member Invitation](./member-invitation.md) | ADMIN member, any company member, authenticated user, unauthenticated user | Backend complete, Frontend invitation acceptance page complete |
-| [Share Class Management](./share-class-management.md) | ADMIN (full CRUD), FINANCE/LEGAL/INVESTOR (read-only) | Backend complete, Frontend list page + create form complete |
-| [Shareholder Management](./shareholder-management.md) | ADMIN (full CRUD + UBO), FINANCE/LEGAL (read-only), ADMIN/LEGAL (foreign view) | Backend complete, Frontend list page complete |
-| [Cap Table Management](./cap-table-management.md) | ADMIN/FINANCE (full access + write/export), LEGAL (read-only) | Backend complete |
-| [Transactions](./transactions.md) | ADMIN (full lifecycle + approve/confirm), FINANCE (create/submit/cancel), LEGAL (read-only) | Backend complete, Frontend list page + create form complete |
-| [Funding Rounds](./funding-rounds.md) | ADMIN (full lifecycle + commitments), FINANCE (read + payment updates), LEGAL (read-only) | Backend complete |
-| [Option Plans, Grants & Exercises](./option-plans.md) | ADMIN (full CRUD + close/cancel + exercise confirm/cancel), FINANCE/LEGAL (read-only) | Backend complete, Frontend list page complete |
-| [Convertible Instruments](./convertible-instruments.md) | ADMIN (full CRUD + convert/redeem/cancel), FINANCE (read + scenarios), LEGAL (read-only) | Backend complete |
-| [Convertible Instruments — Frontend List Page](./convertible-instruments-frontend.md) | ADMIN (view + filter + cancel), FINANCE (view + filter), LEGAL (view + filter) | Frontend list page complete |
+| [Onboarding](./onboarding.md) | Authenticated user (new or incomplete onboarding) | Frontend complete (2-step wizard: PersonalInfo -> CompanyCreation, 22 tests) |
 | [KYC Verification](./kyc-verification.md) | Authenticated user (all roles), System (Verifik, AML screening), Compliance team | Backend complete |
-| [User Permissions](./user-permissions.md) | All roles (ADMIN, FINANCE, LEGAL, INVESTOR, EMPLOYEE) | Frontend spec complete |
-| [Notifications](./notifications.md) | All authenticated users (any role) | Backend + Frontend complete |
-| [Audit Logging](./audit-logging.md) | ADMIN (full access), LEGAL (full access), System (event capture + hash chain) | Backend complete |
+| [Company Management](./company-management.md) | Authenticated user, ADMIN member | Backend complete, Frontend spec complete |
 | [Company CNPJ Validation](./company-cnpj-validation.md) | ADMIN (creator), System (Bull queue, Verifik API) | Backend complete |
-| [Document Generation](./document-generation.md) | ADMIN (full CRUD + generate + delete), LEGAL (create + generate), FINANCE (read-only) | Backend complete |
 | [Company Profile](./company-profile.md) | ADMIN (full lifecycle + publish/archive + analytics), FINANCE (update + analytics), all members (read), public visitors (view via slug) | Backend complete |
 | [Company Dataroom](./company-dataroom.md) | ADMIN/FINANCE (upload/delete/reorder), all members (read/download), public visitors (download via slug) | Backend complete |
 | [Company Litigation](./company-litigation.md) | System (Bull queue, BigDataCorp API), ADMIN/FINANCE (view on profile), public visitors (view on public profile) | Backend complete |
-| [Exit Waterfall](./exit-waterfall.md) | ADMIN (run analysis, save/list/view/delete scenarios) | Backend complete |
-| [Reports & Analytics](./reports-analytics.md) | ADMIN/FINANCE/LEGAL (company reports + exports), any user (portfolio), System (Bull queue export) | Backend complete |
+| [Member Invitation](./member-invitation.md) | ADMIN member, any company member, authenticated user, unauthenticated user | Backend complete, Frontend invitation acceptance page complete |
+| [User Permissions](./user-permissions.md) | All roles (ADMIN, FINANCE, LEGAL, INVESTOR, EMPLOYEE) | Frontend spec complete |
+| [Notifications](./notifications.md) | All authenticated users (any role) | Backend + Frontend complete |
 | [Settings](./settings.md) | ADMIN (full access: edit company, invite/manage members), all members (view) | Frontend Company Info tab + Members tab complete |
+
+---
+
+## Archived Flows
+
+The following flows were archived to `docs/user-flows/archived/` after the platform pivot. They document cap table management features that are no longer part of the active product scope. Retained for historical reference.
+
+| Archived Flow | File |
+|---------------|------|
+| Cap Table Management | `archived/cap-table-management.md` |
+| Share Class Management | `archived/share-class-management.md` |
+| Shareholder Management | `archived/shareholder-management.md` |
+| Transactions | `archived/transactions.md` |
+| Funding Rounds | `archived/funding-rounds.md` |
+| Convertible Instruments | `archived/convertible-instruments.md` |
+| Convertible Instruments (Frontend) | `archived/convertible-instruments-frontend.md` |
+| Option Plans, Grants & Exercises | `archived/option-plans.md` |
+| Document Generation | `archived/document-generation.md` |
+| Exit Waterfall | `archived/exit-waterfall.md` |
+| Audit Logging | `archived/audit-logging.md` |
+| Reports & Analytics | `archived/reports-analytics.md` |
+
+---
+
+## Planned Flows
+
+The following flows will be added as the post-pivot features are designed and implemented:
+
+- **AI Document Intelligence** -- Upload, OCR, and AI-powered extraction/analysis of corporate documents
+- **Investor Q&A** -- AI-assisted question answering over company dataroom and documents
+- **Open Finance** -- Integration with Open Finance APIs for financial data aggregation
+- **Investor Portal** -- Dedicated portal for investors to access company data, documents, and analytics
+
+---
 
 ## Cross-References
 

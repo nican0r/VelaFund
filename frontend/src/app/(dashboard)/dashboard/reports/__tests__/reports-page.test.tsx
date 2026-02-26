@@ -150,11 +150,6 @@ jest.mock('@/hooks/use-reports', () => ({
   useDueDiligenceJobStatus: (...args: unknown[]) => mockUseDueDiligenceJobStatus(...args),
 }));
 
-const mockUseShareClasses = jest.fn();
-jest.mock('@/hooks/use-share-classes', () => ({
-  useShareClasses: (...args: unknown[]) => mockUseShareClasses(...args),
-}));
-
 // --- Mock Data ---
 
 const mockOwnershipData = {
@@ -217,11 +212,6 @@ const mockDilutionData = {
   ],
 };
 
-const mockShareClasses = [
-  { id: 'sc-1', className: 'Quotas', type: 'QUOTA' },
-  { id: 'sc-2', className: 'Preferred A', type: 'PREFERRED' },
-];
-
 // --- Setup ---
 
 function setupDefaultMocks(overrides?: {
@@ -232,7 +222,6 @@ function setupDefaultMocks(overrides?: {
   exportJobStatus?: Record<string, unknown>;
   dueDiligence?: Record<string, unknown>;
   dueDiligenceJobStatus?: Record<string, unknown>;
-  shareClasses?: Record<string, unknown>;
 }) {
   mockUseCompany.mockReturnValue({
     companies: [{ id: 'c1', name: 'Acme', status: 'ACTIVE' }],
@@ -279,11 +268,6 @@ function setupDefaultMocks(overrides?: {
   mockUseDueDiligenceJobStatus.mockReturnValue({
     data: null,
     ...overrides?.dueDiligenceJobStatus,
-  });
-
-  mockUseShareClasses.mockReturnValue({
-    data: { data: mockShareClasses },
-    ...overrides?.shareClasses,
   });
 }
 
@@ -487,23 +471,11 @@ describe('ReportsPage', () => {
       expect(screen.getByText('Available')).toBeInTheDocument();
     });
 
-    it('renders share class filter dropdown', () => {
-      render(<ReportsPage />);
-      expect(screen.getByText('All classes')).toBeInTheDocument();
-    });
-
     it('renders include options checkbox', () => {
       render(<ReportsPage />);
       expect(screen.getByText('Include option pool')).toBeInTheDocument();
       const checkbox = screen.getByRole('checkbox');
       expect(checkbox).toBeChecked();
-    });
-
-    it('renders share class options in dropdown', () => {
-      render(<ReportsPage />);
-      // The dropdown should contain option elements with share class names
-      const select = screen.getAllByRole('combobox')[0]; // First select is share class filter
-      expect(select).toBeInTheDocument();
     });
 
     it('shows empty state when no shareholders', () => {

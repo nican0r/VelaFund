@@ -24,7 +24,6 @@ import {
   useGenerateDueDiligence,
   useDueDiligenceJobStatus,
 } from '@/hooks/use-reports';
-import { useShareClasses } from '@/hooks/use-share-classes';
 import type { ExportFormat } from '@/types/company';
 
 // --- Formatting Helpers ---
@@ -106,14 +105,9 @@ function StatCard({
 
 function OwnershipTab({ companyId }: { companyId: string }) {
   const t = useTranslations('reports.ownership');
-  const [shareClassId, setShareClassId] = useState<string>('');
   const [includeOptions, setIncludeOptions] = useState(true);
 
-  const { data: shareClassesData } = useShareClasses(companyId);
-  const shareClasses = shareClassesData?.data ?? [];
-
   const { data, isLoading, error } = useOwnershipReport(companyId, {
-    shareClassId: shareClassId || undefined,
     includeOptions,
   });
 
@@ -144,19 +138,6 @@ function OwnershipTab({ companyId }: { companyId: string }) {
     <div className="space-y-6">
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-4">
-        <select
-          value={shareClassId}
-          onChange={(e) => setShareClassId(e.target.value)}
-          className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 shadow-sm focus:border-ocean-600 focus:outline-none focus:ring-1 focus:ring-ocean-600"
-        >
-          <option value="">{t('allClasses')}</option>
-          {shareClasses.map((sc) => (
-            <option key={sc.id} value={sc.id}>
-              {sc.className}
-            </option>
-          ))}
-        </select>
-
         <label className="flex items-center gap-2 text-sm text-gray-700">
           <input
             type="checkbox"

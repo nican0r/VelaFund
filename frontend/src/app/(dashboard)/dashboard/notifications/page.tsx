@@ -83,7 +83,7 @@ function getNotificationIconClass(type: NotificationType): string {
   return map[type] || 'bg-gray-100 text-gray-600';
 }
 
-function formatRelativeTime(dateStr: string, t: (key: string, values?: Record<string, unknown>) => string): string {
+function formatRelativeTime(dateStr: string, t: (key: string, values?: Record<string, string | number | Date>) => string): string {
   const now = new Date();
   const date = new Date(dateStr);
   const diffMs = now.getTime() - date.getTime();
@@ -299,7 +299,7 @@ function NotificationList({
   deleteConfirmId: string | null;
   setDeleteConfirmId: (id: string | null) => void;
   deleteIsPending: boolean;
-  t: (key: string, values?: Record<string, unknown>) => string;
+  t: (key: string, values?: Record<string, string | number | Date>) => string;
 }) {
   const showErrorToast = useErrorToast();
 
@@ -551,7 +551,7 @@ function NotificationList({
 
 // --- Preferences Tab ---
 
-function PreferencesTab({ t }: { t: (key: string, values?: Record<string, unknown>) => string }) {
+function PreferencesTab({ t }: { t: (key: string, values?: Record<string, string | number | Date>) => string }) {
   const showErrorToast = useErrorToast();
   const { data: preferences, isLoading } = useNotificationPreferences();
   const updatePreferences = useUpdatePreferences();
@@ -565,7 +565,7 @@ function PreferencesTab({ t }: { t: (key: string, values?: Record<string, unknow
     if (category === 'security') return; // Security cannot be disabled
     setLocalPrefs((prev) => ({
       ...(prev ?? preferences?.categories ?? {}),
-      [category]: !(prev ?? preferences?.categories)?.[category as keyof typeof preferences.categories],
+      [category]: !(prev ?? preferences?.categories)?.[category as keyof NonNullable<typeof preferences>['categories']],
     }));
   }
 

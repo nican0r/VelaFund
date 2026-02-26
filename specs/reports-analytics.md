@@ -1,17 +1,17 @@
 # Reports & Analytics Specification
 
-**Topic of Concern**: Cap table reports, investor reporting, dilution analysis, and due diligence packages
+**Topic of Concern**: AI-generated standardized reports for company health, financial analysis, investor readiness, and custom insights
 
-**One-Sentence Description**: The system generates comprehensive reports including ownership breakdowns, dilution analysis, investor portfolio views, and exports in PDF, Excel, CSV, and OCT JSON formats.
-
-**Note**: Exit waterfall modeling has been moved to [exit-waterfall.md](./exit-waterfall.md).
+**One-Sentence Description**: The system generates AI-powered reports including company health scores, financial summaries, investor-ready packages, and custom analysis reports using data from Open Finance snapshots, dataroom documents, and company profile information, with export in PDF, Excel, and CSV formats.
 
 **Complements**:
 - `api-standards.md` — response envelope, pagination, export content types
-- `audit-logging.md` — audit report generation, due diligence audit trail
+- `audit-logging.md` — audit events for report generation and export
 - `error-handling.md` — error codes for report generation failures
-- `security.md` — PII handling in exported reports
+- `security.md` — PII handling in exported reports, S3 bucket policies
 - `user-permissions.md` — role-based access to reports
+- `company-profile.md` — company data used as AI report input
+- `company-dataroom.md` — dataroom documents used as AI report input
 
 ---
 
@@ -20,1115 +20,230 @@
 1. [Overview](#overview)
 2. [User Stories](#user-stories)
 3. [Report Types](#report-types)
-4. [API Endpoints](#api-endpoints)
-5. [Data Models](#data-models)
-6. [Per-Role Access Matrix](#per-role-access-matrix)
-7. [Edge Cases](#edge-cases)
-8. [Dependencies](#dependencies)
-9. [Technical Implementation](#technical-implementation)
-10. [Security Considerations](#security-considerations)
-11. [Success Criteria](#success-criteria)
-12. [Related Specifications](#related-specifications)
+4. [Data Model](#data-model)
+5. [API Endpoints](#api-endpoints)
+6. [AI Report Generation Pipeline](#ai-report-generation-pipeline)
+7. [Per-Role Access Matrix](#per-role-access-matrix)
+8. [Edge Cases](#edge-cases)
+9. [Error Codes](#error-codes)
+10. [Dependencies](#dependencies)
+11. [Technical Implementation](#technical-implementation)
+12. [Security Considerations](#security-considerations)
+13. [Frontend Specification](#frontend-specification)
+14. [i18n Keys](#i18n-keys)
+15. [Success Criteria](#success-criteria)
+16. [Related Specifications](#related-specifications)
 
 ---
 
 ## Overview
 
-Navia provides reporting and analytics for various stakeholders: admin dashboards for equity tracking, investor reports for portfolio updates, board reports for governance, and due diligence packages for fundraising. Reports are exportable in PDF, Excel, CSV, and OCT JSON formats.
+Navia provides AI-generated reports that help founders understand their company's health, track financial performance, prepare for investor conversations, and analyze custom topics. Reports are generated asynchronously using data from multiple sources: Open Finance snapshots (bank/financial data), dataroom documents (uploaded files), and company profile information.
 
-Reports are generated from current database state (no stale caches). For large exports (>1000 rows or PDF/ZIP generation), the system queues the job via Bull and returns a `202 Accepted` with a job ID. The user receives an email when the export is ready for download.
+All reports are generated via a Bull queue worker. The user requests a report, receives a `202 Accepted` with a job reference, and is notified (via in-app notification and email) when the report is ready. Completed reports are stored as structured JSON in the database and as rendered PDFs in S3 for download.
+
+**Data Sources for AI Reports**:
+- **Open Finance snapshots**: Bank account balances, transaction history, revenue/expense categorization (connected via Open Finance integration — see `open-finance.md`)
+- **Dataroom documents**: Uploaded pitch decks, financial statements, legal documents, product materials (see `company-dataroom.md`)
+- **Company profile**: Company description, sector, team members, metrics, founded year (see `company-profile.md`)
+- **Company record**: Name, CNPJ, entity type, status, founded date
 
 ---
 
 ## User Stories
 
-### US-1: Ownership Breakdown
+### US-1: Company Health Score
 
-**As an** admin, **I want to** view the current ownership breakdown by shareholder and share class, **so that** I can understand the equity distribution at a glance.
-
-**Acceptance Criteria**:
-- Display each shareholder's name, share class, number of shares, basic percentage, and fully-diluted percentage.
-- Include an option pool summary showing allocated, exercised, and remaining shares.
-- Support filtering by share class.
-- Data reflects the current cap table state (no caching delay).
-
-### US-2: Investor Portfolio View
-
-**As an** investor, **I want to** see my portfolio summary across all companies I hold shares in, **so that** I can track my total investment value and ownership percentages.
+**As a** founder, **I want to** generate an AI health score report for my company, **so that** I can understand my financial position and identify areas that need attention.
 
 **Acceptance Criteria**:
-- Show each company with the investor's shares, percentage ownership, and estimated value (based on last round price).
-- Accessible via the user-scoped endpoint (not company-scoped).
-- Only display the investor's own holdings; never expose other shareholders' data.
+- AI analyzes Open Finance data (burn rate, runway, growth) and dataroom documents
+- Produces a score from 0 to 100 with breakdown by category
+- Report includes sections: Financial Health, Growth Indicators, Risk Factors, Recommendations
+- Score methodology is transparent (weights and contributing factors shown)
 
-### US-3: Due Diligence Package
+### US-2: Financial Summary
 
-**As a** legal user, **I want to** generate a due diligence package for the company, **so that** potential investors and auditors can review the company's equity history.
-
-**Acceptance Criteria**:
-- Generate a ZIP file containing: cap table history PDF, transaction ledger CSV, shareholder list, option grant summary, convertible instrument summary, document inventory, and audit trail for the requested period.
-- Include blockchain verification hashes for all on-chain transactions.
-- Large packages are generated asynchronously; the user receives an email with a download link.
-
-### US-4: Cap Table Export
-
-**As a** finance user, **I want to** export the current cap table in standard formats (PDF, Excel, CSV, OCT JSON), **so that** I can share it with accountants, lawyers, and other stakeholders.
+**As a** founder, **I want to** generate a financial summary report, **so that** I can review revenue, expenses, and trends in a structured format with AI-generated narrative.
 
 **Acceptance Criteria**:
-- PDF: formatted, print-ready report with company header and generation date.
-- Excel (XLSX): structured spreadsheet with multiple tabs (summary, by share class, by shareholder).
-- CSV: flat data export, one row per shareholding.
-- OCT JSON: Open Cap Table Coalition standard format for interoperability.
-- All exports include the generation timestamp and company name.
+- Pulls data from Open Finance snapshots for the requested period
+- Monthly/quarterly breakdowns of revenue, expenses, and balance
+- AI generates a narrative paragraph explaining the numbers and trends
+- Includes chart-ready data for revenue trend, expense breakdown, cash flow
+
+### US-3: Investor-Ready Report
+
+**As a** founder, **I want to** generate a polished investor report, **so that** I can share it with potential investors during fundraising.
+
+**Acceptance Criteria**:
+- Combines company profile (overview, team, sector) with financial highlights
+- Includes a dataroom document summary (what is available, key metrics extracted from documents)
+- AI generates an executive summary suitable for investor audiences
+- PDF output is professionally formatted with company branding
+
+### US-4: Custom AI Report
+
+**As a** founder, **I want to** request a custom AI analysis on a specific topic, **so that** I can get insights tailored to my current needs.
+
+**Acceptance Criteria**:
+- Founder provides a free-text prompt describing the focus area
+- AI uses all available data (Open Finance, documents, profile) to generate the report
+- Report structure adapts to the request (not a fixed template)
+- Prompt and response are stored for reference
 
 ---
 
 ## Report Types
 
-### Admin/Board Reports
-- Current cap table with ownership percentages
-- Fully-diluted cap table (including unexercised options and convertibles)
-- Historical cap table snapshots (point-in-time reconstruction)
-- Ownership by share class
-- Voting power distribution
-- Option pool utilization
-- Transaction history ledger
+### Company Health Score Report (`HEALTH_SCORE`)
 
-### Investor Reports
-- Ownership certificates
-- Investment summary (amount invested, current value, ROI multiple)
-- Transaction history for the specific investor
-- Exit proceeds projections at various valuations (see [exit-waterfall.md](./exit-waterfall.md))
+AI-generated company health assessment.
 
-### Due Diligence Packages
-- Complete cap table history
-- All transactions with blockchain verification links
-- Option grant summary
-- Convertible instrument summary
-- Shareholder contact list (masked PII per LGPD)
-- Corporate documents inventory
-- Audit trail for the requested period (see `audit-logging.md` Due Diligence Audit Report)
+**Sections**:
+1. **Overall Score**: 0-100 with color-coded rating (0-30: Critical, 31-50: Needs Attention, 51-70: Moderate, 71-85: Healthy, 86-100: Excellent)
+2. **Financial Health** (weight: 40%):
+   - Burn rate (monthly cash consumption)
+   - Runway (months of cash remaining at current burn)
+   - Debt-to-cash ratio
+   - Revenue-to-expense ratio
+3. **Growth Indicators** (weight: 30%):
+   - Monthly revenue growth rate (MoM)
+   - Revenue trend direction (accelerating, stable, decelerating)
+   - Customer/revenue consistency
+4. **Risk Factors** (weight: 20%):
+   - Cash concentration risk (single account dependency)
+   - Expense volatility
+   - Revenue dependency patterns
+5. **Recommendations** (weight: 10% — qualitative):
+   - Top 3 actionable recommendations based on identified weaknesses
+   - Priority ranking (high, medium, low)
 
-### Analytics
-- Dilution tracking over time (chart data)
-- Ownership concentration (Gini coefficient)
-- Foreign ownership percentage
-- Upcoming vesting events calendar
-- Exit waterfall analysis (see [exit-waterfall.md](./exit-waterfall.md))
+**Data Requirements**:
+- Minimum 3 months of Open Finance data to generate a meaningful score
+- Falls back to available data with a "Limited Data" disclaimer if < 3 months
 
----
+### Financial Summary Report (`FINANCIAL_SUMMARY`)
 
-## API Endpoints
+Structured financial overview with AI narrative.
 
-### GET /api/v1/companies/:companyId/reports/ownership
+**Sections**:
+1. **Period Overview**: Start date, end date, total revenue, total expenses, net result
+2. **Revenue Analysis**: Monthly/quarterly revenue breakdown, growth rates, top revenue categories
+3. **Expense Analysis**: Monthly/quarterly expense breakdown, largest expense categories, trend analysis
+4. **Cash Flow**: Opening balance, closing balance, net cash flow per period, burn rate
+5. **AI Narrative**: 2-3 paragraph summary explaining key trends, anomalies, and outlook
+6. **Chart Data**: Structured arrays for frontend chart rendering (revenue trend, expense breakdown pie, cash flow waterfall)
 
-Returns the current ownership breakdown for the company.
+**Parameters**:
+- `periodStart`: ISO 8601 date (required)
+- `periodEnd`: ISO 8601 date (required)
+- `granularity`: `monthly` (default) or `quarterly`
 
-**Query Parameters**:
+### Investor-Ready Report (`INVESTOR_READY`)
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `shareClassId` | UUID | — | Filter by specific share class |
-| `includeOptions` | boolean | `true` | Include unexercised options in fully-diluted calculation |
+Polished report designed for sharing with potential investors.
 
-**Response** (`200 OK`):
+**Sections**:
+1. **Executive Summary**: AI-generated 1-page overview of the company, market position, and investment opportunity
+2. **Company Overview**: Name, sector, founded year, description, team members (from profile)
+3. **Team**: Key team members with roles and backgrounds (from profile team members)
+4. **Market & Product**: Extracted from pitch deck/product documents in dataroom (AI summarizes)
+5. **Financial Highlights**: Key metrics from Open Finance (revenue, growth, runway) — presented positively for investor audience
+6. **Dataroom Summary**: List of available documents by category with brief descriptions
+7. **Key Metrics**: Curated metrics from company profile (ARR, MRR, team size, etc.)
 
-```json
-{
-  "success": true,
-  "data": {
-    "companyId": "550e8400-e29b-41d4-a716-446655440000",
-    "companyName": "Acme Ltda.",
-    "generatedAt": "2026-02-23T14:30:00.000Z",
-    "totalShares": "100000",
-    "totalFullyDiluted": "120000",
-    "shareholders": [
-      {
-        "shareholderId": "uuid-1",
-        "name": "Joao Silva",
-        "shareClassName": "ON",
-        "shareClassId": "uuid-class-1",
-        "shares": "40000",
-        "percentage": "40.00",
-        "fullyDilutedPercentage": "33.33"
-      },
-      {
-        "shareholderId": "uuid-2",
-        "name": "Fund ABC",
-        "shareClassName": "PN-A",
-        "shareClassId": "uuid-class-2",
-        "shares": "30000",
-        "percentage": "30.00",
-        "fullyDilutedPercentage": "25.00"
-      }
-    ],
-    "optionPoolSummary": {
-      "totalPool": "20000",
-      "granted": "15000",
-      "exercised": "5000",
-      "vestedUnexercised": "4000",
-      "unvested": "6000",
-      "available": "5000"
-    }
-  }
-}
-```
+**Note**: This report intentionally presents data in a positive framing suitable for investor audiences. It highlights strengths and growth while acknowledging risks constructively.
 
-### GET /api/v1/companies/:companyId/reports/cap-table/export
+### Custom AI Report (`CUSTOM`)
 
-Exports the current cap table in the requested format.
+Free-form AI-generated report based on founder prompt.
 
-**Query Parameters**:
+**Input**: `customPrompt` — free-text string describing what the founder wants analyzed (max 2000 characters)
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `format` | string | `pdf` | Export format: `pdf`, `xlsx`, `csv`, `oct` |
-| `snapshotDate` | ISO 8601 | — | Point-in-time export. Omit for current state. |
+**Behavior**:
+- AI receives the prompt along with all available company data
+- Generates a report with a structure adapted to the request
+- Report includes: Title (AI-generated), sections (AI-determined), and a data sources disclaimer
 
-**Response (synchronous, small exports)** (`200 OK`):
-
-```
-Content-Type: application/pdf
-Content-Disposition: attachment; filename="cap-table-2026-02-23.pdf"
-```
-
-Binary file content.
-
-**Response (asynchronous, large exports)** (`202 Accepted`):
-
-```json
-{
-  "success": true,
-  "data": {
-    "jobId": "export-uuid-123",
-    "status": "QUEUED",
-    "format": "xlsx",
-    "estimatedCompletionSeconds": 30,
-    "pollUrl": "/api/v1/companies/:companyId/reports/cap-table/export/export-uuid-123"
-  }
-}
-```
-
-**Polling endpoint**: `GET /api/v1/companies/:companyId/reports/cap-table/export/:jobId`
-
-```json
-{
-  "success": true,
-  "data": {
-    "jobId": "export-uuid-123",
-    "status": "COMPLETED",
-    "format": "xlsx",
-    "downloadUrl": "https://s3.amazonaws.com/navia-exports/...",
-    "expiresAt": "2026-02-23T15:30:00.000Z"
-  }
-}
-```
-
-Export download URLs are pre-signed S3 URLs with 1-hour expiry.
-
-**OCT JSON Format**: Follows the Open Cap Table Coalition schema for cap table interoperability. The response `Content-Type` is `application/json` with `Content-Disposition: attachment`.
-
-### GET /api/v1/companies/:companyId/reports/due-diligence
-
-Generates a complete due diligence package as a ZIP file.
-
-**Query Parameters**:
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `dateFrom` | ISO 8601 | Company creation date | Start of audit trail period |
-| `dateTo` | ISO 8601 | Current date | End of audit trail period |
-
-**Response** (`202 Accepted`):
-
-Due diligence packages are always generated asynchronously due to their size.
-
-```json
-{
-  "success": true,
-  "data": {
-    "jobId": "dd-uuid-456",
-    "status": "QUEUED",
-    "estimatedCompletionSeconds": 120,
-    "pollUrl": "/api/v1/companies/:companyId/reports/due-diligence/dd-uuid-456"
-  }
-}
-```
-
-**ZIP Contents**:
-
-| File | Description |
-|------|-------------|
-| `cap-table-current.pdf` | Current ownership breakdown |
-| `cap-table-history.csv` | All cap table snapshots |
-| `transactions.csv` | Full transaction ledger |
-| `shareholders.csv` | Shareholder list (PII masked per LGPD) |
-| `option-grants.csv` | All option grants with vesting status |
-| `convertibles.csv` | Convertible instruments summary |
-| `documents-inventory.csv` | List of all corporate documents |
-| `audit-trail.pdf` | Audit log report for the period (see `audit-logging.md`) |
-| `blockchain-proofs.json` | On-chain transaction hashes and verification data |
-| `metadata.json` | Package generation timestamp, company info, period covered |
-
-### GET /api/v1/companies/:companyId/reports/dilution
-
-Returns dilution analysis data over time.
-
-**Query Parameters**:
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `dateFrom` | ISO 8601 | 12 months ago | Start date |
-| `dateTo` | ISO 8601 | Current date | End date |
-| `granularity` | string | `month` | Data point granularity: `day`, `week`, `month` |
-
-**Response** (`200 OK`):
-
-```json
-{
-  "success": true,
-  "data": {
-    "companyId": "uuid",
-    "generatedAt": "2026-02-23T14:30:00.000Z",
-    "dataPoints": [
-      {
-        "date": "2025-03-01",
-        "totalShares": "50000",
-        "fullyDilutedShares": "60000",
-        "shareClasses": [
-          { "shareClassId": "uuid-1", "name": "ON", "shares": "40000", "percentage": "80.00" },
-          { "shareClassId": "uuid-2", "name": "PN-A", "shares": "10000", "percentage": "20.00" }
-        ]
-      }
-    ],
-    "giniCoefficient": "0.42",
-    "foreignOwnershipPercentage": "15.00"
-  }
-}
-```
-
-### GET /api/v1/users/me/reports/portfolio
-
-Returns the authenticated investor's portfolio across all companies.
-
-**Response** (`200 OK`):
-
-```json
-{
-  "success": true,
-  "data": {
-    "userId": "uuid",
-    "generatedAt": "2026-02-23T14:30:00.000Z",
-    "holdings": [
-      {
-        "companyId": "uuid-1",
-        "companyName": "Acme Ltda.",
-        "shareClassName": "PN-A",
-        "shares": "10000",
-        "ownershipPercentage": "10.00",
-        "totalInvested": "500000.00",
-        "estimatedValue": "1200000.00",
-        "lastRoundPricePerShare": "120.00",
-        "roiMultiple": "2.40"
-      }
-    ],
-    "totals": {
-      "totalInvested": "500000.00",
-      "totalEstimatedValue": "1200000.00",
-      "weightedRoiMultiple": "2.40"
-    }
-  }
-}
-```
+**Examples of custom prompts**:
+- "Analyze our expense efficiency and suggest areas to cut costs"
+- "Compare our Q3 and Q4 performance and explain the differences"
+- "Assess our readiness for a Series A fundraise"
+- "Summarize our financial position for a board meeting"
 
 ---
 
-## Data Models
+## Data Model
 
-### TypeScript Interfaces
-
-```typescript
-interface OwnershipReportEntry {
-  shareholderId: string;
-  name: string;
-  shareClassId: string;
-  shareClassName: string;
-  shares: string;            // Decimal as string
-  percentage: string;        // e.g., "25.00"
-  fullyDilutedPercentage: string;
-}
-
-interface OptionPoolSummary {
-  totalPool: string;
-  granted: string;
-  exercised: string;
-  vestedUnexercised: string;
-  unvested: string;
-  available: string;
-}
-
-interface OwnershipReport {
-  companyId: string;
-  companyName: string;
-  generatedAt: string;       // ISO 8601
-  totalShares: string;
-  totalFullyDiluted: string;
-  shareholders: OwnershipReportEntry[];
-  optionPoolSummary: OptionPoolSummary;
-}
-
-interface ExportJob {
-  id: string;
-  companyId: string;
-  format: 'pdf' | 'xlsx' | 'csv' | 'oct';
-  status: 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
-  s3Key: string | null;
-  downloadUrl: string | null;
-  expiresAt: string | null;  // ISO 8601, pre-signed URL expiry
-  createdAt: string;
-  errorCode: string | null;
-}
-
-interface PortfolioHolding {
-  companyId: string;
-  companyName: string;
-  shareClassName: string;
-  shares: string;
-  ownershipPercentage: string;
-  totalInvested: string;
-  estimatedValue: string;
-  lastRoundPricePerShare: string;
-  roiMultiple: string;
-}
-```
-
-For waterfall-related data models (`WaterfallShareClassResult`, `WaterfallAnalysis`), see [exit-waterfall.md](./exit-waterfall.md).
-
----
-
-## Per-Role Access Matrix
-
-| Report / Endpoint | ADMIN | FINANCE | LEGAL | INVESTOR | EMPLOYEE |
-|--------------------|-------|---------|-------|----------|----------|
-| Ownership breakdown (`GET .../reports/ownership`) | Full | Full | Full | No | No |
-| Dilution analysis (`GET .../reports/dilution`) | Full | Full | Read | No | No |
-| Cap table export (`GET .../reports/cap-table/export`) | Full | Full | Full | No | No |
-| Due diligence package (`GET .../reports/due-diligence`) | Full | No | Full | No | No |
-| Portfolio view (`GET /users/me/reports/portfolio`) | No | No | No | Own only | No |
-| Option grant report | Full | Full | Read | No | Own only |
-
-For waterfall analysis access, see [exit-waterfall.md](./exit-waterfall.md) (ADMIN only).
-
-**Notes**:
-- "Full" = can view and export.
-- "Read" = can view but not export.
-- "Own only" = can only see data pertaining to the authenticated user.
-- INVESTOR role sees only their own holdings via the user-scoped portfolio endpoint, never via company-scoped report endpoints.
-- Accessing a report endpoint without the required role returns `404 Not Found` (not `403`, to prevent enumeration per `api-standards.md`).
-
----
-
-## Edge Cases
-
-### EC-1: Empty Cap Table
-
-When a company has no shareholders or share classes, the ownership report returns empty arrays with zero totals.
-
-### EC-2: Concurrent Export Requests
-
-If a user requests an export while a previous export of the same format for the same company is still processing, the system returns the existing job ID rather than queuing a duplicate. The deduplication window is 5 minutes.
-
----
-
-## Dependencies
-
-| Dependency | Purpose | Notes |
-|------------|---------|-------|
-| Puppeteer / Chromium | PDF report generation | Runs in a headless browser for HTML-to-PDF rendering |
-| ExcelJS | XLSX spreadsheet generation | Generates multi-tab spreadsheets |
-| Bull queue (`report-export`) | Async export job processing | Separate queue from audit-log queue |
-| AWS S3 (`navia-exports` bucket) | Temporary storage for generated exports | Pre-signed URLs with 1-hour expiry |
-| AWS SES | Email notification when async export completes | Links to the download URL |
-| Recharts (frontend) | Chart rendering for dilution and ownership visuals | Frontend-only dependency |
-| Shareholding / Transaction data | Source data for all calculations | Via Prisma queries |
-| Audit log data | Due diligence audit trail | See `audit-logging.md` |
-
----
-
-## Technical Implementation
-
-### ReportService Skeleton
-
-```typescript
-import { Injectable } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bull';
-import { Queue } from 'bull';
-import { PrismaService } from '../prisma/prisma.service';
-
-@Injectable()
-export class ReportService {
-  constructor(
-    private prisma: PrismaService,
-    @InjectQueue('report-export') private exportQueue: Queue,
-  ) {}
-
-  async getOwnershipReport(companyId: string, options: {
-    shareClassId?: string;
-    includeOptions?: boolean;
-  }): Promise<OwnershipReport> {
-    // 1. Fetch all shareholdings for company (filtered by shareClassId if provided)
-    // 2. Compute basic percentage: shares / totalShares * 100
-    // 3. If includeOptions, fetch vested unexercised options and add to fully-diluted denominator
-    // 4. Compute fully-diluted percentage: shares / totalFullyDiluted * 100
-    // 5. Build option pool summary from OptionGrant and OptionPlan data
-    // 6. Return structured OwnershipReport
-  }
-
-  async exportCapTable(companyId: string, format: string, snapshotDate?: string): Promise<ExportJob> {
-    // 1. Check for duplicate in-progress export (EC-2 deduplication)
-    // 2. Create ExportJob record with status QUEUED
-    // 3. Add job to Bull queue
-    // 4. Return job metadata
-  }
-
-  async generateDueDiligence(companyId: string, dateFrom: string, dateTo: string): Promise<ExportJob> {
-    // 1. Create ExportJob record with status QUEUED
-    // 2. Add job to Bull queue with all sub-report parameters
-    // 3. Return job metadata
-  }
-
-  async getPortfolio(userId: string): Promise<PortfolioHolding[]> {
-    // 1. Find all companies where user is a shareholder
-    // 2. For each company, fetch shareholdings belonging to user
-    // 3. Look up latest funding round price for estimated value
-    // 4. Compute ROI multiple: estimatedValue / totalInvested
-    // 5. Return holdings array
-  }
-
-  // Waterfall analysis method — see exit-waterfall.md for specification
-  // async runWaterfall(companyId, input): Promise<WaterfallAnalysis>
-}
-```
-
-### Bull Queue Processor
-
-```typescript
-import { Processor, Process } from '@nestjs/bull';
-import { Job } from 'bull';
-
-@Processor('report-export')
-export class ReportExportProcessor {
-  @Process('cap-table-export')
-  async handleCapTableExport(job: Job) {
-    // 1. Fetch data based on job.data (companyId, format, snapshotDate)
-    // 2. Generate file (PDF via Puppeteer, XLSX via ExcelJS, CSV via stream, OCT via JSON serialization)
-    // 3. Upload to S3 navia-exports bucket
-    // 4. Update ExportJob record with s3Key, status COMPLETED
-    // 5. Send email notification with pre-signed download URL
-  }
-
-  @Process('due-diligence')
-  async handleDueDiligence(job: Job) {
-    // 1. Generate each sub-report (cap table, transactions, shareholders, etc.)
-    // 2. Fetch audit trail from audit log service
-    // 3. Package all files into a ZIP
-    // 4. Upload ZIP to S3
-    // 5. Update ExportJob record
-    // 6. Send email notification
-  }
-}
-```
-
-### Functional Requirements
-
-| ID | Requirement | Target |
-|----|-------------|--------|
-| FR-1 | Synchronous reports generate from current database state | < 3 seconds |
-| FR-2 | Async export jobs complete within reasonable time | < 60 seconds (cap table), < 5 minutes (due diligence) |
-| FR-3 | Export files are stored temporarily in S3 | 1-hour pre-signed URL expiry, auto-deleted after 24 hours |
-| FR-4 | All numeric values in reports use Brazilian number format for display | `1.234,56` via `Intl.NumberFormat('pt-BR')` on frontend |
-
----
-
-## Security Considerations
-
-- **PII in exports**: Shareholder names are included in reports. Email addresses are masked (`j***@example.com`) in all exports except for ADMIN role, who sees full emails. CPF is never included in any export.
-- **Pre-signed URLs**: All export download links use S3 pre-signed URLs with 1-hour expiry. URLs are single-use (S3 access logging tracks downloads).
-- **Audit logging**: Report generation and export actions are audit-logged as `CAP_TABLE_EXPORTED` (see `audit-logging.md`). The audit event includes the format, date range, and requesting user.
-- **Rate limiting**: Export endpoints use the `write` rate limit tier (30 requests per minute) to prevent abuse. Portfolio endpoint uses the `read` tier (100 requests per minute).
-- **Company scoping**: All company-scoped report endpoints enforce that the authenticated user is an ACTIVE member of the company. Non-members receive `404`.
-- **S3 bucket policy**: The `navia-exports` bucket has `BlockPublicAccess` enabled. Objects are encrypted with SSE-S3. No public read access.
-- **Data export audit**: Every export triggers a `DATA_EXPORTED` audit event for LGPD compliance (Art. 18).
-
----
-
-## Success Criteria
-
-- [ ] Ownership report generates in < 3 seconds for companies with up to 500 shareholders
-- [ ] PDF exports render with correct formatting, company header, and generation date
-- [ ] Excel exports include multiple tabs (summary, by share class, by shareholder) with correct formulas
-- [ ] CSV exports produce valid RFC 4180 CSV with UTF-8 BOM for Brazilian character support
-- [ ] OCT JSON exports conform to the Open Cap Table Coalition schema
-- [ ] Due diligence ZIP includes all specified sub-reports with correct data
-- [ ] Async exports complete within timeout (60s cap table, 5min DD package)
-- [ ] Pre-signed download URLs expire after 1 hour
-- [ ] Duplicate export requests within 5 minutes return existing job (no duplicate work)
-- [ ] Role-based access matrix is enforced: unauthorized roles receive `404`
-- [ ] All export actions are audit-logged
-- [ ] Decimal precision is maintained throughout calculations (no floating-point rounding)
-- [ ] Brazilian number formatting is used for all financial values in display contexts
-
-For waterfall-specific success criteria, see [exit-waterfall.md](./exit-waterfall.md).
-
----
-
-## Frontend Specification
-
-### Navigation Structure
-
-Reports is a **top-level sidebar navigation item** with the following sub-pages:
-
-| Sidebar Label | URL | Component |
-|---------------|-----|-----------|
-| **Reports** (parent) | — | Expandable nav group |
-| └ Ownership | `/dashboard/reports/ownership` | `OwnershipReportPage` |
-| └ Dilution | `/dashboard/reports/dilution` | `DilutionAnalysisPage` |
-| └ Cap Table Export | `/dashboard/reports/export` | `CapTableExportPage` |
-| └ Exit Waterfall | `/dashboard/reports/waterfall` | `WaterfallPage` (see exit-waterfall.md) |
-| └ Due Diligence | `/dashboard/reports/due-diligence` | `DueDiligencePage` |
-
-The Investor Portfolio is a separate route under the user scope:
-
-| Sidebar Label | URL | Component |
-|---------------|-----|-----------|
-| Portfolio | `/dashboard/portfolio` | `PortfolioDashboardPage` |
-
-Portfolio is visible only to users with INVESTOR role. It appears as a top-level sidebar item (not under Reports) because it is user-scoped, not company-scoped.
-
-### Sidebar Icon
-
-- Reports group icon: `BarChart3` (Lucide)
-- Portfolio icon: `Briefcase` (Lucide)
-
----
-
-### Page 1: Ownership Report
-
-**URL**: `/dashboard/reports/ownership`
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  h1: Ownership Report                      [Export ▾]   │
-│  body-sm: Current equity distribution by shareholder     │
-├─────────────────────────────────────────────────────────┤
-│  Filters: [Share Class ▾ All]  [☐ Include Options]      │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│  ┌── Summary Cards (3) ────────────────────────────────┐│
-│  │ Total Shares    │ Fully Diluted   │ Shareholders    ││
-│  │ 100.000         │ 120.000         │ 12              ││
-│  └─────────────────────────────────────────────────────┘│
-│                                                          │
-│  ┌── Ownership Table ──────────────────────────────────┐│
-│  │ Shareholder  │ Class │ Shares │ %    │ FD %  │      ││
-│  │ João Silva   │ ON    │ 40.000 │ 40,00│ 33,33 │      ││
-│  │ Fund ABC     │ PN-A  │ 30.000 │ 30,00│ 25,00 │      ││
-│  │ Maria Santos │ ON    │ 20.000 │ 20,00│ 16,67 │      ││
-│  │ ...          │       │        │      │       │      ││
-│  │ TOTAL        │       │100.000 │100,00│       │      ││
-│  └─────────────────────────────────────────────────────┘│
-│                                                          │
-│  ┌── Option Pool Summary (Card) ───────────────────────┐│
-│  │ Total Pool: 20.000  │ Granted: 15.000 │ Available: 5K││
-│  │ Exercised: 5.000    │ Vested: 4.000   │ Unvested: 6K ││
-│  └─────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────┘
-```
-
-#### Ownership Table Columns
-
-| Column | Field | Alignment | Format | Sortable |
-|--------|-------|-----------|--------|----------|
-| Shareholder | `name` | left | Text | Yes (alpha) |
-| Share Class | `shareClassName` | left | Text + badge | Yes (alpha) |
-| Shares | `shares` | right | Brazilian number (e.g., `40.000`) | Yes (numeric) |
-| Ownership % | `percentage` | right | `{value}%` (e.g., `40,00%`) | Yes (numeric) |
-| Fully Diluted % | `fullyDilutedPercentage` | right | `{value}%` | Yes (numeric) |
-
-- Default sort: `-percentage` (highest ownership first)
-- Summary row at bottom: totals for Shares, Ownership % (should be 100,00%)
-- Pagination: standard (20 per page default)
-
-#### Filter Bar
-
-| Filter | Type | Default | Behavior |
-|--------|------|---------|----------|
-| Share Class | Dropdown (single select) | "All Classes" | Filters table to show only selected class |
-| Include Options | Checkbox/switch | checked (true) | Toggles fully-diluted calculation |
-
-#### Export Button
-
-- Dropdown with options: PDF, Excel, CSV
-- Triggers `GET /reports/cap-table/export?format={format}`
-- For sync exports: browser downloads file directly
-- For async exports (202): shows toast "Export is being generated. You'll receive an email when ready."
-
-#### Loading State
-- Skeleton: 3 stat card skeletons + table skeleton (8 rows)
-
-#### Empty State
-- When company has no shareholders: centered empty state illustration + "No shareholders yet" + "Add your first shareholder to see ownership data." + CTA button "Add Shareholder" (links to shareholders page)
-
----
-
-### Page 2: Dilution Analysis
-
-**URL**: `/dashboard/reports/dilution`
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  h1: Dilution Analysis                                   │
-│  body-sm: Ownership changes over time                    │
-├─────────────────────────────────────────────────────────┤
-│  Filters: [Date From] [Date To] [Granularity: Month ▾]  │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│  ┌── Stacked Area Chart (Recharts) ────────────────────┐│
-│  │                                                      ││
-│  │  100% ┤▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓         ││
-│  │       │▓▓▓ ON ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓         ││
-│  │   75% ┤▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓         ││
-│  │       │░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░         ││
-│  │   50% ┤░░░ PN-A ░░░░░░░░░░░░░░░░░░░░░░░░         ││
-│  │       │░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░         ││
-│  │   25% ┤▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒         ││
-│  │       │▒▒▒ PN-B ▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒▒         ││
-│  │    0% ┤──────────────────────────────────          ││
-│  │       Jan  Feb  Mar  Apr  May  Jun  Jul            ││
-│  │                                                      ││
-│  │  Legend: ▓ ON  ░ PN-A  ▒ PN-B                       ││
-│  └──────────────────────────────────────────────────────┘│
-│                                                          │
-│  ┌── Metrics Cards (2) ───────────────────────────────┐ │
-│  │ Gini Coefficient     │ Foreign Ownership %         │ │
-│  │ 0,42                 │ 15,00%                      │ │
-│  │ (Ownership concentr.)│ (Non-domestic holders)      │ │
-│  └─────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────┘
-```
-
-#### Stacked Area Chart (Recharts)
-
-| Setting | Value |
-|---------|-------|
-| Chart type | `AreaChart` with stacked `Area` components |
-| X-axis | Date (formatted: `MMM yyyy` for month, `dd/MM` for day/week) |
-| Y-axis | Percentage (0% to 100%) |
-| Colors | Chart palette from design system: chart-1 through chart-8 |
-| Tooltip | Custom tooltip showing: date, share class name, shares, percentage |
-| Legend | Bottom, horizontal, using chart color dots + class names |
-| Grid | Dashed horizontal lines, `gray-200` |
-| Responsive | Container width 100%, fixed height 400px (320px on mobile) |
-| Animation | Fade in on load, 500ms duration |
-
-Each `Area` component represents one share class. The areas stack to 100%.
-
-#### Data Points
-
-Each data point from the API `dataPoints[]` array maps to one X-axis tick. The `shareClasses` array within each data point provides the stacked values.
-
-#### Filter Bar
-
-| Filter | Type | Default | Description |
-|--------|------|---------|-------------|
-| Date From | Date picker | 12 months ago | `dateFrom` query param |
-| Date To | Date picker | Today | `dateTo` query param |
-| Granularity | Dropdown | `month` | Options: "Daily", "Weekly", "Monthly" |
-
-Date pickers use Brazilian format (dd/MM/yyyy).
-
-#### Metrics Cards
-
-| Card | Value | Description |
-|------|-------|-------------|
-| Gini Coefficient | `giniCoefficient` | Format: `0,42`. Subtitle: "Concentração de propriedade" / "Ownership concentration" |
-| Foreign Ownership | `foreignOwnershipPercentage` | Format: `15,00%`. Subtitle: "Participação estrangeira" / "Non-domestic holders" |
-
-#### Loading State
-- Chart area: gray-200 rectangle placeholder with pulse animation
-- Metrics cards: 2 skeleton cards
-
-#### Empty State
-- When no data points returned: chart area shows "No dilution data available for this period" + suggestion to adjust date range
-
----
-
-### Page 3: Cap Table Export
-
-**URL**: `/dashboard/reports/export`
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  h1: Cap Table Export                                    │
-│  body-sm: Download cap table in various formats          │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│  ┌── Export Card ──────────────────────────────────────┐ │
-│  │                                                      │ │
-│  │  Format                                              │ │
-│  │  ○ PDF  — Formatted print-ready report               │ │
-│  │  ● Excel — Structured spreadsheet with tabs          │ │
-│  │  ○ CSV  — Flat data export                           │ │
-│  │  ○ OCT JSON — Open Cap Table standard                │ │
-│  │                                                      │ │
-│  │  Point-in-Time (optional)                            │ │
-│  │  [Date picker: dd/MM/yyyy]                           │ │
-│  │  body-sm: Leave empty for current cap table state    │ │
-│  │                                                      │ │
-│  │  [Download Export]                                    │ │
-│  └──────────────────────────────────────────────────────┘ │
-│                                                          │
-│  ┌── Recent Exports (Table) ───────────────────────────┐ │
-│  │ Format │ Date      │ Status    │ Download           │ │
-│  │ XLSX   │ 23/02/2026│ Completed │ [Download] (link)  │ │
-│  │ PDF    │ 22/02/2026│ Completed │ [Download] (link)  │ │
-│  │ CSV    │ 20/02/2026│ Failed    │ [Retry]            │ │
-│  └─────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────┘
-```
-
-#### Export Format Selection
-
-- Radio button group (single select)
-- Each option shows: format name + brief description
-- Default: PDF
-
-#### Point-in-Time Date Picker
-
-- Standard date picker (dd/MM/yyyy format)
-- Optional — leave blank for current state
-- Max date: today
-- Min date: company creation date
-
-#### Download Button
-
-- Variant: primary
-- Label: "Download Export" / "Baixar Exportação"
-- States:
-  - Default: enabled
-  - Loading (sync export): spinner + "Generating..."
-  - Loading (async): spinner + "Queuing..."
-  - After async: button returns to default, toast notification shown
-
-#### Async Export Flow
-
-1. User selects format and clicks Download
-2. If response is `200`: browser triggers file download directly
-3. If response is `202 Accepted`:
-   - Toast: "Your export is being generated. You'll receive an email when it's ready."
-   - Export appears in "Recent Exports" table with status "Processing"
-   - Frontend polls `GET /reports/cap-table/export/:jobId` every 5 seconds
-   - When `status === 'COMPLETED'`: toast "Export ready!" with download link
-   - Download link uses pre-signed S3 URL (1-hour expiry)
-
-#### Recent Exports Table
-
-| Column | Description |
-|--------|-------------|
-| Format | Badge: PDF (blue-100), XLSX (green-100), CSV (gray-100), OCT (cream-100) |
-| Date | `createdAt` in dd/MM/yyyy format |
-| Status | Badge: Queued (gray), Processing (blue, animated), Completed (green), Failed (red) |
-| Action | "Download" link (for completed) or "Retry" button (for failed) |
-
----
-
-### Page 4: Due Diligence Package
-
-**URL**: `/dashboard/reports/due-diligence`
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  h1: Due Diligence Package                               │
-│  body-sm: Generate comprehensive equity documentation    │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│  ┌── Generation Card ─────────────────────────────────┐ │
-│  │                                                      │ │
-│  │  Audit Trail Period                                  │ │
-│  │  From: [Date picker]    To: [Date picker]            │ │
-│  │  body-sm: Defaults to full company history           │ │
-│  │                                                      │ │
-│  │  Package Contents (info, read-only)                  │ │
-│  │  ✓ Current cap table (PDF)                           │ │
-│  │  ✓ Cap table history (CSV)                           │ │
-│  │  ✓ Transaction ledger (CSV)                          │ │
-│  │  ✓ Shareholder list (CSV, PII masked)                │ │
-│  │  ✓ Option grants summary (CSV)                       │ │
-│  │  ✓ Convertible instruments (CSV)                     │ │
-│  │  ✓ Documents inventory (CSV)                         │ │
-│  │  ✓ Audit trail (PDF)                                 │ │
-│  │  ✓ Blockchain proofs (JSON)                          │ │
-│  │  ✓ Package metadata (JSON)                           │ │
-│  │                                                      │ │
-│  │  [Generate Package]                                   │ │
-│  └──────────────────────────────────────────────────────┘ │
-│                                                          │
-│  ┌── Recent Packages (Table) ──────────────────────────┐ │
-│  │ Date Range  │ Generated │ Status    │ Download      │ │
-│  │ Full history│ 23/02/2026│ Completed │ [Download ZIP]│ │
-│  │ 2025-2026   │ 20/02/2026│ Completed │ [Download ZIP]│ │
-│  └─────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────┘
-```
-
-#### Generation Flow
-
-1. User selects date range (optional, defaults to full company history)
-2. User clicks "Generate Package"
-3. Response is always `202 Accepted` (async)
-4. Toast: "Due diligence package is being generated. This may take a few minutes. You'll receive an email when ready."
-5. Package appears in "Recent Packages" table with "Processing" status
-6. Poll every 10 seconds for status update
-7. On completion: toast "Package ready!" + email notification
-8. Download link: pre-signed S3 URL for ZIP file
-
-#### Package Contents List
-
-- Read-only checklist (all items always included — no user customization per user decision)
-- Shows what will be in the ZIP for transparency
-- Each item: green checkmark icon + filename + brief description
-
----
-
-### Page 5: Investor Portfolio Dashboard
-
-**URL**: `/dashboard/portfolio`
-
-This is a **full dashboard** for investors, visible only to INVESTOR role users.
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  h1: My Portfolio                                        │
-│  body-sm: Your investments across all companies          │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│  ┌── Summary Cards (4) ───────────────────────────────┐ │
-│  │ Total Invested│ Current Value│ ROI Multiple│Companies││
-│  │ R$ 500.000    │ R$ 1.200.000│ 2,40x       │ 3       ││
-│  └─────────────────────────────────────────────────────┘ │
-│                                                          │
-│  ┌── Charts Row (2 charts) ───────────────────────────┐ │
-│  │                                                      │ │
-│  │  ┌── Allocation Pie ──┐  ┌── ROI Bar Chart ──────┐ │ │
-│  │  │                    │  │                        │ │ │
-│  │  │  [Donut chart]     │  │  [Horizontal bars]     │ │ │
-│  │  │  showing % of      │  │  showing ROI multiple  │ │ │
-│  │  │  value per company │  │  per company            │ │ │
-│  │  │                    │  │                        │ │ │
-│  │  └────────────────────┘  └────────────────────────┘ │ │
-│  └──────────────────────────────────────────────────────┘ │
-│                                                          │
-│  ┌── Holdings Table ───────────────────────────────────┐ │
-│  │ Company   │ Class│ Shares │ Own. %│ Invested│ Value │ │
-│  │ Acme Ltda.│ PN-A │ 10.000 │ 10,00%│ R$ 500K │R$ 1,2M│ │
-│  │ Beta Inc. │ ON   │  5.000 │  5,00%│ R$ 200K │R$ 400K│ │
-│  │ ...       │      │        │       │         │       │ │
-│  │ TOTAL     │      │        │       │ R$ 700K │R$ 1,6M│ │
-│  └─────────────────────────────────────────────────────┘ │
-│                                                          │
-│  Click any row to view detailed company holdings ↗       │
-└─────────────────────────────────────────────────────────┘
-```
-
-#### Summary Cards (4)
-
-| Card | Value | Format | Icon |
-|------|-------|--------|------|
-| Total Invested | `totals.totalInvested` | `R$ {formatted}` | `DollarSign` |
-| Current Value | `totals.totalEstimatedValue` | `R$ {formatted}` | `TrendingUp` |
-| ROI Multiple | `totals.weightedRoiMultiple` | `{value}x` | `ArrowUpRight` |
-| Companies | Count of `holdings` | Integer | `Building2` |
-
-Active card (highlighted): Current Value card uses `blue-600` bg with white text (per design system stat card active variant).
-
-#### Allocation Pie Chart (Recharts)
-
-| Setting | Value |
-|---------|-------|
-| Chart type | `PieChart` with donut (`innerRadius={60}`) |
-| Data | One slice per company, value = `estimatedValue` |
-| Colors | Chart palette from design system |
-| Center label | "Total Value" + formatted total |
-| Legend | Right side: color dot + company name + percentage |
-| Tooltip | Company name + value + percentage |
-| Responsive | max-width 400px, auto height |
-
-#### ROI Bar Chart (Recharts)
-
-| Setting | Value |
-|---------|-------|
-| Chart type | `BarChart` with horizontal bars |
-| Data | One bar per company, value = `roiMultiple` |
-| Colors | chart-1 for positive ROI (>1x), destructive for negative (<1x) |
-| X-axis | ROI multiple (0x, 1x, 2x, 3x...) |
-| Y-axis | Company names |
-| Reference line | Dashed line at 1.0x (break-even) |
-| Tooltip | Company name + ROI multiple + invested + current value |
-
-#### Holdings Table Columns
-
-| Column | Field | Alignment | Format | Sortable |
-|--------|-------|-----------|--------|----------|
-| Company | `companyName` | left | Text | Yes (alpha) |
-| Share Class | `shareClassName` | left | Text + badge | Yes |
-| Shares | `shares` | right | Brazilian number | Yes (numeric) |
-| Ownership % | `ownershipPercentage` | right | `{value}%` | Yes (numeric) |
-| Invested | `totalInvested` | right | `R$ {formatted}` | Yes (numeric) |
-| Est. Value | `estimatedValue` | right | `R$ {formatted}` | Yes (numeric) |
-| ROI | `roiMultiple` | right | `{value}x` with color (green > 1, red < 1) | Yes (numeric) |
-
-- Default sort: `-estimatedValue` (highest value first)
-- Summary row: totals for Invested, Est. Value, weighted ROI
-- Click row: navigates to `/dashboard/reports/ownership?companyId={id}` (drill-down to company)
-
-#### Loading State
-- 4 skeleton stat cards + 2 skeleton chart areas + skeleton table
-
-#### Empty State
-- When investor has no holdings: "No investments yet" + "You'll see your portfolio here once you hold shares in a company." + illustration (Briefcase icon, 64px)
-
----
-
-### Common Components (Shared Across Report Pages)
-
-#### DateRangePicker
-
-Reusable date range picker component used by Dilution, Due Diligence, and Export pages:
-
-- Two date inputs: From and To
-- Brazilian format: dd/MM/yyyy
-- Calendar popover (using shadcn/ui `Calendar` + `Popover`)
-- Preset ranges: "Last 3 months", "Last 6 months", "Last 12 months", "Full history"
-- Validation: From must be before To, To must not be in the future
-
-#### ExportFormatSelector
-
-Reusable radio group for export format selection:
-
-- Variants: PDF, XLSX, CSV, OCT JSON
-- Each option: radio + format name + description
-- Used by Cap Table Export page and Ownership Report export dropdown
-
-#### AsyncJobStatusBadge
-
-Reusable badge component for export job status:
-
-| Status | Badge Color | Icon |
-|--------|-------------|------|
-| QUEUED | gray-100, gray-600 text | `Clock` |
-| PROCESSING | blue-100, blue-600 text | `Loader2` (spinning) |
-| COMPLETED | green-100, green-700 text | `CheckCircle` |
-| FAILED | red-50, destructive text | `XCircle` |
-
-#### AsyncJobPoller
-
-Hook that polls for async job completion:
-
-```typescript
-function useAsyncJobPoller(companyId: string, jobId: string | null, endpoint: string) {
-  return useQuery({
-    queryKey: ['export-job', jobId],
-    queryFn: () => api.get(`${endpoint}/${jobId}`),
-    enabled: !!jobId,
-    refetchInterval: (data) => {
-      if (!data || data.status === 'QUEUED' || data.status === 'PROCESSING') return 5000;
-      return false; // Stop polling when completed or failed
-    },
-  });
-}
-```
-
----
-
-## Backend Specification Additions
-
-### Dilution Analysis — Calculation Details
-
-#### Gini Coefficient Calculation
-
-The Gini coefficient measures ownership concentration. It is calculated over all current shareholders' ownership percentages:
-
-```typescript
-function computeGiniCoefficient(shareholdings: { percentage: Decimal }[]): Decimal {
-  const n = shareholdings.length;
-  if (n === 0) return new Decimal(0);
-
-  const sorted = shareholdings
-    .map(s => s.percentage)
-    .sort((a, b) => a.comparedTo(b));
-
-  let numerator = new Decimal(0);
-  for (let i = 0; i < n; i++) {
-    numerator = numerator.add(sorted[i].mul(2 * (i + 1) - n - 1));
-  }
-
-  const denominator = new Decimal(n).mul(sorted.reduce((sum, p) => sum.add(p), new Decimal(0)));
-
-  return denominator.isZero() ? new Decimal(0) : numerator.div(denominator).abs();
-}
-```
-
-- Value range: 0 (perfect equality) to 1 (maximum concentration)
-- Computed over: all individual shareholders with > 0 shares
-- Updated on each dilution analysis request (not cached)
-
-#### Foreign Ownership Percentage
-
-"Foreign ownership" is determined by the shareholder's `nationality` field:
-
-- Shareholders with `nationality !== 'BR'` (or null nationality for legal entities registered outside Brazil) are considered foreign
-- Percentage = (shares held by foreign shareholders / total shares) * 100
-- If no shareholders have nationality data, return `"0.00"` with a note
-
-**Note**: The `nationality` field must exist on the Shareholder model. If it doesn't exist yet, it should be added as an optional field:
+### Prisma Schema — AIReport
 
 ```prisma
-model Shareholder {
-  // ... existing fields
-  nationality  String?  @map("nationality")  // ISO 3166-1 alpha-2 code, e.g., "BR", "US"
+model AIReport {
+  id            String         @id @default(uuid())
+  companyId     String         @map("company_id")
+  type          AIReportType   @map("type")
+  title         String
+  content       Json?          // Structured report data (sections, scores, charts)
+  status        AIReportStatus @default(GENERATING)
+  tokensUsed    Int?           @map("tokens_used")
+  s3Key         String?        @map("s3_key")       // Rendered PDF location
+  parameters    Json?          // Input parameters (periodStart, periodEnd, customPrompt, etc.)
+  errorCode     String?        @map("error_code")
+  errorMessage  String?        @map("error_message")
+  requestedById String         @map("requested_by_id")
+  generatedAt   DateTime?      @map("generated_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  company     Company @relation(fields: [companyId], references: [id])
+  requestedBy User    @relation("AIReportRequester", fields: [requestedById], references: [id])
+
+  @@index([companyId, createdAt])
+  @@index([companyId, type])
+  @@index([requestedById])
+  @@index([status])
+  @@map("ai_reports")
+}
+
+enum AIReportType {
+  HEALTH_SCORE
+  FINANCIAL_SUMMARY
+  INVESTOR_READY
+  CUSTOM
+
+  @@map("ai_report_type")
+}
+
+enum AIReportStatus {
+  GENERATING
+  COMPLETED
+  FAILED
+
+  @@map("ai_report_status")
 }
 ```
 
-#### Dilution Data Point Generation
+### ExportJob Model (Existing — Keep As-Is)
 
-For each date in the requested range (at the specified granularity), the system reconstructs the cap table state:
-
-1. Find the nearest `CapTableSnapshot` at or before the date
-2. If no snapshot exists, compute the state from transactions up to that date
-3. Extract share class breakdown and total shares
-4. Return as a data point
-
-This means the Dilution endpoint may be slower for fine granularity (daily) over long periods. The `< 3 seconds` performance target applies to the default (monthly over 12 months, ~12 data points).
-
-### Export Job Persistence
-
-Add an `ExportJob` model for tracking async exports:
+The existing `ExportJob` model is reused for PDF/XLSX/CSV export of completed AI reports:
 
 ```prisma
 model ExportJob {
-  id          String         @id @default(uuid())
-  companyId   String?        @map("company_id")
-  userId      String         @map("user_id")
-  type        ExportJobType  @map("type")
-  format      String?        // pdf, xlsx, csv, oct, zip
+  id          String          @id @default(uuid())
+  companyId   String?         @map("company_id")
+  userId      String          @map("user_id")
+  type        ExportJobType   @map("type")
+  format      String?         // pdf, xlsx, csv
   status      ExportJobStatus @default(QUEUED)
-  s3Key       String?        @map("s3_key")
-  downloadUrl String?        @map("download_url")
-  expiresAt   DateTime?      @map("expires_at")
-  errorCode   String?        @map("error_code")
-  parameters  Json?          // Filters, date ranges, etc.
-  createdAt   DateTime       @default(now()) @map("created_at")
-  completedAt DateTime?      @map("completed_at")
+  s3Key       String?         @map("s3_key")
+  downloadUrl String?         @map("download_url")
+  expiresAt   DateTime?       @map("expires_at")
+  errorCode   String?         @map("error_code")
+  parameters  Json?           // { reportId, format }
+  createdAt   DateTime        @default(now()) @map("created_at")
+  completedAt DateTime?       @map("completed_at")
 
   company Company? @relation(fields: [companyId], references: [id])
   user    User     @relation(fields: [userId], references: [id])
@@ -1140,8 +255,9 @@ model ExportJob {
 }
 
 enum ExportJobType {
-  CAP_TABLE_EXPORT
-  DUE_DILIGENCE
+  REPORT_EXPORT  // Changed: was CAP_TABLE_EXPORT and DUE_DILIGENCE
+
+  @@map("export_job_type")
 }
 
 enum ExportJobStatus {
@@ -1149,17 +265,936 @@ enum ExportJobStatus {
   PROCESSING
   COMPLETED
   FAILED
+
+  @@map("export_job_status")
 }
 ```
+
+### TypeScript Interfaces
+
+```typescript
+// --- AI Report Content Structures ---
+
+interface HealthScoreContent {
+  overallScore: number;               // 0-100
+  rating: 'CRITICAL' | 'NEEDS_ATTENTION' | 'MODERATE' | 'HEALTHY' | 'EXCELLENT';
+  dataQuality: 'FULL' | 'LIMITED';   // LIMITED if < 3 months Open Finance data
+  sections: {
+    financialHealth: {
+      score: number;                  // 0-100
+      weight: number;                 // 0.40
+      burnRate: string;               // Monthly burn as decimal string e.g. "45000.00"
+      runwayMonths: number;           // Estimated months of cash remaining
+      debtToCashRatio: string;        // Decimal string e.g. "0.15"
+      revenueToExpenseRatio: string;  // Decimal string e.g. "1.25"
+      narrative: string;              // AI-generated explanation
+    };
+    growthIndicators: {
+      score: number;
+      weight: number;                 // 0.30
+      monthlyGrowthRate: string;      // Decimal string e.g. "0.08" (8%)
+      trendDirection: 'ACCELERATING' | 'STABLE' | 'DECELERATING';
+      revenueConsistency: string;     // Decimal string 0-1 (coefficient of variation inverse)
+      narrative: string;
+    };
+    riskFactors: {
+      score: number;
+      weight: number;                 // 0.20
+      factors: Array<{
+        name: string;
+        severity: 'HIGH' | 'MEDIUM' | 'LOW';
+        description: string;
+      }>;
+      narrative: string;
+    };
+    recommendations: {
+      items: Array<{
+        title: string;
+        description: string;
+        priority: 'HIGH' | 'MEDIUM' | 'LOW';
+        category: string;             // e.g. "Cost Optimization", "Revenue Growth"
+      }>;
+    };
+  };
+  generatedAt: string;                // ISO 8601
+  periodAnalyzed: {
+    from: string;                     // ISO 8601
+    to: string;                       // ISO 8601
+  };
+}
+
+interface FinancialSummaryContent {
+  periodOverview: {
+    periodStart: string;              // ISO 8601
+    periodEnd: string;
+    totalRevenue: string;             // Decimal string
+    totalExpenses: string;
+    netResult: string;
+    granularity: 'monthly' | 'quarterly';
+  };
+  revenueAnalysis: {
+    periods: Array<{
+      label: string;                  // e.g. "Jan/2026", "Q1/2026"
+      revenue: string;
+      growthRate: string | null;      // vs previous period, null for first
+    }>;
+    topCategories: Array<{
+      name: string;
+      total: string;
+      percentage: string;
+    }>;
+  };
+  expenseAnalysis: {
+    periods: Array<{
+      label: string;
+      expenses: string;
+      growthRate: string | null;
+    }>;
+    topCategories: Array<{
+      name: string;
+      total: string;
+      percentage: string;
+    }>;
+  };
+  cashFlow: {
+    openingBalance: string;
+    closingBalance: string;
+    periods: Array<{
+      label: string;
+      inflow: string;
+      outflow: string;
+      netFlow: string;
+      endingBalance: string;
+    }>;
+    burnRate: string;                 // Average monthly burn
+  };
+  narrative: string;                  // AI-generated 2-3 paragraph summary
+  chartData: {
+    revenueTrend: Array<{ label: string; value: string }>;
+    expenseBreakdown: Array<{ category: string; value: string; percentage: string }>;
+    cashFlowWaterfall: Array<{ label: string; value: string; type: 'inflow' | 'outflow' | 'balance' }>;
+  };
+  generatedAt: string;
+}
+
+interface InvestorReadyContent {
+  executiveSummary: string;           // AI-generated 1-page narrative
+  companyOverview: {
+    name: string;
+    sector: string | null;
+    foundedYear: number | null;
+    description: string | null;
+    location: string | null;
+    website: string | null;
+  };
+  team: Array<{
+    name: string;
+    title: string | null;
+    linkedinUrl: string | null;
+  }>;
+  financialHighlights: {
+    revenue: string | null;           // Latest period revenue
+    revenueGrowth: string | null;     // MoM or QoQ growth
+    burnRate: string | null;
+    runway: number | null;            // Months
+    keyMetrics: Array<{
+      label: string;
+      value: string;
+      format: string;                 // NUMBER, CURRENCY_BRL, PERCENTAGE, etc.
+    }>;
+  };
+  dataroomSummary: {
+    totalDocuments: number;
+    categories: Array<{
+      name: string;
+      count: number;
+      description: string;            // AI-generated summary of category contents
+    }>;
+  };
+  generatedAt: string;
+}
+
+interface CustomReportContent {
+  title: string;                      // AI-generated title
+  prompt: string;                     // Original user prompt
+  sections: Array<{
+    heading: string;
+    content: string;                  // Markdown-formatted text
+    chartData?: Array<{ label: string; value: string }>; // Optional chart data
+  }>;
+  dataSources: string[];              // List of data sources used
+  disclaimer: string;                 // Standard AI disclaimer
+  generatedAt: string;
+}
+
+// --- API Types ---
+
+interface AIReport {
+  id: string;
+  companyId: string;
+  type: AIReportType;
+  title: string;
+  content: HealthScoreContent | FinancialSummaryContent | InvestorReadyContent | CustomReportContent | null;
+  status: 'GENERATING' | 'COMPLETED' | 'FAILED';
+  tokensUsed: number | null;
+  s3Key: string | null;
+  parameters: Record<string, unknown> | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  requestedBy: {
+    id: string;
+    name: string;
+  };
+  generatedAt: string | null;
+  createdAt: string;
+}
+
+type AIReportType = 'HEALTH_SCORE' | 'FINANCIAL_SUMMARY' | 'INVESTOR_READY' | 'CUSTOM';
+
+interface ExportJob {
+  id: string;
+  companyId: string;
+  format: 'pdf' | 'xlsx' | 'csv';
+  status: 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  s3Key: string | null;
+  downloadUrl: string | null;
+  expiresAt: string | null;          // ISO 8601, pre-signed URL expiry
+  createdAt: string;
+  errorCode: string | null;
+}
+```
+
+---
+
+## API Endpoints
+
+### POST /api/v1/companies/:companyId/reports/generate
+
+Requests generation of a new AI report.
+
+**Request Body**:
+
+```json
+{
+  "type": "HEALTH_SCORE",
+  "customPrompt": null,
+  "parameters": {
+    "periodStart": "2025-09-01",
+    "periodEnd": "2026-02-26"
+  }
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `type` | enum | Yes | `HEALTH_SCORE`, `FINANCIAL_SUMMARY`, `INVESTOR_READY`, `CUSTOM` |
+| `customPrompt` | string | Only for `CUSTOM` | Free-text prompt (max 2000 chars) |
+| `parameters.periodStart` | ISO 8601 | For `FINANCIAL_SUMMARY` | Start of analysis period |
+| `parameters.periodEnd` | ISO 8601 | For `FINANCIAL_SUMMARY` | End of analysis period |
+| `parameters.granularity` | string | For `FINANCIAL_SUMMARY` | `monthly` (default) or `quarterly` |
+
+**Response** (`202 Accepted`):
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "report-uuid-123",
+    "companyId": "company-uuid",
+    "type": "HEALTH_SCORE",
+    "title": "Company Health Score — Feb 2026",
+    "status": "GENERATING",
+    "parameters": {
+      "periodStart": "2025-09-01",
+      "periodEnd": "2026-02-26"
+    },
+    "createdAt": "2026-02-26T14:30:00.000Z"
+  }
+}
+```
+
+**Validation Rules**:
+- `type` must be a valid `AIReportType` enum value
+- `customPrompt` is required when `type === 'CUSTOM'`, ignored otherwise
+- `customPrompt` max length: 2000 characters
+- `parameters.periodStart` must be before `parameters.periodEnd`
+- `parameters.periodEnd` must not be in the future
+- Company must have at least one data source connected (Open Finance snapshots or dataroom documents)
+
+### GET /api/v1/companies/:companyId/reports
+
+Lists all reports for the company (paginated).
+
+**Query Parameters**:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `page` | integer | `1` | Page number |
+| `limit` | integer | `20` | Items per page (max: 100) |
+| `type` | string | — | Filter by report type: `HEALTH_SCORE`, `FINANCIAL_SUMMARY`, `INVESTOR_READY`, `CUSTOM` |
+| `status` | string | — | Filter by status: `GENERATING`, `COMPLETED`, `FAILED` |
+| `sort` | string | `-createdAt` | Sort field |
+
+**Response** (`200 OK`):
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "report-uuid-123",
+      "companyId": "company-uuid",
+      "type": "HEALTH_SCORE",
+      "title": "Company Health Score — Feb 2026",
+      "status": "COMPLETED",
+      "tokensUsed": 4250,
+      "requestedBy": {
+        "id": "user-uuid",
+        "name": "Nelson Pereira"
+      },
+      "generatedAt": "2026-02-26T14:31:15.000Z",
+      "createdAt": "2026-02-26T14:30:00.000Z"
+    }
+  ],
+  "meta": {
+    "total": 15,
+    "page": 1,
+    "limit": 20,
+    "totalPages": 1
+  }
+}
+```
+
+**Note**: The list endpoint returns reports **without** the `content` field to keep payload sizes small. Use the detail endpoint to fetch full report content.
+
+### GET /api/v1/companies/:companyId/reports/:id
+
+Returns full report detail including structured content.
+
+**Response** (`200 OK`):
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "report-uuid-123",
+    "companyId": "company-uuid",
+    "type": "HEALTH_SCORE",
+    "title": "Company Health Score — Feb 2026",
+    "content": {
+      "overallScore": 72,
+      "rating": "HEALTHY",
+      "dataQuality": "FULL",
+      "sections": {
+        "financialHealth": {
+          "score": 68,
+          "weight": 0.40,
+          "burnRate": "45000.00",
+          "runwayMonths": 14,
+          "debtToCashRatio": "0.05",
+          "revenueToExpenseRatio": "1.25",
+          "narrative": "A empresa apresenta uma saúde financeira moderada..."
+        },
+        "growthIndicators": {
+          "score": 78,
+          "weight": 0.30,
+          "monthlyGrowthRate": "0.08",
+          "trendDirection": "ACCELERATING",
+          "revenueConsistency": "0.85",
+          "narrative": "O crescimento mensal de 8% indica uma trajetória positiva..."
+        },
+        "riskFactors": {
+          "score": 70,
+          "weight": 0.20,
+          "factors": [
+            {
+              "name": "Concentração de receita",
+              "severity": "MEDIUM",
+              "description": "65% da receita vem de um único cliente"
+            }
+          ],
+          "narrative": "Os principais riscos identificados são..."
+        },
+        "recommendations": {
+          "items": [
+            {
+              "title": "Diversificar base de clientes",
+              "description": "Reduzir dependência do cliente principal...",
+              "priority": "HIGH",
+              "category": "Revenue Growth"
+            }
+          ]
+        }
+      },
+      "generatedAt": "2026-02-26T14:31:15.000Z",
+      "periodAnalyzed": {
+        "from": "2025-09-01",
+        "to": "2026-02-26"
+      }
+    },
+    "status": "COMPLETED",
+    "tokensUsed": 4250,
+    "s3Key": "reports/company-uuid/report-uuid-123.pdf",
+    "parameters": {},
+    "requestedBy": {
+      "id": "user-uuid",
+      "name": "Nelson Pereira"
+    },
+    "generatedAt": "2026-02-26T14:31:15.000Z",
+    "createdAt": "2026-02-26T14:30:00.000Z"
+  }
+}
+```
+
+### GET /api/v1/companies/:companyId/reports/:id/download
+
+Downloads the rendered report file. Redirects to a pre-signed S3 URL.
+
+**Query Parameters**:
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `format` | string | `pdf` | Export format: `pdf`, `xlsx`, `csv` |
+
+**Response (report already rendered in requested format)** (`302 Found`):
+
+Redirects to pre-signed S3 URL (1-hour expiry).
+
+**Response (format not yet rendered — triggers async export)** (`202 Accepted`):
+
+```json
+{
+  "success": true,
+  "data": {
+    "jobId": "export-uuid-456",
+    "status": "QUEUED",
+    "format": "xlsx",
+    "estimatedCompletionSeconds": 15,
+    "pollUrl": "/api/v1/companies/:companyId/reports/:id/download/export-uuid-456"
+  }
+}
+```
+
+**Polling endpoint**: `GET /api/v1/companies/:companyId/reports/:id/download/:jobId`
+
+```json
+{
+  "success": true,
+  "data": {
+    "jobId": "export-uuid-456",
+    "status": "COMPLETED",
+    "format": "xlsx",
+    "downloadUrl": "https://s3.amazonaws.com/navia-exports/...",
+    "expiresAt": "2026-02-26T15:30:00.000Z"
+  }
+}
+```
+
+**Behavior by format**:
+- **PDF**: Generated during AI report creation (always available immediately for completed reports). Redirect to S3.
+- **XLSX**: Generated on demand via Bull queue. Returns `202` on first request, then `302` once ready.
+- **CSV**: Generated on demand via Bull queue. Returns `202` on first request, then `302` once ready.
+
+### DELETE /api/v1/companies/:companyId/reports/:id
+
+Deletes a report and its associated S3 files.
+
+**Response** (`204 No Content`): Empty body.
+
+**Rules**:
+- Only the user who requested the report or an ADMIN can delete it
+- Deletes the `AIReport` record, associated S3 PDF, and any `ExportJob` records
+- Reports in `GENERATING` status cannot be deleted (return `422`)
+- Deletion is audit-logged
+
+---
+
+## AI Report Generation Pipeline
+
+### Flow
+
+```
+POST /reports/generate
+    │
+    ├─ Validate request (type, parameters)
+    ├─ Create AIReport record (status: GENERATING)
+    ├─ Return 202 Accepted with report metadata
+    └─ Push job to Bull queue ('report-generation') ── async ──┐
+                                                                │
+                                                                v
+                                                     Bull Worker
+                                                        │
+                                                        ├─ 1. Gather data sources
+                                                        │     ├─ Fetch Open Finance snapshots
+                                                        │     ├─ Fetch dataroom document metadata
+                                                        │     ├─ Fetch company profile data
+                                                        │     └─ Extract text from key documents (if needed)
+                                                        │
+                                                        ├─ 2. Build AI prompt
+                                                        │     ├─ System prompt (report type template)
+                                                        │     ├─ Company context
+                                                        │     └─ Financial data + document summaries
+                                                        │
+                                                        ├─ 3. Call AI model (Claude API)
+                                                        │     ├─ Structured output (JSON)
+                                                        │     └─ Track token usage
+                                                        │
+                                                        ├─ 4. Validate AI response structure
+                                                        │
+                                                        ├─ 5. Render PDF via Puppeteer
+                                                        │     └─ Upload to S3
+                                                        │
+                                                        ├─ 6. Update AIReport record
+                                                        │     ├─ status: COMPLETED
+                                                        │     ├─ content: structured JSON
+                                                        │     ├─ s3Key: PDF location
+                                                        │     ├─ tokensUsed
+                                                        │     └─ generatedAt
+                                                        │
+                                                        ├─ 7. Send notification (in-app + email)
+                                                        │
+                                                        └─ On failure (after 2 retries):
+                                                              ├─ Update status: FAILED
+                                                              ├─ Set errorCode + errorMessage
+                                                              └─ Send failure notification
+```
+
+### Bull Queue Configuration
+
+```typescript
+const REPORT_GENERATION_QUEUE_CONFIG = {
+  name: 'report-generation',
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: {
+      type: 'exponential',
+      delay: 5000, // 5s, 10s, 20s
+    },
+    removeOnComplete: true,
+    removeOnFail: false,
+    timeout: 120000, // 2 minute timeout per attempt
+  },
+};
+```
+
+### AI Model Configuration
+
+| Setting | Value |
+|---------|-------|
+| Model | Claude (via Anthropic API) |
+| Max output tokens | 8192 |
+| Temperature | 0.3 (factual, low creativity) |
+| Response format | Structured JSON (using tool_use or JSON mode) |
+| Language | Report generated in the company's `locale` (PT-BR or EN) |
+| Rate limit | Max 10 concurrent report generations per company |
+
+### Data Gathering Strategy
+
+For each report type, the worker gathers different data:
+
+| Report Type | Open Finance | Dataroom Docs | Company Profile | Document Text Extraction |
+|-------------|-------------|---------------|-----------------|--------------------------|
+| `HEALTH_SCORE` | Required (3+ months) | Optional (enhances score) | Yes | No |
+| `FINANCIAL_SUMMARY` | Required | No | Minimal (name, sector) | No |
+| `INVESTOR_READY` | Optional (enhances) | Yes (summary) | Yes (full) | Yes (pitch deck) |
+| `CUSTOM` | If available | If available | Yes | Depends on prompt |
+
+**Document text extraction**: For reports that benefit from document content (e.g., `INVESTOR_READY` extracting from pitch decks), the worker downloads the PDF from S3 and extracts text. Only the first 10 pages of each document are processed. Maximum 5 documents are processed per report to control costs and latency.
+
+---
+
+## Per-Role Access Matrix
+
+| Action | ADMIN | FINANCE | LEGAL | INVESTOR | EMPLOYEE |
+|--------|-------|---------|-------|----------|----------|
+| Generate report (`POST .../reports/generate`) | Yes | Yes | No | No | No |
+| List reports (`GET .../reports`) | Yes | Yes | Read-only | No | No |
+| View report detail (`GET .../reports/:id`) | Yes | Yes | Read-only | No | No |
+| Download report (`GET .../reports/:id/download`) | Yes | Yes | PDF only | No | No |
+| Delete report (`DELETE .../reports/:id`) | Yes | Own only | No | No | No |
+
+**Notes**:
+- "Read-only" means can view but cannot generate new reports or delete.
+- "Own only" means FINANCE users can only delete reports they personally requested.
+- "PDF only" means LEGAL can download PDF but not XLSX/CSV exports.
+- ADMIN can perform all actions including deleting any report.
+- Accessing a report endpoint without the required role returns `404 Not Found` (not `403`, to prevent enumeration per `api-standards.md`).
+
+---
+
+## Edge Cases
+
+### EC-1: No Open Finance Data Connected
+
+When a company has no Open Finance snapshots:
+- `HEALTH_SCORE`: Returns `422` with `REPORT_INSUFFICIENT_DATA` — requires at least Open Finance connection
+- `FINANCIAL_SUMMARY`: Returns `422` with `REPORT_INSUFFICIENT_DATA`
+- `INVESTOR_READY`: Generates with financial section marked as "Financial data not yet connected" — still produces other sections
+- `CUSTOM`: Generates with available data, notes missing financial data in disclaimer
+
+### EC-2: Concurrent Report Generation
+
+If a user requests a report while the same type is already generating for the same company:
+- Allow it — each report is a separate record. No deduplication of AI reports (unlike file exports).
+- Rate limit: Maximum 3 concurrent `GENERATING` reports per company. If exceeded, return `429` with `REPORT_GENERATION_LIMIT`.
+
+### EC-3: AI Generation Timeout
+
+If the AI model call exceeds 120 seconds:
+- Bull retries up to 3 times
+- After all retries fail: status set to `FAILED`, errorCode: `REPORT_AI_TIMEOUT`
+- User receives failure notification with suggestion to retry
+
+### EC-4: Empty Dataroom
+
+When company has no documents in the dataroom:
+- `INVESTOR_READY`: Generates with dataroom section showing "No documents uploaded yet" + recommendation to upload pitch deck and financials
+- Other types: Not affected (dataroom is supplementary)
+
+### EC-5: Report Deletion While Export In Progress
+
+If a report is deleted while an export job is processing:
+- The export job completes but the S3 file is orphaned
+- Hourly S3 cleanup job handles orphaned files (checks if parent AIReport still exists)
+
+---
+
+## Error Codes
+
+| Error Code | HTTP Status | messageKey | When |
+|------------|-------------|------------|------|
+| `REPORT_GENERATION_FAILED` | 500 | `errors.report.generationFailed` | Unexpected error during AI report generation |
+| `REPORT_AI_TIMEOUT` | 500 | `errors.report.aiTimeout` | AI model call timed out after retries |
+| `REPORT_INSUFFICIENT_DATA` | 422 | `errors.report.insufficientData` | Company lacks required data sources for the report type |
+| `REPORT_NOT_FOUND` | 404 | `errors.report.notFound` | Report ID does not exist or user lacks access |
+| `REPORT_EXPORT_FAILED` | 500 | `errors.report.exportFailed` | Export file generation failed |
+| `REPORT_EXPORT_NOT_FOUND` | 404 | `errors.report.exportNotFound` | Export job ID does not exist |
+| `REPORT_EXPORT_EXPIRED` | 410 | `errors.report.exportExpired` | Pre-signed URL has expired |
+| `REPORT_FORMAT_UNSUPPORTED` | 400 | `errors.report.formatUnsupported` | Invalid export format requested |
+| `REPORT_GENERATION_LIMIT` | 429 | `errors.report.generationLimit` | Too many concurrent report generations |
+| `REPORT_CUSTOM_PROMPT_REQUIRED` | 400 | `errors.report.customPromptRequired` | `CUSTOM` type requires `customPrompt` |
+| `REPORT_CUSTOM_PROMPT_TOO_LONG` | 400 | `errors.report.customPromptTooLong` | `customPrompt` exceeds 2000 characters |
+| `REPORT_CANNOT_DELETE_GENERATING` | 422 | `errors.report.cannotDeleteGenerating` | Cannot delete a report that is still generating |
+| `REPORT_INVALID_PERIOD` | 400 | `errors.report.invalidPeriod` | periodStart must be before periodEnd, periodEnd must not be in the future |
+
+---
+
+## Dependencies
+
+| Dependency | Purpose | Notes |
+|------------|---------|-------|
+| Anthropic Claude API | AI report generation | Via `@anthropic-ai/sdk` |
+| Puppeteer / Chromium | PDF report rendering | Headless browser for HTML-to-PDF |
+| ExcelJS | XLSX spreadsheet generation | Multi-tab workbooks for financial data |
+| Bull queue (`report-generation`) | Async AI report generation | Separate queue from `report-export` |
+| Bull queue (`report-export`) | Async file export (XLSX, CSV) | Existing queue, shared with other exports |
+| AWS S3 (`navia-exports` bucket) | Storage for rendered PDFs and exports | Pre-signed URLs with 1-hour expiry |
+| AWS SES | Email notification on report completion/failure | Per user locale |
+| Recharts (frontend) | Chart rendering for financial data visualization | Frontend-only dependency |
+| Open Finance data | Financial snapshots for AI analysis | Via internal database queries |
+| Dataroom documents | Document metadata and text extraction | Via S3 + pdf-parse for text extraction |
+| Company profile data | Company context for AI prompts | Via Prisma queries |
+
+---
+
+## Technical Implementation
+
+### ReportService
+
+```typescript
+import { Injectable } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
+import { PrismaService } from '../prisma/prisma.service';
+
+@Injectable()
+export class ReportService {
+  constructor(
+    private prisma: PrismaService,
+    @InjectQueue('report-generation') private generationQueue: Queue,
+    @InjectQueue('report-export') private exportQueue: Queue,
+  ) {}
+
+  async generateReport(
+    companyId: string,
+    userId: string,
+    input: {
+      type: AIReportType;
+      customPrompt?: string;
+      parameters?: Record<string, unknown>;
+    },
+  ): Promise<AIReport> {
+    // 1. Validate data source availability
+    // 2. Check concurrent generation limit (max 3 per company)
+    // 3. Create AIReport record with status GENERATING
+    // 4. Push job to Bull queue
+    // 5. Return report metadata
+  }
+
+  async listReports(
+    companyId: string,
+    options: {
+      page?: number;
+      limit?: number;
+      type?: AIReportType;
+      status?: AIReportStatus;
+      sort?: string;
+    },
+  ): Promise<{ items: AIReport[]; total: number }> {
+    // 1. Query AIReport with filters
+    // 2. Exclude content field from list results (performance)
+    // 3. Include requestedBy user name
+    // 4. Return paginated results
+  }
+
+  async getReport(companyId: string, reportId: string): Promise<AIReport> {
+    // 1. Fetch report with full content
+    // 2. Include requestedBy user name
+    // 3. Return full report (including content JSON)
+  }
+
+  async downloadReport(
+    companyId: string,
+    reportId: string,
+    format: string,
+  ): Promise<{ redirectUrl: string } | ExportJob> {
+    // 1. Validate report exists and is COMPLETED
+    // 2. If format is PDF and s3Key exists: generate pre-signed URL, return redirect
+    // 3. If format is XLSX/CSV: check for existing export job
+    //    a. If recent completed export exists: return pre-signed URL
+    //    b. Otherwise: create ExportJob, push to queue, return 202
+  }
+
+  async deleteReport(
+    companyId: string,
+    reportId: string,
+    userId: string,
+  ): Promise<void> {
+    // 1. Validate report exists
+    // 2. Validate status !== GENERATING
+    // 3. Validate user is ADMIN or report requester
+    // 4. Delete S3 files (PDF + any exports)
+    // 5. Delete ExportJob records
+    // 6. Delete AIReport record
+  }
+}
+```
+
+### ReportGenerationProcessor (Bull Worker)
+
+```typescript
+import { Processor, Process } from '@nestjs/bull';
+import { Job } from 'bull';
+
+@Processor('report-generation')
+export class ReportGenerationProcessor {
+  @Process('generate')
+  async handleGenerate(job: Job<{
+    reportId: string;
+    companyId: string;
+    type: AIReportType;
+    parameters: Record<string, unknown>;
+  }>) {
+    const { reportId, companyId, type, parameters } = job.data;
+
+    // 1. Gather data sources based on report type
+    const data = await this.gatherData(companyId, type, parameters);
+
+    // 2. Build AI prompt
+    const prompt = this.buildPrompt(type, data, parameters);
+
+    // 3. Call Claude API
+    const aiResponse = await this.callAI(prompt);
+
+    // 4. Validate and parse structured response
+    const content = this.parseResponse(type, aiResponse);
+
+    // 5. Generate PDF
+    const pdfBuffer = await this.renderPdf(type, content, data.companyInfo);
+    const s3Key = await this.uploadToS3(pdfBuffer, companyId, reportId);
+
+    // 6. Update AIReport record
+    await this.prisma.aIReport.update({
+      where: { id: reportId },
+      data: {
+        content,
+        status: 'COMPLETED',
+        tokensUsed: aiResponse.usage.total_tokens,
+        s3Key,
+        generatedAt: new Date(),
+      },
+    });
+
+    // 7. Send notifications
+    await this.notifyUser(reportId);
+  }
+
+  private async gatherData(
+    companyId: string,
+    type: AIReportType,
+    parameters: Record<string, unknown>,
+  ) {
+    // Fetch company profile
+    const company = await this.prisma.company.findUniqueOrThrow({
+      where: { id: companyId },
+      include: {
+        profile: {
+          include: { metrics: true, team: true, documents: true },
+        },
+      },
+    });
+
+    // Fetch Open Finance snapshots (if available)
+    // const financialData = await this.openFinanceService.getSnapshots(companyId, ...);
+
+    // Fetch dataroom document metadata
+    // const documents = await this.dataroomService.listDocuments(companyId);
+
+    return { companyInfo: company /*, financialData, documents */ };
+  }
+}
+```
+
+### ReportExportProcessor (Bull Worker)
+
+```typescript
+@Processor('report-export')
+export class ReportExportProcessor {
+  @Process('report-export')
+  async handleExport(job: Job<{
+    exportJobId: string;
+    reportId: string;
+    format: string;
+  }>) {
+    const { exportJobId, reportId, format } = job.data;
+
+    // 1. Fetch report content
+    const report = await this.prisma.aIReport.findUniqueOrThrow({
+      where: { id: reportId },
+    });
+
+    // 2. Generate file based on format
+    let buffer: Buffer;
+    if (format === 'xlsx') {
+      buffer = await this.generateXlsx(report);
+    } else if (format === 'csv') {
+      buffer = await this.generateCsv(report);
+    }
+
+    // 3. Upload to S3
+    const s3Key = `exports/${report.companyId}/${exportJobId}.${format}`;
+    await this.s3.upload(buffer, s3Key);
+
+    // 4. Generate pre-signed URL
+    const downloadUrl = await this.s3.getPresignedUrl(s3Key, 3600);
+    const expiresAt = new Date(Date.now() + 3600 * 1000);
+
+    // 5. Update ExportJob
+    await this.prisma.exportJob.update({
+      where: { id: exportJobId },
+      data: {
+        status: 'COMPLETED',
+        s3Key,
+        downloadUrl,
+        expiresAt,
+        completedAt: new Date(),
+      },
+    });
+
+    // 6. Send email notification
+    await this.notifyUser(exportJobId);
+  }
+}
+```
+
+### PDF Generation
+
+Using Puppeteer for HTML-to-PDF rendering:
+
+```typescript
+async renderPdf(
+  type: AIReportType,
+  content: unknown,
+  companyInfo: { name: string; logoUrl?: string },
+): Promise<Buffer> {
+  const html = this.renderTemplate(`report-${type.toLowerCase()}`, {
+    companyName: companyInfo.name,
+    companyLogo: companyInfo.logoUrl,
+    generatedAt: formatDate(new Date(), 'pt-BR'),
+    content,
+  });
+
+  const browser = await puppeteer.launch({ headless: true });
+  const page = await browser.newPage();
+  await page.setContent(html);
+  const pdf = await page.pdf({
+    format: 'A4',
+    margin: { top: '2cm', bottom: '2cm', left: '1.5cm', right: '1.5cm' },
+    printBackground: true,
+  });
+  await browser.close();
+  return Buffer.from(pdf);
+}
+```
+
+PDF template includes:
+- Company logo (if uploaded) and name in header
+- Report title and type badge
+- Generation date and time
+- Page numbers in footer
+- Sections with headings, narrative text, and data tables
+- Chart placeholders rendered as static images (using chart-to-image service)
+- All numbers in Brazilian format
+
+### Excel Generation
+
+Using ExcelJS:
+
+```typescript
+async generateXlsx(report: AIReport): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+
+  if (report.type === 'HEALTH_SCORE') {
+    // Tab 1: Summary — overall score, rating, period
+    // Tab 2: Financial Health — metrics breakdown
+    // Tab 3: Growth Indicators — growth data
+    // Tab 4: Risk Factors — risk table
+    // Tab 5: Recommendations — action items
+  } else if (report.type === 'FINANCIAL_SUMMARY') {
+    // Tab 1: Period Overview — totals
+    // Tab 2: Revenue — monthly/quarterly breakdown
+    // Tab 3: Expenses — monthly/quarterly breakdown
+    // Tab 4: Cash Flow — period-by-period flow
+  } else if (report.type === 'INVESTOR_READY') {
+    // Tab 1: Executive Summary — narrative text
+    // Tab 2: Company Overview — profile data
+    // Tab 3: Financial Highlights — key metrics
+    // Tab 4: Dataroom — document inventory
+  } else if (report.type === 'CUSTOM') {
+    // Tab 1: Report — all sections
+    // Tab 2: Data Sources — sources used
+  }
+
+  return workbook.xlsx.writeBuffer();
+}
+```
+
+### CSV Generation
+
+- UTF-8 encoding with BOM (`\uFEFF` prefix) for Brazilian character support
+- Delimiter: semicolon (`;`) — Brazilian Excel uses semicolons by default
+- Line ending: CRLF
+- RFC 4180 compliant
+- Flat structure: one row per data point with section/category columns
 
 ### Export Deduplication Logic
 
 ```typescript
-async findExistingJob(companyId: string, format: string): Promise<ExportJob | null> {
+async findExistingExport(reportId: string, format: string): Promise<ExportJob | null> {
   const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
   return this.prisma.exportJob.findFirst({
     where: {
-      companyId,
+      parameters: { path: ['reportId'], equals: reportId },
       format,
       status: { in: ['QUEUED', 'PROCESSING'] },
       createdAt: { gte: fiveMinutesAgo },
@@ -1169,12 +1204,7 @@ async findExistingJob(companyId: string, format: string): Promise<ExportJob | nu
 }
 ```
 
-Deduplication key: `(companyId, format, status in [QUEUED, PROCESSING], createdAt within 5 minutes)`.
-Note: `snapshotDate` is NOT part of the deduplication key (different snapshots create different jobs).
-
 ### S3 Cleanup Job
-
-Scheduled job to delete expired exports:
 
 ```typescript
 @Cron('0 * * * *') // Every hour
@@ -1197,104 +1227,421 @@ async cleanupExpiredExports() {
 }
 ```
 
-### Email Notification for Async Exports
+### Email Notification for Report Completion
 
-- Template: `export-completed` (PT-BR and EN per user locale)
-- Subject: "[Navia] Sua exportação está pronta — {formatName}" / "[Navia] Your export is ready — {formatName}"
-- Content: Export type, format, company name, download link (pre-signed URL, 1-hour expiry)
-- Sent when job status transitions to `COMPLETED`
-- For failed jobs: separate email template `export-failed` with error description and retry suggestion
+- Template: `report-completed` (PT-BR and EN per user locale)
+- Subject: "[Navia] Seu relatório está pronto — {reportTitle}" / "[Navia] Your report is ready — {reportTitle}"
+- Content: Report type, title, company name, "View Report" link (to frontend report detail page)
+- Sent when report status transitions to `COMPLETED`
+- For failed reports: separate template `report-failed` with error description and retry suggestion
 
-### PDF Generation Details
+### Functional Requirements
 
-Using Puppeteer for HTML-to-PDF rendering:
+| ID | Requirement | Target |
+|----|-------------|--------|
+| FR-1 | AI report generation completes within timeout | < 2 minutes |
+| FR-2 | PDF rendering after AI response | < 15 seconds |
+| FR-3 | XLSX/CSV export generation | < 30 seconds |
+| FR-4 | Export files are stored temporarily in S3 | 1-hour pre-signed URL expiry, auto-deleted after 24 hours |
+| FR-5 | AI-generated PDF stored permanently in S3 | Deleted only when report is deleted |
+| FR-6 | All numeric values in reports use Brazilian number format | `1.234,56` via `Intl.NumberFormat('pt-BR')` on frontend |
+| FR-7 | Reports generated in company locale | PT-BR or EN based on `Company.locale` |
 
-```typescript
-async generateCapTablePdf(data: OwnershipReport): Promise<Buffer> {
-  const html = this.renderTemplate('cap-table-pdf', {
-    companyName: data.companyName,
-    generatedAt: formatDate(data.generatedAt, 'pt-BR'),
-    shareholders: data.shareholders,
-    optionPool: data.optionPoolSummary,
-    totalShares: data.totalShares,
-  });
+---
 
-  const browser = await puppeteer.launch({ headless: true });
-  const page = await browser.newPage();
-  await page.setContent(html);
-  const pdf = await page.pdf({
-    format: 'A4',
-    margin: { top: '2cm', bottom: '2cm', left: '1.5cm', right: '1.5cm' },
-    printBackground: true,
-  });
-  await browser.close();
-  return Buffer.from(pdf);
-}
+## Security Considerations
+
+- **AI prompt injection**: User-provided `customPrompt` is sanitized and length-limited (2000 chars). The system prompt instructs the AI to only analyze company data and ignore any instructions embedded in the prompt.
+- **Data isolation**: AI prompts only include data from the requesting company. Cross-company data leakage is prevented by always filtering by `companyId`.
+- **PII in reports**: Reports may contain company financial data but no personal PII. Company names, team member names (from public profile) are included. No CPF, email, or personal financial data.
+- **Pre-signed URLs**: All download links use S3 pre-signed URLs with 1-hour expiry. Report PDFs use separate pre-signed URLs generated on demand.
+- **Audit logging**: Report generation and download actions are audit-logged:
+  - `REPORT_GENERATED` — when AI report creation is requested
+  - `REPORT_COMPLETED` — when report generation succeeds
+  - `REPORT_EXPORTED` — when report is downloaded/exported
+  - `REPORT_DELETED` — when report is deleted
+- **Rate limiting**: Generation endpoint uses the `write` rate limit tier (30 requests per minute). Download uses `read` tier (100 requests per minute).
+- **Company scoping**: All report endpoints enforce that the authenticated user is an ACTIVE member of the company with appropriate role. Non-members receive `404`.
+- **S3 bucket policy**: The `navia-exports` bucket has `BlockPublicAccess` enabled. Objects are encrypted with SSE-S3.
+- **Token usage tracking**: `tokensUsed` is stored per report for cost monitoring and billing.
+
+---
+
+## Frontend Specification
+
+### Navigation Structure
+
+Reports is a **top-level sidebar navigation item**:
+
+| Sidebar Label | URL | Component |
+|---------------|-----|-----------|
+| **Reports** | `/dashboard/reports` | `ReportsPage` |
+
+### Sidebar Icon
+
+- Reports icon: `BarChart3` (Lucide)
+
+---
+
+### Page: Reports Hub
+
+**URL**: `/dashboard/reports`
+
+The reports page has two sections: a generation card for creating new reports and a list of existing reports.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  h1: Reports                              [+ New Report] │
+│  body-sm: AI-generated reports and analytics             │
+├─────────────────────────────────────────────────────────┤
+│                                                          │
+│  ┌── Report Type Cards (4) ─────────────────────────────┐│
+│  │                                                       ││
+│  │ ┌─────────────┐ ┌─────────────┐ ┌──────────────┐    ││
+│  │ │ 🏥 Health   │ │ 📊 Financial│ │ 🤝 Investor  │    ││
+│  │ │ Score       │ │ Summary     │ │ Ready        │    ││
+│  │ │             │ │             │ │              │    ││
+│  │ │ AI health   │ │ Revenue,    │ │ Polished     │    ││
+│  │ │ assessment  │ │ expenses &  │ │ report for   │    ││
+│  │ │ 0-100 score │ │ trends      │ │ investors    │    ││
+│  │ │             │ │             │ │              │    ││
+│  │ │ [Generate]  │ │ [Generate]  │ │ [Generate]   │    ││
+│  │ └─────────────┘ └─────────────┘ └──────────────┘    ││
+│  │                                                       ││
+│  │ ┌─────────────────────────────────────────────────┐  ││
+│  │ │ 🤖 Custom AI Report                             │  ││
+│  │ │ Ask AI to analyze any aspect of your company    │  ││
+│  │ │ [Text area: Describe what you want analyzed...] │  ││
+│  │ │ [Generate Custom Report]                         │  ││
+│  │ └─────────────────────────────────────────────────┘  ││
+│  └───────────────────────────────────────────────────────┘│
+│                                                          │
+│  ┌── Report History ─────────────────────────────────────┐│
+│  │ Filters: [Type ▾ All]  [Status ▾ All]                ││
+│  │                                                       ││
+│  │ Title              │ Type     │ Status   │ Date    │ ⋯││
+│  │ Health Score — Feb  │ Health   │ ✓ Done   │ 26/02  │ ⋯││
+│  │ Q4 Financials       │ Financial│ ✓ Done   │ 25/02  │ ⋯││
+│  │ Investor Pkg        │ Investor │ ⏳ Gen.  │ 26/02  │ ⋯││
+│  │ Cost Analysis       │ Custom   │ ✓ Done   │ 24/02  │ ⋯││
+│  │                                                       ││
+│  │ Showing 1-10 of 15             < 1 2 >               ││
+│  └───────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────┘
 ```
 
-PDF template includes:
-- Company logo (if uploaded) and name in header
-- Generation date and time
-- Page numbers in footer
-- Table formatting matching the design system
-- All numbers in Brazilian format
+#### Report Type Cards
 
-### Excel Generation Details
+Four cards in a grid layout (3 columns on desktop, 1 on mobile):
 
-Using ExcelJS:
+| Card | Icon | Title | Description | Action |
+|------|------|-------|-------------|--------|
+| Health Score | `HeartPulse` | Health Score | AI health assessment with 0-100 score | "Generate" button |
+| Financial Summary | `BarChart3` | Financial Summary | Revenue, expenses & trends | "Generate" button (opens period picker) |
+| Investor Ready | `Handshake` | Investor Ready | Polished report for investors | "Generate" button |
+| Custom | `Sparkles` | Custom AI Report | Full-width card with text area | "Generate Custom Report" button |
 
-```typescript
-async generateCapTableXlsx(data: OwnershipReport): Promise<Buffer> {
-  const workbook = new ExcelJS.Workbook();
+**Financial Summary card**: Clicking "Generate" opens a modal/popover with date range picker (period start, period end, granularity dropdown).
 
-  // Tab 1: Summary
-  const summarySheet = workbook.addWorksheet('Summary');
-  // Company name, date, total shares, fully-diluted total
+**Custom Report card**: Full-width card at the bottom with a text area (placeholder: "Describe what you want analyzed...") and a character counter (max 2000). The generate button is disabled until text is entered.
 
-  // Tab 2: By Share Class
-  const classSheet = workbook.addWorksheet('By Share Class');
-  // Columns: Share Class, Total Shares, Percentage, Shareholders Count
+#### Report History Table
 
-  // Tab 3: By Shareholder
-  const holderSheet = workbook.addWorksheet('By Shareholder');
-  // Columns: Name, Share Class, Shares, %, Fully Diluted %
+| Column | Field | Alignment | Format | Sortable |
+|--------|-------|-----------|--------|----------|
+| Title | `title` | left | Text (link to detail) | Yes (alpha) |
+| Type | `type` | left | Badge (color-coded) | Yes |
+| Status | `status` | left | Badge with icon | Yes |
+| Requested By | `requestedBy.name` | left | Text | Yes |
+| Date | `createdAt` | right | dd/MM/yyyy HH:mm | Yes |
+| Actions | — | right | Icon buttons | No |
 
-  // Tab 4: Option Pool
-  const optionSheet = workbook.addWorksheet('Option Pool');
-  // Pool summary data
+**Type Badges**:
 
-  return workbook.xlsx.writeBuffer();
-}
+| Type | Badge Color | Label |
+|------|-------------|-------|
+| HEALTH_SCORE | blue-100, blue-600 text | "Health Score" |
+| FINANCIAL_SUMMARY | green-100, green-700 text | "Financial" |
+| INVESTOR_READY | cream-100, cream-700 text | "Investor" |
+| CUSTOM | gray-100, gray-600 text | "Custom" |
+
+**Status Badges**:
+
+| Status | Badge Color | Icon | Label |
+|--------|-------------|------|-------|
+| GENERATING | blue-100, blue-600 text | `Loader2` (spinning) | "Generating" |
+| COMPLETED | green-100, green-700 text | `CheckCircle` | "Completed" |
+| FAILED | red-50, destructive text | `XCircle` | "Failed" |
+
+**Action Buttons** (icon buttons, ghost variant):
+
+| Action | Icon | Condition | Behavior |
+|--------|------|-----------|----------|
+| View | `Eye` | status === COMPLETED | Navigate to report detail |
+| Download PDF | `Download` | status === COMPLETED | Trigger PDF download |
+| Delete | `Trash2` | ADMIN or own report | Confirmation dialog, then DELETE |
+| Retry | `RotateCcw` | status === FAILED | Re-trigger generation with same parameters |
+
+**Filters**:
+
+| Filter | Type | Default | Options |
+|--------|------|---------|---------|
+| Type | Dropdown | "All Types" | All, Health Score, Financial, Investor, Custom |
+| Status | Dropdown | "All Statuses" | All, Generating, Completed, Failed |
+
+- Default sort: `-createdAt` (newest first)
+- Pagination: standard (20 per page)
+
+#### Loading State
+- 4 skeleton type cards + skeleton table (6 rows)
+
+#### Empty State (No Reports)
+- Report type cards still shown (primary UI)
+- Report history section: "No reports generated yet. Choose a report type above to get started."
+
+---
+
+### Page: Report Detail
+
+**URL**: `/dashboard/reports/:reportId`
+
+Displays the full AI-generated report content.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  ← Back to Reports                                       │
+│  h1: Company Health Score — Feb 2026                     │
+│  body-sm: Generated on 26/02/2026 14:31 by Nelson P.    │
+│  [Download PDF ▾]  [Delete]                              │
+├─────────────────────────────────────────────────────────┤
+│                                                          │
+│  (Content varies by report type — see below)             │
+│                                                          │
+└─────────────────────────────────────────────────────────┘
 ```
 
-### CSV Generation Details
+#### Header
 
-- UTF-8 encoding with BOM (`\uFEFF` prefix) for Brazilian character support
-- Delimiter: semicolon (`;`) — Brazilian Excel uses semicolons by default
-- Line ending: CRLF
-- RFC 4180 compliant (fields with commas/semicolons/newlines are quoted)
+- Back link: "← Back to Reports" (navigates to `/dashboard/reports`)
+- Title: `report.title`
+- Subtitle: "Generated on {date} by {requestedBy.name}"
+- Download button: Dropdown with PDF, Excel, CSV options
+- Delete button: Ghost destructive variant, with confirmation dialog
 
-### OCT JSON Format
+#### Health Score Report Content
 
-Follows Open Cap Table Coalition v1.1 schema. Key mappings:
+```
+┌─────────────────────────────────────────────────────────┐
+│  ┌── Score Card (large, centered) ─────────────────────┐│
+│  │            72 / 100                                  ││
+│  │            HEALTHY                                   ││
+│  │   [═══════════════════░░░░░░░░] (progress bar)       ││
+│  │   Period: 01/09/2025 — 26/02/2026                   ││
+│  └──────────────────────────────────────────────────────┘│
+│                                                          │
+│  ┌── Section Cards (2x2 grid) ─────────────────────────┐│
+│  │ ┌── Financial Health ──┐ ┌── Growth Indicators ──┐  ││
+│  │ │ Score: 68/100        │ │ Score: 78/100         │  ││
+│  │ │ Burn: R$ 45.000/mo   │ │ Growth: 8% MoM       │  ││
+│  │ │ Runway: 14 months    │ │ Trend: Accelerating   │  ││
+│  │ │ Rev/Exp: 1,25x       │ │ Consistency: 85%      │  ││
+│  │ │                      │ │                       │  ││
+│  │ │ [AI narrative...]    │ │ [AI narrative...]     │  ││
+│  │ └──────────────────────┘ └───────────────────────┘  ││
+│  │ ┌── Risk Factors ──────┐ ┌── Recommendations ───┐  ││
+│  │ │ Score: 70/100        │ │ 1. Diversify clients │  ││
+│  │ │                      │ │    Priority: HIGH    │  ││
+│  │ │ ⚠ Revenue conc.     │ │ 2. Build reserves    │  ││
+│  │ │   (MEDIUM)           │ │    Priority: MEDIUM  │  ││
+│  │ │                      │ │ 3. Review contracts  │  ││
+│  │ │ [AI narrative...]    │ │    Priority: LOW     │  ││
+│  │ └──────────────────────┘ └───────────────────────┘  ││
+│  └──────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────┘
+```
 
-| OCT Field | Navia Source |
-|-----------|-------------|
-| `issuer.legal_name` | `Company.legalName` |
-| `issuer.country_of_formation` | `"BR"` (always) |
-| `stakeholders[].name` | `Shareholder.name` |
-| `stock_classes[].name` | `ShareClass.className` |
-| `transactions[].type` | `Transaction.type` mapped to OCT transaction types |
+**Score color mapping**:
+| Range | Color | Rating Label |
+|-------|-------|-------------|
+| 0-30 | destructive (#DC2626) | Critical |
+| 31-50 | cream-700 (#C4A44E) | Needs Attention |
+| 51-70 | blue-600 (#1B6B93) | Moderate |
+| 71-85 | green-700 (#6BAF5E) | Healthy |
+| 86-100 | green-600 (#9DCE94) | Excellent |
 
-### Error Codes (Report-Specific)
+#### Financial Summary Report Content
 
-| Error Code | HTTP Status | messageKey | When |
-|------------|-------------|------------|------|
-| `REPORT_GENERATION_FAILED` | 500 | `errors.report.generationFailed` | Unexpected error during report generation |
-| `REPORT_EXPORT_FAILED` | 500 | `errors.report.exportFailed` | Export file generation failed |
-| `REPORT_EXPORT_NOT_FOUND` | 404 | `errors.report.exportNotFound` | Export job ID doesn't exist |
-| `REPORT_EXPORT_EXPIRED` | 410 | `errors.report.exportExpired` | Pre-signed URL has expired |
-| `REPORT_FORMAT_UNSUPPORTED` | 400 | `errors.report.formatUnsupported` | Invalid export format requested |
+```
+┌─────────────────────────────────────────────────────────┐
+│  ┌── Period Overview Cards (4) ────────────────────────┐│
+│  │ Revenue      │ Expenses    │ Net Result │ Burn Rate ││
+│  │ R$ 320.000   │ R$ 245.000  │ R$ 75.000  │ R$ 45K/mo││
+│  └──────────────────────────────────────────────────────┘│
+│                                                          │
+│  ┌── Revenue Trend Chart (Recharts) ───────────────────┐│
+│  │ [Line chart: monthly revenue over the period]       ││
+│  └──────────────────────────────────────────────────────┘│
+│                                                          │
+│  ┌── Expense Breakdown (Recharts) ─────────────────────┐│
+│  │ [Donut chart: expense categories]                   ││
+│  └──────────────────────────────────────────────────────┘│
+│                                                          │
+│  ┌── Cash Flow Table ──────────────────────────────────┐│
+│  │ Period │ Inflow    │ Outflow   │ Net      │ Balance ││
+│  │ Oct    │ R$ 50.000 │ R$ 42.000 │ R$ 8.000 │ R$ 180K││
+│  │ Nov    │ R$ 55.000 │ R$ 43.000 │ R$ 12.000│ R$ 192K││
+│  │ ...    │           │           │          │        ││
+│  └──────────────────────────────────────────────────────┘│
+│                                                          │
+│  ┌── AI Narrative (Card) ──────────────────────────────┐│
+│  │ [2-3 paragraphs of AI-generated analysis...]        ││
+│  └──────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────┘
+```
+
+**Revenue Trend Chart (Recharts)**:
+
+| Setting | Value |
+|---------|-------|
+| Chart type | `LineChart` with `Line` component |
+| X-axis | Period labels (e.g., "Oct/2025", "Nov/2025") |
+| Y-axis | Revenue in BRL (formatted: `R$ {value}`) |
+| Colors | chart-1 (`#1B6B93`) |
+| Tooltip | Period + formatted revenue value |
+| Grid | Dashed horizontal lines, `gray-200` |
+| Responsive | Container width 100%, height 300px |
+
+**Expense Breakdown Chart (Recharts)**:
+
+| Setting | Value |
+|---------|-------|
+| Chart type | `PieChart` with donut (`innerRadius={60}`) |
+| Data | One slice per expense category |
+| Colors | Chart palette from design system |
+| Center label | "Total" + formatted total expenses |
+| Legend | Bottom, horizontal |
+| Tooltip | Category + amount + percentage |
+
+#### Investor-Ready Report Content
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  ┌── Executive Summary (Card, full-width) ─────────────┐│
+│  │ [AI-generated executive summary text...]            ││
+│  └──────────────────────────────────────────────────────┘│
+│                                                          │
+│  ┌── Company Overview ──┐ ┌── Team ─────────────────┐  │
+│  │ Name: Acme Ltda.     │ │ ┌─ Avatar + Name ─────┐ │  │
+│  │ Sector: SaaS         │ │ │ Nelson P. — CEO      │ │  │
+│  │ Founded: 2023        │ │ │ Maria S. — CTO       │ │  │
+│  │ Location: São Paulo  │ │ │ João L. — CFO        │ │  │
+│  │ Website: acme.com    │ │ └──────────────────────┘ │  │
+│  └──────────────────────┘ └──────────────────────────┘  │
+│                                                          │
+│  ┌── Financial Highlights (Card) ──────────────────────┐│
+│  │ Revenue: R$ 55.000/mo │ Growth: 8% MoM            ││
+│  │ Burn: R$ 45.000/mo    │ Runway: 14 months         ││
+│  │ Key Metrics:                                        ││
+│  │   ARR: R$ 660.000  │  MRR: R$ 55.000              ││
+│  │   Team Size: 12     │  Customers: 45               ││
+│  └──────────────────────────────────────────────────────┘│
+│                                                          │
+│  ┌── Dataroom Summary (Card) ──────────────────────────┐│
+│  │ 8 documents available                               ││
+│  │ Pitch Deck (2) — [AI summary of pitch deck]        ││
+│  │ Financials (3)  — [AI summary of financials]       ││
+│  │ Legal (1)       — [AI summary of legal docs]       ││
+│  │ Product (2)     — [AI summary of product docs]     ││
+│  └──────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────┘
+```
+
+#### Custom Report Content
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  ┌── Original Prompt (Card, muted bg) ─────────────────┐│
+│  │ "Analyze our expense efficiency and suggest areas   ││
+│  │  to cut costs"                                      ││
+│  └──────────────────────────────────────────────────────┘│
+│                                                          │
+│  ┌── Section 1: [AI heading] ──────────────────────────┐│
+│  │ [Markdown-rendered AI content...]                   ││
+│  │ [Optional: embedded chart from chartData]           ││
+│  └──────────────────────────────────────────────────────┘│
+│                                                          │
+│  ┌── Section 2: [AI heading] ──────────────────────────┐│
+│  │ [Markdown-rendered AI content...]                   ││
+│  └──────────────────────────────────────────────────────┘│
+│                                                          │
+│  ┌── Data Sources (Card, caption text) ────────────────┐│
+│  │ This report was generated using:                    ││
+│  │ • Open Finance snapshots (Oct 2025 — Feb 2026)     ││
+│  │ • 5 dataroom documents                              ││
+│  │ • Company profile data                              ││
+│  │                                                      ││
+│  │ ℹ AI-generated reports are based on available data  ││
+│  │   and should be reviewed for accuracy.              ││
+│  └──────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────┘
+```
+
+#### Download Dropdown
+
+- Appears on report detail page header
+- Options: PDF (always available for completed reports), Excel (.xlsx), CSV
+- PDF: immediate download via pre-signed URL
+- Excel/CSV: if not yet generated, triggers async export. Shows toast "Export is being generated. You'll receive an email when ready." Poll for completion.
+
+#### Loading State (Report Detail)
+- Skeleton: header area + 4 section card skeletons
+
+#### Error State (Report Failed)
+- Show error card with errorCode and errorMessage
+- "Retry" button to re-generate with same parameters
+- "Back to Reports" link
+
+---
+
+### Common Components (Shared Across Report Pages)
+
+#### DateRangePicker
+
+Reusable date range picker component used by Financial Summary generation:
+
+- Two date inputs: From and To
+- Brazilian format: dd/MM/yyyy
+- Calendar popover (using shadcn/ui `Calendar` + `Popover`)
+- Preset ranges: "Last 3 months", "Last 6 months", "Last 12 months", "YTD"
+- Validation: From must be before To, To must not be in the future
+
+#### AsyncJobStatusBadge
+
+Reusable badge component for report/export status:
+
+| Status | Badge Color | Icon |
+|--------|-------------|------|
+| GENERATING | blue-100, blue-600 text | `Loader2` (spinning) |
+| COMPLETED | green-100, green-700 text | `CheckCircle` |
+| FAILED | red-50, destructive text | `XCircle` |
+
+#### AsyncJobPoller
+
+Hook that polls for report generation completion:
+
+```typescript
+function useReportPoller(companyId: string, reportId: string | null) {
+  return useQuery({
+    queryKey: ['report', companyId, reportId],
+    queryFn: () => api.get(`/api/v1/companies/${companyId}/reports/${reportId}`),
+    enabled: !!reportId,
+    refetchInterval: (data) => {
+      if (!data || data.status === 'GENERATING') return 5000;
+      return false; // Stop polling when completed or failed
+    },
+  });
+}
+```
 
 ---
 
@@ -1304,89 +1651,112 @@ Add to both `messages/pt-BR.json` and `messages/en.json`:
 
 ```
 reports.nav.title = "Relatórios" / "Reports"
-reports.ownership.title = "Relatório de Propriedade" / "Ownership Report"
-reports.ownership.description = "Distribuição atual de equity por acionista" / "Current equity distribution by shareholder"
-reports.ownership.totalShares = "Total de Ações" / "Total Shares"
-reports.ownership.fullyDiluted = "Totalmente Diluído" / "Fully Diluted"
-reports.ownership.shareholders = "Acionistas" / "Shareholders"
-reports.ownership.table.shareholder = "Acionista" / "Shareholder"
-reports.ownership.table.shareClass = "Classe de Ação" / "Share Class"
-reports.ownership.table.shares = "Ações" / "Shares"
-reports.ownership.table.percentage = "%" / "%"
-reports.ownership.table.fullyDilutedPercentage = "% Diluído" / "FD %"
-reports.ownership.filterShareClass = "Classe de Ação" / "Share Class"
-reports.ownership.filterAllClasses = "Todas as Classes" / "All Classes"
-reports.ownership.includeOptions = "Incluir Opções" / "Include Options"
-reports.ownership.optionPool = "Pool de Opções" / "Option Pool"
-reports.ownership.optionPool.total = "Pool Total" / "Total Pool"
-reports.ownership.optionPool.granted = "Concedidas" / "Granted"
-reports.ownership.optionPool.exercised = "Exercidas" / "Exercised"
-reports.ownership.optionPool.vestedUnexercised = "Adquiridas" / "Vested"
-reports.ownership.optionPool.unvested = "Não Adquiridas" / "Unvested"
-reports.ownership.optionPool.available = "Disponíveis" / "Available"
-reports.ownership.empty.title = "Nenhum acionista ainda" / "No shareholders yet"
-reports.ownership.empty.description = "Adicione seu primeiro acionista para ver os dados de propriedade." / "Add your first shareholder to see ownership data."
+reports.title = "Relatórios" / "Reports"
+reports.description = "Relatórios e análises gerados por IA" / "AI-generated reports and analytics"
 
-reports.dilution.title = "Análise de Diluição" / "Dilution Analysis"
-reports.dilution.description = "Mudanças de propriedade ao longo do tempo" / "Ownership changes over time"
-reports.dilution.dateFrom = "De" / "From"
-reports.dilution.dateTo = "Até" / "To"
-reports.dilution.granularity = "Granularidade" / "Granularity"
-reports.dilution.granularity.day = "Diário" / "Daily"
-reports.dilution.granularity.week = "Semanal" / "Weekly"
-reports.dilution.granularity.month = "Mensal" / "Monthly"
-reports.dilution.giniCoefficient = "Coeficiente de Gini" / "Gini Coefficient"
-reports.dilution.giniDescription = "Concentração de propriedade" / "Ownership concentration"
-reports.dilution.foreignOwnership = "Participação Estrangeira" / "Foreign Ownership"
-reports.dilution.foreignDescription = "Acionistas não-domésticos" / "Non-domestic holders"
-reports.dilution.empty = "Sem dados de diluição disponíveis para este período" / "No dilution data available for this period"
+reports.types.healthScore.title = "Health Score" / "Health Score"
+reports.types.healthScore.description = "Avaliação de saúde da empresa com pontuação de 0 a 100" / "AI health assessment with 0-100 score"
+reports.types.financialSummary.title = "Resumo Financeiro" / "Financial Summary"
+reports.types.financialSummary.description = "Receitas, despesas e tendências" / "Revenue, expenses & trends"
+reports.types.investorReady.title = "Investor Ready" / "Investor Ready"
+reports.types.investorReady.description = "Relatório polido para investidores" / "Polished report for investors"
+reports.types.custom.title = "Relatório Personalizado" / "Custom AI Report"
+reports.types.custom.description = "Peça à IA para analisar qualquer aspecto da sua empresa" / "Ask AI to analyze any aspect of your company"
+reports.types.custom.placeholder = "Descreva o que você quer analisar..." / "Describe what you want analyzed..."
+reports.types.custom.charCount = "{count}/2000 caracteres" / "{count}/2000 characters"
 
-reports.export.title = "Exportar Cap Table" / "Cap Table Export"
-reports.export.description = "Baixe o cap table em diversos formatos" / "Download cap table in various formats"
-reports.export.format = "Formato" / "Format"
-reports.export.format.pdf = "PDF — Relatório formatado para impressão" / "PDF — Formatted print-ready report"
-reports.export.format.xlsx = "Excel — Planilha estruturada com abas" / "Excel — Structured spreadsheet with tabs"
-reports.export.format.csv = "CSV — Exportação de dados plana" / "CSV — Flat data export"
-reports.export.format.oct = "OCT JSON — Padrão Open Cap Table" / "OCT JSON — Open Cap Table standard"
-reports.export.snapshotDate = "Data do Snapshot" / "Point-in-Time"
-reports.export.snapshotHint = "Deixe vazio para o estado atual do cap table" / "Leave empty for current cap table state"
-reports.export.downloadButton = "Baixar Exportação" / "Download Export"
-reports.export.generating = "Gerando..." / "Generating..."
-reports.export.queuing = "Enfileirando..." / "Queuing..."
+reports.generate = "Gerar" / "Generate"
+reports.generateCustom = "Gerar Relatório Personalizado" / "Generate Custom Report"
+reports.generating = "Gerando relatório..." / "Generating report..."
+reports.generatingToast = "Seu relatório está sendo gerado. Você será notificado quando estiver pronto." / "Your report is being generated. You'll be notified when it's ready."
+reports.completedToast = "Relatório pronto!" / "Report ready!"
+reports.failedToast = "Falha na geração do relatório. Tente novamente." / "Report generation failed. Please try again."
+
+reports.history.title = "Histórico de Relatórios" / "Report History"
+reports.history.table.title = "Título" / "Title"
+reports.history.table.type = "Tipo" / "Type"
+reports.history.table.status = "Status" / "Status"
+reports.history.table.requestedBy = "Solicitado por" / "Requested by"
+reports.history.table.date = "Data" / "Date"
+reports.history.table.actions = "Ações" / "Actions"
+reports.history.filterType = "Tipo" / "Type"
+reports.history.filterAllTypes = "Todos os Tipos" / "All Types"
+reports.history.filterStatus = "Status" / "Status"
+reports.history.filterAllStatuses = "Todos os Status" / "All Statuses"
+reports.history.empty = "Nenhum relatório gerado ainda. Escolha um tipo de relatório acima para começar." / "No reports generated yet. Choose a report type above to get started."
+
+reports.status.generating = "Gerando" / "Generating"
+reports.status.completed = "Concluído" / "Completed"
+reports.status.failed = "Falhou" / "Failed"
+
+reports.detail.backToReports = "← Voltar para Relatórios" / "← Back to Reports"
+reports.detail.generatedOn = "Gerado em {date} por {name}" / "Generated on {date} by {name}"
+reports.detail.download = "Baixar" / "Download"
+reports.detail.downloadPdf = "Baixar PDF" / "Download PDF"
+reports.detail.downloadXlsx = "Baixar Excel" / "Download Excel"
+reports.detail.downloadCsv = "Baixar CSV" / "Download CSV"
+reports.detail.delete = "Excluir" / "Delete"
+reports.detail.deleteConfirm = "Tem certeza que deseja excluir este relatório?" / "Are you sure you want to delete this report?"
+reports.detail.retry = "Tentar Novamente" / "Retry"
+
+reports.healthScore.overallScore = "Pontuação Geral" / "Overall Score"
+reports.healthScore.financialHealth = "Saúde Financeira" / "Financial Health"
+reports.healthScore.growthIndicators = "Indicadores de Crescimento" / "Growth Indicators"
+reports.healthScore.riskFactors = "Fatores de Risco" / "Risk Factors"
+reports.healthScore.recommendations = "Recomendações" / "Recommendations"
+reports.healthScore.burnRate = "Burn Rate" / "Burn Rate"
+reports.healthScore.runway = "Runway" / "Runway"
+reports.healthScore.runwayMonths = "{months} meses" / "{months} months"
+reports.healthScore.revenueToExpense = "Receita/Despesa" / "Revenue/Expense"
+reports.healthScore.monthlyGrowth = "Crescimento Mensal" / "Monthly Growth"
+reports.healthScore.trend = "Tendência" / "Trend"
+reports.healthScore.trend.accelerating = "Acelerando" / "Accelerating"
+reports.healthScore.trend.stable = "Estável" / "Stable"
+reports.healthScore.trend.decelerating = "Desacelerando" / "Decelerating"
+reports.healthScore.consistency = "Consistência" / "Consistency"
+reports.healthScore.rating.critical = "Crítico" / "Critical"
+reports.healthScore.rating.needsAttention = "Atenção Necessária" / "Needs Attention"
+reports.healthScore.rating.moderate = "Moderado" / "Moderate"
+reports.healthScore.rating.healthy = "Saudável" / "Healthy"
+reports.healthScore.rating.excellent = "Excelente" / "Excellent"
+reports.healthScore.priority.high = "Alta" / "High"
+reports.healthScore.priority.medium = "Média" / "Medium"
+reports.healthScore.priority.low = "Baixa" / "Low"
+reports.healthScore.limitedData = "Dados limitados — menos de 3 meses de dados financeiros disponíveis" / "Limited data — less than 3 months of financial data available"
+
+reports.financialSummary.periodOverview = "Visão do Período" / "Period Overview"
+reports.financialSummary.totalRevenue = "Receita Total" / "Total Revenue"
+reports.financialSummary.totalExpenses = "Despesas Totais" / "Total Expenses"
+reports.financialSummary.netResult = "Resultado Líquido" / "Net Result"
+reports.financialSummary.burnRate = "Burn Rate" / "Burn Rate"
+reports.financialSummary.revenueTrend = "Tendência de Receita" / "Revenue Trend"
+reports.financialSummary.expenseBreakdown = "Composição de Despesas" / "Expense Breakdown"
+reports.financialSummary.cashFlow = "Fluxo de Caixa" / "Cash Flow"
+reports.financialSummary.openingBalance = "Saldo Inicial" / "Opening Balance"
+reports.financialSummary.closingBalance = "Saldo Final" / "Closing Balance"
+reports.financialSummary.inflow = "Entrada" / "Inflow"
+reports.financialSummary.outflow = "Saída" / "Outflow"
+reports.financialSummary.netFlow = "Fluxo Líquido" / "Net Flow"
+reports.financialSummary.narrative = "Análise" / "Analysis"
+reports.financialSummary.periodStart = "Início do Período" / "Period Start"
+reports.financialSummary.periodEnd = "Fim do Período" / "Period End"
+reports.financialSummary.granularity = "Granularidade" / "Granularity"
+reports.financialSummary.granularity.monthly = "Mensal" / "Monthly"
+reports.financialSummary.granularity.quarterly = "Trimestral" / "Quarterly"
+
+reports.investorReady.executiveSummary = "Resumo Executivo" / "Executive Summary"
+reports.investorReady.companyOverview = "Visão da Empresa" / "Company Overview"
+reports.investorReady.team = "Equipe" / "Team"
+reports.investorReady.financialHighlights = "Destaques Financeiros" / "Financial Highlights"
+reports.investorReady.dataroomSummary = "Resumo do Dataroom" / "Dataroom Summary"
+reports.investorReady.documentsAvailable = "{count} documentos disponíveis" / "{count} documents available"
+
+reports.custom.originalPrompt = "Prompt Original" / "Original Prompt"
+reports.custom.dataSources = "Fontes de Dados" / "Data Sources"
+reports.custom.disclaimer = "Relatórios gerados por IA são baseados nos dados disponíveis e devem ser revisados para precisão." / "AI-generated reports are based on available data and should be reviewed for accuracy."
+
 reports.export.asyncToast = "Sua exportação está sendo gerada. Você receberá um e-mail quando estiver pronta." / "Your export is being generated. You'll receive an email when ready."
 reports.export.readyToast = "Exportação pronta!" / "Export ready!"
-reports.export.recentExports = "Exportações Recentes" / "Recent Exports"
-
-reports.dueDiligence.title = "Pacote de Due Diligence" / "Due Diligence Package"
-reports.dueDiligence.description = "Gere documentação completa de equity" / "Generate comprehensive equity documentation"
-reports.dueDiligence.auditPeriod = "Período da Trilha de Auditoria" / "Audit Trail Period"
-reports.dueDiligence.from = "De" / "From"
-reports.dueDiligence.to = "Até" / "To"
-reports.dueDiligence.defaultPeriod = "Padrão: histórico completo da empresa" / "Defaults to full company history"
-reports.dueDiligence.contents = "Conteúdo do Pacote" / "Package Contents"
-reports.dueDiligence.generateButton = "Gerar Pacote" / "Generate Package"
-reports.dueDiligence.generating = "Gerando pacote. Isso pode levar alguns minutos. Você receberá um e-mail quando estiver pronto." / "Generating package. This may take a few minutes. You'll receive an email when ready."
-reports.dueDiligence.readyToast = "Pacote pronto!" / "Package ready!"
-reports.dueDiligence.recentPackages = "Pacotes Recentes" / "Recent Packages"
-
-portfolio.title = "Meu Portfólio" / "My Portfolio"
-portfolio.description = "Seus investimentos em todas as empresas" / "Your investments across all companies"
-portfolio.totalInvested = "Total Investido" / "Total Invested"
-portfolio.currentValue = "Valor Atual" / "Current Value"
-portfolio.roiMultiple = "Múltiplo ROI" / "ROI Multiple"
-portfolio.companies = "Empresas" / "Companies"
-portfolio.allocation = "Alocação" / "Allocation"
-portfolio.roiByCompany = "ROI por Empresa" / "ROI by Company"
-portfolio.table.company = "Empresa" / "Company"
-portfolio.table.shareClass = "Classe" / "Class"
-portfolio.table.shares = "Ações" / "Shares"
-portfolio.table.ownership = "Propriedade %" / "Ownership %"
-portfolio.table.invested = "Investido" / "Invested"
-portfolio.table.value = "Valor Est." / "Est. Value"
-portfolio.table.roi = "ROI" / "ROI"
-portfolio.drillDown = "Clique em uma linha para ver detalhes" / "Click a row to view details"
-portfolio.empty.title = "Nenhum investimento ainda" / "No investments yet"
-portfolio.empty.description = "Você verá seu portfólio aqui quando possuir ações em uma empresa." / "You'll see your portfolio here once you hold shares in a company."
 
 common.export = "Exportar" / "Export"
 common.download = "Baixar" / "Download"
@@ -1394,14 +1764,49 @@ common.retry = "Tentar novamente" / "Retry"
 common.dateRange.last3Months = "Últimos 3 meses" / "Last 3 months"
 common.dateRange.last6Months = "Últimos 6 meses" / "Last 6 months"
 common.dateRange.last12Months = "Últimos 12 meses" / "Last 12 months"
-common.dateRange.fullHistory = "Histórico completo" / "Full history"
+common.dateRange.ytd = "Ano atual" / "Year to date"
 
 errors.report.generationFailed = "Falha na geração do relatório" / "Report generation failed"
+errors.report.aiTimeout = "O tempo de geração do relatório expirou. Tente novamente." / "Report generation timed out. Please try again."
+errors.report.insufficientData = "Dados insuficientes para gerar este tipo de relatório. Conecte uma fonte de dados financeiros." / "Insufficient data to generate this report type. Connect a financial data source."
+errors.report.notFound = "Relatório não encontrado" / "Report not found"
 errors.report.exportFailed = "Falha na geração da exportação" / "Export generation failed"
 errors.report.exportNotFound = "Exportação não encontrada" / "Export not found"
-errors.report.exportExpired = "Link de download expirado. Gere uma nova exportação." / "Download link expired. Generate a new export."
+errors.report.exportExpired = "Link de download expirado. Baixe novamente." / "Download link expired. Download again."
 errors.report.formatUnsupported = "Formato de exportação não suportado" / "Unsupported export format"
+errors.report.generationLimit = "Limite de relatórios simultâneos atingido. Aguarde a conclusão dos relatórios em andamento." / "Concurrent report limit reached. Wait for ongoing reports to complete."
+errors.report.customPromptRequired = "Prompt é obrigatório para relatórios personalizados" / "Prompt is required for custom reports"
+errors.report.customPromptTooLong = "Prompt excede o limite de 2.000 caracteres" / "Prompt exceeds 2,000 character limit"
+errors.report.cannotDeleteGenerating = "Não é possível excluir um relatório em geração" / "Cannot delete a report that is still generating"
+errors.report.invalidPeriod = "Período inválido. A data inicial deve ser anterior à data final." / "Invalid period. Start date must be before end date."
 ```
+
+---
+
+## Success Criteria
+
+- [ ] AI Health Score report generates with 0-100 score and four breakdown sections
+- [ ] Financial Summary report includes revenue, expenses, cash flow, and AI narrative
+- [ ] Investor-Ready report combines profile, team, financials, and dataroom summary
+- [ ] Custom AI report accepts free-text prompt and generates adaptive report structure
+- [ ] Report generation completes within 2 minutes (including AI call and PDF rendering)
+- [ ] PDF exports render with correct formatting, company header, and Brazilian number formatting
+- [ ] Excel exports include structured tabs appropriate to each report type
+- [ ] CSV exports produce valid RFC 4180 CSV with UTF-8 BOM and semicolon delimiter
+- [ ] Async generation returns 202 with job reference and notifies user on completion
+- [ ] Failed reports show error state with retry option
+- [ ] Concurrent generation limited to 3 per company, returns 429 when exceeded
+- [ ] Role-based access enforced: only ADMIN/FINANCE can generate, LEGAL can view
+- [ ] Report deletion removes S3 files and associated export records
+- [ ] Pre-signed download URLs expire after 1 hour
+- [ ] All report actions are audit-logged (REPORT_GENERATED, REPORT_COMPLETED, REPORT_EXPORTED, REPORT_DELETED)
+- [ ] Token usage tracked per report for cost monitoring
+- [ ] Reports generated in company locale (PT-BR or EN)
+- [ ] AI reports use data from Open Finance, dataroom, and company profile only (no cross-company data)
+- [ ] Custom prompt sanitized and length-limited to prevent injection
+- [ ] Duplicate export requests within 5 minutes return existing job
+- [ ] Hourly S3 cleanup removes expired export files
+- [ ] Brazilian number formatting used for all financial values in display contexts
 
 ---
 
@@ -1409,17 +1814,13 @@ errors.report.formatUnsupported = "Formato de exportação não suportado" / "Un
 
 | Specification | Relationship |
 |---------------|-------------|
-| [exit-waterfall.md](./exit-waterfall.md) | Exit waterfall scenario modeling — extracted from this spec |
-| [cap-table-management.md](./cap-table-management.md) | Source data for ownership reports, shareholding breakdowns, and snapshots |
-| [shareholder-registry.md](./shareholder-registry.md) | Shareholder data for ownership reports and due diligence packages |
-| [share-classes.md](./share-classes.md) | Per-class breakdowns in cap table reports |
-| [transactions.md](./transactions.md) | Transaction history reports and activity timelines |
-| [funding-rounds.md](./funding-rounds.md) | Funding round summary reports and round history |
-| [convertible-instruments.md](./convertible-instruments.md) | Convertible tracking data for due diligence packages |
-| [option-plans.md](./option-plans.md) | Option pool reports and fully-diluted calculations |
-| [user-permissions.md](./user-permissions.md) | Role-based report access: ADMIN, FINANCE, LEGAL, INVESTOR, EMPLOYEE |
+| [company-profile.md](./company-profile.md) | Company profile data used as AI report input (overview, team, metrics) |
+| [company-dataroom.md](./company-dataroom.md) | Dataroom documents used as AI report input (document metadata and text extraction) |
+| [company-management.md](./company-management.md) | Company record data (name, CNPJ, sector) used in report context |
+| [user-permissions.md](./user-permissions.md) | Role-based report access: ADMIN, FINANCE (generate), LEGAL (view) |
+| [notifications.md](./notifications.md) | In-app notifications for report completion/failure |
 | [api-standards.md](../.claude/rules/api-standards.md) | Response envelope format, pagination, export content types, HTTP status codes |
-| [error-handling.md](../.claude/rules/error-handling.md) | Error codes: CAP_*, VAL_*, SYS_* used in report endpoint responses |
-| [audit-logging.md](../.claude/rules/audit-logging.md) | Audit events: CAP_TABLE_EXPORTED, due diligence audit trail section |
-| [security.md](../.claude/rules/security.md) | S3 bucket policies, PII handling in exports, pre-signed URL configuration |
-| [i18n.md](../.claude/rules/i18n.md) | Brazilian number formatting rules for all financial values in report display |
+| [error-handling.md](../.claude/rules/error-handling.md) | Error codes: REPORT_*, VAL_*, SYS_* used in report endpoint responses |
+| [audit-logging.md](../.claude/rules/audit-logging.md) | Audit events: REPORT_GENERATED, REPORT_COMPLETED, REPORT_EXPORTED, REPORT_DELETED |
+| [security.md](../.claude/rules/security.md) | S3 bucket policies, pre-signed URL configuration, AI prompt injection prevention |
+| [i18n.md](../.claude/rules/i18n.md) | Brazilian number formatting rules, report language selection based on company locale |

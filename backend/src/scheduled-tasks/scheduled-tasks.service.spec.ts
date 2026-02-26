@@ -2,20 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getQueueToken } from '@nestjs/bull';
 import { ScheduledTasksService } from './scheduled-tasks.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
-import { ConvertibleService } from '../convertible/convertible.service';
-import { OptionPlanService } from '../option-plan/option-plan.service';
 
 const mockAuditLogService = {
   computeDailyHash: jest.fn().mockResolvedValue(undefined),
   log: jest.fn().mockResolvedValue(undefined),
-};
-
-const mockConvertibleService = {
-  updateAccruedInterestForAll: jest.fn().mockResolvedValue(0),
-};
-
-const mockOptionPlanService = {
-  expireStaleGrants: jest.fn().mockResolvedValue(0),
 };
 
 const createMockQueue = (failedCount = 0) => ({
@@ -26,8 +16,6 @@ const createMockQueue = (failedCount = 0) => ({
 describe('ScheduledTasksService', () => {
   let service: ScheduledTasksService;
   let auditLogService: typeof mockAuditLogService;
-  let convertibleService: typeof mockConvertibleService;
-  let optionPlanService: typeof mockOptionPlanService;
   let mockQueues: Record<string, ReturnType<typeof createMockQueue>>;
 
   beforeEach(async () => {
@@ -46,8 +34,6 @@ describe('ScheduledTasksService', () => {
       providers: [
         ScheduledTasksService,
         { provide: AuditLogService, useValue: mockAuditLogService },
-        { provide: ConvertibleService, useValue: mockConvertibleService },
-        { provide: OptionPlanService, useValue: mockOptionPlanService },
         { provide: getQueueToken('audit-log'), useValue: mockQueues['audit-log'] },
         { provide: getQueueToken('notification'), useValue: mockQueues['notification'] },
         { provide: getQueueToken('company-setup'), useValue: mockQueues['company-setup'] },
@@ -62,8 +48,6 @@ describe('ScheduledTasksService', () => {
 
     service = module.get<ScheduledTasksService>(ScheduledTasksService);
     auditLogService = module.get(AuditLogService);
-    convertibleService = module.get(ConvertibleService);
-    optionPlanService = module.get(OptionPlanService);
   });
 
   describe('getYesterdayDateString', () => {
@@ -140,86 +124,6 @@ describe('ScheduledTasksService', () => {
 
       await expect(service.computeDailyAuditHashChain()).resolves.not.toThrow();
       expect(auditLogService.computeDailyHash).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('accrueConvertibleInterest', () => {
-    it('should call convertibleService.updateAccruedInterestForAll', async () => {
-      convertibleService.updateAccruedInterestForAll.mockResolvedValue(5);
-
-      await service.accrueConvertibleInterest();
-
-      expect(convertibleService.updateAccruedInterestForAll).toHaveBeenCalledTimes(1);
-    });
-
-    it('should not throw when updateAccruedInterestForAll succeeds', async () => {
-      convertibleService.updateAccruedInterestForAll.mockResolvedValue(10);
-
-      await expect(service.accrueConvertibleInterest()).resolves.not.toThrow();
-    });
-
-    it('should handle zero instruments gracefully', async () => {
-      convertibleService.updateAccruedInterestForAll.mockResolvedValue(0);
-
-      await expect(service.accrueConvertibleInterest()).resolves.not.toThrow();
-      expect(convertibleService.updateAccruedInterestForAll).toHaveBeenCalledTimes(1);
-    });
-
-    it('should catch and log errors without rethrowing', async () => {
-      convertibleService.updateAccruedInterestForAll.mockRejectedValue(
-        new Error('Database connection failed'),
-      );
-
-      await expect(service.accrueConvertibleInterest()).resolves.not.toThrow();
-      expect(convertibleService.updateAccruedInterestForAll).toHaveBeenCalledTimes(1);
-    });
-
-    it('should catch non-Error exceptions without rethrowing', async () => {
-      convertibleService.updateAccruedInterestForAll.mockRejectedValue(
-        'unexpected string error',
-      );
-
-      await expect(service.accrueConvertibleInterest()).resolves.not.toThrow();
-      expect(convertibleService.updateAccruedInterestForAll).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('expireOptionGrants', () => {
-    it('should call optionPlanService.expireStaleGrants', async () => {
-      mockOptionPlanService.expireStaleGrants.mockResolvedValue(3);
-
-      await service.expireOptionGrants();
-
-      expect(optionPlanService.expireStaleGrants).toHaveBeenCalledTimes(1);
-    });
-
-    it('should not throw when expireStaleGrants succeeds', async () => {
-      mockOptionPlanService.expireStaleGrants.mockResolvedValue(5);
-
-      await expect(service.expireOptionGrants()).resolves.not.toThrow();
-    });
-
-    it('should handle zero expired grants gracefully', async () => {
-      mockOptionPlanService.expireStaleGrants.mockResolvedValue(0);
-
-      await expect(service.expireOptionGrants()).resolves.not.toThrow();
-      expect(optionPlanService.expireStaleGrants).toHaveBeenCalledTimes(1);
-    });
-
-    it('should catch and log errors without rethrowing', async () => {
-      mockOptionPlanService.expireStaleGrants.mockRejectedValue(
-        new Error('Database connection failed'),
-      );
-
-      await expect(service.expireOptionGrants()).resolves.not.toThrow();
-      expect(optionPlanService.expireStaleGrants).toHaveBeenCalledTimes(1);
-    });
-
-    it('should catch non-Error exceptions without rethrowing', async () => {
-      mockOptionPlanService.expireStaleGrants.mockRejectedValue('string error');
-
-      await expect(service.expireOptionGrants()).resolves.not.toThrow();
-      expect(optionPlanService.expireStaleGrants).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -416,14 +320,6 @@ describe('ScheduledTasksService', () => {
       expect(typeof service.computeDailyAuditHashChain).toBe('function');
     });
 
-    it('should have accrueConvertibleInterest as a method', () => {
-      expect(typeof service.accrueConvertibleInterest).toBe('function');
-    });
-
-    it('should have expireOptionGrants as a method', () => {
-      expect(typeof service.expireOptionGrants).toBe('function');
-    });
-
     it('should have monitorDeadLetterQueues as a method', () => {
       expect(typeof service.monitorDeadLetterQueues).toBe('function');
     });
@@ -433,8 +329,6 @@ describe('ScheduledTasksService', () => {
       // reads the metadata at runtime. We verify the behavior, not the decorator.
       const proto = Object.getPrototypeOf(service);
       expect(proto.computeDailyAuditHashChain).toBeDefined();
-      expect(proto.accrueConvertibleInterest).toBeDefined();
-      expect(proto.expireOptionGrants).toBeDefined();
       expect(proto.monitorDeadLetterQueues).toBeDefined();
     });
   });

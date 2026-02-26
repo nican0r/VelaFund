@@ -1,8 +1,8 @@
 # Company Dataroom Specification
 
-**Topic of Concern**: Document management for the company profile dataroom — upload, storage, download, categorization, and thumbnail generation for investor-facing documents
+**Topic of Concern**: Document management for the company profile dataroom — upload, storage, download, categorization, thumbnail generation, and AI processing for investor-facing documents
 
-**One-Sentence Description**: The system allows company admins to upload, organize, and serve documents (pitch decks, financials, legal documents, etc.) via the company profile dataroom, with categorization, PDF metadata extraction, thumbnail generation, and secure pre-signed URL downloads.
+**One-Sentence Description**: The system allows company admins to upload, organize, and serve documents (pitch decks, financials, legal documents, etc.) via the company profile dataroom, with categorization, PDF metadata extraction, thumbnail generation, secure pre-signed URL downloads, and optional AI processing for text extraction and embedding generation.
 
 ---
 
@@ -15,6 +15,8 @@ Dataroom documents are **manually curated** files uploaded by the company admin 
 - **Due diligence package exports** (auto-generated ZIPs from `reports-analytics.md`)
 
 Documents are stored in a dedicated S3 bucket (`navia-profile-documents`) with SSE-S3 encryption, served via pre-signed URLs with 15-minute expiry. PDF files receive automatic page count extraction and first-page thumbnail generation via a background Bull job.
+
+Uploaded documents can optionally be processed with AI to extract text and generate embeddings for downstream features (e.g., AI-powered Q&A, document search). AI processing is queued asynchronously via Bull and tracked per document with a dedicated status field.
 
 ---
 
@@ -29,6 +31,8 @@ Documents are stored in a dedicated S3 bucket (`navia-profile-documents`) with S
 - **Download via pre-signed URLs**: Authenticated download for company members
 - **Public download for shared profile visitors**: Unauthenticated download through the public profile link, with download tracking
 - **Storage usage indicator**: Visual bar showing used vs. total storage (500 MB limit)
+- **AI processing trigger**: Manual or automatic queuing of documents for AI text extraction and embedding generation
+- **AI processing status tracking**: Per-document status badge showing processing state (Pending, Processing, Completed, Failed)
 
 ### Out of Scope (Post-MVP)
 - **Document reordering**: No drag-and-drop reorder. Documents are ordered by upload date (newest first) within each category
@@ -37,6 +41,7 @@ Documents are stored in a dedicated S3 bucket (`navia-profile-documents`) with S
 - **Bulk upload**: Single file upload per operation
 - **Document versioning**: No version history; delete and re-upload to replace
 - **Access analytics dashboard**: Download tracking is recorded but no analytics UI in MVP
+- **AI-powered Q&A interface**: Text extraction and embeddings are generated but the conversational AI interface is post-MVP
 
 ---
 
@@ -57,6 +62,16 @@ Documents are stored in a dedicated S3 bucket (`navia-profile-documents`) with S
 **I want to** download documents from the dataroom
 **So that** I can review materials offline or share them with my team
 
+### US-4: Process Documents with AI
+**As an** admin user
+**I want to** trigger AI processing on uploaded documents
+**So that** the platform can extract text and generate embeddings for future AI-powered features
+
+### US-5: View AI Processing Status
+**As an** admin user
+**I want to** see the AI processing status of each document
+**So that** I know which documents are ready for AI features and which need attention
+
 ---
 
 ## Frontend Specification
@@ -75,31 +90,31 @@ Both routes render the same `DataroomPage` component with identical functionalit
 ### Dataroom Page Layout
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  h1: Documentos             [+ Upload Document]          │
-│  body-sm: Gerencie os documentos da sua empresa          │
-├─────────────────────────────────────────────────────────┤
-│  Category Tabs:                                          │
-│  [Todos] [Pitch Deck] [Financeiro] [Juridico] [Produto] [Equipe] [Outros] │
-├─────────────────────────────────────────────────────────┤
-│  Storage: 45 MB / 500 MB used                            │
-├─────────────────────────────────────────────────────────┤
-│  Document Grid/List                                      │
-│  ┌────────────────────────────────────────────────────┐ │
-│  │ [Thumbnail] │ Document Name.pdf      │ 2.4 MB     │ │
-│  │  or icon    │ Pitch Deck • 12 pages  │ 20/02/2026 │ │
-│  │             │                         │ [↓] [🗑]   │ │
-│  └────────────────────────────────────────────────────┘ │
-│  ┌────────────────────────────────────────────────────┐ │
-│  │ [Thumbnail] │ Financials_Q4.xlsx     │ 1.1 MB     │ │
-│  │  or icon    │ Financeiro              │ 18/02/2026 │ │
-│  │             │                         │ [↓] [🗑]   │ │
-│  └────────────────────────────────────────────────────┘ │
-├─────────────────────────────────────────────────────────┤
-│  Empty State (when no docs in selected category):        │
-│  "Nenhum documento nesta categoria"                      │
-│  [Upload Document]                                       │
-└─────────────────────────────────────────────────────────┘
++---------------------------------------------------------+
+|  h1: Documentos             [+ Upload Document]          |
+|  body-sm: Gerencie os documentos da sua empresa          |
++----------------------------------------------------------+
+|  Category Tabs:                                          |
+|  [Todos] [Pitch Deck] [Financeiro] [Juridico] [Produto] [Equipe] [Outros] |
++----------------------------------------------------------+
+|  Storage: 45 MB / 500 MB used                            |
++----------------------------------------------------------+
+|  Document Grid/List                                      |
+|  +----------------------------------------------------+  |
+|  | [Thumbnail] | Document Name.pdf      | 2.4 MB     |  |
+|  |  or icon    | Pitch Deck * 12 pages  | 20/02/2026 |  |
+|  |             | [AI: Completed]        | [DL] [DEL] |  |
+|  +----------------------------------------------------+  |
+|  +----------------------------------------------------+  |
+|  | [Thumbnail] | Financials_Q4.xlsx     | 1.1 MB     |  |
+|  |  or icon    | Financeiro             | 18/02/2026 |  |
+|  |             | [AI: Pending]          | [DL] [DEL] |  |
+|  +----------------------------------------------------+  |
++----------------------------------------------------------+
+|  Empty State (when no docs in selected category):        |
+|  "Nenhum documento nesta categoria"                      |
+|  [Upload Document]                                       |
++----------------------------------------------------------+
 ```
 
 **Layout details**:
@@ -114,28 +129,28 @@ Both routes render the same `DataroomPage` component with identical functionalit
 Triggered by the "+ Upload Document" button. Uses shadcn/ui `Dialog`.
 
 ```
-┌────────────────────────────────────────┐
-│  Upload Document                    [X] │
-├────────────────────────────────────────┤
-│  ┌──────────────────────────────────┐  │
-│  │                                   │  │
-│  │  [cloud upload icon]              │  │
-│  │  Arraste um arquivo ou clique     │  │
-│  │  para selecionar                  │  │
-│  │                                   │  │
-│  │  PDF, PNG, JPG, XLSX, PPTX, DOCX │  │
-│  │  Maximo 25 MB                     │  │
-│  │                                   │  │
-│  └──────────────────────────────────┘  │
-│                                         │
-│  Category: [Dropdown selector]          │
-│  Name: [Auto-filled from filename]      │
-│                                         │
-│  ── Upload Progress ──                  │
-│  [████████████░░░░░░░░] 65%            │
-│                                         │
-│  [Cancel]                   [Upload]    │
-└────────────────────────────────────────┘
++----------------------------------------+
+|  Upload Document                    [X] |
++----------------------------------------+
+|  +----------------------------------+  |
+|  |                                   |  |
+|  |  [cloud upload icon]              |  |
+|  |  Arraste um arquivo ou clique     |  |
+|  |  para selecionar                  |  |
+|  |                                   |  |
+|  |  PDF, PNG, JPG, XLSX, PPTX, DOCX |  |
+|  |  Maximo 25 MB                     |  |
+|  |                                   |  |
+|  +----------------------------------+  |
+|                                         |
+|  Category: [Dropdown selector]          |
+|  Name: [Auto-filled from filename]      |
+|                                         |
+|  -- Upload Progress --                  |
+|  [xxxxxxxxxxxx--------] 65%            |
+|                                         |
+|  [Cancel]                   [Upload]    |
++----------------------------------------+
 ```
 
 **Upload dialog behavior**:
@@ -154,6 +169,8 @@ Triggered by the "+ Upload Document" button. Uses shadcn/ui `Dialog`.
    - On failure: error toast shown (file type, size, or storage limit error), dialog stays open for retry
 7. "Cancel" button closes the dialog and aborts any in-progress upload
 
+**Auto AI processing**: If `autoProcessWithAI` is enabled on the CompanyProfile (default true), the uploaded document is automatically queued for AI processing after successful upload. The document appears in the list with an AI status badge of "Pending" immediately.
+
 **Drop zone states**:
 - Default: dashed `gray-300` border, `gray-50` background, cloud upload icon in `gray-400`
 - Drag hover: dashed `blue-600` border, `blue-50` background, icon color `blue-600`
@@ -165,12 +182,12 @@ Triggered by the "+ Upload Document" button. Uses shadcn/ui `Dialog`.
 Each document is displayed as a horizontal card with the following layout:
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  ┌──────────┐  Document Name.pdf                 2,4 MB    │
-│  │ Thumbnail │  [Pitch Deck badge] • 12 paginas  20/02/2026│
-│  │  64x64    │                                   [↓] [🗑]  │
-│  └──────────┘                                               │
-└─────────────────────────────────────────────────────────────┘
++-------------------------------------------------------------+
+|  +----------+  Document Name.pdf                 2,4 MB    |
+|  | Thumbnail |  [Pitch Deck badge] * 12 paginas  20/02/2026|
+|  |  64x64    |  [AI: Completed]                  [DL] [DEL]|
+|  +----------+                                               |
++-------------------------------------------------------------+
 ```
 
 **Thumbnail/icon** (64x64px, `radius-md`):
@@ -184,12 +201,14 @@ Each document is displayed as a horizontal card with the following layout:
 **Metadata display**:
 - **Document name**: `body` (14px), `gray-800`, truncated with ellipsis if too long (max 1 line)
 - **Category badge**: Colored pill badge (see design-system.md Section 6.5) using the category label
-- **Page count** (PDFs only): " • {n} paginas" appended after the category badge, `body-sm`, `gray-500`
+- **Page count** (PDFs only): " * {n} paginas" appended after the category badge, `body-sm`, `gray-500`
+- **AI processing status badge**: Displayed on the second line below the category badge (see [AI Processing Status Badges](#ai-processing-status-badges))
 - **File size**: Formatted in Brazilian style ("2,4 MB"), `body-sm`, `gray-500`, right-aligned
 - **Upload date**: `dd/MM/yyyy` format, `body-sm`, `gray-500`, right-aligned
 
 **Action buttons** (right side, visible on hover for desktop, always visible on mobile):
 - **Download**: Ghost icon button with `Download` Lucide icon. On click, fetches pre-signed URL via `useDocumentDownloadUrl` and opens in a new tab.
+- **Process with AI**: Ghost icon button with `Sparkles` Lucide icon in `gray-500`, hover `blue-600`. Only visible when `aiProcessingStatus` is `PENDING` or `FAILED`. Only visible to ADMIN and FINANCE roles. On click, calls `useProcessDocumentWithAI` mutation.
 - **Delete**: Ghost icon button with `Trash2` Lucide icon in `gray-500`, hover `destructive`. Only visible to ADMIN and FINANCE roles. On click, opens the delete confirmation dialog.
 
 **Category badge colors**:
@@ -202,20 +221,37 @@ Each document is displayed as a horizontal card with the following layout:
 | Equipe | `blue-100` | `blue-700` |
 | Outros | `gray-100` | `gray-600` |
 
+### AI Processing Status Badges
+
+Each document displays an AI processing status badge below the category badge. The badge is only visible to authenticated company members (not on the public profile view).
+
+| Status | Background | Text/Icon | Display |
+|--------|-----------|-----------|---------|
+| `PENDING` | `gray-100` | `gray-500` text, no icon | "IA: Pendente" |
+| `PROCESSING` | `blue-50` | `blue-600` text, animated spinner icon (16px) | "IA: Processando..." |
+| `COMPLETED` | `green-100` | `green-700` text, `Check` Lucide icon (14px) | "IA: Concluido" |
+| `FAILED` | `red-50` (`#FEE2E2`) | `destructive-text` (`#991B1B`), `X` Lucide icon (14px) | "IA: Falhou" |
+
+**Badge behavior**:
+- Badge size: `caption` (12px), weight 500, padding `2px 8px`, `radius-full` (pill)
+- When status is `PROCESSING`, the spinner animates continuously. The frontend polls the document list every 5 seconds while any document in the list has `PROCESSING` status.
+- When status is `FAILED`, hovering the badge shows a tooltip: "O processamento falhou. Clique no botao de IA para tentar novamente."
+- When status is `COMPLETED`, the badge also shows the chunk count if available: "IA: Concluido (24 chunks)"
+
 ### Delete Confirmation Dialog
 
 Uses shadcn/ui `AlertDialog`.
 
 ```
-┌────────────────────────────────────────┐
-│  Excluir Documento                      │
-│                                         │
-│  Tem certeza que deseja excluir         │
-│  "LuminaTech_PitchDeck.pdf"?            │
-│  Esta acao nao pode ser desfeita.       │
-│                                         │
-│  [Cancelar]          [Excluir] (red)    │
-└────────────────────────────────────────┘
++----------------------------------------+
+|  Excluir Documento                      |
+|                                         |
+|  Tem certeza que deseja excluir         |
+|  "LuminaTech_PitchDeck.pdf"?            |
+|  Esta acao nao pode ser desfeita.       |
+|                                         |
+|  [Cancelar]          [Excluir] (red)    |
++----------------------------------------+
 ```
 
 - Document name displayed in bold within the confirmation message
@@ -240,6 +276,8 @@ The public profile page (`/p/:slug`) includes a read-only document section.
 - No "+ Upload Document" button
 - No delete buttons on document items
 - No storage usage bar
+- No AI processing status badges (AI status is internal only)
+- No "Process with AI" buttons
 - Download button is always visible (not hover-only)
 - Download triggers the public download endpoint (`GET /api/v1/profiles/:slug/documents/:documentId/download`) which records a `ProfileDocumentDownload` event
 
@@ -252,7 +290,7 @@ The public profile page (`/p/:slug`) includes a read-only document section.
 | `DataroomPage` | `frontend/src/app/(dashboard)/companies/[companyId]/documents/page.tsx` | Standalone page wrapper, fetches data and renders the document management UI |
 | `DocumentCategoryTabs` | `frontend/src/components/dataroom/DocumentCategoryTabs.tsx` | Horizontal tab bar for filtering by category. Uses shadcn/ui `Tabs`. Tabs: Todos, Pitch Deck, Financeiro, Juridico, Produto, Equipe, Outros |
 | `DocumentList` | `frontend/src/components/dataroom/DocumentList.tsx` | Renders the list of `DocumentItem` components, handles grouping by category when "Todos" tab is active |
-| `DocumentItem` | `frontend/src/components/dataroom/DocumentItem.tsx` | Single document card with thumbnail, metadata, and action buttons |
+| `DocumentItem` | `frontend/src/components/dataroom/DocumentItem.tsx` | Single document card with thumbnail, metadata, AI status badge, and action buttons |
 | `DocumentUploadDialog` | `frontend/src/components/dataroom/DocumentUploadDialog.tsx` | Modal dialog containing the drop zone, category selector, name input, and upload progress |
 | `DocumentDropZone` | `frontend/src/components/dataroom/DocumentDropZone.tsx` | Drag-and-drop file area with visual states (default, hover, selected, error). Uses native HTML5 drag events |
 | `DocumentUploadProgress` | `frontend/src/components/dataroom/DocumentUploadProgress.tsx` | Progress bar with percentage label, shown during active upload |
@@ -260,6 +298,7 @@ The public profile page (`/p/:slug`) includes a read-only document section.
 | `DocumentTypeIcon` | `frontend/src/components/dataroom/DocumentTypeIcon.tsx` | Maps MIME type to the appropriate Lucide icon and color |
 | `StorageUsageBar` | `frontend/src/components/dataroom/StorageUsageBar.tsx` | Progress bar showing storage used vs. 500 MB limit with color thresholds |
 | `DocumentEmptyState` | `frontend/src/components/dataroom/DocumentEmptyState.tsx` | Empty state illustration with message and upload CTA button |
+| `AIProcessingBadge` | `frontend/src/components/dataroom/AIProcessingBadge.tsx` | Pill badge showing AI processing status with icon and label. Handles all four states (PENDING, PROCESSING, COMPLETED, FAILED) |
 
 ### TanStack Query Hooks
 
@@ -273,6 +312,7 @@ The public profile page (`/p/:slug`) includes a read-only document section.
  * Returns: ProfileDocument[]
  * Query key: ['profile-documents', companyId]
  * Refetch: on window focus, after upload/delete mutations
+ * Polling: refetchInterval 5000ms when any document has aiProcessingStatus === 'PROCESSING'
  */
 
 /**
@@ -300,6 +340,14 @@ The public profile page (`/p/:slug`) includes a read-only document section.
  * On success: open downloadUrl in new tab via window.open()
  * No caching (staleTime: 0) — pre-signed URLs expire
  */
+
+/**
+ * useProcessDocumentWithAI(companyId: string)
+ * Mutation: POST /api/v1/companies/:companyId/profile/documents/:documentId/process
+ * onSuccess: invalidate ['profile-documents', companyId], show info toast "Documento enviado para processamento"
+ * onError: show error toast with messageKey translation
+ * Returns 202 Accepted — processing happens asynchronously
+ */
 ```
 
 ### Loading States
@@ -308,6 +356,7 @@ The public profile page (`/p/:slug`) includes a read-only document section.
 - **Upload in progress**: Progress bar with percentage inside the upload dialog. "Upload" button disabled with spinner. Drop zone shows the selected filename.
 - **Download in progress**: Download icon button shows a spinner while the pre-signed URL is being fetched (typically < 200ms).
 - **Delete in progress**: "Excluir" button in the confirmation dialog shows a spinner and is disabled until the mutation completes.
+- **AI processing trigger**: "Process with AI" icon button shows a brief spinner while the POST request completes. On success, the AI status badge transitions from PENDING/FAILED to PROCESSING.
 
 ### Error States
 
@@ -320,6 +369,9 @@ The public profile page (`/p/:slug`) includes a read-only document section.
 | Delete failure | Error toast: "Falha ao excluir documento. Tente novamente." | User retries delete |
 | Download URL generation failure | Error toast: "Falha ao gerar link de download. Tente novamente." | User retries download |
 | Document list fetch failure | Error state in document list area with retry button | User clicks retry |
+| AI processing trigger failure | Error toast: "Falha ao iniciar processamento de IA. Tente novamente." | User retries via "Process with AI" button |
+| AI document unsupported type | Error toast: "Tipo de arquivo nao suportado para processamento de IA" | User cannot process this file type; only PDF, DOCX, PPTX, XLSX supported |
+| AI processing already in progress | Warning toast: "Documento ja esta sendo processado" | User waits for current processing to complete |
 
 ### Empty States
 
@@ -367,6 +419,7 @@ All user-facing strings must be added to both `messages/pt-BR.json` and `message
 | `dataroom.document.page` | 1 pagina |
 | `dataroom.document.download` | Baixar |
 | `dataroom.document.delete` | Excluir |
+| `dataroom.document.processAI` | Processar com IA |
 | `dataroom.delete.title` | Excluir Documento |
 | `dataroom.delete.message` | Tem certeza que deseja excluir "{name}"? Esta acao nao pode ser desfeita. |
 | `dataroom.delete.confirm` | Excluir |
@@ -379,6 +432,16 @@ All user-facing strings must be added to both `messages/pt-BR.json` and `message
 | `dataroom.empty.action` | Upload de Documento |
 | `dataroom.empty.categoryMessage` | Nenhum documento nesta categoria |
 | `dataroom.download.error` | Falha ao gerar link de download. Tente novamente. |
+| `dataroom.ai.pending` | IA: Pendente |
+| `dataroom.ai.processing` | IA: Processando... |
+| `dataroom.ai.completed` | IA: Concluido |
+| `dataroom.ai.completedWithChunks` | IA: Concluido ({count} chunks) |
+| `dataroom.ai.failed` | IA: Falhou |
+| `dataroom.ai.failedTooltip` | O processamento falhou. Clique no botao de IA para tentar novamente. |
+| `dataroom.ai.queued` | Documento enviado para processamento |
+| `dataroom.ai.triggerError` | Falha ao iniciar processamento de IA. Tente novamente. |
+| `dataroom.ai.unsupportedType` | Tipo de arquivo nao suportado para processamento de IA |
+| `dataroom.ai.alreadyProcessing` | Documento ja esta sendo processado |
 
 **EN translations**:
 
@@ -409,6 +472,7 @@ All user-facing strings must be added to both `messages/pt-BR.json` and `message
 | `dataroom.document.page` | 1 page |
 | `dataroom.document.download` | Download |
 | `dataroom.document.delete` | Delete |
+| `dataroom.document.processAI` | Process with AI |
 | `dataroom.delete.title` | Delete Document |
 | `dataroom.delete.message` | Are you sure you want to delete "{name}"? This action cannot be undone. |
 | `dataroom.delete.confirm` | Delete |
@@ -421,16 +485,28 @@ All user-facing strings must be added to both `messages/pt-BR.json` and `message
 | `dataroom.empty.action` | Upload Document |
 | `dataroom.empty.categoryMessage` | No documents in this category |
 | `dataroom.download.error` | Failed to generate download link. Please try again. |
+| `dataroom.ai.pending` | AI: Pending |
+| `dataroom.ai.processing` | AI: Processing... |
+| `dataroom.ai.completed` | AI: Completed |
+| `dataroom.ai.completedWithChunks` | AI: Completed ({count} chunks) |
+| `dataroom.ai.failed` | AI: Failed |
+| `dataroom.ai.failedTooltip` | Processing failed. Click the AI button to try again. |
+| `dataroom.ai.queued` | Document queued for AI processing |
+| `dataroom.ai.triggerError` | Failed to start AI processing. Please try again. |
+| `dataroom.ai.unsupportedType` | File type not supported for AI processing |
+| `dataroom.ai.alreadyProcessing` | Document is already being processed |
 
 ### Accessibility Requirements
 
 - Upload drop zone is keyboard accessible: focusable with `tabindex="0"`, activates file browser on `Enter` or `Space`
 - Category tabs support keyboard navigation with arrow keys
-- All action buttons have `aria-label` attributes (e.g., `aria-label="Download Document Name.pdf"`)
+- All action buttons have `aria-label` attributes (e.g., `aria-label="Download Document Name.pdf"`, `aria-label="Process Document Name.pdf with AI"`)
 - Delete confirmation dialog traps focus when open
 - Upload progress is announced to screen readers via `aria-live="polite"` region
 - File type icons have `aria-hidden="true"` (decorative, the file name provides context)
 - Empty states use `role="status"` for screen reader announcement
+- AI processing status badge has `aria-label` describing the current state (e.g., `aria-label="AI processing status: Completed"`)
+- When AI processing status changes from PROCESSING to COMPLETED or FAILED, the change is announced via `aria-live="polite"`
 
 ---
 
@@ -455,12 +531,32 @@ All user-facing strings must be added to both `messages/pt-BR.json` and `message
   - `order`: display order within category (0-indexed)
   - `uploadedAt`: timestamp
   - `uploadedById`: user who uploaded the file
+  - `aiProcessingStatus`: current AI processing state (PENDING, PROCESSING, COMPLETED, FAILED)
+  - `aiProcessedAt`: timestamp when AI processing completed (null if not yet processed)
+  - `extractedTextKey`: S3 key for extracted text file (null if not yet processed)
+  - `chunkCount`: number of embedding chunks generated (null if not yet processed)
 - Allowed file types: PDF, PNG, JPG, JPEG, XLSX, PPTX, DOCX
 - Maximum file size: 25 MB per file
 - Maximum total storage per company profile: 500 MB
 - System MUST generate a thumbnail preview for PDF first pages
 - System MUST extract page count from uploaded PDFs
 - Documents are served via pre-signed S3 URLs (15-minute expiry) — never directly public
+
+### FR-5: AI Document Processing
+- System MUST support queuing documents for AI text extraction and embedding generation
+- AI processing is triggered either:
+  - **Automatically** on upload, when `CompanyProfile.autoProcessWithAI` is `true` (default)
+  - **Manually** via the "Process with AI" button on individual documents
+- Supported file types for AI processing: PDF, DOCX, PPTX, XLSX (image files PNG/JPG are not supported for text extraction)
+- AI processing is asynchronous via Bull queue (`ai-document-processing`)
+- Processing pipeline:
+  1. Extract raw text from the document (PDF text extraction, DOCX/PPTX/XLSX parsing)
+  2. Store extracted text in S3 (`navia-profile-documents/extracted/{documentId}.txt`)
+  3. Chunk text into segments suitable for embedding (target ~500 tokens per chunk)
+  4. Generate embeddings for each chunk (embedding model and storage are handled by downstream AI services)
+  5. Update `ProfileDocument` with `aiProcessingStatus = COMPLETED`, `aiProcessedAt`, `extractedTextKey`, and `chunkCount`
+- On processing failure: set `aiProcessingStatus = FAILED`, log the error, allow manual retry
+- Deleting a document also deletes its extracted text from S3 and any associated embeddings
 
 ---
 
@@ -480,6 +576,10 @@ interface ProfileDocument {
   pageCount: number | null;            // Page count (PDFs only)
   thumbnailKey: string | null;         // S3 key for PDF first-page thumbnail
   order: number;                       // Display order within category
+  aiProcessingStatus: AIProcessingStatus; // AI processing state
+  aiProcessedAt: Date | null;          // When AI processing completed
+  extractedTextKey: string | null;     // S3 key for extracted text file
+  chunkCount: number | null;           // Number of embedding chunks generated
   uploadedById: string;                // Foreign key to User
   uploadedAt: Date;
   createdAt: Date;
@@ -493,6 +593,13 @@ enum DocumentCategory {
   PRODUCT = 'PRODUCT',
   TEAM = 'TEAM',
   OTHER = 'OTHER',
+}
+
+enum AIProcessingStatus {
+  PENDING = 'PENDING',
+  PROCESSING = 'PROCESSING',
+  COMPLETED = 'COMPLETED',
+  FAILED = 'FAILED',
 }
 ```
 
@@ -509,30 +616,46 @@ interface ProfileDocumentDownload {
 }
 ```
 
+### CompanyProfile Addition
+
+The following field is added to the existing `CompanyProfile` model (defined in `company-profile.md`):
+
+```typescript
+interface CompanyProfile {
+  // ... existing fields ...
+  autoProcessWithAI: boolean;          // Whether to auto-queue docs for AI processing on upload (default true)
+}
+```
+
 ### Prisma Schema
 
 ```prisma
 model ProfileDocument {
-  id           String           @id @default(uuid())
-  profileId    String           @map("profile_id")
-  name         String
-  category     DocumentCategory
-  fileKey      String           @map("file_key")
-  fileSize     Int              @map("file_size")
-  mimeType     String           @map("mime_type")
-  pageCount    Int?             @map("page_count")
-  thumbnailKey String?          @map("thumbnail_key")
-  order        Int              @default(0)
-  uploadedById String           @map("uploaded_by_id")
-  uploadedAt   DateTime         @map("uploaded_at")
-  createdAt    DateTime         @default(now()) @map("created_at")
-  updatedAt    DateTime         @updatedAt @map("updated_at")
+  id                  String              @id @default(uuid())
+  profileId           String              @map("profile_id")
+  name                String
+  category            DocumentCategory
+  fileKey             String              @map("file_key")
+  fileSize            Int                 @map("file_size")
+  mimeType            String              @map("mime_type")
+  pageCount           Int?                @map("page_count")
+  thumbnailKey        String?             @map("thumbnail_key")
+  order               Int                 @default(0)
+  aiProcessingStatus  AIProcessingStatus  @default(PENDING) @map("ai_processing_status")
+  aiProcessedAt       DateTime?           @map("ai_processed_at")
+  extractedTextKey    String?             @map("extracted_text_key")
+  chunkCount          Int?                @map("chunk_count")
+  uploadedById        String              @map("uploaded_by_id")
+  uploadedAt          DateTime            @map("uploaded_at")
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
 
   profile      CompanyProfile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
   uploadedBy   User             @relation(fields: [uploadedById], references: [id])
   downloads    ProfileDocumentDownload[]
 
   @@index([profileId, category, order])
+  @@index([profileId, aiProcessingStatus])
   @@map("profile_documents")
 }
 
@@ -559,6 +682,22 @@ enum DocumentCategory {
   TEAM
   OTHER
 }
+
+enum AIProcessingStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+```
+
+**CompanyProfile schema addition** (add to existing model in `company-profile.md`):
+
+```prisma
+model CompanyProfile {
+  // ... existing fields ...
+  autoProcessWithAI Boolean @default(true) @map("auto_process_with_ai")
+}
 ```
 
 ---
@@ -568,7 +707,7 @@ enum DocumentCategory {
 ### Document Upload
 
 #### POST /api/v1/companies/:companyId/profile/documents
-**Description**: Upload a document to the dataroom.
+**Description**: Upload a document to the dataroom. If `autoProcessWithAI` is enabled on the profile, the document is automatically queued for AI processing after upload.
 
 **Auth**: Required. User must be ADMIN or FINANCE.
 
@@ -589,6 +728,9 @@ enum DocumentCategory {
     "mimeType": "application/pdf",
     "pageCount": 12,
     "thumbnailUrl": "https://s3.amazonaws.com/navia/thumbnails/doc_001.png",
+    "aiProcessingStatus": "PENDING",
+    "aiProcessedAt": null,
+    "chunkCount": null,
     "order": 0,
     "uploadedAt": "2026-02-20T15:00:00Z"
   }
@@ -603,7 +745,7 @@ enum DocumentCategory {
 ---
 
 #### DELETE /api/v1/companies/:companyId/profile/documents/:documentId
-**Description**: Remove a document from the dataroom. Deletes the file from S3.
+**Description**: Remove a document from the dataroom. Deletes the file from S3, thumbnail from S3, and extracted text from S3 (if present).
 
 **Auth**: Required. User must be ADMIN or FINANCE.
 
@@ -648,6 +790,35 @@ enum DocumentCategory {
 
 ---
 
+#### POST /api/v1/companies/:companyId/profile/documents/:documentId/process
+**Description**: Queue a document for AI processing (text extraction and embedding generation). Returns immediately with 202 Accepted. Processing happens asynchronously via Bull queue.
+
+**Auth**: Required. User must be ADMIN or FINANCE.
+
+**Validation**:
+- Document must exist and belong to the company's profile
+- Document MIME type must be supported for AI processing (PDF, DOCX, PPTX, XLSX)
+- Document must not already be in `PROCESSING` status
+
+**Response** (202 Accepted):
+```json
+{
+  "success": true,
+  "data": {
+    "id": "doc_001",
+    "aiProcessingStatus": "PROCESSING",
+    "message": "Document queued for AI processing"
+  }
+}
+```
+
+**Error Responses**:
+- `404 Not Found` — Document not found or not in this company
+- `409 Conflict` — Document is already being processed (`AI_PROCESSING_IN_PROGRESS`)
+- `422 Unprocessable Entity` — File type not supported for AI processing (`AI_DOCUMENT_UNSUPPORTED_TYPE`)
+
+---
+
 ### Public Document Download
 
 #### GET /api/v1/profiles/:slug/documents/:documentId/download
@@ -686,6 +857,17 @@ enum DocumentCategory {
 - PDF page count is extracted server-side using a PDF parsing library
 - Thumbnails are generated asynchronously via Bull job after upload
 
+### BR-10: AI Processing Eligibility
+- Only documents with MIME types `application/pdf`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document` (DOCX), `application/vnd.openxmlformats-officedocument.presentationml.presentation` (PPTX), and `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` (XLSX) are eligible for AI processing
+- Image files (PNG, JPG, JPEG) are not supported for AI text extraction in MVP
+- Re-processing a document that is already `COMPLETED` is allowed — it overwrites the previous extracted text and embeddings
+- Re-processing a document that is `PROCESSING` is blocked with a 409 Conflict
+
+### BR-11: Auto AI Processing
+- When `CompanyProfile.autoProcessWithAI` is `true` (default), uploading a document automatically queues it for AI processing if the file type is eligible
+- When `autoProcessWithAI` is `false`, documents are uploaded with `aiProcessingStatus = PENDING` and must be manually triggered
+- Ineligible file types (images) are always uploaded with `aiProcessingStatus = PENDING` regardless of the auto-process setting, since they cannot be processed
+
 ---
 
 ## Edge Cases & Error Handling
@@ -702,26 +884,41 @@ enum DocumentCategory {
 **Scenario**: Uploaded PDF is corrupt or password-protected, thumbnail generation fails.
 **Handling**: Document is stored successfully. Thumbnail is null. Frontend shows a generic PDF icon instead.
 
+### EC-6: AI Processing Fails
+**Scenario**: AI text extraction fails due to corrupt/encrypted document or downstream service error.
+**Handling**: `aiProcessingStatus` is set to `FAILED`. The error is logged to the Bull job's failure metadata. The user sees a "Failed" badge and can retry via the "Process with AI" button. The document remains fully functional for download regardless of AI processing status.
+
+### EC-7: Document Deleted During AI Processing
+**Scenario**: User deletes a document while it is being processed by AI.
+**Handling**: The document is deleted from the database and S3 immediately. When the AI processing Bull job completes and tries to update the document, it finds no record and silently discards the result (job completes without error). Any partially written extracted text in S3 is cleaned up by the delete operation if the key was already set.
+
+### EC-8: Auto AI Processing with Unsupported File Type
+**Scenario**: User uploads a PNG file with `autoProcessWithAI` enabled.
+**Handling**: The document is uploaded successfully. Since PNG is not eligible for AI processing, the `aiProcessingStatus` remains `PENDING` and no job is queued. The "Process with AI" button on the document will show the unsupported type error if clicked manually.
+
 ---
 
 ## Dependencies
 
 ### Internal Dependencies
-- **company-profile.md**: ProfileDocument belongs to CompanyProfile (foreign key relationship)
+- **company-profile.md**: ProfileDocument belongs to CompanyProfile (foreign key relationship); `autoProcessWithAI` field on CompanyProfile
 - **user-permissions.md**: ADMIN and FINANCE role checks for document management
 - **authentication.md**: Authenticated endpoints require Privy JWT; public download respects profile access controls
-- **audit-logging.md**: Document upload and deletion events are audit-logged
+- **audit-logging.md**: Document upload, deletion, and AI processing events are audit-logged
 - **security.md**: File upload validation (MIME + magic bytes), EXIF stripping, S3 pre-signed URLs
 
 ### External Dependencies
-- **AWS S3**: Document storage (`navia-profile-documents` bucket), thumbnail storage
+- **AWS S3**: Document storage (`navia-profile-documents` bucket), thumbnail storage, extracted text storage
   - SSE-S3 encryption (not KMS — profile documents are not high-sensitivity PII)
   - Pre-signed URLs with 15-minute expiry for downloads
   - Lifecycle rule: delete incomplete multipart uploads after 24 hours
-- **Bull (Redis-backed)**: PDF thumbnail generation queue
-  - Queue: `profile-thumbnails` — Retry: 2 attempts, 5-second backoff
+  - Extracted text stored under `extracted/` prefix in the same bucket
+- **Bull (Redis-backed)**: PDF thumbnail generation queue and AI document processing queue
+  - Queue `profile-thumbnails`: Retry 2 attempts, 5-second backoff
+  - Queue `ai-document-processing`: Retry 3 attempts, exponential backoff (5s, 15s, 45s), 5-minute job timeout
 - **sharp**: Image processing for EXIF stripping on image uploads
 - **pdf-lib or pdf-parse**: PDF page count extraction and thumbnail generation
+- **pdf-parse / mammoth / xlsx**: Text extraction from PDF, DOCX, XLSX files for AI processing
 
 ---
 
@@ -739,6 +936,13 @@ import { Queue } from 'bull';
 import { PrismaService } from '../prisma/prisma.service';
 import * as pdfParse from 'pdf-parse';
 
+const AI_PROCESSABLE_MIME_TYPES = [
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+];
+
 @Injectable()
 export class ProfileDocumentService {
   private s3: S3Client;
@@ -747,6 +951,7 @@ export class ProfileDocumentService {
   constructor(
     private prisma: PrismaService,
     @InjectQueue('profile-thumbnails') private thumbnailQueue: Queue,
+    @InjectQueue('ai-document-processing') private aiProcessingQueue: Queue,
   ) {
     this.s3 = new S3Client({ region: 'sa-east-1' });
   }
@@ -806,6 +1011,7 @@ export class ProfileDocumentService {
         fileSize: file.size,
         mimeType: file.mimetype,
         pageCount,
+        aiProcessingStatus: 'PENDING',
         order: (maxOrder._max.order ?? -1) + 1,
         uploadedById: userId,
         uploadedAt: new Date(),
@@ -818,6 +1024,19 @@ export class ProfileDocumentService {
         documentId: document.id,
         fileKey,
       });
+    }
+
+    // Auto-queue AI processing if enabled and file type is supported
+    const profile = await this.prisma.companyProfile.findUnique({
+      where: { id: profileId },
+      select: { autoProcessWithAI: true },
+    });
+
+    if (
+      profile?.autoProcessWithAI &&
+      AI_PROCESSABLE_MIME_TYPES.includes(file.mimetype)
+    ) {
+      await this.queueAIProcessing(document.id, fileKey, file.mimetype);
     }
 
     return document;
@@ -839,6 +1058,14 @@ export class ProfileDocumentService {
       await this.s3.send(new DeleteObjectCommand({
         Bucket: this.bucket,
         Key: document.thumbnailKey,
+      }));
+    }
+
+    // Delete extracted text from S3 if exists
+    if (document.extractedTextKey) {
+      await this.s3.send(new DeleteObjectCommand({
+        Bucket: this.bucket,
+        Key: document.extractedTextKey,
       }));
     }
 
@@ -909,6 +1136,199 @@ export class ProfileDocumentService {
       where: { profileId },
       orderBy: [{ category: 'asc' }, { order: 'asc' }],
     });
+  }
+
+  async triggerAIProcessing(documentId: string): Promise<void> {
+    const document = await this.prisma.profileDocument.findUniqueOrThrow({
+      where: { id: documentId },
+    });
+
+    // Validate MIME type is supported for AI processing
+    if (!AI_PROCESSABLE_MIME_TYPES.includes(document.mimeType)) {
+      throw new BusinessRuleException(
+        'AI_DOCUMENT_UNSUPPORTED_TYPE',
+        'errors.ai.documentUnsupportedType',
+        { mimeType: document.mimeType },
+      );
+    }
+
+    // Prevent re-processing if already in progress
+    if (document.aiProcessingStatus === 'PROCESSING') {
+      throw new ConflictException(
+        'AI_PROCESSING_IN_PROGRESS',
+        'errors.ai.processingInProgress',
+        { documentId },
+      );
+    }
+
+    await this.queueAIProcessing(document.id, document.fileKey, document.mimeType);
+  }
+
+  private async queueAIProcessing(
+    documentId: string,
+    fileKey: string,
+    mimeType: string,
+  ): Promise<void> {
+    // Update status to PROCESSING
+    await this.prisma.profileDocument.update({
+      where: { id: documentId },
+      data: { aiProcessingStatus: 'PROCESSING' },
+    });
+
+    // Queue the job
+    await this.aiProcessingQueue.add(
+      'process-document',
+      {
+        documentId,
+        fileKey,
+        mimeType,
+      },
+      {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 5000, // 5s, 15s, 45s
+        },
+        timeout: 5 * 60 * 1000, // 5 minutes
+      },
+    );
+  }
+}
+```
+
+### AI Document Processing Worker
+
+```typescript
+// /backend/src/profile/ai-document-processing.processor.ts
+import { Processor, Process } from '@nestjs/bull';
+import { Job } from 'bull';
+import { PrismaService } from '../prisma/prisma.service';
+import { S3Client, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+
+@Processor('ai-document-processing')
+export class AIDocumentProcessingProcessor {
+  private s3: S3Client;
+  private bucket = 'navia-profile-documents';
+
+  constructor(private prisma: PrismaService) {
+    this.s3 = new S3Client({ region: 'sa-east-1' });
+  }
+
+  @Process('process-document')
+  async handleProcessDocument(job: Job<{
+    documentId: string;
+    fileKey: string;
+    mimeType: string;
+  }>) {
+    const { documentId, fileKey, mimeType } = job.data;
+
+    try {
+      // Verify document still exists (may have been deleted during processing)
+      const document = await this.prisma.profileDocument.findUnique({
+        where: { id: documentId },
+      });
+      if (!document) {
+        return; // Document deleted, silently discard
+      }
+
+      // 1. Download file from S3
+      const fileResponse = await this.s3.send(new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: fileKey,
+      }));
+      const fileBuffer = Buffer.from(await fileResponse.Body.transformToByteArray());
+
+      // 2. Extract text based on MIME type
+      const extractedText = await this.extractText(fileBuffer, mimeType);
+
+      // 3. Store extracted text in S3
+      const extractedTextKey = `extracted/${documentId}.txt`;
+      await this.s3.send(new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: extractedTextKey,
+        Body: extractedText,
+        ContentType: 'text/plain; charset=utf-8',
+      }));
+
+      // 4. Chunk text for embeddings
+      const chunks = this.chunkText(extractedText);
+
+      // 5. Generate embeddings (delegate to embedding service)
+      // await this.embeddingService.generateAndStore(documentId, chunks);
+
+      // 6. Update document record
+      await this.prisma.profileDocument.update({
+        where: { id: documentId },
+        data: {
+          aiProcessingStatus: 'COMPLETED',
+          aiProcessedAt: new Date(),
+          extractedTextKey,
+          chunkCount: chunks.length,
+        },
+      });
+    } catch (error) {
+      // Update status to FAILED
+      await this.prisma.profileDocument.update({
+        where: { id: documentId },
+        data: { aiProcessingStatus: 'FAILED' },
+      }).catch(() => {
+        // Document may have been deleted — ignore update failure
+      });
+
+      throw error; // Re-throw to trigger Bull retry
+    }
+  }
+
+  private async extractText(buffer: Buffer, mimeType: string): Promise<string> {
+    switch (mimeType) {
+      case 'application/pdf':
+        // Use pdf-parse for text extraction
+        const pdfData = await require('pdf-parse')(buffer);
+        return pdfData.text;
+      case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+        // Use mammoth for DOCX
+        const mammoth = require('mammoth');
+        const result = await mammoth.extractRawText({ buffer });
+        return result.value;
+      case 'application/vnd.openxmlformats-officedocument.presentationml.presentation':
+        // PPTX extraction (use pptx-parser or similar)
+        // Implementation delegated to a specialized utility
+        return ''; // Placeholder
+      case 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+        // Use xlsx for spreadsheet text extraction
+        const XLSX = require('xlsx');
+        const workbook = XLSX.read(buffer, { type: 'buffer' });
+        const sheets = workbook.SheetNames.map((name: string) =>
+          XLSX.utils.sheet_to_csv(workbook.Sheets[name]),
+        );
+        return sheets.join('\n\n');
+      default:
+        throw new Error(`Unsupported MIME type for text extraction: ${mimeType}`);
+    }
+  }
+
+  private chunkText(text: string, targetTokens: number = 500): string[] {
+    // Simple chunking by paragraphs, targeting ~500 tokens per chunk
+    // A more sophisticated implementation may use recursive character splitting
+    const paragraphs = text.split(/\n\s*\n/);
+    const chunks: string[] = [];
+    let currentChunk = '';
+
+    for (const paragraph of paragraphs) {
+      const estimatedTokens = (currentChunk + paragraph).length / 4; // rough estimate
+      if (estimatedTokens > targetTokens && currentChunk.length > 0) {
+        chunks.push(currentChunk.trim());
+        currentChunk = paragraph;
+      } else {
+        currentChunk += '\n\n' + paragraph;
+      }
+    }
+
+    if (currentChunk.trim().length > 0) {
+      chunks.push(currentChunk.trim());
+    }
+
+    return chunks;
   }
 }
 ```
@@ -985,6 +1405,23 @@ export class ProfileDocumentController {
     return { downloadUrl: url, expiresIn: 900 };
   }
 
+  @Post('companies/:companyId/profile/documents/:documentId/process')
+  @RequireAuth()
+  @Roles('ADMIN', 'FINANCE')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @Auditable({ action: 'PROFILE_DOCUMENT_AI_PROCESSING_TRIGGERED', resourceType: 'ProfileDocument', resourceIdParam: 'documentId' })
+  async triggerAIProcessing(
+    @Param('companyId') companyId: string,
+    @Param('documentId') documentId: string,
+  ) {
+    await this.documentService.triggerAIProcessing(documentId);
+    return {
+      id: documentId,
+      aiProcessingStatus: 'PROCESSING',
+      message: 'Document queued for AI processing',
+    };
+  }
+
   @Get('profiles/:slug/documents/:documentId/download')
   @Public()
   async downloadPublicDocument(
@@ -1004,11 +1441,19 @@ export class ProfileDocumentController {
 
 ## Error Codes
 
-### PROFILE — Document-Related Error Codes
+### PROFILE -- Document-Related Error Codes
 
 | Code | messageKey | HTTP | PT-BR | EN |
 |------|-----------|------|-------|-----|
 | `PROFILE_STORAGE_LIMIT` | `errors.profile.storageLimit` | 422 | Limite de armazenamento de 500 MB excedido | 500 MB storage limit exceeded |
+
+### AI -- AI Processing Error Codes
+
+| Code | messageKey | HTTP | PT-BR | EN |
+|------|-----------|------|-------|-----|
+| `AI_PROCESSING_QUEUED` | `errors.ai.processingQueued` | — (info, not an error) | Documento enviado para processamento de IA | Document queued for AI processing |
+| `AI_DOCUMENT_UNSUPPORTED_TYPE` | `errors.ai.documentUnsupportedType` | 422 | Tipo de arquivo nao suportado para processamento de IA | File type not supported for AI processing |
+| `AI_PROCESSING_IN_PROGRESS` | `errors.ai.processingInProgress` | 409 | Documento ja esta sendo processado | Document is already being processed |
 
 ### Audit Events
 
@@ -1016,6 +1461,9 @@ export class ProfileDocumentController {
 |--------|-------------|-----------|---------------|
 | `PROFILE_DOCUMENT_UPLOADED` | ProfileDocument | USER | Document uploaded to dataroom |
 | `PROFILE_DOCUMENT_DELETED` | ProfileDocument | USER | Document removed from dataroom |
+| `PROFILE_DOCUMENT_AI_PROCESSING_TRIGGERED` | ProfileDocument | USER | AI processing manually triggered for a document |
+| `PROFILE_DOCUMENT_AI_PROCESSING_COMPLETED` | ProfileDocument | SYSTEM | AI processing completed successfully |
+| `PROFILE_DOCUMENT_AI_PROCESSING_FAILED` | ProfileDocument | SYSTEM | AI processing failed after all retries |
 
 ---
 
@@ -1028,6 +1476,12 @@ export class ProfileDocumentController {
 - File uploads validated by MIME type + magic bytes (not just extension)
 - EXIF metadata stripped from image uploads
 
+### SEC-4: AI Processing Security
+- Extracted text is stored in the same S3 bucket under the `extracted/` prefix with SSE-S3 encryption
+- Extracted text files are not directly accessible — no pre-signed URL endpoint is exposed for them
+- AI processing jobs run in the backend context with the same database access controls
+- Document content is not logged during AI processing (only document ID and status transitions)
+
 ---
 
 ## Success Criteria
@@ -1036,12 +1490,18 @@ export class ProfileDocumentController {
 - Document upload (25 MB): < 30 seconds
 - Pre-signed URL generation: < 200ms
 - Thumbnail generation: < 10 seconds after upload
+- AI processing trigger (queue submission): < 500ms
+- AI text extraction (PDF, < 50 pages): < 30 seconds
+- AI text extraction (DOCX/XLSX): < 15 seconds
 
 ### Accuracy
 - PDF page count extraction: 99%+ accuracy for valid PDFs
+- AI text extraction: 95%+ accuracy for standard text PDFs (scanned/image PDFs may have lower accuracy)
 
 ### User Experience
 - Document upload: drag-and-drop with progress indicator
+- AI processing status visible at a glance via color-coded badge
+- Automatic polling refreshes AI status without manual page reload
 
 ---
 
@@ -1049,10 +1509,10 @@ export class ProfileDocumentController {
 
 | Specification | Relationship |
 |---------------|-------------|
-| [company-profile.md](./company-profile.md) | ProfileDocument belongs to CompanyProfile; documents appear in the profile page and shared link |
+| [company-profile.md](./company-profile.md) | ProfileDocument belongs to CompanyProfile; documents appear in the profile page and shared link; `autoProcessWithAI` field on CompanyProfile |
 | [document-generation.md](./document-generation.md) | Dataroom documents are separate from generated legal documents; different storage prefix |
 | [reports-analytics.md](./reports-analytics.md) | Due diligence package (auto-generated ZIP) is distinct from dataroom (manually curated) |
-| [user-permissions.md](./user-permissions.md) | Only ADMIN and FINANCE roles can upload/delete documents |
+| [user-permissions.md](./user-permissions.md) | Only ADMIN and FINANCE roles can upload/delete documents and trigger AI processing |
 | [security.md](../.claude/rules/security.md) | File upload validation (MIME + magic bytes), EXIF stripping, S3 pre-signed URLs, BlockPublicAccess |
-| [audit-logging.md](../.claude/rules/audit-logging.md) | Document upload and deletion events are audit-logged |
+| [audit-logging.md](../.claude/rules/audit-logging.md) | Document upload, deletion, and AI processing events are audit-logged |
 | [api-standards.md](../.claude/rules/api-standards.md) | Endpoints follow standard envelope responses |

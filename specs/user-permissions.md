@@ -2,7 +2,7 @@
 
 **Topic of Concern**: Role-based access control (RBAC)
 
-**One-Sentence Description**: The system enforces role-based permissions determining what actions users can perform based on their assigned role within a company, with optional fine-grained overrides per member.
+**One-Sentence Description**: The system enforces role-based permissions determining what actions users can perform based on their assigned role within a company, with optional fine-grained overrides per member, plus a separate INVESTOR_VIEWER role assigned via the InvestorAccess model.
 
 ---
 
@@ -33,10 +33,11 @@ Navia uses role-based access control (RBAC) to manage user permissions. Each use
 
 Key characteristics:
 
-- **Company-scoped**: Roles are assigned per company. A user can be ADMIN in one company and INVESTOR in another.
+- **Company-scoped**: Roles are assigned per company. A user can be ADMIN in one company and FINANCE in another.
 - **Single role per company**: Each CompanyMember record has exactly one role. No multi-role assignment.
 - **Override-capable**: Fine-grained permission overrides on the CompanyMember record can grant or restrict individual permissions beyond the role default.
 - **Backend-enforced**: The backend always validates permissions. The frontend hides UI elements as a convenience but is never trusted.
+- **Investor viewer separation**: INVESTOR_VIEWER is not a CompanyMember role. It is assigned via the InvestorAccess model and grants read-only access scoped by access level (BASIC or FULL).
 
 ---
 
@@ -45,43 +46,37 @@ Key characteristics:
 ### Admin
 
 - Full access to all features within the company
-- Can manage shareholders, transactions, and the cap table
-- Can create/edit documents and manage templates
-- Can confirm option exercise payments
+- Can manage AI settings, investor access, and company updates
+- Can configure open finance connections and view financial data
+- Can generate and view AI reports
 - Can manage other users' roles and permissions
 - Can view audit logs and export reports
+- Can manage dataroom documents
 
 ### Finance
 
-- View and edit cap table
-- Create and approve transactions
-- Generate and export financial reports
-- View funding rounds and commitments
-- View option plans and grants (no creation)
-- Cannot manage users, legal documents, or audit logs
+- View and manage open finance connections and data
+- Generate and view AI reports
+- Export financial reports
+- View company updates (read-only)
+- Cannot manage users, AI settings, or audit logs
 
 ### Legal
 
-- View cap table (read-only)
-- Manage documents and templates (create, edit, upload)
-- Request and track signatures
+- Manage dataroom documents (upload, organize, access control)
 - View audit logs (full access, same as Admin)
-- Cannot create transactions or manage users
+- View company profile and KYC/compliance data
+- Manage data enrichment workflows
+- Cannot manage users, AI settings, or open finance
 
-### Investor
+### Investor Viewer (INVESTOR_VIEWER)
 
-- View own shareholdings (read-only)
-- View company cap table (if permitted by shareholder agreement)
-- View own funding round commitments
-- Download own reports and documents they signed
-- Cannot edit anything
-
-### Employee
-
-- View own option grants and vesting schedule (read-only)
-- Request option exercises
-- View own documents (grant letters, exercise confirmations)
-- Cannot view full cap table or other shareholders' data
+- **Not a CompanyMember role** — assigned via the `InvestorAccess` model
+- Read-only access to company profile, dataroom documents, company updates, and financial highlights
+- Can use Q&A chat if access level is FULL
+- Cannot modify any data
+- Access level (BASIC or FULL) determines the depth of information visible
+- See `investor-access.md` for the InvestorAccess model and invitation flow
 
 ---
 
@@ -114,11 +109,18 @@ Key characteristics:
 - Overrides can restrict permissions that the role default would allow
 - Override changes are captured in the audit log (`PERMISSION_CHANGED`)
 
+### FR-5: Investor Viewer Access
+
+- INVESTOR_VIEWER access is managed via the InvestorAccess model, not CompanyMember
+- Admin can grant or revoke investor access via `manage_investors` permission
+- Investor viewers do not appear in the CompanyMember list
+- Investor viewer permissions are resolved from the InvestorAccess record's access level (BASIC or FULL)
+
 ---
 
 ## Data Models
 
-> **Note**: The role and permissions entity is the **CompanyMember** table defined in `company-management.md`. CompanyMember is a merged entity that combines role, permissions, and invitation workflow in one table.
+> **Note**: The role and permissions entity is the **CompanyMember** table defined in `company-management.md`. CompanyMember is a merged entity that combines role, permissions, and invitation workflow in one table. INVESTOR_VIEWER is managed separately via the InvestorAccess model.
 
 ```typescript
 // See company-management.md for the full CompanyMember entity definition.
@@ -128,7 +130,7 @@ interface CompanyMember {
   companyId: string;
   userId: string | null;               // null for pending invitations
   email: string;
-  role: 'ADMIN' | 'FINANCE' | 'LEGAL' | 'INVESTOR' | 'EMPLOYEE';
+  role: 'ADMIN' | 'FINANCE' | 'LEGAL';
 
   // Fine-grained permission overrides (JSONB column)
   // null means "use role defaults only, no overrides"
@@ -139,6 +141,20 @@ interface CompanyMember {
   invitedAt: Date;
   acceptedAt: Date | null;
 }
+
+// See investor-access.md for the full InvestorAccess entity definition.
+// Key fields relevant to permissions:
+interface InvestorAccess {
+  id: string;
+  companyId: string;
+  userId: string | null;               // null for pending invitations
+  email: string;
+  accessLevel: 'BASIC' | 'FULL';      // Determines depth of read-only access
+  status: 'PENDING' | 'ACTIVE' | 'REVOKED';
+  grantedBy: string;                   // User ID who granted access
+  grantedAt: Date;
+  acceptedAt: Date | null;
+}
 ```
 
 ### Permission Key Format
@@ -147,106 +163,98 @@ Permission keys use the pattern `resource:action`:
 
 ```typescript
 type PermissionKey =
-  | 'capTable:read'
-  | 'capTable:write'
-  | 'capTable:export'
-  | 'shareholders:read'
-  | 'shareholders:create'
-  | 'shareholders:edit'
-  | 'shareholders:delete'
-  | 'transactions:read'
-  | 'transactions:create'
-  | 'transactions:approve'
-  | 'documents:read'
-  | 'documents:create'
-  | 'documents:sign'
-  | 'users:manage'
-  | 'reports:view'
-  | 'reports:export'
+  // AI
+  | 'ai:manageSettings'
+  | 'ai:viewReports'
+  | 'ai:generateReports'
+  // Open Finance
+  | 'openFinance:manage'
+  | 'openFinance:viewData'
+  // Investors
+  | 'investors:manage'
+  // Company Updates
+  | 'updates:read'
+  | 'updates:manage'
+  // Investor Q&A
+  | 'investorQA:view'
+  // Dataroom Documents
+  | 'dataroom:read'
+  | 'dataroom:manage'
+  // Audit Logs
   | 'auditLogs:view'
   | 'auditLogs:export'
-  | 'fundingRounds:read'
-  | 'fundingRounds:create'
-  | 'fundingRounds:close'
-  | 'fundingRounds:cancel'
-  | 'convertibles:read'
-  | 'convertibles:create'
-  | 'convertibles:convert'
-  | 'optionPlans:read'
-  | 'optionPlans:create'
-  | 'optionPlans:modify'
-  | 'optionGrants:read'
-  | 'optionGrants:create'
-  | 'optionGrants:approveExercise'
+  // Reports
+  | 'reports:view'
+  | 'reports:export'
+  // Company Settings
   | 'companySettings:read'
   | 'companySettings:modify'
-  | 'capTableSnapshots:read'
-  | 'capTableSnapshots:export';
+  // User Management
+  | 'users:manage'
+  // Dashboard
+  | 'dashboard:read'
+  // Members (read-only list)
+  | 'members:read'
+  | 'members:manage';
 ```
 
 ---
 
 ## Permission Matrix
 
-The following matrix defines the default permissions for each role. Rows marked with footnotes have conditional access.
+The following matrix defines the default permissions for each CompanyMember role. INVESTOR_VIEWER permissions are resolved separately from the InvestorAccess model (see below).
 
-| Resource / Action | Admin | Finance | Legal | Investor | Employee |
-|---|---|---|---|---|---|
-| **Cap Table** | | | | | |
-| View cap table | Yes | Yes | Yes | Yes* | No |
-| Edit cap table | Yes | Yes | No | No | No |
-| Export cap table | Yes | Yes | No | No | No |
-| **Cap Table Snapshots** | | | | | |
-| View snapshots | Yes | Yes | Yes | No | No |
-| Export snapshots | Yes | Yes | No | No | No |
-| **Shareholders** | | | | | |
-| View shareholders | Yes | Yes | Yes | No | No |
-| Create shareholder | Yes | No | No | No | No |
-| Edit shareholder | Yes | No | No | No | No |
-| Delete shareholder | Yes | No | No | No | No |
-| **Transactions** | | | | | |
-| View transactions | Yes | Yes | Yes | No | No |
-| Create transaction | Yes | Yes | No | No | No |
-| Approve transaction | Yes | Yes | No | No | No |
-| **Funding Rounds** | | | | | |
-| View funding rounds | Yes | Yes | Yes | Yes** | No |
-| Create funding round | Yes | Yes | No | No | No |
-| Close funding round | Yes | Yes | No | No | No |
-| Cancel funding round | Yes | No | No | No | No |
-| **Convertible Instruments** | | | | | |
-| View convertibles | Yes | Yes | Yes | Yes** | No |
-| Create convertible | Yes | Yes | No | No | No |
-| Convert convertible | Yes | Yes | No | No | No |
-| **Option Plans** | | | | | |
-| View option plans | Yes | Yes | No | No | No |
-| Create option plan | Yes | No | No | No | No |
-| Modify option plan | Yes | No | No | No | No |
-| **Option Grants** | | | | | |
-| View option grants | Yes | Yes | No | No | Yes*** |
-| Create option grant | Yes | No | No | No | No |
-| Approve exercise | Yes | Yes | No | No | No |
-| **Documents** | | | | | |
-| View documents | Yes | Yes | Yes | Yes**** | Yes**** |
-| Create documents | Yes | No | Yes | No | No |
-| Sign documents | Yes | Yes | Yes | Yes | Yes |
-| **Audit Logs** | | | | | |
-| View audit logs | Yes | No | Yes | No | No |
-| Export audit logs | Yes | No | Yes | No | No |
-| **Reports** | | | | | |
-| View reports | Yes | Yes | Yes | No | No |
-| Export reports | Yes | Yes | No | No | No |
-| **Company Settings** | | | | | |
-| View settings | Yes | Yes | Yes | No | No |
-| Modify settings | Yes | No | No | No | No |
-| **User Management** | | | | | |
-| Manage members | Yes | No | No | No | No |
+### CompanyMember Roles
 
-**Footnotes:**
+| Resource / Action | Admin | Finance | Legal |
+|---|---|---|---|
+| **Dashboard** | | | |
+| View dashboard | Yes | Yes | Yes |
+| **AI** | | | |
+| Manage AI settings | Yes | No | No |
+| View AI reports | Yes | Yes | No |
+| Generate AI reports | Yes | Yes | No |
+| **Open Finance** | | | |
+| Manage connections | Yes | Yes | No |
+| View financial data | Yes | Yes | No |
+| **Investors** | | | |
+| Manage investor access | Yes | No | No |
+| **Company Updates** | | | |
+| View updates | Yes | Yes | Yes |
+| Create/edit/delete updates | Yes | No | No |
+| **Investor Q&A** | | | |
+| View Q&A conversations | Yes | Yes | No |
+| **Dataroom Documents** | | | |
+| View dataroom | Yes | Yes | Yes |
+| Manage dataroom | Yes | No | Yes |
+| **Audit Logs** | | | |
+| View audit logs | Yes | No | Yes |
+| Export audit logs | Yes | No | Yes |
+| **Reports** | | | |
+| View reports | Yes | Yes | Yes |
+| Export reports | Yes | Yes | No |
+| **Company Settings** | | | |
+| View settings | Yes | Yes | Yes |
+| Modify settings | Yes | No | No |
+| **User Management** | | | |
+| View members | Yes | Yes | Yes |
+| Manage members | Yes | No | No |
 
-\* Investor can view cap table only if permitted by their shareholder agreement.
-\** Investor can view only funding rounds and convertibles related to their own commitments.
-\*** Employee can view only their own option grants and vesting schedule.
-\**** Investor and Employee can view only documents they are a signer on.
+### Investor Viewer Access (via InvestorAccess model)
+
+INVESTOR_VIEWER permissions are not part of the CompanyMember permission system. They are resolved from the InvestorAccess record's `accessLevel` field.
+
+| Resource / Action | BASIC | FULL |
+|---|---|---|
+| View company profile | Yes | Yes |
+| View company updates | Yes | Yes |
+| View financial highlights (summary) | Yes | Yes |
+| View dataroom documents | Yes | Yes |
+| View detailed financial data | No | Yes |
+| Use Q&A chat | No | Yes |
+| Modify any data | No | No |
+
+INVESTOR_VIEWER users access the company through a separate investor portal route, not the main dashboard. Their permissions are enforced by the `InvestorAccessGuard` (see [NestJS Guard Implementation](#nestjs-guard-implementation)).
 
 ---
 
@@ -260,8 +268,8 @@ The `permissions` JSON field on CompanyMember allows Admins to override any indi
 
 ```json
 {
-  "shareholders:create": true,
-  "transactions:approve": false
+  "ai:generateReports": true,
+  "openFinance:manage": false
 }
 ```
 
@@ -282,33 +290,33 @@ resolved = override[key] ?? roleDefault[key] ?? false
 
 ### Example Scenarios
 
-**Scenario 1: Finance user needs to create shareholders**
+**Scenario 1: Finance user needs to manage dataroom documents**
 
-The FINANCE role does not include `shareholders:create` by default. An Admin sets:
-
-```json
-{ "shareholders:create": true }
-```
-
-Now this Finance member can create shareholders while retaining all other Finance defaults.
-
-**Scenario 2: Admin user should not approve transactions**
-
-A company wants one Admin to handle setup but not approve transactions (segregation of duties):
+The FINANCE role does not include `dataroom:manage` by default. An Admin sets:
 
 ```json
-{ "transactions:approve": false }
+{ "dataroom:manage": true }
 ```
 
-This Admin can still do everything else but cannot approve transactions.
+Now this Finance member can manage dataroom documents while retaining all other Finance defaults.
 
-**Scenario 3: Legal user needs report export access**
+**Scenario 2: Admin user should not manage AI settings**
+
+A company wants one Admin to handle general operations but not AI configuration:
 
 ```json
-{ "reports:export": true }
+{ "ai:manageSettings": false }
 ```
 
-The Legal member gains export capability while keeping all other Legal defaults.
+This Admin can still do everything else but cannot configure AI settings.
+
+**Scenario 3: Legal user needs AI report access**
+
+```json
+{ "ai:viewReports": true }
+```
+
+The Legal member gains AI report viewing capability while keeping all other Legal defaults.
 
 ### Constraints
 
@@ -335,7 +343,7 @@ Update a member's role or permissions. Request body:
 {
   "role": "FINANCE",
   "permissions": {
-    "shareholders:create": true
+    "dataroom:manage": true
   }
 }
 ```
@@ -352,6 +360,10 @@ List all members and their roles in the company. Returns the role and resolved p
 
 Returns the fully resolved permission set for a specific member (role defaults merged with overrides).
 
+### GET /api/v1/companies/:companyId/members/me
+
+Returns the authenticated user's role and resolved permissions for this company. Used by the frontend PermissionContext.
+
 ---
 
 ## Business Rules
@@ -367,21 +379,22 @@ Returns the fully resolved permission set for a specific member (role defaults m
 - Users cannot assign roles to themselves
 - Must be assigned by an existing ADMIN
 
-### BR-3: Investor Auto-Role
-
-- When a shareholder is added and they have an existing user account, auto-assign the INVESTOR role
-- If the user already has a higher role (ADMIN, FINANCE, LEGAL), do not downgrade
-
-### BR-4: Protected Permissions
+### BR-3: Protected Permissions
 
 - The `users:manage` permission cannot be granted via overrides to non-ADMIN roles
 - This ensures only Admins can manage company membership
 
-### BR-5: Role Change Immediacy
+### BR-4: Role Change Immediacy
 
 - Role and permission changes take effect immediately on the next API request
 - No caching of resolved permissions between requests
 - Active sessions are not invalidated, but the next permission check uses the updated role
+
+### BR-5: Investor Viewer Separation
+
+- INVESTOR_VIEWER is not a CompanyMember role and cannot be assigned via the members/invite endpoint
+- Investor access is managed via dedicated endpoints (see `investor-access.md`)
+- An investor viewer who is also a CompanyMember (e.g., they are also a FINANCE member) uses the CompanyMember role for dashboard access and InvestorAccess for investor portal access
 
 ---
 
@@ -506,27 +519,106 @@ export class PermissionGuard implements CanActivate {
 }
 ```
 
+### InvestorAccessGuard
+
+Protects investor portal endpoints. Checks the InvestorAccess model instead of CompanyMember:
+
+```typescript
+import { Injectable, CanActivate, ExecutionContext, HttpStatus } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { AppException } from '../common/exceptions/app.exception';
+
+@Injectable()
+export class InvestorAccessGuard implements CanActivate {
+  constructor(private prisma: PrismaService) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest();
+    const user = request.user;
+    const companyId = request.params.companyId;
+
+    if (!user || !companyId) {
+      throw new AppException(
+        'AUTH_FORBIDDEN',
+        'errors.auth.forbidden',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    const investorAccess = await this.prisma.investorAccess.findFirst({
+      where: {
+        userId: user.id,
+        companyId,
+        status: 'ACTIVE',
+      },
+    });
+
+    if (!investorAccess) {
+      // Return 404 to prevent enumeration
+      throw new AppException(
+        'COMPANY_NOT_FOUND',
+        'errors.company.notFound',
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    // Attach investor access to request for downstream use
+    request.investorAccess = investorAccess;
+    return true;
+  }
+}
+```
+
+### @RequireInvestorAccess() Decorator
+
+For endpoints that require a specific investor access level:
+
+```typescript
+import { SetMetadata } from '@nestjs/common';
+
+export const INVESTOR_ACCESS_LEVEL_KEY = 'requiredAccessLevel';
+export const RequireInvestorAccess = (level: 'BASIC' | 'FULL') =>
+  SetMetadata(INVESTOR_ACCESS_LEVEL_KEY, level);
+```
+
 ### Controller Usage Example
 
 ```typescript
-@Controller('api/v1/companies/:companyId/shareholders')
+@Controller('api/v1/companies/:companyId/ai/reports')
 @RequireAuth()
 @UseGuards(CompanyScopeGuard)
-export class ShareholderController {
+export class AIReportsController {
   @Get()
-  @Roles('ADMIN', 'FINANCE', 'LEGAL')
+  @RequirePermission('ai:viewReports')
   async list(@Param('companyId') companyId: string) {
-    // Role check via RolesGuard
+    // Permission check via PermissionGuard
   }
 
-  @Post()
-  @RequirePermission('shareholders:create')
-  async create(
+  @Post('generate')
+  @RequirePermission('ai:generateReports')
+  async generate(
     @Param('companyId') companyId: string,
-    @Body() dto: CreateShareholderDto,
+    @Body() dto: GenerateReportDto,
   ) {
     // Fine-grained check via PermissionGuard
-    // Allows ADMIN by default, or any role with override
+    // Allows ADMIN and FINANCE by default, or any role with override
+  }
+}
+
+// Investor portal controller
+@Controller('api/v1/investor/companies/:companyId')
+@RequireAuth()
+@UseGuards(InvestorAccessGuard)
+export class InvestorPortalController {
+  @Get('profile')
+  async getProfile(@Param('companyId') companyId: string) {
+    // Any active investor viewer can access (BASIC or FULL)
+  }
+
+  @Get('qa')
+  @RequireInvestorAccess('FULL')
+  async getQA(@Param('companyId') companyId: string) {
+    // Only FULL access level investors can access Q&A
   }
 }
 ```
@@ -541,27 +633,55 @@ import { ValidationError } from '../common/types';
 
 // Default permission matrix — derived from the Permission Matrix table above.
 // Each role maps to its set of granted permissions. Unlisted keys default to false.
-// Full matrix: ADMIN has all permissions, others as defined in the table.
 const ROLE_DEFAULTS: Record<string, Record<string, boolean>> = {
   ADMIN: {
-    // All permissions set to true (all PermissionKey values)
-    'capTable:read': true, 'capTable:write': true, 'capTable:export': true,
-    'shareholders:read': true, 'shareholders:create': true, /* ... all true */
+    'dashboard:read': true,
+    'ai:manageSettings': true,
+    'ai:viewReports': true,
+    'ai:generateReports': true,
+    'openFinance:manage': true,
+    'openFinance:viewData': true,
+    'investors:manage': true,
+    'updates:read': true,
+    'updates:manage': true,
+    'investorQA:view': true,
+    'dataroom:read': true,
+    'dataroom:manage': true,
+    'auditLogs:view': true,
+    'auditLogs:export': true,
+    'reports:view': true,
+    'reports:export': true,
+    'companySettings:read': true,
+    'companySettings:modify': true,
     'users:manage': true, // Protected: only ADMIN has this by default
+    'members:read': true,
+    'members:manage': true,
   },
   FINANCE: {
-    'capTable:read': true, 'capTable:write': true, 'capTable:export': true,
-    'transactions:read': true, 'transactions:create': true,
-    'transactions:approve': true, 'reports:view': true, 'reports:export': true,
-    // See Permission Matrix for complete list
+    'dashboard:read': true,
+    'ai:viewReports': true,
+    'ai:generateReports': true,
+    'openFinance:manage': true,
+    'openFinance:viewData': true,
+    'updates:read': true,
+    'investorQA:view': true,
+    'dataroom:read': true,
+    'reports:view': true,
+    'reports:export': true,
+    'companySettings:read': true,
+    'members:read': true,
   },
   LEGAL: {
-    'capTable:read': true, 'documents:read': true, 'documents:create': true,
-    'auditLogs:view': true, 'auditLogs:export': true, 'reports:view': true,
-    // See Permission Matrix for complete list
+    'dashboard:read': true,
+    'updates:read': true,
+    'dataroom:read': true,
+    'dataroom:manage': true,
+    'auditLogs:view': true,
+    'auditLogs:export': true,
+    'reports:view': true,
+    'companySettings:read': true,
+    'members:read': true,
   },
-  INVESTOR: { 'documents:sign': true },
-  EMPLOYEE: { 'documents:sign': true },
 };
 
 // Protected permissions that cannot be granted via overrides
@@ -622,6 +742,30 @@ export class PermissionService {
     }
     return errors;
   }
+
+  /**
+   * Checks if an investor viewer has access to a specific resource
+   * based on their access level.
+   */
+  hasInvestorAccess(
+    accessLevel: 'BASIC' | 'FULL',
+    resource: string,
+  ): boolean {
+    const BASIC_RESOURCES = [
+      'companyProfile',
+      'companyUpdates',
+      'financialHighlights',
+      'dataroomDocuments',
+    ];
+    const FULL_RESOURCES = [
+      ...BASIC_RESOURCES,
+      'detailedFinancialData',
+      'investorQA',
+    ];
+
+    const allowed = accessLevel === 'FULL' ? FULL_RESOURCES : BASIC_RESOURCES;
+    return allowed.includes(resource);
+  }
 }
 ```
 
@@ -649,7 +793,7 @@ Permission-related operations use the standard error envelope defined in `api-st
   "success": false,
   "error": {
     "code": "AUTH_FORBIDDEN",
-    "message": "Você não tem permissão para realizar esta ação",
+    "message": "Voce nao tem permissao para realizar esta acao",
     "messageKey": "errors.auth.forbidden"
   }
 }
@@ -662,7 +806,7 @@ Permission-related operations use the standard error envelope defined in `api-st
   "success": false,
   "error": {
     "code": "COMPANY_LAST_ADMIN",
-    "message": "Não é possível remover ou rebaixar o único administrador",
+    "message": "Nao e possivel remover ou rebaixar o unico administrador",
     "messageKey": "errors.company.lastAdmin"
   }
 }
@@ -674,7 +818,7 @@ Permission-related operations use the standard error envelope defined in `api-st
 
 ### EC-1: Cross-Company Role Isolation
 
-A user is ADMIN in Company A but INVESTOR in Company B. When they access Company B's API endpoints, they must only have INVESTOR permissions. The `CompanyScopeGuard` extracts the `companyId` from the URL, looks up the user's membership for that specific company, and attaches the correct role to the request context.
+A user is ADMIN in Company A but FINANCE in Company B. When they access Company B's API endpoints, they must only have FINANCE permissions. The `CompanyScopeGuard` extracts the `companyId` from the URL, looks up the user's membership for that specific company, and attaches the correct role to the request context.
 
 ### EC-2: Last Admin Demotion or Removal
 
@@ -682,7 +826,7 @@ When an Admin attempts to remove or demote another Admin, the system counts rema
 
 ### EC-3: Override Grants More Than Role Default
 
-A FINANCE member receives `{ "shareholders:create": true }` via override. The `PermissionGuard` resolves this correctly because overrides take priority over role defaults. The `@RequirePermission('shareholders:create')` check will pass even though FINANCE does not include this permission by default.
+A FINANCE member receives `{ "dataroom:manage": true }` via override. The `PermissionGuard` resolves this correctly because overrides take priority over role defaults. The `@RequirePermission('dataroom:manage')` check will pass even though FINANCE does not include this permission by default.
 
 ### EC-4: User Removed Mid-Session
 
@@ -690,7 +834,18 @@ If a user is removed from a company (`status = 'REMOVED'`) while they have an ac
 
 ### EC-5: Role Change Immediate Effect
 
-When an Admin changes a member's role from FINANCE to INVESTOR, the change is persisted immediately. The member's very next API request will be evaluated against INVESTOR permissions. There is no permission caching layer. The `CompanyScopeGuard` fetches the member record from the database on each request.
+When an Admin changes a member's role from FINANCE to LEGAL, the change is persisted immediately. The member's very next API request will be evaluated against LEGAL permissions. There is no permission caching layer. The `CompanyScopeGuard` fetches the member record from the database on each request.
+
+### EC-6: User Is Both CompanyMember and Investor Viewer
+
+A user can simultaneously be a CompanyMember (e.g., FINANCE) and have InvestorAccess to the same company. In this case:
+- Dashboard routes use the CompanyMember role (FINANCE permissions)
+- Investor portal routes use the InvestorAccess record (BASIC or FULL permissions)
+- The two access paths are independent and do not merge
+
+### EC-7: Investor Access Revoked Mid-Session
+
+If an Admin revokes an investor's access (`status = 'REVOKED'`) while the investor has an active session, their next API request to the investor portal will fail. The `InvestorAccessGuard` checks access status on every request and rejects REVOKED investors with a 404.
 
 ---
 
@@ -720,6 +875,13 @@ Company-scoped queries are filtered via Prisma middleware that injects `companyI
 
 Every request verifies the Privy JWT independently. Permission results are never cached across requests. This ensures that role changes, member removal, and account locks take effect immediately.
 
+### Investor Portal Isolation
+
+The investor portal uses a separate route namespace (`/api/v1/investor/companies/:companyId/*`) from the main dashboard API (`/api/v1/companies/:companyId/*`). This separation ensures:
+- Investor viewers cannot access dashboard-only endpoints
+- CompanyMember guards do not run on investor portal routes
+- InvestorAccessGuard does not run on dashboard routes
+
 ---
 
 ## Dependencies
@@ -728,6 +890,7 @@ Every request verifies the Privy JWT independently. Permission results are never
 |---|---|
 | `authentication.md` | JWT verification and session management (runs before permission checks) |
 | `company-management.md` | CompanyMember entity definition, invitation workflow, member CRUD endpoints |
+| `investor-access.md` | InvestorAccess entity definition, investor invitation and access management |
 | `security.md` | Company scoping enforcement, row-level security, permission denial logging |
 | `error-handling.md` | Error codes (`COMPANY_LAST_ADMIN`, `AUTH_INVALID_TOKEN`), standard error envelope |
 | `api-standards.md` | Response format, HTTP status codes, rate limiting |
@@ -749,6 +912,9 @@ Every request verifies the Privy JWT independently. Permission results are never
 - [ ] Permission denial logging fires for all rejected requests
 - [ ] Repeated denial alerts trigger at >10 denials per user in 5 minutes
 - [ ] Role assignment completes in <1 second
+- [ ] InvestorAccessGuard correctly enforces BASIC vs FULL access levels
+- [ ] Investor viewers cannot access dashboard-only endpoints
+- [ ] CompanyMembers cannot use investor portal endpoints (unless they also have InvestorAccess)
 
 ---
 
@@ -756,12 +922,10 @@ Every request verifies the Privy JWT independently. Permission results are never
 
 | Specification | Relationship |
 |---------------|-------------|
-| [company-membership.md](./company-membership.md) | Roles are assigned per company membership; invitation flow assigns initial role |
 | [company-management.md](./company-management.md) | Company-scoped authorization; all resource access gated by company membership |
+| [investor-access.md](./investor-access.md) | InvestorAccess model; investor invitation flow; BASIC vs FULL access levels |
 | [authentication.md](./authentication.md) | Authentication precedes authorization; Privy JWT verification provides user identity |
-| [shareholder-registry.md](./shareholder-registry.md) | Permission matrix defines which roles can view/create/edit/delete shareholders |
-| [cap-table-management.md](./cap-table-management.md) | View and export permissions for cap table data are role-based |
-| [reports-analytics.md](./reports-analytics.md) | Report access is restricted by role: ADMIN, FINANCE, LEGAL have different access levels |
+| [reports-analytics.md](./reports-analytics.md) | Report access is restricted by role: ADMIN and FINANCE can generate AI reports |
 | [api-standards.md](../.claude/rules/api-standards.md) | API response envelope, HTTP status codes (403 Forbidden, 404 for non-members) |
 | [error-handling.md](../.claude/rules/error-handling.md) | Error codes: COMPANY_LAST_ADMIN; permission denial handling and logging |
 | [audit-logging.md](../.claude/rules/audit-logging.md) | Audit events: COMPANY_ROLE_CHANGED, PERMISSION_CHANGED |
@@ -804,8 +968,9 @@ Every request verifies the Privy JWT independently. Permission results are never
 - **Backend is the source of truth**: The frontend permission layer is a UX convenience. The backend always validates permissions independently on every request.
 - **One company per user for MVP**: The permission context loads for the user's single active company. No company-switching logic is needed.
 - **Permissions fetched once, refreshed on events**: The user's resolved permissions are fetched on initial load and cached in React context. They refresh on window refocus and when a role change notification is received.
+- **Investor portal is separate**: INVESTOR_VIEWER users access a dedicated investor portal UI, not the main dashboard. The investor portal has its own layout and route tree.
 
-**Component hierarchy**:
+**Component hierarchy (dashboard)**:
 ```
 <AuthProvider>                          // from authentication.md
   <PermissionProvider companyId={id}>   // fetches role + permissions
@@ -816,6 +981,17 @@ Every request verifies the Privy JWT independently. Permission results are never
       </ProtectedRoute>
     </DashboardLayout>
   </PermissionProvider>
+</AuthProvider>
+```
+
+**Component hierarchy (investor portal)**:
+```
+<AuthProvider>
+  <InvestorAccessProvider companyId={id}>  // fetches access level
+    <InvestorPortalLayout>
+      <InvestorPageContent />
+    </InvestorPortalLayout>
+  </InvestorAccessProvider>
 </AuthProvider>
 ```
 
@@ -841,7 +1017,7 @@ interface PermissionContextValue {
   refetch: () => Promise<void>;
 }
 
-type Role = 'ADMIN' | 'FINANCE' | 'LEGAL' | 'INVESTOR' | 'EMPLOYEE';
+type Role = 'ADMIN' | 'FINANCE' | 'LEGAL';
 ```
 
 ### Data Source
@@ -856,7 +1032,7 @@ Response shape:
     "id": "member-uuid",
     "userId": "user-uuid",
     "role": "FINANCE",
-    "permissions": ["capTable:read", "capTable:write", "capTable:export", "transactions:read", "..."],
+    "permissions": ["dashboard:read", "ai:viewReports", "ai:generateReports", "openFinance:manage", "..."],
     "status": "ACTIVE"
   }
 }
@@ -995,7 +1171,7 @@ export function usePermissions(): UsePermissionsReturn {
 ```tsx
 // Check a specific permission
 const { hasPermission } = usePermissions();
-if (hasPermission('shareholders:create')) { /* show create button */ }
+if (hasPermission('ai:generateReports')) { /* show generate button */ }
 
 // Check by role
 const { hasRole } = usePermissions();
@@ -1003,7 +1179,7 @@ if (hasRole(['ADMIN', 'FINANCE'])) { /* show finance section */ }
 
 // Resource + action shorthand
 const { canAccess } = usePermissions();
-if (canAccess('capTable', 'export')) { /* show export button */ }
+if (canAccess('dataroom', 'manage')) { /* show upload button */ }
 ```
 
 ---
@@ -1018,11 +1194,11 @@ Wrapper component that conditionally renders children based on the user's permis
 
 ```typescript
 interface PermissionGateProps {
-  /** Permission key to check (e.g., 'shareholders:create') */
+  /** Permission key to check (e.g., 'ai:generateReports') */
   permission?: string;
   /** Alternative: check by role instead of specific permission */
   role?: Role | Role[];
-  /** Optional fallback when permission denied (defaults to null — hidden) */
+  /** Optional fallback when permission denied (defaults to null -- hidden) */
   fallback?: React.ReactNode;
   /** Content to render when permission is granted */
   children: React.ReactNode;
@@ -1069,18 +1245,18 @@ export function PermissionGate({
 | Scenario | Renders |
 |----------|---------|
 | `permission` provided, user has it | `children` |
-| `permission` provided, user lacks it | `fallback` (default: `null` — nothing) |
+| `permission` provided, user lacks it | `fallback` (default: `null` -- nothing) |
 | `role` provided, user matches | `children` |
-| `role` provided, user does not match | `fallback` (default: `null` — nothing) |
+| `role` provided, user does not match | `fallback` (default: `null` -- nothing) |
 | Neither `permission` nor `role` provided | `children` (always) |
-| Permissions loading | `null` (nothing — prevents flash) |
+| Permissions loading | `null` (nothing -- prevents flash) |
 
 ### Usage
 
 ```tsx
 // Hide a button for non-ADMIN users
-<PermissionGate permission="shareholders:create">
-  <Button>Adicionar Acionista</Button>
+<PermissionGate permission="investors:manage">
+  <Button>Gerenciar Investidores</Button>
 </PermissionGate>
 
 // Gate by role with a custom fallback
@@ -1089,10 +1265,10 @@ export function PermissionGate({
 </PermissionGate>
 
 // Multiple gates can be nested
-<PermissionGate permission="transactions:read">
-  <TransactionsTable />
-  <PermissionGate permission="transactions:create">
-    <Button>Nova Transacao</Button>
+<PermissionGate permission="ai:viewReports">
+  <AIReportsList />
+  <PermissionGate permission="ai:generateReports">
+    <Button>Gerar Relatorio</Button>
   </PermissionGate>
 </PermissionGate>
 ```
@@ -1188,11 +1364,11 @@ export function ProtectedRoute({
 ### Usage in Page Components
 
 ```tsx
-// app/dashboard/shareholders/page.tsx
-export default function ShareholdersPage() {
+// app/dashboard/ai/reports/page.tsx
+export default function AIReportsPage() {
   return (
-    <ProtectedRoute permission="shareholders:read">
-      <ShareholdersContent />
+    <ProtectedRoute permission="ai:viewReports">
+      <AIReportsContent />
     </ProtectedRoute>
   );
 }
@@ -1219,14 +1395,15 @@ The sidebar navigation is filtered based on the user's role. Unauthorized items 
 // frontend/src/config/navigation.ts
 import {
   LayoutDashboard,
-  PieChart,
+  Brain,
+  Landmark,
   Users,
-  ArrowLeftRight,
-  TrendingUp,
-  Target,
   FileText,
+  BarChart3,
+  MessageSquare,
   UserPlus,
   Settings,
+  ScrollText,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -1238,32 +1415,32 @@ export interface NavItem {
 
 export const navConfig: NavItem[] = [
   { label: 'dashboard.nav.dashboard', href: '/dashboard', icon: LayoutDashboard, permission: 'dashboard:read' },
-  { label: 'dashboard.nav.capTable', href: '/dashboard/cap-table', icon: PieChart, permission: 'capTable:read' },
-  { label: 'dashboard.nav.shareholders', href: '/dashboard/shareholders', icon: Users, permission: 'shareholders:read' },
-  { label: 'dashboard.nav.transactions', href: '/dashboard/transactions', icon: ArrowLeftRight, permission: 'transactions:read' },
-  { label: 'dashboard.nav.investments', href: '/dashboard/investments', icon: TrendingUp, permission: 'fundingRounds:read' },
-  { label: 'dashboard.nav.options', href: '/dashboard/options', icon: Target, permission: 'optionPlans:read' },
-  { label: 'dashboard.nav.documents', href: '/dashboard/documents', icon: FileText, permission: 'documents:read' },
+  { label: 'dashboard.nav.aiReports', href: '/dashboard/ai/reports', icon: Brain, permission: 'ai:viewReports' },
+  { label: 'dashboard.nav.openFinance', href: '/dashboard/open-finance', icon: Landmark, permission: 'openFinance:viewData' },
+  { label: 'dashboard.nav.investors', href: '/dashboard/investors', icon: Users, permission: 'investors:manage' },
+  { label: 'dashboard.nav.updates', href: '/dashboard/updates', icon: ScrollText, permission: 'updates:read' },
+  { label: 'dashboard.nav.investorQA', href: '/dashboard/investor-qa', icon: MessageSquare, permission: 'investorQA:view' },
+  { label: 'dashboard.nav.dataroom', href: '/dashboard/dataroom', icon: FileText, permission: 'dataroom:read' },
+  { label: 'dashboard.nav.reports', href: '/dashboard/reports', icon: BarChart3, permission: 'reports:view' },
   { label: 'dashboard.nav.members', href: '/dashboard/members', icon: UserPlus, permission: 'members:manage' },
-  { label: 'dashboard.nav.settings', href: '/dashboard/settings', icon: Settings, permission: 'settings:manage' },
+  { label: 'dashboard.nav.settings', href: '/dashboard/settings', icon: Settings, permission: 'companySettings:modify' },
 ];
 ```
 
 ### Visibility per Role
 
-| Nav Item | Route | ADMIN | FINANCE | LEGAL | INVESTOR | EMPLOYEE |
-|----------|-------|-------|---------|-------|----------|----------|
-| Dashboard | `/dashboard` | Yes | Yes | Yes | Yes | Yes |
-| Cap Table | `/dashboard/cap-table` | Yes | Yes | Yes | Yes (own holdings) | No |
-| Shareholders | `/dashboard/shareholders` | Yes | Yes | Yes | No | No |
-| Transactions | `/dashboard/transactions` | Yes | Yes | Yes | No | No |
-| Investments | `/dashboard/investments` | Yes | Yes | Yes | Yes (own) | No |
-| Options | `/dashboard/options` | Yes | Yes | No | No | Yes (own) |
-| Documents | `/dashboard/documents` | Yes | Yes | Yes | Yes (own) | Yes (own) |
-| Members | `/dashboard/members` | Yes | No | No | No | No |
-| Settings | `/dashboard/settings` | Yes | No | No | No | No |
-
-"Own" means the user can see the nav item but the backend filters results to only their own data. The frontend shows the navigation link; the backend enforces data scoping.
+| Nav Item | Route | ADMIN | FINANCE | LEGAL |
+|----------|-------|-------|---------|-------|
+| Dashboard | `/dashboard` | Yes | Yes | Yes |
+| AI Reports | `/dashboard/ai/reports` | Yes | Yes | No |
+| Open Finance | `/dashboard/open-finance` | Yes | Yes | No |
+| Investors | `/dashboard/investors` | Yes | No | No |
+| Updates | `/dashboard/updates` | Yes | Yes | Yes |
+| Investor Q&A | `/dashboard/investor-qa` | Yes | Yes | No |
+| Dataroom | `/dashboard/dataroom` | Yes | Yes | Yes |
+| Reports | `/dashboard/reports` | Yes | Yes | Yes |
+| Members | `/dashboard/members` | Yes | No | No |
+| Settings | `/dashboard/settings` | Yes | No | No |
 
 ### Sidebar Filtering Implementation
 
@@ -1301,48 +1478,29 @@ Sidebar visual styling follows design-system.md section 5.2:
 
 Complete mapping of frontend permission keys to roles. This mirrors the backend permission matrix but uses the frontend permission key format (`resource:action`) for UI gating.
 
-| Permission | ADMIN | FINANCE | LEGAL | INVESTOR | EMPLOYEE |
-|-----------|-------|---------|-------|----------|----------|
-| `dashboard:read` | Yes | Yes | Yes | Yes | Yes |
-| `capTable:read` | Yes | Yes | Yes | Own | No |
-| `capTable:write` | Yes | Yes | No | No | No |
-| `capTable:export` | Yes | Yes | No | No | No |
-| `capTableSnapshots:read` | Yes | Yes | Yes | No | No |
-| `capTableSnapshots:export` | Yes | Yes | No | No | No |
-| `shareholders:read` | Yes | Yes | Yes | No | No |
-| `shareholders:create` | Yes | No | No | No | No |
-| `shareholders:edit` | Yes | No | No | No | No |
-| `shareholders:delete` | Yes | No | No | No | No |
-| `transactions:read` | Yes | Yes | Yes | No | No |
-| `transactions:create` | Yes | Yes | No | No | No |
-| `transactions:approve` | Yes | Yes | No | No | No |
-| `fundingRounds:read` | Yes | Yes | Yes | Own | No |
-| `fundingRounds:create` | Yes | Yes | No | No | No |
-| `fundingRounds:close` | Yes | Yes | No | No | No |
-| `fundingRounds:cancel` | Yes | No | No | No | No |
-| `convertibles:read` | Yes | Yes | Yes | Own | No |
-| `convertibles:create` | Yes | Yes | No | No | No |
-| `convertibles:convert` | Yes | Yes | No | No | No |
-| `optionPlans:read` | Yes | Yes | No | No | No |
-| `optionPlans:create` | Yes | No | No | No | No |
-| `optionPlans:modify` | Yes | No | No | No | No |
-| `optionGrants:read` | Yes | Yes | No | No | Own |
-| `optionGrants:create` | Yes | No | No | No | No |
-| `optionGrants:approveExercise` | Yes | Yes | No | No | No |
-| `documents:read` | Yes | Yes | Yes | Own | Own |
-| `documents:create` | Yes | No | Yes | No | No |
-| `documents:sign` | Yes | Yes | Yes | Yes | Yes |
-| `auditLogs:read` | Yes | No | Yes | No | No |
-| `auditLogs:export` | Yes | No | Yes | No | No |
-| `reports:view` | Yes | Yes | Yes | No | No |
-| `reports:export` | Yes | Yes | No | No | No |
-| `companySettings:read` | Yes | Yes | Yes | No | No |
-| `companySettings:modify` | Yes | No | No | No | No |
-| `members:manage` | Yes | No | No | No | No |
-| `members:read` | Yes | Yes | Yes | Yes | Yes |
-| `settings:manage` | Yes | No | No | No | No |
-
-**"Own" means**: The frontend shows the navigation item and page structure, but the backend filters query results to only return the user's own records. The frontend does not need to implement this filtering — it is enforced server-side.
+| Permission | ADMIN | FINANCE | LEGAL |
+|-----------|-------|---------|-------|
+| `dashboard:read` | Yes | Yes | Yes |
+| `ai:manageSettings` | Yes | No | No |
+| `ai:viewReports` | Yes | Yes | No |
+| `ai:generateReports` | Yes | Yes | No |
+| `openFinance:manage` | Yes | Yes | No |
+| `openFinance:viewData` | Yes | Yes | No |
+| `investors:manage` | Yes | No | No |
+| `updates:read` | Yes | Yes | Yes |
+| `updates:manage` | Yes | No | No |
+| `investorQA:view` | Yes | Yes | No |
+| `dataroom:read` | Yes | Yes | Yes |
+| `dataroom:manage` | Yes | No | Yes |
+| `auditLogs:view` | Yes | No | Yes |
+| `auditLogs:export` | Yes | No | Yes |
+| `reports:view` | Yes | Yes | Yes |
+| `reports:export` | Yes | Yes | No |
+| `companySettings:read` | Yes | Yes | Yes |
+| `companySettings:modify` | Yes | No | No |
+| `users:manage` | Yes | No | No |
+| `members:read` | Yes | Yes | Yes |
+| `members:manage` | Yes | No | No |
 
 ---
 
@@ -1362,10 +1520,10 @@ Five standard patterns are used throughout the application. Every UI element tha
 ### Pattern 2: Hide Action Buttons
 
 ```tsx
-// In ShareholdersPage toolbar
-<PermissionGate permission="shareholders:create">
-  <Button onClick={openCreateModal}>
-    {t('shareholders.actions.add')}
+// In AI Reports page toolbar
+<PermissionGate permission="ai:generateReports">
+  <Button onClick={openGenerateModal}>
+    {t('aiReports.actions.generate')}
   </Button>
 </PermissionGate>
 ```
@@ -1374,10 +1532,10 @@ Five standard patterns are used throughout the application. Every UI element tha
 
 ```tsx
 // In page component
-export default function ShareholdersPage() {
+export default function AIReportsPage() {
   return (
-    <ProtectedRoute permission="shareholders:read">
-      <ShareholdersContent />
+    <ProtectedRoute permission="ai:viewReports">
+      <AIReportsContent />
     </ProtectedRoute>
   );
 }
@@ -1392,8 +1550,8 @@ const { hasPermission } = usePermissions();
 const columns = [
   nameColumn,
   emailColumn,
-  roleColumn,
-  ...(hasPermission('shareholders:edit') ? [actionsColumn] : []),
+  accessLevelColumn,
+  ...(hasPermission('investors:manage') ? [actionsColumn] : []),
 ];
 ```
 
@@ -1460,11 +1618,11 @@ SIDE EFFECTS: None (read-only permission check, no audit log)
 ```
 User types URL directly or uses bookmark to a page they cannot access
   |
-  +-- [e.g., EMPLOYEE navigates to /dashboard/members]
+  +-- [e.g., LEGAL navigates to /dashboard/open-finance]
   |     |
-  |     +-- [ProtectedRoute checks permission 'members:manage']
+  |     +-- [ProtectedRoute checks permission 'openFinance:viewData']
   |     |     |
-  |     |     +-- [EMPLOYEE lacks 'members:manage'] --> redirect to /dashboard
+  |     |     +-- [LEGAL lacks 'openFinance:viewData'] --> redirect to /dashboard
   |     |           +-- toast: "Voce nao tem acesso a esta pagina"
   |     |
   |     +-- [permission granted] --> render page (normal flow)
@@ -1473,39 +1631,39 @@ User types URL directly or uses bookmark to a page they cannot access
 Step-by-step:
 
 ```
-PRECONDITION: User is authenticated with EMPLOYEE role
-ACTOR: EMPLOYEE user
-TRIGGER: Direct navigation to /dashboard/members (bookmark, typed URL, shared link)
+PRECONDITION: User is authenticated with LEGAL role
+ACTOR: LEGAL user
+TRIGGER: Direct navigation to /dashboard/open-finance (bookmark, typed URL, shared link)
 
-1. [Frontend] Next.js App Router loads the members page component
-2. [Frontend] ProtectedRoute evaluates hasPermission('members:manage')
-3. [Frontend] EMPLOYEE does not have 'members:manage' -> isAuthorized = false
+1. [Frontend] Next.js App Router loads the open finance page component
+2. [Frontend] ProtectedRoute evaluates hasPermission('openFinance:viewData')
+3. [Frontend] LEGAL does not have 'openFinance:viewData' -> isAuthorized = false
 4. [Frontend] useEffect fires: router.replace('/dashboard')
 5. [UI] Toast notification: "Voce nao tem acesso a esta pagina" (error variant)
 6. [UI] User lands on /dashboard, which they can access
 
-POSTCONDITION: User is on /dashboard; they never saw the members page content
+POSTCONDITION: User is on /dashboard; they never saw the open finance page content
 SIDE EFFECTS: None on frontend. Backend would return 403/404 if an API call had been made.
 ```
 
 ### Flow 3: Role Change Takes Effect
 
 ```
-Admin changes user X's role from FINANCE to INVESTOR
+Admin changes user X's role from FINANCE to LEGAL
   |
   +-- [Backend updates role] --> X's permissions change server-side
   |     |
   |     +-- [X switches tabs / refocuses window]
   |     |     +-- [PermissionContext refetches GET /members/me]
-  |     |     +-- [new role: INVESTOR with reduced permissions]
-  |     |     +-- [sidebar re-filters: fewer nav items visible]
+  |     |     +-- [new role: LEGAL with different permissions]
+  |     |     +-- [sidebar re-filters: different nav items visible]
   |     |
-  |     +-- [X is currently on /dashboard/shareholders (now unauthorized)]
+  |     +-- [X is currently on /dashboard/open-finance (now unauthorized)]
   |           +-- [next navigation triggers ProtectedRoute check]
   |           +-- [redirect to /dashboard + toast]
   |
   +-- [X makes an API call before refetch]
-        +-- [backend enforces new INVESTOR role]
+        +-- [backend enforces new LEGAL role]
         +-- [403/404 returned]
         +-- [frontend error handler shows toast]
 ```
@@ -1513,66 +1671,66 @@ Admin changes user X's role from FINANCE to INVESTOR
 Step-by-step:
 
 ```
-PRECONDITION: Admin changes user X's role from FINANCE to INVESTOR
+PRECONDITION: Admin changes user X's role from FINANCE to LEGAL
 ACTOR: User X (affected), Admin (initiator)
-TRIGGER: PUT /api/v1/companies/:companyId/members/:memberId { role: 'INVESTOR' }
+TRIGGER: PUT /api/v1/companies/:companyId/members/:memberId { role: 'LEGAL' }
 
 1. [Backend] Updates X's role in database
 2. [Admin UI] Toast: "Papel alterado com sucesso"
 3. [User X Frontend] On next window refocus or page navigation:
    - PermissionContext refetches GET /api/v1/companies/:companyId/members/me
-   - Returns new role: INVESTOR, reduced permissions array
+   - Returns new role: LEGAL, different permissions array
 4. [User X UI] Sidebar re-renders with filtered navConfig
-   - Shareholders, Transactions, Options, Members, Settings: HIDDEN
-   - Dashboard, Cap Table (own), Investments (own), Documents (own): VISIBLE
-5. [User X] If currently on a now-unauthorized page (e.g., /dashboard/shareholders):
+   - AI Reports, Open Finance, Investor Q&A: HIDDEN
+   - Dashboard, Updates, Dataroom, Reports, Audit Logs: VISIBLE
+5. [User X] If currently on a now-unauthorized page (e.g., /dashboard/open-finance):
    - Page remains visible until next navigation (we do not force-redirect mid-session)
    - Next navigation triggers ProtectedRoute which redirects to /dashboard
 6. [User X] If they make an API call before the frontend refetches:
    - Backend returns 403 AUTH_FORBIDDEN (or 404 for enumeration prevention)
    - Frontend error handler shows toast: "Voce nao tem permissao para acessar este recurso"
 
-POSTCONDITION: User X sees INVESTOR-level navigation and content
+POSTCONDITION: User X sees LEGAL-level navigation and content
 SIDE EFFECTS: COMPANY_ROLE_CHANGED audit log (from the admin's action)
 ```
 
 ### Flow 4: Permission Override Applied
 
 ```
-Admin grants 'shareholders:create' to FINANCE member Y
+Admin grants 'ai:generateReports' to LEGAL member Y
   |
   +-- [Backend updates Y's permissions JSON]
   |     |
   |     +-- [Y refocuses window / navigates]
   |     |     +-- [PermissionContext refetches]
-  |     |     +-- [permissions array now includes 'shareholders:create']
+  |     |     +-- [permissions array now includes 'ai:generateReports']
   |     |
-  |     +-- [Y visits /dashboard/shareholders]
-  |           +-- [PermissionGate for 'shareholders:create' now passes]
-  |           +-- ["Adicionar Acionista" button is now visible]
+  |     +-- [Y visits /dashboard/ai/reports]
+  |           +-- [PermissionGate for 'ai:generateReports' now passes]
+  |           +-- ["Gerar Relatorio" button is now visible]
 ```
 
 Step-by-step:
 
 ```
-PRECONDITION: Admin sets override { "shareholders:create": true } on FINANCE member Y
+PRECONDITION: Admin sets override { "ai:generateReports": true } on LEGAL member Y
 ACTOR: Admin (initiator), User Y (affected)
-TRIGGER: PUT /api/v1/companies/:companyId/members/:memberId { permissions: { "shareholders:create": true } }
+TRIGGER: PUT /api/v1/companies/:companyId/members/:memberId { permissions: { "ai:generateReports": true } }
 
 1. [Backend] Updates Y's CompanyMember.permissions JSON
-2. [Backend] Permission resolution: override['shareholders:create'] = true
+2. [Backend] Permission resolution: override['ai:generateReports'] = true
 3. [Admin UI] Toast: "Permissoes atualizadas com sucesso"
 4. [User Y Frontend] On refetch:
    - GET /api/v1/companies/:companyId/members/me returns updated permissions array
-   - Array now includes 'shareholders:create'
-5. [User Y UI] On /dashboard/shareholders:
-   - PermissionGate with permission="shareholders:create" evaluates to true
-   - "Adicionar Acionista" button renders in the toolbar
-6. [User Y] Clicks "Adicionar Acionista"
-   - Backend validates: override grants 'shareholders:create' -> allowed
-   - Shareholder creation proceeds normally
+   - Array now includes 'ai:generateReports' and 'ai:viewReports' (via override + default)
+5. [User Y UI] On /dashboard/ai/reports:
+   - PermissionGate with permission="ai:generateReports" evaluates to true
+   - "Gerar Relatorio" button renders in the toolbar
+6. [User Y] Clicks "Gerar Relatorio"
+   - Backend validates: override grants 'ai:generateReports' -> allowed
+   - Report generation proceeds normally
 
-POSTCONDITION: FINANCE member Y can see and use the "Adicionar Acionista" button
+POSTCONDITION: LEGAL member Y can see and use the "Gerar Relatorio" button
 SIDE EFFECTS: PERMISSION_CHANGED audit log (from admin's action)
 ```
 
@@ -1660,12 +1818,13 @@ All user-facing strings for the permission system. These must be added to both `
 | Key | PT-BR | EN |
 |-----|-------|-----|
 | `dashboard.nav.dashboard` | Dashboard | Dashboard |
-| `dashboard.nav.capTable` | Cap Table | Cap Table |
-| `dashboard.nav.shareholders` | Acionistas | Shareholders |
-| `dashboard.nav.transactions` | Transacoes | Transactions |
-| `dashboard.nav.investments` | Investimentos | Investments |
-| `dashboard.nav.options` | Opcoes | Options |
-| `dashboard.nav.documents` | Documentos | Documents |
+| `dashboard.nav.aiReports` | Relatorios IA | AI Reports |
+| `dashboard.nav.openFinance` | Open Finance | Open Finance |
+| `dashboard.nav.investors` | Investidores | Investors |
+| `dashboard.nav.updates` | Atualizacoes | Updates |
+| `dashboard.nav.investorQA` | Q&A Investidores | Investor Q&A |
+| `dashboard.nav.dataroom` | Dataroom | Dataroom |
+| `dashboard.nav.reports` | Relatorios | Reports |
 | `dashboard.nav.members` | Membros | Members |
 | `dashboard.nav.settings` | Configuracoes | Settings |
 
@@ -1673,7 +1832,7 @@ All user-facing strings for the permission system. These must be added to both `
 
 ## Component Specifications
 
-### PermissionGate — Visual Spec
+### PermissionGate -- Visual Spec
 
 - **No visual representation**: This is a logic-only wrapper component
 - When permission denied: renders `null` (or optional `fallback`)
@@ -1681,7 +1840,7 @@ All user-facing strings for the permission system. These must be added to both `
 - No border, background, padding, or any visual footprint
 - When hidden: the element is completely absent from the DOM, not `display: none`
 
-### Sidebar Navigation — Visual Spec
+### Sidebar Navigation -- Visual Spec
 
 Per design-system.md section 5.2:
 
@@ -1689,20 +1848,20 @@ Per design-system.md section 5.2:
 - Active state: `navy-800` bg, white text, 3px `ocean-600` left border accent
 - Inactive state: transparent bg, white/70% text
 - Hover state: `navy-950` bg, white/90% text
-- **No "locked", "disabled", or "coming soon" indicators** — items simply do not appear
+- **No "locked", "disabled", or "coming soon" indicators** -- items simply do not appear
 - Navigation items: 40px height, 12px horizontal padding, 8px border-radius, 6px icon-to-text gap
 
-### ProtectedRoute — Visual Spec
+### ProtectedRoute -- Visual Spec
 
 - **Checking state**: Centered `<Spinner>` component
   - Color: `ocean-600` (#1B6B93)
   - Size: 20px
   - Container: `flex h-full items-center justify-center bg-gray-50`
 - **Unauthorized state**: Nothing rendered (redirect is in progress)
-  - No error page, no "access denied" screen — user is immediately redirected
+  - No error page, no "access denied" screen -- user is immediately redirected
 - **Authorized state**: Renders children with no wrapper elements (fragment only)
 
-### Permission Error Toast — Visual Spec
+### Permission Error Toast -- Visual Spec
 
 Per design-system.md section 6.7:
 
@@ -1723,12 +1882,12 @@ Per design-system.md section 6.7:
 - [ ] `PermissionContext` refreshes on window refocus and role change notifications
 - [ ] `PermissionContext` error state falls back to most restrictive (deny all)
 - [ ] `usePermissions()` hook provides `hasPermission()`, `hasRole()`, and `canAccess()`
-- [ ] `PermissionGate` hides unauthorized elements (not disabled — completely absent from DOM)
+- [ ] `PermissionGate` hides unauthorized elements (not disabled -- completely absent from DOM)
 - [ ] `PermissionGate` renders `null` while permissions are loading (no flash of unauthorized content)
 - [ ] `ProtectedRoute` redirects unauthorized users to `/dashboard` with error toast
 - [ ] `ProtectedRoute` shows spinner during permission check
 - [ ] Sidebar navigation filters items based on user permissions
-- [ ] ADMIN sees all 9 nav items; EMPLOYEE sees only Dashboard, Options, Documents
+- [ ] ADMIN sees all 10 nav items; LEGAL sees Dashboard, Updates, Dataroom, Reports
 - [ ] Table action columns are conditionally rendered based on permissions
 - [ ] Settings form is read-only for non-ADMIN users who have `companySettings:read`
 - [ ] Direct URL access to unauthorized pages triggers redirect + toast
@@ -1739,3 +1898,5 @@ Per design-system.md section 6.7:
 - [ ] Both `pt-BR.json` and `en.json` contain all permission i18n keys
 - [ ] Permission components have unit tests with 80%+ coverage
 - [ ] PermissionGate, ProtectedRoute, and usePermissions are tested for all role variants
+- [ ] Investor portal uses InvestorAccessProvider, not PermissionProvider
+- [ ] Investor viewers cannot access dashboard routes
