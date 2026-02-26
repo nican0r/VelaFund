@@ -7,6 +7,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { SessionService } from './session.service';
+import { AuditLogService } from '../audit-log/audit-log.service';
 
 describe('AuthController', () => {
   let controller: AuthController;
@@ -18,6 +19,10 @@ describe('AuthController', () => {
   let sessionService: {
     createSession: jest.Mock;
     destroySession: jest.Mock;
+    getSession: jest.Mock;
+  };
+  let auditLogService: {
+    log: jest.Mock;
   };
 
   const mockAuthenticatedUser = {
@@ -54,6 +59,11 @@ describe('AuthController', () => {
     sessionService = {
       createSession: jest.fn(),
       destroySession: jest.fn().mockResolvedValue(undefined),
+      getSession: jest.fn().mockResolvedValue(null),
+    };
+
+    auditLogService = {
+      log: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -61,6 +71,7 @@ describe('AuthController', () => {
       providers: [
         { provide: AuthService, useValue: authService },
         { provide: SessionService, useValue: sessionService },
+        { provide: AuditLogService, useValue: auditLogService },
       ],
     }).compile();
 
@@ -193,14 +204,26 @@ describe('AuthController', () => {
 
   describe('logout', () => {
     it('should destroy session and clear auth cookie', async () => {
+      sessionService.getSession.mockResolvedValue({
+        userId: 'user-uuid-1',
+        createdAt: Date.now(),
+        lastActivityAt: Date.now(),
+        ipAddress: '192.168.1.1',
+        userAgent: 'Mozilla/5.0',
+      });
+
       const mockReq = {
         cookies: { 'navia-auth-token': 'session-to-destroy' },
+        ip: '192.168.1.1',
+        socket: { remoteAddress: '192.168.1.1' },
+        headers: { 'user-agent': 'Mozilla/5.0', 'x-request-id': 'req-123' },
       };
       const mockRes = { clearCookie: jest.fn() };
 
       const result = await controller.logout(mockReq as any, mockRes as any);
 
       expect(result).toEqual({ messageKey: 'errors.auth.loggedOut' });
+      expect(sessionService.getSession).toHaveBeenCalledWith('session-to-destroy');
       expect(sessionService.destroySession).toHaveBeenCalledWith('session-to-destroy');
       expect(mockRes.clearCookie).toHaveBeenCalledWith(
         'navia-auth-token',
@@ -215,6 +238,9 @@ describe('AuthController', () => {
     it('should handle logout when no cookie present', async () => {
       const mockReq = {
         cookies: {},
+        ip: '10.0.0.1',
+        socket: { remoteAddress: '10.0.0.1' },
+        headers: {},
       };
       const mockRes = { clearCookie: jest.fn() };
 
@@ -295,6 +321,260 @@ describe('AuthController', () => {
         firstName: 'Maria',
         lastName: 'Santos',
         email: 'maria@example.com',
+      });
+    });
+  });
+
+  describe('audit logging', () => {
+    describe('AUTH_LOGIN_SUCCESS', () => {
+      it('should log AUTH_LOGIN_SUCCESS on successful login', async () => {
+        authService.login.mockResolvedValue({
+          user: mockAuthenticatedUser,
+          isNewUser: false,
+        });
+        sessionService.createSession.mockResolvedValue('session-id-abc');
+
+        const mockReq = {
+          ip: '192.168.1.100',
+          socket: { remoteAddress: '192.168.1.100' },
+          headers: { 'user-agent': 'Mozilla/5.0', 'x-request-id': 'req-uuid-1' },
+        };
+        const mockRes = { cookie: jest.fn() };
+
+        await controller.login({ privyAccessToken: 'valid-token' }, mockReq as any, mockRes as any);
+
+        expect(auditLogService.log).toHaveBeenCalledWith({
+          actorId: 'user-uuid-1',
+          actorType: 'USER',
+          action: 'AUTH_LOGIN_SUCCESS',
+          resourceType: 'User',
+          resourceId: 'user-uuid-1',
+          metadata: {
+            source: 'api',
+            ipAddress: '192.168.1.0/24',
+            userAgent: 'Mozilla/5.0',
+            requestId: 'req-uuid-1',
+            loginMethod: 'privy',
+            isNewUser: false,
+          },
+        });
+      });
+
+      it('should include isNewUser=true for first-time users', async () => {
+        authService.login.mockResolvedValue({
+          user: mockAuthenticatedUser,
+          isNewUser: true,
+        });
+        sessionService.createSession.mockResolvedValue('session-id-new');
+
+        const mockReq = {
+          ip: '10.0.0.1',
+          socket: { remoteAddress: '10.0.0.1' },
+          headers: { 'user-agent': 'Chrome', 'x-request-id': 'req-new' },
+        };
+        const mockRes = { cookie: jest.fn() };
+
+        await controller.login({ privyAccessToken: 'token' }, mockReq as any, mockRes as any);
+
+        expect(auditLogService.log).toHaveBeenCalledWith(
+          expect.objectContaining({
+            action: 'AUTH_LOGIN_SUCCESS',
+            metadata: expect.objectContaining({
+              isNewUser: true,
+            }),
+          }),
+        );
+      });
+
+      it('should not block login if audit logging fails', async () => {
+        authService.login.mockResolvedValue({
+          user: mockAuthenticatedUser,
+          isNewUser: false,
+        });
+        sessionService.createSession.mockResolvedValue('session-id');
+        auditLogService.log.mockRejectedValue(new Error('Bull queue unavailable'));
+
+        const mockReq = {
+          ip: '10.0.0.1',
+          socket: { remoteAddress: '10.0.0.1' },
+          headers: {},
+        };
+        const mockRes = { cookie: jest.fn() };
+
+        const result = await controller.login(
+          { privyAccessToken: 'token' },
+          mockReq as any,
+          mockRes as any,
+        );
+
+        expect(result.user).toEqual(mockAuthenticatedUser);
+        expect(mockRes.cookie).toHaveBeenCalled();
+      });
+    });
+
+    describe('AUTH_LOGIN_FAILED', () => {
+      it('should log AUTH_LOGIN_FAILED when login throws', async () => {
+        const loginError = new Error('errors.auth.invalidToken');
+        authService.login.mockRejectedValue(loginError);
+
+        const mockReq = {
+          ip: '192.168.1.50',
+          socket: { remoteAddress: '192.168.1.50' },
+          headers: { 'user-agent': 'Attacker/1.0', 'x-request-id': 'req-fail' },
+        };
+        const mockRes = { cookie: jest.fn() };
+
+        await expect(
+          controller.login({ privyAccessToken: 'bad-token' }, mockReq as any, mockRes as any),
+        ).rejects.toThrow();
+
+        expect(auditLogService.log).toHaveBeenCalledWith({
+          actorType: 'SYSTEM',
+          action: 'AUTH_LOGIN_FAILED',
+          resourceType: 'User',
+          metadata: {
+            source: 'api',
+            ipAddress: '192.168.1.0/24',
+            userAgent: 'Attacker/1.0',
+            requestId: 'req-fail',
+            reason: 'errors.auth.invalidToken',
+          },
+        });
+      });
+
+      it('should still throw the original error after logging failure', async () => {
+        const loginError = new Error('errors.auth.invalidToken');
+        authService.login.mockRejectedValue(loginError);
+
+        const mockReq = {
+          ip: '10.0.0.1',
+          socket: { remoteAddress: '10.0.0.1' },
+          headers: {},
+        };
+        const mockRes = { cookie: jest.fn() };
+
+        await expect(
+          controller.login({ privyAccessToken: 'bad-token' }, mockReq as any, mockRes as any),
+        ).rejects.toThrow('errors.auth.invalidToken');
+      });
+
+      it('should not block error propagation if audit logging fails', async () => {
+        authService.login.mockRejectedValue(new Error('errors.auth.invalidToken'));
+        auditLogService.log.mockRejectedValue(new Error('Queue down'));
+
+        const mockReq = {
+          ip: '10.0.0.1',
+          socket: { remoteAddress: '10.0.0.1' },
+          headers: {},
+        };
+        const mockRes = { cookie: jest.fn() };
+
+        await expect(
+          controller.login({ privyAccessToken: 'bad-token' }, mockReq as any, mockRes as any),
+        ).rejects.toThrow('errors.auth.invalidToken');
+      });
+    });
+
+    describe('AUTH_LOGOUT', () => {
+      it('should log AUTH_LOGOUT with userId when session exists', async () => {
+        sessionService.getSession.mockResolvedValue({
+          userId: 'user-uuid-1',
+          createdAt: Date.now(),
+          lastActivityAt: Date.now(),
+          ipAddress: '192.168.1.1',
+          userAgent: 'Mozilla/5.0',
+        });
+
+        const mockReq = {
+          cookies: { 'navia-auth-token': 'session-abc' },
+          ip: '192.168.1.1',
+          socket: { remoteAddress: '192.168.1.1' },
+          headers: { 'user-agent': 'Mozilla/5.0', 'x-request-id': 'req-logout' },
+        };
+        const mockRes = { clearCookie: jest.fn() };
+
+        await controller.logout(mockReq as any, mockRes as any);
+
+        expect(auditLogService.log).toHaveBeenCalledWith({
+          actorId: 'user-uuid-1',
+          actorType: 'USER',
+          action: 'AUTH_LOGOUT',
+          resourceType: 'User',
+          resourceId: 'user-uuid-1',
+          metadata: {
+            source: 'api',
+            ipAddress: '192.168.1.0/24',
+            userAgent: 'Mozilla/5.0',
+            requestId: 'req-logout',
+          },
+        });
+      });
+
+      it('should log AUTH_LOGOUT as SYSTEM when no session found', async () => {
+        sessionService.getSession.mockResolvedValue(null);
+
+        const mockReq = {
+          cookies: { 'navia-auth-token': 'expired-session' },
+          ip: '10.0.0.5',
+          socket: { remoteAddress: '10.0.0.5' },
+          headers: { 'user-agent': 'Chrome' },
+        };
+        const mockRes = { clearCookie: jest.fn() };
+
+        await controller.logout(mockReq as any, mockRes as any);
+
+        expect(auditLogService.log).toHaveBeenCalledWith(
+          expect.objectContaining({
+            actorId: undefined,
+            actorType: 'SYSTEM',
+            action: 'AUTH_LOGOUT',
+          }),
+        );
+      });
+
+      it('should log AUTH_LOGOUT when no cookie present', async () => {
+        const mockReq = {
+          cookies: {},
+          ip: '10.0.0.1',
+          socket: { remoteAddress: '10.0.0.1' },
+          headers: {},
+        };
+        const mockRes = { clearCookie: jest.fn() };
+
+        await controller.logout(mockReq as any, mockRes as any);
+
+        expect(auditLogService.log).toHaveBeenCalledWith(
+          expect.objectContaining({
+            actorId: undefined,
+            actorType: 'SYSTEM',
+            action: 'AUTH_LOGOUT',
+            resourceType: 'User',
+          }),
+        );
+      });
+
+      it('should not block logout if audit logging fails', async () => {
+        sessionService.getSession.mockResolvedValue({
+          userId: 'user-uuid-1',
+          createdAt: Date.now(),
+          lastActivityAt: Date.now(),
+          ipAddress: '192.168.1.1',
+          userAgent: 'Mozilla/5.0',
+        });
+        auditLogService.log.mockRejectedValue(new Error('Queue down'));
+
+        const mockReq = {
+          cookies: { 'navia-auth-token': 'session-abc' },
+          ip: '192.168.1.1',
+          socket: { remoteAddress: '192.168.1.1' },
+          headers: {},
+        };
+        const mockRes = { clearCookie: jest.fn() };
+
+        const result = await controller.logout(mockReq as any, mockRes as any);
+
+        expect(result).toEqual({ messageKey: 'errors.auth.loggedOut' });
+        expect(mockRes.clearCookie).toHaveBeenCalled();
       });
     });
   });

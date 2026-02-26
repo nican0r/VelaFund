@@ -1,6 +1,6 @@
 # Navia MVP — Implementation Plan v62.0
 
-> **Generated**: 2026-02-26 | **Tests**: 2748 passing (1731 backend + 1017 frontend) | **Backend modules**: 22 of 23 built
+> **Generated**: 2026-02-26 | **Tests**: 2758 passing (1741 backend + 1017 frontend) | **Backend modules**: 22 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -110,7 +110,7 @@ Gaps in the 12 built modules, ordered by module.
 - [x] Move failed-attempt lockout from in-memory Map to Redis — DONE: Redis INCR with TTL-based auto-expiry (15-min lockout period). Graceful degradation: if Redis is unavailable or errors, falls back to in-memory Map with 10K IP cap. 8 new tests (968 total passing).
 - [ ] Duplicate wallet check — prevent two users from linking the same wallet address
 - [ ] Privy API retry with exponential backoff (currently no retry on verify failure)
-- [ ] Audit logging events: AUTH_LOGIN_SUCCESS, AUTH_LOGIN_FAILED, AUTH_LOGOUT (requires programmatic AuditLogService.log() — @Public endpoints don't have request.user for interceptor)
+- [x] Audit logging events: AUTH_LOGIN_SUCCESS, AUTH_LOGIN_FAILED, AUTH_LOGOUT — DONE: Programmatic AuditLogService.log() calls in AuthController (login success/failure + logout). Fire-and-forget pattern, PII-safe metadata (maskIp), 10 new controller tests (21 total). Auth events not company-scoped (no companyId).
 - [x] Onboarding wizard status tracking per `authentication.md` spec — DONE (v0.0.62): AuthProvider tracks needsOnboarding/isNewUser state. Step determined by user.firstName presence (null → Step 1, exists → Step 2). completeOnboarding() callback clears state and triggers redirect to /dashboard.
 
 ### Company Module
@@ -227,7 +227,7 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 - [ ] PostgreSQL immutability trigger (migration to add BEFORE UPDATE OR DELETE trigger on audit_logs)
 - [ ] PostgreSQL table partitioning for audit_logs by month (migration)
 - [x] Integrate `@Auditable()` into all 10 target controllers — DONE (v0.0.24): Registered AuditInterceptor as APP_INTERCEPTOR in AppModule (useExisting to reuse AuditLogModule instance with Bull queue). Added @Auditable() decorators to 44 state-changing endpoints across 10 controllers: CompanyController (4), MemberController (4), InvitationController (1), ShareClassController (3), ShareholderController (4), CapTableController (2), TransactionController (5), FundingRoundController (8), ConvertibleController (5), OptionPlanController (8). Covers 40+ event types from the audit catalog. Auth events (login/logout) require programmatic logging via AuditLogService.log() — deferred. NotificationController skipped (user-scoped, not company audit-relevant). captureBeforeState set on update/delete ops for forward-compatibility (requires ClsModule for actual before-state capture).
-- [ ] All 50+ event types from the catalog — ~40 covered via @Auditable decorators; auth events (AUTH_LOGIN_SUCCESS/FAILED/LOGOUT), KYC events, blockchain events, and SYSTEM events (reconciliation, vesting milestones) require programmatic AuditLogService.log() calls in their respective modules
+- [ ] All 50+ event types from the catalog — ~43 covered (40 via @Auditable decorators + 3 auth events via programmatic AuditLogService.log()); KYC events, blockchain events, and SYSTEM events (reconciliation, vesting milestones) still require programmatic AuditLogService.log() calls in their respective modules
 - [ ] Export (CSV/PDF/XLSX)
 - [ ] User flow doc: `docs/user-flows/audit-logging.md`
 

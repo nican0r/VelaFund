@@ -4,11 +4,13 @@ import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { SessionService } from './session.service';
+import { AuditLogService } from '../audit-log/audit-log.service';
 import { LoginDto } from './dto/login.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { Public } from './decorators/public.decorator';
 import { RequireAuth } from './decorators/require-auth.decorator';
 import { CurrentUser, AuthenticatedUser } from './decorators/current-user.decorator';
+import { maskIp } from '../common/utils/redact-pii';
 
 @ApiTags('Auth')
 @Controller('api/v1/auth')
@@ -16,6 +18,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly sessionService: SessionService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   @Post('login')
@@ -32,7 +35,36 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
-    const { user, isNewUser } = await this.authService.login(dto.privyAccessToken, ipAddress);
+    const userAgent = req.headers['user-agent'] || '';
+    const requestId = (req.headers['x-request-id'] as string) || '';
+
+    let user: AuthenticatedUser;
+    let isNewUser: boolean;
+
+    try {
+      const result = await this.authService.login(dto.privyAccessToken, ipAddress);
+      user = result.user;
+      isNewUser = result.isNewUser;
+    } catch (error) {
+      // Log AUTH_LOGIN_FAILED for authentication failures (fire-and-forget)
+      this.auditLogService
+        .log({
+          actorType: 'SYSTEM',
+          action: 'AUTH_LOGIN_FAILED',
+          resourceType: 'User',
+          metadata: {
+            source: 'api',
+            ipAddress: maskIp(ipAddress),
+            userAgent,
+            requestId,
+            reason: error instanceof Error ? error.message : 'Unknown',
+          },
+        })
+        .catch(() => {
+          /* audit log failure should not affect auth flow */
+        });
+      throw error;
+    }
 
     // BUG-1 fix: Create a Redis-backed session instead of storing the raw Privy token.
     // Privy tokens expire in 1-6 hours, but our session needs to last 7 days.
@@ -40,7 +72,7 @@ export class AuthController {
     // so we no longer depend on Privy token validity for ongoing requests.
     const sessionId = await this.sessionService.createSession(user.id, {
       ipAddress,
-      userAgent: req.headers['user-agent'] || '',
+      userAgent,
     });
 
     // If Redis is unavailable, fall back to storing the Privy token (legacy behavior)
@@ -54,6 +86,27 @@ export class AuthController {
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days (absolute session limit)
     });
+
+    // Log AUTH_LOGIN_SUCCESS (fire-and-forget)
+    this.auditLogService
+      .log({
+        actorId: user.id,
+        actorType: 'USER',
+        action: 'AUTH_LOGIN_SUCCESS',
+        resourceType: 'User',
+        resourceId: user.id,
+        metadata: {
+          source: 'api',
+          ipAddress: maskIp(ipAddress),
+          userAgent,
+          requestId,
+          loginMethod: 'privy',
+          isNewUser,
+        },
+      })
+      .catch(() => {
+        /* audit log failure should not affect auth flow */
+      });
 
     return {
       user,
@@ -70,9 +123,13 @@ export class AuthController {
   @ApiOperation({ summary: 'Logout and invalidate session' })
   @ApiResponse({ status: 200, description: 'Logout successful' })
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    // Destroy the Redis session if one exists
+    // Read session to get userId for audit logging before destroying
     const sessionId = req.cookies?.['navia-auth-token'];
+    let userId: string | undefined;
+
     if (sessionId) {
+      const session = await this.sessionService.getSession(sessionId);
+      userId = session?.userId;
       await this.sessionService.destroySession(sessionId);
     }
 
@@ -82,6 +139,26 @@ export class AuthController {
       sameSite: 'strict',
       path: '/',
     });
+
+    // Log AUTH_LOGOUT (fire-and-forget)
+    const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
+    this.auditLogService
+      .log({
+        actorId: userId,
+        actorType: userId ? 'USER' : 'SYSTEM',
+        action: 'AUTH_LOGOUT',
+        resourceType: 'User',
+        resourceId: userId,
+        metadata: {
+          source: 'api',
+          ipAddress: maskIp(ipAddress),
+          userAgent: req.headers['user-agent'] || '',
+          requestId: (req.headers['x-request-id'] as string) || '',
+        },
+      })
+      .catch(() => {
+        /* audit log failure should not affect logout flow */
+      });
 
     return { messageKey: 'errors.auth.loggedOut' };
   }

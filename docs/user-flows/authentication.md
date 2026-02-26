@@ -392,6 +392,24 @@ POSTCONDITION: User authenticated, but without Redis session resilience
 
 ---
 
+## Audit Events
+
+Authentication events are audit-logged programmatically via `AuditLogService.log()` in `AuthController`. These events are fire-and-forget — audit log failures never block the auth flow.
+
+| Event | Action Code | Actor Type | Trigger | Metadata |
+|-------|------------|-----------|---------|----------|
+| Login success | `AUTH_LOGIN_SUCCESS` | `USER` | Successful Privy token verification + user lookup/creation | `ipAddress` (masked /24), `userAgent`, `requestId`, `loginMethod: 'privy'`, `isNewUser` |
+| Login failed | `AUTH_LOGIN_FAILED` | `SYSTEM` | Invalid Privy token or lockout | `ipAddress` (masked /24), `userAgent`, `requestId`, `reason` |
+| Logout | `AUTH_LOGOUT` | `USER` or `SYSTEM` | User initiates logout | `ipAddress` (masked /24), `userAgent`, `requestId` |
+
+**Notes**:
+- Auth events are not company-scoped (`companyId` is null) since login/logout are global operations.
+- `AUTH_LOGIN_FAILED` uses `actorType: 'SYSTEM'` because there is no authenticated user on failure.
+- `AUTH_LOGOUT` uses `actorType: 'USER'` when the session is found (userId extracted from Redis session before destruction), or `SYSTEM` when the session is expired/missing.
+- IP addresses are always masked to `/24` subnet before logging for LGPD compliance.
+
+---
+
 ## Auth Token Flow (Request Lifecycle)
 
 Every request goes through three global guards in order: ThrottlerGuard -> AuthGuard -> RolesGuard.

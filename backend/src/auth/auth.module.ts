@@ -5,8 +5,10 @@ import { SessionService } from './session.service';
 import { AuthController } from './auth.controller';
 import { AuthGuard } from './guards/auth.guard';
 import { RolesGuard } from './guards/roles.guard';
+import { AuditLogModule } from '../audit-log/audit-log.module';
 
 @Module({
+  imports: [AuditLogModule],
   controllers: [AuthController],
   providers: [
     AuthService,
