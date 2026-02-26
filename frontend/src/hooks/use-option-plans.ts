@@ -242,6 +242,56 @@ export function useOptionExercises(
   });
 }
 
+export function useCreateExercise(companyId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      grantId,
+      quantity,
+    }: {
+      grantId: string;
+      quantity: string;
+    }) =>
+      api.post<OptionExerciseRequest>(
+        `/api/v1/companies/${companyId}/option-grants/${grantId}/exercise`,
+        { quantity },
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['optionExercises', companyId],
+      });
+      queryClient.invalidateQueries({ queryKey: ['optionGrants', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['optionPlans', companyId] });
+    },
+  });
+}
+
+export function useConfirmExercise(companyId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      exerciseId,
+      paymentNotes,
+    }: {
+      exerciseId: string;
+      paymentNotes?: string;
+    }) =>
+      api.post<OptionExerciseRequest>(
+        `/api/v1/companies/${companyId}/option-exercises/${exerciseId}/confirm`,
+        paymentNotes ? { paymentNotes } : {},
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['optionExercises', companyId],
+      });
+      queryClient.invalidateQueries({ queryKey: ['optionGrants', companyId] });
+      queryClient.invalidateQueries({ queryKey: ['optionPlans', companyId] });
+    },
+  });
+}
+
 export function useCancelExercise(companyId: string | undefined) {
   const queryClient = useQueryClient();
 

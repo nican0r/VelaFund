@@ -24,6 +24,20 @@ jest.mock('next-intl', () => ({
         'confirm.cancelExerciseTitle': 'Cancel Exercise',
         'confirm.cancelExerciseDescription': 'This action cannot be undone. The exercise request will be cancelled.',
         'confirm.cancelExercise': 'Confirm Cancellation',
+        'confirmExercise.title': 'Confirm Exercise',
+        'confirmExercise.description': 'Confirm that payment has been received.',
+        'confirmExercise.employee': 'Employee',
+        'confirmExercise.quantity': 'Quantity',
+        'confirmExercise.totalCost': 'Total Cost',
+        'confirmExercise.paymentReference': 'Payment Reference',
+        'confirmExercise.paymentNotes': 'Payment Notes',
+        'confirmExercise.paymentNotesPlaceholder': 'e.g. Bank transfer received',
+        'confirmExercise.confirmButton': 'Confirm Payment',
+        'confirmExercise.cancel': 'Cancel',
+        'success.cancelled': 'Grant cancelled successfully',
+        'success.cancelledExercise': 'Exercise cancelled successfully',
+        'success.closed': 'Plan closed successfully',
+        'success.confirmedExercise': 'Exercise confirmed successfully',
         'stats.total': 'Total Plans',
         'stats.active': 'Active',
         'stats.closed': 'Closed',
@@ -111,6 +125,7 @@ const mockUseOptionGrants = jest.fn();
 const mockUseCancelGrant = jest.fn();
 const mockUseOptionExercises = jest.fn();
 const mockUseCancelExercise = jest.fn();
+const mockUseConfirmExercise = jest.fn();
 jest.mock('@/hooks/use-option-plans', () => ({
   useOptionPlans: (...args: unknown[]) => mockUseOptionPlans(...args),
   useClosePlan: (...args: unknown[]) => mockUseClosePlan(...args),
@@ -118,6 +133,18 @@ jest.mock('@/hooks/use-option-plans', () => ({
   useCancelGrant: (...args: unknown[]) => mockUseCancelGrant(...args),
   useOptionExercises: (...args: unknown[]) => mockUseOptionExercises(...args),
   useCancelExercise: (...args: unknown[]) => mockUseCancelExercise(...args),
+  useConfirmExercise: (...args: unknown[]) => mockUseConfirmExercise(...args),
+}));
+
+// Mock error toast
+const mockShowErrorToast = jest.fn();
+jest.mock('@/lib/use-error-toast', () => ({
+  useErrorToast: () => ({ showErrorToast: mockShowErrorToast }),
+}));
+
+// Mock sonner
+jest.mock('sonner', () => ({
+  toast: { success: jest.fn(), error: jest.fn() },
 }));
 
 // --- Mock data ---
@@ -300,6 +327,7 @@ function setupDefaultMocks(overrides?: {
   cancelGrant?: Record<string, unknown>;
   exercises?: Record<string, unknown>;
   cancelExercise?: Record<string, unknown>;
+  confirmExercise?: Record<string, unknown>;
 }) {
   mockUseCompany.mockReturnValue({
     companies: [{ id: 'c1', name: 'Acme', status: 'ACTIVE' }],
@@ -341,6 +369,11 @@ function setupDefaultMocks(overrides?: {
     mutateAsync: jest.fn().mockResolvedValue(undefined),
     isPending: false,
     ...overrides?.cancelExercise,
+  });
+  mockUseConfirmExercise.mockReturnValue({
+    mutateAsync: jest.fn().mockResolvedValue(undefined),
+    isPending: false,
+    ...overrides?.confirmExercise,
   });
 }
 
@@ -938,6 +971,152 @@ describe('OptionPlansPage', () => {
       fireEvent.click(screen.getByText('Exercises'));
 
       expect(screen.getByText('Failed to load exercises')).toBeInTheDocument();
+    });
+
+    // --- Confirm Exercise tests ---
+
+    it('renders confirm button for PENDING_PAYMENT exercises', () => {
+      renderExercisesTab();
+
+      const confirmButtons = screen.getAllByTitle('Confirm Payment');
+      expect(confirmButtons).toHaveLength(1);
+    });
+
+    it('does not render confirm button for COMPLETED exercises', () => {
+      setupDefaultMocks({
+        exercises: {
+          data: {
+            data: [mockExercises[1]], // COMPLETED exercise only
+            meta: { total: 1, page: 1, limit: 20, totalPages: 1 },
+          },
+          isLoading: false,
+        },
+      });
+      render(<OptionPlansPage />);
+      fireEvent.click(screen.getByText('Exercises'));
+
+      expect(screen.queryByTitle('Confirm Payment')).not.toBeInTheDocument();
+    });
+
+    it('opens confirm exercise dialog on confirm click', () => {
+      renderExercisesTab();
+
+      const confirmButton = screen.getByTitle('Confirm Payment');
+      fireEvent.click(confirmButton);
+
+      expect(screen.getByText('Confirm Exercise')).toBeInTheDocument();
+      expect(screen.getByText('Confirm that payment has been received.')).toBeInTheDocument();
+    });
+
+    it('shows exercise details in confirm dialog', () => {
+      renderExercisesTab();
+
+      const confirmButton = screen.getByTitle('Confirm Payment');
+      fireEvent.click(confirmButton);
+
+      expect(screen.getAllByText('Payment Reference').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText('PIX-20260115').length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('shows payment notes textarea in confirm dialog', () => {
+      renderExercisesTab();
+
+      const confirmButton = screen.getByTitle('Confirm Payment');
+      fireEvent.click(confirmButton);
+
+      expect(screen.getByText('Payment Notes')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('e.g. Bank transfer received')).toBeInTheDocument();
+    });
+
+    it('calls confirm exercise mutation when dialog confirmed', async () => {
+      const mockConfirmMutateAsync = jest.fn().mockResolvedValue(undefined);
+      setupDefaultMocks({
+        confirmExercise: { mutateAsync: mockConfirmMutateAsync, isPending: false },
+      });
+
+      render(<OptionPlansPage />);
+      fireEvent.click(screen.getByText('Exercises'));
+
+      const confirmButton = screen.getByTitle('Confirm Payment');
+      fireEvent.click(confirmButton);
+
+      // Click confirm payment button in dialog
+      const dialogConfirmButton = screen.getByText('Confirm Payment');
+      // The button in dialog (not the table action button)
+      const dialogButton = screen.getAllByText('Confirm Payment').find(
+        (el) => el.tagName === 'BUTTON' && el.closest('.fixed'),
+      );
+      fireEvent.click(dialogButton!);
+
+      await waitFor(() => {
+        expect(mockConfirmMutateAsync).toHaveBeenCalledWith({
+          exerciseId: 'exercise-1',
+          paymentNotes: undefined,
+        });
+      });
+    });
+
+    it('passes payment notes to confirm mutation', async () => {
+      const mockConfirmMutateAsync = jest.fn().mockResolvedValue(undefined);
+      setupDefaultMocks({
+        confirmExercise: { mutateAsync: mockConfirmMutateAsync, isPending: false },
+      });
+
+      render(<OptionPlansPage />);
+      fireEvent.click(screen.getByText('Exercises'));
+
+      const confirmButton = screen.getByTitle('Confirm Payment');
+      fireEvent.click(confirmButton);
+
+      // Type payment notes
+      const textarea = screen.getByPlaceholderText('e.g. Bank transfer received');
+      fireEvent.change(textarea, { target: { value: 'PIX received' } });
+
+      // Click confirm
+      const dialogButton = screen.getAllByText('Confirm Payment').find(
+        (el) => el.tagName === 'BUTTON' && el.closest('.fixed'),
+      );
+      fireEvent.click(dialogButton!);
+
+      await waitFor(() => {
+        expect(mockConfirmMutateAsync).toHaveBeenCalledWith({
+          exerciseId: 'exercise-1',
+          paymentNotes: 'PIX received',
+        });
+      });
+    });
+
+    it('closes confirm dialog when backdrop clicked', () => {
+      renderExercisesTab();
+
+      const confirmButton = screen.getByTitle('Confirm Payment');
+      fireEvent.click(confirmButton);
+
+      expect(screen.getByText('Confirm Exercise')).toBeInTheDocument();
+
+      // Click backdrop
+      const backdrop = screen.getByRole('presentation');
+      fireEvent.click(backdrop);
+
+      expect(screen.queryByText('Confirm Exercise')).not.toBeInTheDocument();
+    });
+
+    it('closes confirm dialog when cancel button clicked', () => {
+      renderExercisesTab();
+
+      const confirmButton = screen.getByTitle('Confirm Payment');
+      fireEvent.click(confirmButton);
+
+      expect(screen.getByText('Confirm Exercise')).toBeInTheDocument();
+
+      // Click cancel button in dialog
+      const cancelButtons = screen.getAllByText('Cancel');
+      const dialogCancelButton = cancelButtons.find(
+        (el) => el.tagName === 'BUTTON' && el.closest('.fixed'),
+      );
+      fireEvent.click(dialogCancelButton!);
+
+      expect(screen.queryByText('Confirm Exercise')).not.toBeInTheDocument();
     });
   });
 });

@@ -587,33 +587,41 @@ ACTOR: ADMIN member
 TRIGGER: User clicks "Exercise Options" on an ACTIVE grant
 
 1. [UI] User views grant detail page with ACTIVE status and exercisable options > 0
-2. [UI] User clicks "Exercise Options"
-3. [UI] Form opens showing: grant details, vested/exercisable quantity, strike price
-   Fields: quantity (required)
-4. [UI] User enters quantity to exercise and clicks "Submit"
-5. [Frontend] Validates input client-side (quantity > 0, quantity <= exercisable)
+2. [UI] User clicks "Exercise Options" button in header
+3. [UI] Navigates to /dashboard/options/grants/:grantId/exercise
+   → Guard checks: no pending exercise, grant ACTIVE, exercisableQty > 0
+   → IF pending exercise exists: show warning banner, STOP
+   → IF grant not active: show "not active" message, STOP
+   → IF no exercisable: show "no exercisable options" message, STOP
+4. [UI] Step 1 (Details): Grant info card (employee, plan, exercisable qty, strike price)
+   Quantity input with live total cost calculation (quantity × strikePrice)
+   Helper text shows max exercisable
+5. [UI] User enters quantity and clicks "Review"
+6. [Frontend] Validates input client-side (quantity > 0, quantity <= exercisable)
    → IF invalid: show field-level errors, STOP
-6. [Frontend] Sends POST /api/v1/companies/:companyId/option-grants/:grantId/exercise
+7. [UI] Step 2 (Review): Summary card with employee, plan, quantity, strike price, total cost
+8. [UI] User clicks "Submit Exercise"
+9. [Frontend] Sends POST /api/v1/companies/:companyId/option-grants/:grantId/exercise
    Body: { quantity }
-7. [Backend] Validates authentication and authorization (ADMIN)
-8. [Backend] Validates grant exists and belongs to company
-   → IF not found: return 404
-9. [Backend] Validates grant status = ACTIVE
-   → IF not ACTIVE: return 422 OPT_GRANT_NOT_ACTIVE
-10. [Backend] If grant has terminatedAt, checks exercise window
+10. [Backend] Validates authentication and authorization (ADMIN or grantee EMPLOYEE)
+11. [Backend] Validates grant exists and belongs to company
+    → IF not found: return 404
+12. [Backend] Validates grant status = ACTIVE
+    → IF not ACTIVE: return 422 OPT_GRANT_NOT_ACTIVE
+13. [Backend] If grant has terminatedAt, checks exercise window
     → IF exerciseWindowDays elapsed since terminatedAt: return 422 OPT_EXERCISE_WINDOW_CLOSED
-11. [Backend] Validates quantity > 0
+14. [Backend] Validates quantity > 0
     → IF invalid: return 422 OPT_INVALID_QUANTITY
-12. [Backend] Calculates vesting: exercisable = vestedQuantity - exercised
+15. [Backend] Calculates vesting: exercisable = vestedQuantity - exercised
     → IF quantity > exercisable: return 422 OPT_INSUFFICIENT_VESTED
-13. [Backend] Checks for existing PENDING_PAYMENT exercise on this grant
+16. [Backend] Checks for existing PENDING_PAYMENT exercise on this grant
     → IF pending exists: return 422 OPT_EXERCISE_PENDING
-14. [Backend] Calculates totalCost = quantity × strikePrice
-15. [Backend] Generates unique payment reference (EX-YYYY-XXXXXX)
-16. [Backend] Creates OptionExerciseRequest with status = PENDING_PAYMENT
-17. [Backend] Returns 201 with created exercise request
-18. [UI] Shows success toast: "Exercise request created. Payment reference: EX-2026-A1B2C3"
-19. [UI] Navigates to exercise detail page
+17. [Backend] Calculates totalCost = quantity × strikePrice
+18. [Backend] Generates unique payment reference (EX-YYYY-XXXXXX)
+19. [Backend] Creates OptionExerciseRequest with status = PENDING_PAYMENT
+20. [Backend] Returns 201 with created exercise request
+21. [UI] Shows success toast: "Exercise request created successfully"
+22. [UI] Navigates back to grant detail page
 
 POSTCONDITION: OptionExerciseRequest exists with status PENDING_PAYMENT, payment reference generated
 SIDE EFFECTS: Audit log (future: OPTION_EXERCISE_REQUESTED)
@@ -669,33 +677,39 @@ PRECONDITION: Exercise request is PENDING_PAYMENT, grant has linked shareholder,
 ACTOR: ADMIN member
 TRIGGER: User clicks "Confirm Payment" on a PENDING_PAYMENT exercise
 
-1. [UI] User views exercise detail page with PENDING_PAYMENT status
-2. [UI] User clicks "Confirm Payment"
-3. [UI] Confirmation dialog showing: quantity, total cost, payment reference, shareholder receiving shares
-   Optional field: paymentNotes
-4. [UI] User clicks "Confirm"
-5. [Frontend] Sends POST /api/v1/companies/:companyId/option-exercises/:exerciseId/confirm
+1. [UI] User views the Exercises tab on the Options page, or the Exercises tab on a grant detail page
+   - PENDING_PAYMENT exercises show a green checkmark (✓) confirm button in the actions column
+2. [UI] User clicks the confirm button (CheckCircle2 icon) on a PENDING_PAYMENT exercise row
+3. [UI] ConfirmExerciseDialog modal opens, showing:
+   - Exercise summary card: quantity, price per share, total cost (BRL), payment reference, grant name
+   - Optional textarea: "Payment Notes" for admin to add payment confirmation details
+   - Two buttons: "Confirm Payment" (primary, blue) and "Cancel" (secondary)
+   - Backdrop overlay (click to close)
+4. [UI] User optionally fills in payment notes (e.g., bank transfer confirmation number)
+5. [UI] User clicks "Confirm Payment"
+6. [Frontend] Sends POST /api/v1/companies/:companyId/option-exercises/:exerciseId/confirm
    Body: { paymentNotes? }
-6. [Backend] Validates auth (ADMIN), exercise exists (scoped through grant.companyId)
+7. [Backend] Validates auth (ADMIN), exercise exists (scoped through grant.companyId)
    → IF not found: return 404
-7. [Backend] Validates status = PENDING_PAYMENT
+8. [Backend] Validates status = PENDING_PAYMENT
    → IF COMPLETED/PAYMENT_CONFIRMED/SHARES_ISSUED: return 422 OPT_EXERCISE_ALREADY_CONFIRMED
    → IF CANCELLED: return 422 OPT_EXERCISE_ALREADY_CANCELLED
    → IF other non-pending status: return 422 OPT_EXERCISE_NOT_PENDING
-8. [Backend] Validates grant has linked shareholder
+9. [Backend] Validates grant has linked shareholder
    → IF shareholderId is null: return 422 OPT_NO_SHAREHOLDER_LINKED
-9. [Backend] Begins $transaction (atomic, all-or-nothing):
-   a. Updates OptionExerciseRequest: status → COMPLETED, confirmedBy, confirmedAt
-   b. Updates OptionGrant: exercised += quantity
-      - If exercised >= total quantity: status → EXERCISED
-   c. Updates OptionPlan: totalExercised += quantity
-   d. Upserts Shareholding for the shareholder + share class:
-      - If holding exists: quantity += exercise quantity
-      - If no holding: creates new Shareholding with exercise quantity
-   e. Updates ShareClass: totalIssued += quantity
-10. [Backend] Returns 200 with confirmed exercise
-11. [UI] Shows success toast: "Payment confirmed. Shares issued."
-12. [UI] Exercise detail refreshes with COMPLETED status badge
+10. [Backend] Begins $transaction (atomic, all-or-nothing):
+    a. Updates OptionExerciseRequest: status → COMPLETED, confirmedBy, confirmedAt
+    b. Updates OptionGrant: exercised += quantity
+       - If exercised >= total quantity: status → EXERCISED
+    c. Updates OptionPlan: totalExercised += quantity
+    d. Upserts Shareholding for the shareholder + share class:
+       - If holding exists: quantity += exercise quantity
+       - If no holding: creates new Shareholding with exercise quantity
+    e. Updates ShareClass: totalIssued += quantity
+11. [Backend] Returns 200 with confirmed exercise
+12. [UI] Shows success toast: "Payment confirmed. Shares issued."
+13. [UI] Exercises list refreshes, exercise now shows COMPLETED status badge
+    - Confirm button no longer appears for this exercise
 
 POSTCONDITION: Exercise status = COMPLETED. Grant.exercised incremented (may transition to EXERCISED if fully exercised). Plan.totalExercised incremented. Shareholder holdings increased by exercise quantity. ShareClass.totalIssued increased.
 SIDE EFFECTS: Audit log (future: OPTION_EXERCISE_CONFIRMED). Cap table mutated.
@@ -708,10 +722,12 @@ PRECONDITION: Exercise request is PENDING_PAYMENT, user has ADMIN role
 ACTOR: ADMIN member
 TRIGGER: User clicks "Cancel Exercise" on a PENDING_PAYMENT exercise
 
-1. [UI] User views exercise detail page with PENDING_PAYMENT status
-2. [UI] User clicks "Cancel Exercise"
-3. [UI] Confirmation dialog: "Cancel this exercise request?"
-4. [UI] User clicks "Confirm"
+1. [UI] User views the Exercises tab on the Options page, or the Exercises tab on a grant detail page
+   - PENDING_PAYMENT exercises show a cancel button (X icon) in the actions column
+2. [UI] User clicks the cancel button on a PENDING_PAYMENT exercise row
+3. [UI] ConfirmDialog modal opens: "Cancel this exercise request?" with exercise details
+   - Two buttons: "Yes, cancel" (destructive, red) and "No" (secondary)
+4. [UI] User clicks "Yes, cancel"
 5. [Frontend] Sends POST /api/v1/companies/:companyId/option-exercises/:exerciseId/cancel
 6. [Backend] Validates auth (ADMIN), exercise exists
    → IF not found: return 404
@@ -721,7 +737,8 @@ TRIGGER: User clicks "Cancel Exercise" on a PENDING_PAYMENT exercise
 8. [Backend] Updates exercise: status → CANCELLED, cancelledAt = now
 9. [Backend] Returns 200 with cancelled exercise
 10. [UI] Shows success toast: "Exercise request cancelled"
-11. [UI] Exercise detail refreshes with CANCELLED status badge
+11. [UI] Exercises list refreshes, exercise now shows CANCELLED status badge
+    - Cancel and confirm buttons no longer appear for this exercise
 
 POSTCONDITION: Exercise status = CANCELLED, cancelledAt set. No changes to grant, plan, or cap table.
 SIDE EFFECTS: Audit log (future: OPTION_EXERCISE_REJECTED)

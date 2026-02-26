@@ -82,6 +82,19 @@ jest.mock('next-intl', () => ({
         'confirm.cancelExerciseTitle': 'Cancel Exercise',
         'confirm.cancelExerciseDescription': 'Are you sure you want to cancel this exercise?',
         'confirm.cancelExercise': 'Cancel Exercise',
+        'confirmExercise.title': 'Confirm Exercise',
+        'confirmExercise.description': 'Confirm payment received.',
+        'confirmExercise.employee': 'Employee',
+        'confirmExercise.quantity': 'Quantity',
+        'confirmExercise.totalCost': 'Total Cost',
+        'confirmExercise.paymentReference': 'Payment Reference',
+        'confirmExercise.paymentNotes': 'Payment Notes',
+        'confirmExercise.paymentNotesPlaceholder': 'e.g. Bank transfer received',
+        'confirmExercise.confirmButton': 'Confirm Payment',
+        'confirmExercise.cancel': 'Cancel',
+        'exerciseForm.exerciseButton': 'Exercise Options',
+        'success.cancelledExercise': 'Exercise cancelled',
+        'success.confirmedExercise': 'Exercise confirmed',
         actions: 'Actions',
         'pagination.showing': `Showing ${params?.from ?? ''} to ${params?.to ?? ''} of ${params?.total ?? ''}`,
         'pagination.previous': 'Previous',
@@ -120,12 +133,24 @@ const mockUseGrantVestingSchedule = jest.fn();
 const mockUseOptionExercises = jest.fn();
 const mockUseCancelGrant = jest.fn();
 const mockUseCancelExercise = jest.fn();
+const mockUseConfirmExercise = jest.fn();
 jest.mock('@/hooks/use-option-plans', () => ({
   useOptionGrant: (...args: unknown[]) => mockUseOptionGrant(...args),
   useGrantVestingSchedule: (...args: unknown[]) => mockUseGrantVestingSchedule(...args),
   useOptionExercises: (...args: unknown[]) => mockUseOptionExercises(...args),
   useCancelGrant: (...args: unknown[]) => mockUseCancelGrant(...args),
   useCancelExercise: (...args: unknown[]) => mockUseCancelExercise(...args),
+  useConfirmExercise: (...args: unknown[]) => mockUseConfirmExercise(...args),
+}));
+
+// Mock error toast
+jest.mock('@/lib/use-error-toast', () => ({
+  useErrorToast: () => ({ showErrorToast: jest.fn() }),
+}));
+
+// Mock sonner
+jest.mock('sonner', () => ({
+  toast: { success: jest.fn(), error: jest.fn() },
 }));
 
 // --- Mock data ---
@@ -285,6 +310,10 @@ function setupDefaults() {
     isPending: false,
   });
   mockUseCancelExercise.mockReturnValue({
+    mutateAsync: jest.fn().mockResolvedValue({}),
+    isPending: false,
+  });
+  mockUseConfirmExercise.mockReturnValue({
     mutateAsync: jest.fn().mockResolvedValue({}),
     isPending: false,
   });
@@ -519,7 +548,7 @@ describe('OptionGrantDetailPage', () => {
     fireEvent.click(exercisesTab);
 
     // Only 1 pending exercise should have cancel button
-    const cancelButtons = screen.getAllByTitle('Cancel');
+    const cancelButtons = screen.getAllByTitle('Cancel Exercise');
     expect(cancelButtons).toHaveLength(1);
   });
 
@@ -590,10 +619,10 @@ describe('OptionGrantDetailPage', () => {
     const exercisesTab = screen.getByText('Exercises');
     fireEvent.click(exercisesTab);
 
-    const cancelButtons = screen.getAllByTitle('Cancel');
+    const cancelButtons = screen.getAllByTitle('Cancel Exercise');
     fireEvent.click(cancelButtons[0]);
 
-    // 'Cancel Exercise' appears in both dialog title and confirm button
+    // 'Cancel Exercise' appears in dialog title and confirm button
     const cancelTexts = screen.getAllByText('Cancel Exercise');
     expect(cancelTexts.length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Are you sure you want to cancel this exercise?')).toBeInTheDocument();
@@ -609,7 +638,7 @@ describe('OptionGrantDetailPage', () => {
     const exercisesTab = screen.getByText('Exercises');
     fireEvent.click(exercisesTab);
 
-    const cancelButtons = screen.getAllByTitle('Cancel');
+    const cancelButtons = screen.getAllByTitle('Cancel Exercise');
     fireEvent.click(cancelButtons[0]);
 
     // Find and click confirm in dialog

@@ -28,7 +28,10 @@ import {
   useOptionExercises,
   useCancelGrant,
   useCancelExercise,
+  useConfirmExercise,
 } from '@/hooks/use-option-plans';
+import { useErrorToast } from '@/lib/use-error-toast';
+import { toast } from 'sonner';
 import type {
   OptionGrant,
   OptionGrantStatus,
@@ -628,6 +631,111 @@ function VestingTab({
 
 // --- Exercises Tab ---
 
+// --- Confirm Exercise Dialog ---
+
+function ConfirmExerciseDialog({
+  open,
+  onClose,
+  onConfirm,
+  loading,
+  exercise,
+  t,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: (paymentNotes?: string) => void;
+  loading: boolean;
+  exercise: OptionExerciseRequest | null;
+  t: (key: string, values?: Record<string, string | number>) => string;
+}) {
+  const [paymentNotes, setPaymentNotes] = useState('');
+
+  if (!open || !exercise) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div
+        className="fixed inset-0 bg-navy-900/50"
+        onClick={onClose}
+        role="presentation"
+      />
+      <div className="relative z-50 w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+        <h3 className="text-lg font-semibold text-navy-900">
+          {t('confirmExercise.title')}
+        </h3>
+        <p className="mt-2 text-sm text-gray-600">
+          {t('confirmExercise.description')}
+        </p>
+
+        {/* Exercise summary */}
+        <div className="mt-4 rounded-md bg-gray-50 p-4 space-y-2">
+          {exercise.grant?.employeeName && (
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-500">{t('confirmExercise.employee')}</span>
+              <span className="font-medium text-gray-900">{exercise.grant.employeeName}</span>
+            </div>
+          )}
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500">{t('confirmExercise.quantity')}</span>
+            <span className="font-medium text-gray-900">
+              {formatNumber(exercise.quantity)}
+            </span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500">{t('confirmExercise.totalCost')}</span>
+            <span className="font-bold text-navy-900">
+              {formatCurrency(exercise.totalCost)}
+            </span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500">{t('confirmExercise.paymentReference')}</span>
+            <span className="font-mono text-sm text-gray-900">{exercise.paymentReference}</span>
+          </div>
+        </div>
+
+        {/* Payment notes */}
+        <div className="mt-4">
+          <label
+            htmlFor="paymentNotes"
+            className="block text-sm font-medium text-gray-700 mb-1"
+          >
+            {t('confirmExercise.paymentNotes')}
+          </label>
+          <textarea
+            id="paymentNotes"
+            value={paymentNotes}
+            onChange={(e) => setPaymentNotes(e.target.value)}
+            placeholder={t('confirmExercise.paymentNotesPlaceholder')}
+            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-ocean-600 focus:outline-none focus:ring-2 focus:ring-ocean-600/10"
+            rows={3}
+          />
+        </div>
+
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            disabled={loading}
+          >
+            {t('confirmExercise.cancel')}
+          </button>
+          <button
+            onClick={() => onConfirm(paymentNotes || undefined)}
+            disabled={loading}
+            className={cn(
+              'inline-flex items-center gap-2 rounded-md bg-ocean-600 px-4 py-2 text-sm font-medium text-white hover:bg-ocean-500',
+              loading && 'opacity-75',
+            )}
+          >
+            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+            {t('confirmExercise.confirmButton')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ExercisesTab({
   companyId,
   grantId,
@@ -639,6 +747,7 @@ function ExercisesTab({
 }) {
   const [page, setPage] = useState(1);
   const limit = 10;
+  const { showErrorToast } = useErrorToast();
 
   const { data: exercisesData, isLoading } = useOptionExercises(companyId, {
     grantId,
@@ -648,15 +757,32 @@ function ExercisesTab({
   });
 
   const cancelExerciseMutation = useCancelExercise(companyId);
+  const confirmExerciseMutation = useConfirmExercise(companyId);
   const [cancelExerciseId, setCancelExerciseId] = useState<string | null>(null);
+  const [confirmExercise, setConfirmExercise] = useState<OptionExerciseRequest | null>(null);
 
   const handleCancelExercise = async () => {
     if (!cancelExerciseId) return;
     try {
       await cancelExerciseMutation.mutateAsync(cancelExerciseId);
       setCancelExerciseId(null);
-    } catch {
-      // Error handled by TanStack Query
+      toast.success(t('success.cancelledExercise'));
+    } catch (err) {
+      showErrorToast(err);
+    }
+  };
+
+  const handleConfirmExercise = async (paymentNotes?: string) => {
+    if (!confirmExercise) return;
+    try {
+      await confirmExerciseMutation.mutateAsync({
+        exerciseId: confirmExercise.id,
+        paymentNotes,
+      });
+      setConfirmExercise(null);
+      toast.success(t('success.confirmedExercise'));
+    } catch (err) {
+      showErrorToast(err);
     }
   };
 
@@ -740,13 +866,22 @@ function ExercisesTab({
                   </td>
                   <td className="px-4 py-3 text-right">
                     {exercise.status === 'PENDING_PAYMENT' && (
-                      <button
-                        onClick={() => setCancelExerciseId(exercise.id)}
-                        className="rounded-md p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                        title="Cancel"
-                      >
-                        <XCircle className="h-4 w-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => setConfirmExercise(exercise)}
+                          className="rounded-md p-2 text-gray-400 transition-colors hover:bg-green-50 hover:text-green-600"
+                          title={t('confirmExercise.confirmButton')}
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => setCancelExerciseId(exercise.id)}
+                          className="rounded-md p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                          title={t('confirm.cancelExercise')}
+                        >
+                          <XCircle className="h-4 w-4" />
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -799,6 +934,16 @@ function ExercisesTab({
         title={t('confirm.cancelExerciseTitle')}
         description={t('confirm.cancelExerciseDescription')}
         confirmLabel={t('confirm.cancelExercise')}
+      />
+
+      {/* Confirm exercise dialog */}
+      <ConfirmExerciseDialog
+        open={!!confirmExercise}
+        onClose={() => setConfirmExercise(null)}
+        onConfirm={handleConfirmExercise}
+        loading={confirmExerciseMutation.isPending}
+        exercise={confirmExercise}
+        t={t}
       />
     </div>
   );
@@ -946,6 +1091,15 @@ export default function OptionGrantDetailPage() {
           )}
         </div>
         <div className="flex items-center gap-3">
+          {grant.status === 'ACTIVE' && exercisableQty > 0 && (
+            <Link
+              href={`/dashboard/options/grants/${id}/exercise`}
+              className="inline-flex items-center gap-2 rounded-md bg-ocean-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-ocean-500"
+            >
+              <DollarSign className="h-4 w-4" />
+              {t('exerciseForm.exerciseButton')}
+            </Link>
+          )}
           {grant.status === 'ACTIVE' && (
             <button
               onClick={() => setShowCancelDialog(true)}
