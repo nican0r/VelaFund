@@ -25,17 +25,65 @@
     "title": "Your companies"
   },
   "dashboard": {
+    "completeness": {
+      "complete": "Your profile is ready for investors!",
+      "items": {
+        "description": "Add company description",
+        "documents": "Upload documents to dataroom",
+        "kyc": "Complete KYC verification",
+        "logo": "Upload company logo",
+        "metrics": "Add key metrics",
+        "profile": "Create company page",
+        "publish": "Publish your profile",
+        "team": "Add team members"
+      },
+      "percent": "{value}%",
+      "title": "Profile Completeness"
+    },
     "description": "Overview of your company and recent activity.",
+    "health": {
+      "cnpj": "CNPJ",
+      "cnpjPending": "Pending validation",
+      "cnpjValidated": "Validated",
+      "companyStatus": "Company",
+      "kyc": "KYC",
+      "kycApproved": "Approved",
+      "kycPending": "Pending",
+      "kycRejected": "Rejected",
+      "title": "Company Health"
+    },
     "noCompany": {
       "description": "Create a company to build your investor-ready profile.",
       "title": "No company found"
     },
-    "stats": {
-      "company": "Company",
-      "notifications": "Notifications",
-      "settings": "Settings"
+    "quickActions": {
+      "editProfile": "Edit Company Page",
+      "inviteMember": "Invite Team Member",
+      "title": "Quick Actions",
+      "uploadDocument": "Upload Document",
+      "viewSettings": "Company Settings"
     },
-    "title": "Dashboard"
+    "recentActivity": {
+      "empty": "No recent activity",
+      "emptyDescription": "Activity from your company will appear here.",
+      "title": "Recent Activity",
+      "viewAll": "View all"
+    },
+    "stats": {
+      "companyStatus": "Status",
+      "profileViews": "Profile Views",
+      "teamMembers": "Team Members",
+      "unread": "Unread"
+    },
+    "statuses": {
+      "ACTIVE": "Active",
+      "DISSOLVED": "Dissolved",
+      "DRAFT": "Draft",
+      "INACTIVE": "Inactive"
+    },
+    "title": "Dashboard",
+    "welcome": "Welcome back, {firstName}!",
+    "welcomeGeneric": "Welcome back!"
   },
   "errors": {
     "auth": {

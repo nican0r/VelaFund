@@ -1,3 +1,64 @@
+// Company profile types returned by GET /api/v1/companies/:id/profile
+export type ProfileStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+export type ProfileAccessType = 'PUBLIC' | 'PASSWORD' | 'EMAIL_GATED';
+
+export interface ProfileMetric {
+  id: string;
+  label: string;
+  value: string;
+  format: 'NUMBER' | 'CURRENCY_BRL' | 'CURRENCY_USD' | 'PERCENTAGE' | 'TEXT';
+  icon: string | null;
+  order: number;
+}
+
+export interface ProfileTeamMember {
+  id: string;
+  name: string;
+  title: string;
+  photoUrl: string | null;
+  linkedinUrl: string | null;
+  order: number;
+}
+
+export interface ProfileDocument {
+  id: string;
+  name: string;
+  category: string;
+  fileSize: number;
+  mimeType: string;
+  order: number;
+  createdAt: string;
+}
+
+export interface CompanyProfile {
+  id: string;
+  companyId: string;
+  slug: string;
+  headline: string | null;
+  description: string | null;
+  sector: string | null;
+  foundedYear: number | null;
+  website: string | null;
+  location: string | null;
+  status: ProfileStatus;
+  accessType: ProfileAccessType;
+  publishedAt: string | null;
+  archivedAt: string | null;
+  viewCount: number;
+  shareUrl: string;
+  company: { name: string; logoUrl: string | null };
+  metrics: ProfileMetric[];
+  team: ProfileTeamMember[];
+  documents: ProfileDocument[];
+  litigation: {
+    status: string | null;
+    riskLevel: string | null;
+    data: unknown | null;
+  } | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Company types returned by GET /api/v1/companies
 export interface CompanyListItem {
   id: string;

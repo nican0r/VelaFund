@@ -25,17 +25,65 @@
     "title": "Suas empresas"
   },
   "dashboard": {
+    "completeness": {
+      "complete": "Seu perfil está pronto para investidores!",
+      "items": {
+        "description": "Adicionar descrição da empresa",
+        "documents": "Enviar documentos ao dataroom",
+        "kyc": "Completar verificação KYC",
+        "logo": "Enviar logo da empresa",
+        "metrics": "Adicionar métricas principais",
+        "profile": "Criar página da empresa",
+        "publish": "Publicar seu perfil",
+        "team": "Adicionar membros da equipe"
+      },
+      "percent": "{value}%",
+      "title": "Completude do Perfil"
+    },
     "description": "Visão geral da sua empresa e atividade recente.",
+    "health": {
+      "cnpj": "CNPJ",
+      "cnpjPending": "Validação pendente",
+      "cnpjValidated": "Validado",
+      "companyStatus": "Empresa",
+      "kyc": "KYC",
+      "kycApproved": "Aprovado",
+      "kycPending": "Pendente",
+      "kycRejected": "Rejeitado",
+      "title": "Saúde da Empresa"
+    },
     "noCompany": {
       "description": "Crie uma empresa para montar seu perfil pronto para investidores.",
       "title": "Nenhuma empresa encontrada"
     },
-    "stats": {
-      "company": "Empresa",
-      "notifications": "Notificações",
-      "settings": "Configurações"
+    "quickActions": {
+      "editProfile": "Editar Página da Empresa",
+      "inviteMember": "Convidar Membro",
+      "title": "Ações Rápidas",
+      "uploadDocument": "Enviar Documento",
+      "viewSettings": "Configurações da Empresa"
     },
-    "title": "Painel"
+    "recentActivity": {
+      "empty": "Nenhuma atividade recente",
+      "emptyDescription": "Atividades da sua empresa aparecerão aqui.",
+      "title": "Atividade Recente",
+      "viewAll": "Ver tudo"
+    },
+    "stats": {
+      "companyStatus": "Status",
+      "profileViews": "Visualizações",
+      "teamMembers": "Membros",
+      "unread": "Não Lidas"
+    },
+    "statuses": {
+      "ACTIVE": "Ativa",
+      "DISSOLVED": "Dissolvida",
+      "DRAFT": "Rascunho",
+      "INACTIVE": "Inativa"
+    },
+    "title": "Painel",
+    "welcome": "Bem-vindo(a), {firstName}!",
+    "welcomeGeneric": "Bem-vindo(a)!"
   },
   "errors": {
     "auth": {
