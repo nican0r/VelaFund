@@ -1,5 +1,5 @@
 import { IsOptional, IsUUID, IsBoolean } from 'class-validator';
-import { Type, Transform } from 'class-transformer';
+import { Transform } from 'class-transformer';
 
 export class OwnershipQueryDto {
   @IsOptional()

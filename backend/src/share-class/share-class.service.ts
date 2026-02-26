@@ -40,11 +40,10 @@ export class ShareClassService {
     }
 
     if (company.status !== 'ACTIVE') {
-      throw new BusinessRuleException(
-        'CAP_COMPANY_NOT_ACTIVE',
-        'errors.cap.companyNotActive',
-        { companyId, status: company.status },
-      );
+      throw new BusinessRuleException('CAP_COMPANY_NOT_ACTIVE', 'errors.cap.companyNotActive', {
+        companyId,
+        status: company.status,
+      });
     }
 
     // Ltda. companies can only have QUOTA type
@@ -58,8 +57,7 @@ export class ShareClassService {
 
     // S.A. companies cannot have QUOTA type
     if (
-      (company.entityType === 'SA_CAPITAL_FECHADO' ||
-        company.entityType === 'SA_CAPITAL_ABERTO') &&
+      (company.entityType === 'SA_CAPITAL_FECHADO' || company.entityType === 'SA_CAPITAL_ABERTO') &&
       dto.type === 'QUOTA'
     ) {
       throw new BusinessRuleException(
@@ -71,10 +69,7 @@ export class ShareClassService {
 
     // BR-3: Preferred share limit check for S.A. companies
     if (dto.type === 'PREFERRED_SHARES') {
-      await this.validatePreferredShareLimit(
-        companyId,
-        new Prisma.Decimal(dto.totalAuthorized),
-      );
+      await this.validatePreferredShareLimit(companyId, new Prisma.Decimal(dto.totalAuthorized));
     }
 
     // Validate totalAuthorized is non-negative
@@ -103,9 +98,7 @@ export class ShareClassService {
           rightOfFirstRefusal: dto.rightOfFirstRefusal ?? true,
           lockUpPeriodMonths: dto.lockUpPeriodMonths ?? null,
           tagAlongPercentage:
-            dto.tagAlongPercentage != null
-              ? new Prisma.Decimal(dto.tagAlongPercentage)
-              : null,
+            dto.tagAlongPercentage != null ? new Prisma.Decimal(dto.tagAlongPercentage) : null,
         },
       });
 
@@ -115,15 +108,11 @@ export class ShareClassService {
 
       return shareClass;
     } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
-        throw new ConflictException(
-          'CAP_SHARE_CLASS_DUPLICATE',
-          'errors.cap.shareClassDuplicate',
-          { companyId, className: dto.className },
-        );
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('CAP_SHARE_CLASS_DUPLICATE', 'errors.cap.shareClassDuplicate', {
+          companyId,
+          className: dto.className,
+        });
       }
       throw error;
     }
@@ -174,13 +163,24 @@ export class ShareClassService {
     return shareClass;
   }
 
+  /** Fields that become immutable once shares have been issued (totalIssued > 0). */
+  private static readonly IMMUTABLE_AFTER_ISSUANCE: readonly string[] = [
+    'className',
+    'type',
+    'votesPerShare',
+    'liquidationPreferenceMultiple',
+    'participatingRights',
+  ] as const;
+
   /**
    * Update a share class.
    *
    * Business rules:
    * - Company must be ACTIVE
-   * - BR-4: Once totalIssued > 0, only mutable fields can be changed
-   *   (totalAuthorized increase, lockUpPeriodMonths, tagAlongPercentage, rightOfFirstRefusal)
+   * - EC-3: Once totalIssued > 0, immutable fields cannot be changed
+   *   (className, type, votesPerShare, liquidationPreferenceMultiple, participatingRights)
+   * - Always-mutable fields: totalAuthorized (increase only), lockUpPeriodMonths,
+   *   tagAlongPercentage, rightOfFirstRefusal
    * - totalAuthorized can only increase and must be >= totalIssued
    */
   async update(companyId: string, id: string, dto: UpdateShareClassDto) {
@@ -193,14 +193,49 @@ export class ShareClassService {
     }
 
     if (company.status !== 'ACTIVE') {
-      throw new BusinessRuleException(
-        'CAP_COMPANY_NOT_ACTIVE',
-        'errors.cap.companyNotActive',
-        { companyId, status: company.status },
-      );
+      throw new BusinessRuleException('CAP_COMPANY_NOT_ACTIVE', 'errors.cap.companyNotActive', {
+        companyId,
+        status: company.status,
+      });
     }
 
     const existing = await this.findById(companyId, id);
+    const totalIssued = new Prisma.Decimal(existing.totalIssued.toString());
+
+    // EC-3: Enforce immutability of certain fields after shares have been issued
+    if (totalIssued.gt(0)) {
+      for (const field of ShareClassService.IMMUTABLE_AFTER_ISSUANCE) {
+        if ((dto as Record<string, unknown>)[field] !== undefined) {
+          throw new BusinessRuleException(
+            'CAP_IMMUTABLE_AFTER_ISSUANCE',
+            'errors.cap.immutableAfterIssuance',
+            { field, totalIssued: totalIssued.toString() },
+          );
+        }
+      }
+    }
+
+    // Validate entity type compatibility if type is being changed (only before issuance)
+    if (dto.type !== undefined && dto.type !== existing.type) {
+      if (company.entityType === 'LTDA' && dto.type !== 'QUOTA') {
+        throw new BusinessRuleException(
+          'CAP_INVALID_SHARE_CLASS_TYPE',
+          'errors.cap.invalidShareClassType',
+          { entityType: company.entityType, requestedType: dto.type },
+        );
+      }
+      if (
+        (company.entityType === 'SA_CAPITAL_FECHADO' ||
+          company.entityType === 'SA_CAPITAL_ABERTO') &&
+        dto.type === 'QUOTA'
+      ) {
+        throw new BusinessRuleException(
+          'CAP_INVALID_SHARE_CLASS_TYPE',
+          'errors.cap.invalidShareClassType',
+          { entityType: company.entityType, requestedType: dto.type },
+        );
+      }
+    }
 
     // Validate totalAuthorized update
     if (dto.totalAuthorized !== undefined) {
@@ -233,33 +268,62 @@ export class ShareClassService {
       }
 
       // If increasing preferred shares, check the 2/3 limit
-      if (existing.type === 'PREFERRED_SHARES' && newTotal.gt(currentTotal)) {
+      const effectiveType = dto.type ?? existing.type;
+      if (effectiveType === 'PREFERRED_SHARES' && newTotal.gt(currentTotal)) {
         const increase = newTotal.minus(currentTotal);
         await this.validatePreferredShareLimit(companyId, increase);
       }
     }
 
+    // BR-3: If changing type to PREFERRED_SHARES, check limit
+    if (
+      dto.type === 'PREFERRED_SHARES' &&
+      existing.type !== 'PREFERRED_SHARES' &&
+      dto.totalAuthorized === undefined
+    ) {
+      const existingAuthorized = new Prisma.Decimal(existing.totalAuthorized.toString());
+      await this.validatePreferredShareLimit(companyId, existingAuthorized);
+    }
+
+    // Build update data — always-mutable fields
     const data: Prisma.ShareClassUpdateInput = {};
     if (dto.totalAuthorized !== undefined)
       data.totalAuthorized = new Prisma.Decimal(dto.totalAuthorized);
-    if (dto.lockUpPeriodMonths !== undefined)
-      data.lockUpPeriodMonths = dto.lockUpPeriodMonths;
+    if (dto.lockUpPeriodMonths !== undefined) data.lockUpPeriodMonths = dto.lockUpPeriodMonths;
     if (dto.tagAlongPercentage !== undefined)
       data.tagAlongPercentage =
-        dto.tagAlongPercentage != null
-          ? new Prisma.Decimal(dto.tagAlongPercentage)
+        dto.tagAlongPercentage != null ? new Prisma.Decimal(dto.tagAlongPercentage) : null;
+    if (dto.rightOfFirstRefusal !== undefined) data.rightOfFirstRefusal = dto.rightOfFirstRefusal;
+
+    // Pre-issuance mutable fields (only allowed when totalIssued = 0)
+    if (dto.className !== undefined) data.className = dto.className;
+    if (dto.type !== undefined) data.type = dto.type;
+    if (dto.votesPerShare !== undefined) data.votesPerShare = dto.votesPerShare;
+    if (dto.liquidationPreferenceMultiple !== undefined)
+      data.liquidationPreferenceMultiple =
+        dto.liquidationPreferenceMultiple != null
+          ? new Prisma.Decimal(dto.liquidationPreferenceMultiple)
           : null;
-    if (dto.rightOfFirstRefusal !== undefined)
-      data.rightOfFirstRefusal = dto.rightOfFirstRefusal;
+    if (dto.participatingRights !== undefined) data.participatingRights = dto.participatingRights;
 
-    const updated = await this.prisma.shareClass.update({
-      where: { id },
-      data,
-    });
+    try {
+      const updated = await this.prisma.shareClass.update({
+        where: { id },
+        data,
+      });
 
-    this.logger.log(`Share class ${id} updated for company ${companyId}`);
+      this.logger.log(`Share class ${id} updated for company ${companyId}`);
 
-    return updated;
+      return updated;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('CAP_SHARE_CLASS_DUPLICATE', 'errors.cap.shareClassDuplicate', {
+          companyId,
+          className: dto.className,
+        });
+      }
+      throw error;
+    }
   }
 
   /**
@@ -273,11 +337,10 @@ export class ShareClassService {
     // Cannot delete if shares have been issued
     const totalIssued = new Prisma.Decimal(existing.totalIssued.toString());
     if (totalIssued.gt(0)) {
-      throw new BusinessRuleException(
-        'CAP_SHARE_CLASS_IN_USE',
-        'errors.cap.shareClassInUse',
-        { shareClassId: id, totalIssued: totalIssued.toString() },
-      );
+      throw new BusinessRuleException('CAP_SHARE_CLASS_IN_USE', 'errors.cap.shareClassInUse', {
+        shareClassId: id,
+        totalIssued: totalIssued.toString(),
+      });
     }
 
     // Check for any active shareholdings
@@ -286,11 +349,10 @@ export class ShareClassService {
     });
 
     if (activeShareholdings > 0) {
-      throw new BusinessRuleException(
-        'CAP_SHARE_CLASS_IN_USE',
-        'errors.cap.shareClassInUse',
-        { shareClassId: id, activeShareholdings },
-      );
+      throw new BusinessRuleException('CAP_SHARE_CLASS_IN_USE', 'errors.cap.shareClassInUse', {
+        shareClassId: id,
+        activeShareholdings,
+      });
     }
 
     await this.prisma.shareClass.delete({

@@ -47,9 +47,7 @@ describe('KycController', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [KycController],
-      providers: [
-        { provide: KycService, useValue: mockService },
-      ],
+      providers: [{ provide: KycService, useValue: mockService }],
     }).compile();
 
     controller = module.get<KycController>(KycController);
@@ -192,9 +190,7 @@ describe('KycController', () => {
     });
 
     it('should propagate NotFoundException when no KYC record exists', async () => {
-      kycService.verifyCpf.mockRejectedValue(
-        new NotFoundException('kycVerification', mockUserId),
-      );
+      kycService.verifyCpf.mockRejectedValue(new NotFoundException('kycVerification', mockUserId));
 
       await expect(controller.verifyCpf(mockUserId, mockDto)).rejects.toThrow(NotFoundException);
       await expect(controller.verifyCpf(mockUserId, mockDto)).rejects.toMatchObject({
@@ -275,9 +271,9 @@ describe('KycController', () => {
     it('should throw BadRequestException when no front file is provided', async () => {
       const files = {} as { file?: Express.Multer.File[]; fileBack?: Express.Multer.File[] };
 
-      await expect(
-        controller.uploadDocument(mockUserId, files, mockDto),
-      ).rejects.toThrow(BadRequestException);
+      await expect(controller.uploadDocument(mockUserId, files, mockDto)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should throw BadRequestException when files object is undefined', async () => {
@@ -289,9 +285,9 @@ describe('KycController', () => {
     it('should throw BadRequestException when file array is empty', async () => {
       const files = { file: [] as Express.Multer.File[] };
 
-      await expect(
-        controller.uploadDocument(mockUserId, files, mockDto),
-      ).rejects.toThrow(BadRequestException);
+      await expect(controller.uploadDocument(mockUserId, files, mockDto)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should include error code and messageKey in BadRequestException', async () => {
@@ -375,12 +371,10 @@ describe('KycController', () => {
 
       const files = { file: [frontFile] };
 
-      await expect(
-        controller.uploadDocument(mockUserId, files, mockDto),
-      ).rejects.toThrow(BusinessRuleException);
-      await expect(
-        controller.uploadDocument(mockUserId, files, mockDto),
-      ).rejects.toMatchObject({
+      await expect(controller.uploadDocument(mockUserId, files, mockDto)).rejects.toThrow(
+        BusinessRuleException,
+      );
+      await expect(controller.uploadDocument(mockUserId, files, mockDto)).rejects.toMatchObject({
         code: 'KYC_STEP_ORDER_VIOLATION',
       });
     });
@@ -395,9 +389,9 @@ describe('KycController', () => {
 
       const files = { file: [frontFile] };
 
-      await expect(
-        controller.uploadDocument(mockUserId, files, mockDto),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(controller.uploadDocument(mockUserId, files, mockDto)).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should not call the service when front file is missing', async () => {
@@ -448,15 +442,15 @@ describe('KycController', () => {
     });
 
     it('should throw BadRequestException when no selfie file is provided', async () => {
-      await expect(
-        controller.verifyFace(mockUserId, undefined as any),
-      ).rejects.toThrow(BadRequestException);
+      await expect(controller.verifyFace(mockUserId, undefined as any)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should throw BadRequestException when selfie is null', async () => {
-      await expect(
-        controller.verifyFace(mockUserId, null as any),
-      ).rejects.toThrow(BadRequestException);
+      await expect(controller.verifyFace(mockUserId, null as any)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should include error code and messageKey in BadRequestException for missing selfie', async () => {
@@ -693,12 +687,10 @@ describe('KycController', () => {
         }),
       );
 
-      await expect(
-        controller.uploadDocument(mockUserId, files, dto),
-      ).rejects.toThrow(BusinessRuleException);
-      await expect(
-        controller.uploadDocument(mockUserId, files, dto),
-      ).rejects.toMatchObject({
+      await expect(controller.uploadDocument(mockUserId, files, dto)).rejects.toThrow(
+        BusinessRuleException,
+      );
+      await expect(controller.uploadDocument(mockUserId, files, dto)).rejects.toMatchObject({
         code: 'KYC_FILE_TOO_LARGE',
       });
     });
@@ -714,9 +706,9 @@ describe('KycController', () => {
         }),
       );
 
-      await expect(
-        controller.uploadDocument(mockUserId, files, dto),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(controller.uploadDocument(mockUserId, files, dto)).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
   });
 });

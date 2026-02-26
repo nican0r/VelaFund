@@ -99,9 +99,7 @@ describe('S3Service', () => {
 
         const command = mockSend.mock.calls[0][0];
         expect(command.input.ServerSideEncryption).toBe('aws:kms');
-        expect(command.input.SSEKMSKeyId).toBe(
-          'arn:aws:kms:sa-east-1:123:key/test-key',
-        );
+        expect(command.input.SSEKMSKeyId).toBe('arn:aws:kms:sa-east-1:123:key/test-key');
       });
 
       it('should upload with custom metadata', async () => {
@@ -122,11 +120,7 @@ describe('S3Service', () => {
         mockSend.mockRejectedValue(new Error('Access Denied'));
 
         await expect(
-          service.upload(
-            'navia-documents',
-            'test.pdf',
-            Buffer.from('test'),
-          ),
+          service.upload('navia-documents', 'test.pdf', Buffer.from('test')),
         ).rejects.toThrow('Access Denied');
       });
     });
@@ -164,9 +158,9 @@ describe('S3Service', () => {
       it('should throw on empty response body', async () => {
         mockSend.mockResolvedValue({ Body: null });
 
-        await expect(
-          service.download('navia-documents', 'missing.pdf'),
-        ).rejects.toThrow('Empty response body');
+        await expect(service.download('navia-documents', 'missing.pdf')).rejects.toThrow(
+          'Empty response body',
+        );
       });
     });
 
@@ -187,9 +181,9 @@ describe('S3Service', () => {
       it('should propagate S3 delete errors', async () => {
         mockSend.mockRejectedValue(new Error('NoSuchKey'));
 
-        await expect(
-          service.delete('navia-documents', 'nonexistent.pdf'),
-        ).rejects.toThrow('NoSuchKey');
+        await expect(service.delete('navia-documents', 'nonexistent.pdf')).rejects.toThrow(
+          'NoSuchKey',
+        );
       });
     });
 
@@ -197,33 +191,22 @@ describe('S3Service', () => {
       it('should generate a presigned URL with default 15-min expiry', async () => {
         const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
-        const url = await service.generatePresignedUrl(
-          'navia-documents',
-          'test.pdf',
-        );
+        const url = await service.generatePresignedUrl('navia-documents', 'test.pdf');
 
         expect(url).toBe('https://s3.presigned.url/test');
-        expect(getSignedUrl).toHaveBeenCalledWith(
-          expect.any(Object),
-          expect.any(Object),
-          { expiresIn: 900 },
-        );
+        expect(getSignedUrl).toHaveBeenCalledWith(expect.any(Object), expect.any(Object), {
+          expiresIn: 900,
+        });
       });
 
       it('should accept custom expiry seconds', async () => {
         const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
-        await service.generatePresignedUrl(
-          'navia-documents',
-          'test.pdf',
-          3600,
-        );
+        await service.generatePresignedUrl('navia-documents', 'test.pdf', 3600);
 
-        expect(getSignedUrl).toHaveBeenCalledWith(
-          expect.any(Object),
-          expect.any(Object),
-          { expiresIn: 3600 },
-        );
+        expect(getSignedUrl).toHaveBeenCalledWith(expect.any(Object), expect.any(Object), {
+          expiresIn: 3600,
+        });
       });
     });
 
@@ -270,27 +253,23 @@ describe('S3Service', () => {
     });
 
     it('should throw on upload when not configured', async () => {
-      await expect(
-        service.upload('bucket', 'key', Buffer.from('test')),
-      ).rejects.toThrow('S3 client not initialized');
+      await expect(service.upload('bucket', 'key', Buffer.from('test'))).rejects.toThrow(
+        'S3 client not initialized',
+      );
     });
 
     it('should throw on download when not configured', async () => {
-      await expect(service.download('bucket', 'key')).rejects.toThrow(
-        'S3 client not initialized',
-      );
+      await expect(service.download('bucket', 'key')).rejects.toThrow('S3 client not initialized');
     });
 
     it('should throw on delete when not configured', async () => {
-      await expect(service.delete('bucket', 'key')).rejects.toThrow(
-        'S3 client not initialized',
-      );
+      await expect(service.delete('bucket', 'key')).rejects.toThrow('S3 client not initialized');
     });
 
     it('should throw on generatePresignedUrl when not configured', async () => {
-      await expect(
-        service.generatePresignedUrl('bucket', 'key'),
-      ).rejects.toThrow('S3 client not initialized');
+      await expect(service.generatePresignedUrl('bucket', 'key')).rejects.toThrow(
+        'S3 client not initialized',
+      );
     });
 
     it('should return false for checkBucketHealth when not configured', async () => {

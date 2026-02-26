@@ -1,6 +1,6 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { GlobalExceptionFilter } from './global-exception.filter';
-import { AppException, NotFoundException, ValidationException } from './app-exception';
+import { NotFoundException, ValidationException } from './app-exception';
 
 describe('GlobalExceptionFilter', () => {
   let filter: GlobalExceptionFilter;

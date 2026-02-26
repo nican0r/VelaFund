@@ -86,9 +86,7 @@ describe('EncryptionService', () => {
     it('should propagate KmsService decrypt errors', async () => {
       (kmsService.decrypt as jest.Mock).mockRejectedValue(new Error('KMS decrypt error'));
 
-      await expect(
-        service.decrypt(Buffer.from('bad-data')),
-      ).rejects.toThrow('KMS decrypt error');
+      await expect(service.decrypt(Buffer.from('bad-data'))).rejects.toThrow('KMS decrypt error');
     });
 
     // ─── createBlindIndex (HMAC mode) ─────────────────────────────
@@ -181,10 +179,7 @@ describe('EncryptionService', () => {
     it('should fall back to SHA-256 for blind index', () => {
       const index = service.createBlindIndex('529.982.247-25');
 
-      const expected = createHash('sha256')
-        .update('52998224725')
-        .digest('hex')
-        .slice(0, 32);
+      const expected = createHash('sha256').update('52998224725').digest('hex').slice(0, 32);
 
       expect(index).toBe(expected);
     });
@@ -214,9 +209,7 @@ describe('EncryptionService', () => {
     });
 
     it('should throw when trying to decrypt without KMS', async () => {
-      await expect(
-        service.decrypt(Buffer.from('data')),
-      ).rejects.toThrow();
+      await expect(service.decrypt(Buffer.from('data'))).rejects.toThrow();
     });
   });
 

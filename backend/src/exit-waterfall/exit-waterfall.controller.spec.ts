@@ -207,10 +207,7 @@ describe('ExitWaterfallController', () => {
 
       await controller.deleteScenario('comp-1', 'scenario-1');
 
-      expect(service.deleteScenario).toHaveBeenCalledWith(
-        'comp-1',
-        'scenario-1',
-      );
+      expect(service.deleteScenario).toHaveBeenCalledWith('comp-1', 'scenario-1');
     });
   });
 });

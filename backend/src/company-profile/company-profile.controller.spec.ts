@@ -101,9 +101,7 @@ describe('CompanyProfileController & PublicProfileController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CompanyProfileController, PublicProfileController],
-      providers: [
-        { provide: CompanyProfileService, useValue: mockService },
-      ],
+      providers: [{ provide: CompanyProfileService, useValue: mockService }],
     }).compile();
 
     profileController = module.get<CompanyProfileController>(CompanyProfileController);
@@ -139,9 +137,7 @@ describe('CompanyProfileController & PublicProfileController', () => {
       });
 
       it('should propagate NotFoundException when company not found', async () => {
-        mockService.create.mockRejectedValue(
-          new NotFoundException('company', COMPANY_ID),
-        );
+        mockService.create.mockRejectedValue(new NotFoundException('company', COMPANY_ID));
 
         await expect(
           profileController.create(COMPANY_ID, mockUser as any, dto as any),
@@ -163,7 +159,11 @@ describe('CompanyProfileController & PublicProfileController', () => {
 
     describe('findByCompanyId', () => {
       it('should return the profile for the company', async () => {
-        const profileWithExtras = { ...mockProfile, viewCount: 42, shareUrl: 'http://localhost:3000/p/acme-corp-ab12' };
+        const profileWithExtras = {
+          ...mockProfile,
+          viewCount: 42,
+          shareUrl: 'http://localhost:3000/p/acme-corp-ab12',
+        };
         mockService.findByCompanyId.mockResolvedValue(profileWithExtras);
 
         const result = await profileController.findByCompanyId(COMPANY_ID);
@@ -174,13 +174,11 @@ describe('CompanyProfileController & PublicProfileController', () => {
       });
 
       it('should propagate NotFoundException when no profile exists', async () => {
-        mockService.findByCompanyId.mockRejectedValue(
-          new NotFoundException('companyProfile'),
-        );
+        mockService.findByCompanyId.mockRejectedValue(new NotFoundException('companyProfile'));
 
-        await expect(
-          profileController.findByCompanyId(COMPANY_ID),
-        ).rejects.toThrow(NotFoundException);
+        await expect(profileController.findByCompanyId(COMPANY_ID)).rejects.toThrow(
+          NotFoundException,
+        );
       });
     });
 
@@ -193,7 +191,11 @@ describe('CompanyProfileController & PublicProfileController', () => {
       };
 
       it('should update the profile and return the result', async () => {
-        const updated = { ...mockProfile, headline: 'Updated headline', description: 'Updated description' };
+        const updated = {
+          ...mockProfile,
+          headline: 'Updated headline',
+          description: 'Updated description',
+        };
         mockService.update.mockResolvedValue(updated);
 
         const result = await profileController.update(COMPANY_ID, dto as any);
@@ -204,13 +206,11 @@ describe('CompanyProfileController & PublicProfileController', () => {
       });
 
       it('should propagate NotFoundException when profile not found', async () => {
-        mockService.update.mockRejectedValue(
-          new NotFoundException('companyProfile'),
-        );
+        mockService.update.mockRejectedValue(new NotFoundException('companyProfile'));
 
-        await expect(
-          profileController.update(COMPANY_ID, dto as any),
-        ).rejects.toThrow(NotFoundException);
+        await expect(profileController.update(COMPANY_ID, dto as any)).rejects.toThrow(
+          NotFoundException,
+        );
       });
     });
 
@@ -235,9 +235,9 @@ describe('CompanyProfileController & PublicProfileController', () => {
           new BusinessRuleException('PROFILE_SLUG_INVALID', 'errors.profile.slugInvalid'),
         );
 
-        await expect(
-          profileController.updateSlug(COMPANY_ID, dto as any),
-        ).rejects.toThrow(BusinessRuleException);
+        await expect(profileController.updateSlug(COMPANY_ID, dto as any)).rejects.toThrow(
+          BusinessRuleException,
+        );
       });
 
       it('should propagate ConflictException when slug is taken', async () => {
@@ -245,9 +245,9 @@ describe('CompanyProfileController & PublicProfileController', () => {
           new ConflictException('PROFILE_SLUG_TAKEN', 'errors.profile.slugTaken'),
         );
 
-        await expect(
-          profileController.updateSlug(COMPANY_ID, dto as any),
-        ).rejects.toThrow(ConflictException);
+        await expect(profileController.updateSlug(COMPANY_ID, dto as any)).rejects.toThrow(
+          ConflictException,
+        );
       });
     });
 
@@ -269,19 +269,13 @@ describe('CompanyProfileController & PublicProfileController', () => {
           new BusinessRuleException('PROFILE_EMPTY', 'errors.profile.empty'),
         );
 
-        await expect(
-          profileController.publish(COMPANY_ID),
-        ).rejects.toThrow(BusinessRuleException);
+        await expect(profileController.publish(COMPANY_ID)).rejects.toThrow(BusinessRuleException);
       });
 
       it('should propagate NotFoundException when profile not found', async () => {
-        mockService.publish.mockRejectedValue(
-          new NotFoundException('companyProfile'),
-        );
+        mockService.publish.mockRejectedValue(new NotFoundException('companyProfile'));
 
-        await expect(
-          profileController.publish(COMPANY_ID),
-        ).rejects.toThrow(NotFoundException);
+        await expect(profileController.publish(COMPANY_ID)).rejects.toThrow(NotFoundException);
       });
     });
 
@@ -300,13 +294,9 @@ describe('CompanyProfileController & PublicProfileController', () => {
       });
 
       it('should propagate NotFoundException when profile not found', async () => {
-        mockService.unpublish.mockRejectedValue(
-          new NotFoundException('companyProfile'),
-        );
+        mockService.unpublish.mockRejectedValue(new NotFoundException('companyProfile'));
 
-        await expect(
-          profileController.unpublish(COMPANY_ID),
-        ).rejects.toThrow(NotFoundException);
+        await expect(profileController.unpublish(COMPANY_ID)).rejects.toThrow(NotFoundException);
       });
     });
 
@@ -325,13 +315,9 @@ describe('CompanyProfileController & PublicProfileController', () => {
       });
 
       it('should propagate NotFoundException when profile not found', async () => {
-        mockService.archive.mockRejectedValue(
-          new NotFoundException('companyProfile'),
-        );
+        mockService.archive.mockRejectedValue(new NotFoundException('companyProfile'));
 
-        await expect(
-          profileController.archive(COMPANY_ID),
-        ).rejects.toThrow(NotFoundException);
+        await expect(profileController.archive(COMPANY_ID)).rejects.toThrow(NotFoundException);
       });
     });
 
@@ -361,9 +347,9 @@ describe('CompanyProfileController & PublicProfileController', () => {
           new BusinessRuleException('PROFILE_MAX_METRICS', 'errors.profile.maxMetrics'),
         );
 
-        await expect(
-          profileController.replaceMetrics(COMPANY_ID, dto as any),
-        ).rejects.toThrow(BusinessRuleException);
+        await expect(profileController.replaceMetrics(COMPANY_ID, dto as any)).rejects.toThrow(
+          BusinessRuleException,
+        );
       });
     });
 
@@ -393,9 +379,9 @@ describe('CompanyProfileController & PublicProfileController', () => {
           new BusinessRuleException('PROFILE_MAX_TEAM', 'errors.profile.maxTeam'),
         );
 
-        await expect(
-          profileController.replaceTeamMembers(COMPANY_ID, dto as any),
-        ).rejects.toThrow(BusinessRuleException);
+        await expect(profileController.replaceTeamMembers(COMPANY_ID, dto as any)).rejects.toThrow(
+          BusinessRuleException,
+        );
       });
     });
 
@@ -416,7 +402,9 @@ describe('CompanyProfileController & PublicProfileController', () => {
       };
 
       it('should upload a team photo and return the URL', async () => {
-        const uploadResult = { url: 'https://s3.amazonaws.com/navia-documents/profiles/profile-1/team/abc123.jpg' };
+        const uploadResult = {
+          url: 'https://s3.amazonaws.com/navia-documents/profiles/profile-1/team/abc123.jpg',
+        };
         mockService.uploadTeamPhoto.mockResolvedValue(uploadResult);
 
         const result = await profileController.uploadTeamPhoto(COMPANY_ID, mockFile);
@@ -431,19 +419,17 @@ describe('CompanyProfileController & PublicProfileController', () => {
           new BusinessRuleException('SYS_S3_UNAVAILABLE', 'errors.kyc.s3Unavailable'),
         );
 
-        await expect(
-          profileController.uploadTeamPhoto(COMPANY_ID, mockFile),
-        ).rejects.toThrow(BusinessRuleException);
+        await expect(profileController.uploadTeamPhoto(COMPANY_ID, mockFile)).rejects.toThrow(
+          BusinessRuleException,
+        );
       });
 
       it('should propagate NotFoundException when profile not found', async () => {
-        mockService.uploadTeamPhoto.mockRejectedValue(
-          new NotFoundException('companyProfile'),
-        );
+        mockService.uploadTeamPhoto.mockRejectedValue(new NotFoundException('companyProfile'));
 
-        await expect(
-          profileController.uploadTeamPhoto(COMPANY_ID, mockFile),
-        ).rejects.toThrow(NotFoundException);
+        await expect(profileController.uploadTeamPhoto(COMPANY_ID, mockFile)).rejects.toThrow(
+          NotFoundException,
+        );
       });
     });
 
@@ -478,13 +464,11 @@ describe('CompanyProfileController & PublicProfileController', () => {
       });
 
       it('should propagate NotFoundException when profile not found', async () => {
-        mockService.getAnalytics.mockRejectedValue(
-          new NotFoundException('companyProfile'),
-        );
+        mockService.getAnalytics.mockRejectedValue(new NotFoundException('companyProfile'));
 
-        await expect(
-          profileController.getAnalytics(COMPANY_ID, '30d'),
-        ).rejects.toThrow(NotFoundException);
+        await expect(profileController.getAnalytics(COMPANY_ID, '30d')).rejects.toThrow(
+          NotFoundException,
+        );
       });
     });
   });
@@ -530,12 +514,7 @@ describe('CompanyProfileController & PublicProfileController', () => {
       it('should pass password query param to the service', async () => {
         mockService.getPublicProfile.mockResolvedValue(mockPublicProfile);
 
-        await publicController.getPublicProfile(
-          SLUG,
-          'secret123',
-          undefined,
-          mockRequest,
-        );
+        await publicController.getPublicProfile(SLUG, 'secret123', undefined, mockRequest);
 
         expect(mockService.getPublicProfile).toHaveBeenCalledWith(
           SLUG,
@@ -550,12 +529,7 @@ describe('CompanyProfileController & PublicProfileController', () => {
       it('should pass email query param to the service', async () => {
         mockService.getPublicProfile.mockResolvedValue(mockPublicProfile);
 
-        await publicController.getPublicProfile(
-          SLUG,
-          undefined,
-          'investor@fund.com',
-          mockRequest,
-        );
+        await publicController.getPublicProfile(SLUG, undefined, 'investor@fund.com', mockRequest);
 
         expect(mockService.getPublicProfile).toHaveBeenCalledWith(
           SLUG,
@@ -578,12 +552,7 @@ describe('CompanyProfileController & PublicProfileController', () => {
 
         mockService.getPublicProfile.mockResolvedValue(mockPublicProfile);
 
-        await publicController.getPublicProfile(
-          SLUG,
-          undefined,
-          undefined,
-          reqWithReferrer,
-        );
+        await publicController.getPublicProfile(SLUG, undefined, undefined, reqWithReferrer);
 
         // referer is undefined, so falls through to referrer
         expect(mockService.getPublicProfile).toHaveBeenCalledWith(
@@ -604,12 +573,7 @@ describe('CompanyProfileController & PublicProfileController', () => {
 
         mockService.getPublicProfile.mockResolvedValue(mockPublicProfile);
 
-        await publicController.getPublicProfile(
-          SLUG,
-          undefined,
-          undefined,
-          minimalRequest,
-        );
+        await publicController.getPublicProfile(SLUG, undefined, undefined, minimalRequest);
 
         expect(mockService.getPublicProfile).toHaveBeenCalledWith(
           SLUG,
@@ -622,9 +586,7 @@ describe('CompanyProfileController & PublicProfileController', () => {
       });
 
       it('should propagate NotFoundException when profile not found or not published', async () => {
-        mockService.getPublicProfile.mockRejectedValue(
-          new NotFoundException('companyProfile'),
-        );
+        mockService.getPublicProfile.mockRejectedValue(new NotFoundException('companyProfile'));
 
         await expect(
           publicController.getPublicProfile(SLUG, undefined, undefined, mockRequest),

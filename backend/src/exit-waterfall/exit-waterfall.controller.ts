@@ -41,10 +41,7 @@ export class ExitWaterfallController {
   @HttpCode(HttpStatus.OK)
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
-  async runWaterfall(
-    @Param('companyId') companyId: string,
-    @Body() dto: RunWaterfallDto,
-  ) {
+  async runWaterfall(@Param('companyId') companyId: string, @Body() dto: RunWaterfallDto) {
     return this.waterfallService.runWaterfall(companyId, dto);
   }
 

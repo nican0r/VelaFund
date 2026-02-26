@@ -18,10 +18,7 @@ import { CreateCompanyDto } from './dto/create-company.dto';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { paginate } from '../common/helpers/paginate';
-import {
-  CurrentUser,
-  AuthenticatedUser,
-} from '../auth/decorators/current-user.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Auditable } from '../audit-log/decorators/auditable.decorator';
 
@@ -50,10 +47,7 @@ export class CompanyController {
   @ApiResponse({ status: 400, description: 'Invalid input' })
   @ApiResponse({ status: 409, description: 'CNPJ already registered' })
   @ApiResponse({ status: 422, description: 'Business rule violation' })
-  async create(
-    @Body() dto: CreateCompanyDto,
-    @CurrentUser('id') userId: string,
-  ) {
+  async create(@Body() dto: CreateCompanyDto, @CurrentUser('id') userId: string) {
     return this.companyService.create(dto, userId);
   }
 
@@ -73,11 +67,10 @@ export class CompanyController {
     @Query('status') status?: string,
     @Query('sort') sort?: string,
   ) {
-    const { items, total } = await this.companyService.findAllForUser(
-      userId,
-      pagination,
-      { status, sort },
-    );
+    const { items, total } = await this.companyService.findAllForUser(userId, pagination, {
+      status,
+      sort,
+    });
     return paginate(items, total, pagination.page, pagination.limit);
   }
 
@@ -120,10 +113,7 @@ export class CompanyController {
   @ApiResponse({ status: 403, description: 'Not an ADMIN' })
   @ApiResponse({ status: 404, description: 'Company not found or not a member' })
   @ApiResponse({ status: 422, description: 'Cannot update dissolved company' })
-  async update(
-    @Param('companyId') companyId: string,
-    @Body() dto: UpdateCompanyDto,
-  ) {
+  async update(@Param('companyId') companyId: string, @Body() dto: UpdateCompanyDto) {
     return this.companyService.update(companyId, dto);
   }
 
@@ -190,10 +180,7 @@ export class CompanyController {
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiResponse({ status: 200, description: 'Validation retry dispatched' })
   @ApiResponse({ status: 422, description: 'Company not in DRAFT or validation not failed' })
-  async retryValidation(
-    @Param('companyId') companyId: string,
-    @CurrentUser('id') userId: string,
-  ) {
+  async retryValidation(@Param('companyId') companyId: string, @CurrentUser('id') userId: string) {
     await this.companyService.retryCnpjValidation(companyId, userId);
     return { message: 'CNPJ validation retry dispatched' };
   }

@@ -26,13 +26,9 @@ export class S3Service {
   constructor(private readonly configService: ConfigService) {
     const region = this.configService.get<string>('AWS_REGION');
     const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
-    const secretAccessKey = this.configService.get<string>(
-      'AWS_SECRET_ACCESS_KEY',
-    );
+    const secretAccessKey = this.configService.get<string>('AWS_SECRET_ACCESS_KEY');
 
-    this.documentsBucket = this.configService.get<string>(
-      'AWS_S3_DOCUMENTS_BUCKET',
-    );
+    this.documentsBucket = this.configService.get<string>('AWS_S3_DOCUMENTS_BUCKET');
     this.kycBucket = this.configService.get<string>('AWS_S3_KYC_BUCKET');
 
     if (region && accessKeyId && secretAccessKey) {
@@ -43,9 +39,7 @@ export class S3Service {
       this.logger.log(`S3 client initialized (region: ${region})`);
     } else {
       this.client = null;
-      this.logger.warn(
-        'AWS credentials not configured. S3 operations will be unavailable.',
-      );
+      this.logger.warn('AWS credentials not configured. S3 operations will be unavailable.');
     }
   }
 
@@ -61,12 +55,7 @@ export class S3Service {
     return this.kycBucket;
   }
 
-  async upload(
-    bucket: string,
-    key: string,
-    body: Buffer,
-    options?: UploadOptions,
-  ): Promise<void> {
+  async upload(bucket: string, key: string, body: Buffer, options?: UploadOptions): Promise<void> {
     this.ensureAvailable();
 
     await this.client!.send(
@@ -87,9 +76,7 @@ export class S3Service {
   async download(bucket: string, key: string): Promise<Buffer> {
     this.ensureAvailable();
 
-    const response = await this.client!.send(
-      new GetObjectCommand({ Bucket: bucket, Key: key }),
-    );
+    const response = await this.client!.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
 
     const stream = response.Body;
     if (!stream) {
@@ -107,18 +94,12 @@ export class S3Service {
   async delete(bucket: string, key: string): Promise<void> {
     this.ensureAvailable();
 
-    await this.client!.send(
-      new DeleteObjectCommand({ Bucket: bucket, Key: key }),
-    );
+    await this.client!.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
 
     this.logger.debug(`Deleted s3://${bucket}/${key}`);
   }
 
-  async generatePresignedUrl(
-    bucket: string,
-    key: string,
-    expiresInSeconds = 900,
-  ): Promise<string> {
+  async generatePresignedUrl(bucket: string, key: string, expiresInSeconds = 900): Promise<string> {
     this.ensureAvailable();
 
     const command = new GetObjectCommand({ Bucket: bucket, Key: key });

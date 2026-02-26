@@ -9,7 +9,6 @@ import {
   MinLength,
   Matches,
   ValidateNested,
-  IsBoolean,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -53,13 +52,6 @@ export class AddressDto {
   @MaxLength(20)
   postalCode?: string;
 }
-
-/**
- * CPF format: XXX.XXX.XXX-XX (11 digits)
- * CNPJ format: XX.XXX.XXX/XXXX-XX (14 digits)
- */
-const CPF_REGEX = /^\d{3}\.\d{3}\.\d{3}-\d{2}$/;
-const CNPJ_REGEX = /^\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}$/;
 
 export class CreateShareholderDto {
   @ApiProperty({

@@ -1,10 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  NotFoundException,
-  BusinessRuleException,
-} from '../common/filters/app-exception';
+import { NotFoundException, BusinessRuleException } from '../common/filters/app-exception';
 import { parseSort } from '../common/helpers/sort-parser';
 import { CreateOptionPlanDto } from './dto/create-option-plan.dto';
 import { UpdateOptionPlanDto } from './dto/update-option-plan.dto';
@@ -46,10 +43,7 @@ export class OptionPlanService {
     });
     if (!company) throw new NotFoundException('company', companyId);
     if (company.status !== 'ACTIVE') {
-      throw new BusinessRuleException(
-        'OPT_COMPANY_NOT_ACTIVE',
-        'errors.opt.companyNotActive',
-      );
+      throw new BusinessRuleException('OPT_COMPANY_NOT_ACTIVE', 'errors.opt.companyNotActive');
     }
 
     // Validate share class belongs to company
@@ -61,10 +55,7 @@ export class OptionPlanService {
 
     const totalPoolSize = new Prisma.Decimal(dto.totalPoolSize);
     if (totalPoolSize.lte(0)) {
-      throw new BusinessRuleException(
-        'OPT_INVALID_POOL_SIZE',
-        'errors.opt.invalidPoolSize',
-      );
+      throw new BusinessRuleException('OPT_INVALID_POOL_SIZE', 'errors.opt.invalidPoolSize');
     }
 
     return this.prisma.optionPlan.create({
@@ -73,9 +64,7 @@ export class OptionPlanService {
         name: dto.name,
         shareClassId: dto.shareClassId,
         totalPoolSize,
-        boardApprovalDate: dto.boardApprovalDate
-          ? new Date(dto.boardApprovalDate)
-          : null,
+        boardApprovalDate: dto.boardApprovalDate ? new Date(dto.boardApprovalDate) : null,
         terminationPolicy: dto.terminationPolicy ?? 'FORFEITURE',
         exerciseWindowDays: dto.exerciseWindowDays ?? 90,
         notes: dto.notes,
@@ -147,10 +136,7 @@ export class OptionPlanService {
     if (!plan) throw new NotFoundException('optionPlan', planId);
 
     if (plan.status !== 'ACTIVE') {
-      throw new BusinessRuleException(
-        'OPT_PLAN_CLOSED',
-        'errors.opt.planClosed',
-      );
+      throw new BusinessRuleException('OPT_PLAN_CLOSED', 'errors.opt.planClosed');
     }
 
     const data: Prisma.OptionPlanUpdateInput = {};
@@ -166,21 +152,14 @@ export class OptionPlanService {
     if (dto.totalPoolSize !== undefined) {
       const newPoolSize = new Prisma.Decimal(dto.totalPoolSize);
       if (newPoolSize.lte(0)) {
-        throw new BusinessRuleException(
-          'OPT_INVALID_POOL_SIZE',
-          'errors.opt.invalidPoolSize',
-        );
+        throw new BusinessRuleException('OPT_INVALID_POOL_SIZE', 'errors.opt.invalidPoolSize');
       }
       // Pool size can only increase (cannot shrink below granted amount)
       if (newPoolSize.lt(plan.totalGranted)) {
-        throw new BusinessRuleException(
-          'OPT_POOL_CANNOT_SHRINK',
-          'errors.opt.poolCannotShrink',
-          {
-            currentGranted: plan.totalGranted.toString(),
-            requested: dto.totalPoolSize,
-          },
-        );
+        throw new BusinessRuleException('OPT_POOL_CANNOT_SHRINK', 'errors.opt.poolCannotShrink', {
+          currentGranted: plan.totalGranted.toString(),
+          requested: dto.totalPoolSize,
+        });
       }
       data.totalPoolSize = newPoolSize;
     }
@@ -199,10 +178,7 @@ export class OptionPlanService {
     if (!plan) throw new NotFoundException('optionPlan', planId);
 
     if (plan.status !== 'ACTIVE') {
-      throw new BusinessRuleException(
-        'OPT_PLAN_ALREADY_CLOSED',
-        'errors.opt.planAlreadyClosed',
-      );
+      throw new BusinessRuleException('OPT_PLAN_ALREADY_CLOSED', 'errors.opt.planAlreadyClosed');
     }
 
     return this.prisma.optionPlan.update({
@@ -233,27 +209,18 @@ export class OptionPlanService {
     if (!plan) throw new NotFoundException('optionPlan', dto.optionPlanId);
 
     if (plan.status !== 'ACTIVE') {
-      throw new BusinessRuleException(
-        'OPT_PLAN_CLOSED',
-        'errors.opt.planClosed',
-      );
+      throw new BusinessRuleException('OPT_PLAN_CLOSED', 'errors.opt.planClosed');
     }
 
     const quantity = new Prisma.Decimal(dto.quantity);
     const strikePrice = new Prisma.Decimal(dto.strikePrice);
 
     if (quantity.lte(0)) {
-      throw new BusinessRuleException(
-        'OPT_INVALID_QUANTITY',
-        'errors.opt.invalidQuantity',
-      );
+      throw new BusinessRuleException('OPT_INVALID_QUANTITY', 'errors.opt.invalidQuantity');
     }
 
     if (strikePrice.lte(0)) {
-      throw new BusinessRuleException(
-        'OPT_INVALID_STRIKE_PRICE',
-        'errors.opt.invalidStrikePrice',
-      );
+      throw new BusinessRuleException('OPT_INVALID_STRIKE_PRICE', 'errors.opt.invalidStrikePrice');
     }
 
     // Check pool availability (sum non-cancelled grants)
@@ -265,14 +232,10 @@ export class OptionPlanService {
     const available = plan.totalPoolSize.sub(totalGranted);
 
     if (quantity.gt(available)) {
-      throw new BusinessRuleException(
-        'OPT_PLAN_EXHAUSTED',
-        'errors.opt.planExhausted',
-        {
-          optionsAvailable: available.toString(),
-          quantityRequested: dto.quantity,
-        },
-      );
+      throw new BusinessRuleException('OPT_PLAN_EXHAUSTED', 'errors.opt.planExhausted', {
+        optionsAvailable: available.toString(),
+        quantityRequested: dto.quantity,
+      });
     }
 
     // Validate shareholder if provided
@@ -300,10 +263,7 @@ export class OptionPlanService {
     const grantDate = new Date(dto.grantDate);
     const expirationDate = new Date(dto.expirationDate);
     if (expirationDate <= grantDate) {
-      throw new BusinessRuleException(
-        'OPT_INVALID_EXPIRATION',
-        'errors.opt.invalidExpiration',
-      );
+      throw new BusinessRuleException('OPT_INVALID_EXPIRATION', 'errors.opt.invalidExpiration');
     }
 
     // Calculate cliff percentage based on cliff vs total vesting
@@ -351,11 +311,10 @@ export class OptionPlanService {
     if (query.optionPlanId) where.planId = query.optionPlanId;
     if (query.shareholderId) where.shareholderId = query.shareholderId;
 
-    const sortFields = parseSort(
-      query.sort,
-      GRANT_SORTABLE_FIELDS,
-      { field: 'grantDate', direction: 'desc' },
-    );
+    const sortFields = parseSort(query.sort, GRANT_SORTABLE_FIELDS, {
+      field: 'grantDate',
+      direction: 'desc',
+    });
     const orderBy = sortFields.map((sf) => ({ [sf.field]: sf.direction }));
 
     const [items, total] = await Promise.all([
@@ -385,7 +344,9 @@ export class OptionPlanService {
     const grant = await this.prisma.optionGrant.findFirst({
       where: { id: grantId, companyId },
       include: {
-        plan: { select: { id: true, name: true, terminationPolicy: true, exerciseWindowDays: true } },
+        plan: {
+          select: { id: true, name: true, terminationPolicy: true, exerciseWindowDays: true },
+        },
         shareholder: { select: { id: true, name: true } },
       },
     });
@@ -441,10 +402,7 @@ export class OptionPlanService {
     }
 
     if (grant.status === 'EXERCISED') {
-      throw new BusinessRuleException(
-        'OPT_GRANT_TERMINATED',
-        'errors.opt.grantTerminated',
-      );
+      throw new BusinessRuleException('OPT_GRANT_TERMINATED', 'errors.opt.grantTerminated');
     }
 
     // Return unexercised options to the pool
@@ -485,7 +443,14 @@ export class OptionPlanService {
     const grant = await this.prisma.optionGrant.findFirst({
       where: { id: grantId, companyId },
       include: {
-        plan: { select: { id: true, exerciseWindowDays: true, terminationPolicy: true, shareClassId: true } },
+        plan: {
+          select: {
+            id: true,
+            exerciseWindowDays: true,
+            terminationPolicy: true,
+            shareClassId: true,
+          },
+        },
       },
     });
     if (!grant) throw new NotFoundException('optionGrant', grantId);
@@ -496,10 +461,7 @@ export class OptionPlanService {
 
     // Grant must be ACTIVE (CANCELLED/EXPIRED/EXERCISED cannot exercise)
     if (grant.status !== 'ACTIVE') {
-      throw new BusinessRuleException(
-        'OPT_GRANT_NOT_ACTIVE',
-        'errors.opt.grantNotActive',
-      );
+      throw new BusinessRuleException('OPT_GRANT_NOT_ACTIVE', 'errors.opt.grantNotActive');
     }
 
     // Check exercise window for terminated grants
@@ -517,24 +479,17 @@ export class OptionPlanService {
 
     const quantity = new Prisma.Decimal(dto.quantity);
     if (quantity.lte(0)) {
-      throw new BusinessRuleException(
-        'OPT_INVALID_QUANTITY',
-        'errors.opt.invalidQuantity',
-      );
+      throw new BusinessRuleException('OPT_INVALID_QUANTITY', 'errors.opt.invalidQuantity');
     }
 
     // Validate quantity against vested options
     const vesting = this.calculateVesting(grant);
     const exercisable = new Prisma.Decimal(vesting.exercisableQuantity);
     if (quantity.gt(exercisable)) {
-      throw new BusinessRuleException(
-        'OPT_INSUFFICIENT_VESTED',
-        'errors.opt.insufficientVested',
-        {
-          exercisableOptions: vesting.exercisableQuantity,
-          requestedQuantity: dto.quantity,
-        },
-      );
+      throw new BusinessRuleException('OPT_INSUFFICIENT_VESTED', 'errors.opt.insufficientVested', {
+        exercisableOptions: vesting.exercisableQuantity,
+        requestedQuantity: dto.quantity,
+      });
     }
 
     // Check no pending exercise request exists for this grant
@@ -543,10 +498,7 @@ export class OptionPlanService {
       select: { id: true },
     });
     if (pendingExercise) {
-      throw new BusinessRuleException(
-        'OPT_EXERCISE_PENDING',
-        'errors.opt.exercisePending',
-      );
+      throw new BusinessRuleException('OPT_EXERCISE_PENDING', 'errors.opt.exercisePending');
     }
 
     // Calculate total cost
@@ -654,7 +606,11 @@ export class OptionPlanService {
     });
     if (!exercise) throw new NotFoundException('optionExercise', exerciseId);
 
-    if (exercise.status === 'COMPLETED' || exercise.status === 'PAYMENT_CONFIRMED' || exercise.status === 'SHARES_ISSUED') {
+    if (
+      exercise.status === 'COMPLETED' ||
+      exercise.status === 'PAYMENT_CONFIRMED' ||
+      exercise.status === 'SHARES_ISSUED'
+    ) {
       throw new BusinessRuleException(
         'OPT_EXERCISE_ALREADY_CONFIRMED',
         'errors.opt.exerciseAlreadyConfirmed',
@@ -669,10 +625,7 @@ export class OptionPlanService {
     }
 
     if (exercise.status !== 'PENDING_PAYMENT') {
-      throw new BusinessRuleException(
-        'OPT_EXERCISE_NOT_PENDING',
-        'errors.opt.exerciseNotPending',
-      );
+      throw new BusinessRuleException('OPT_EXERCISE_NOT_PENDING', 'errors.opt.exerciseNotPending');
     }
 
     // Require shareholder to be linked for share issuance
@@ -784,10 +737,7 @@ export class OptionPlanService {
     }
 
     if (exercise.status !== 'PENDING_PAYMENT') {
-      throw new BusinessRuleException(
-        'OPT_EXERCISE_NOT_PENDING',
-        'errors.opt.exerciseNotPending',
-      );
+      throw new BusinessRuleException('OPT_EXERCISE_NOT_PENDING', 'errors.opt.exerciseNotPending');
     }
 
     return this.prisma.optionExerciseRequest.update({
@@ -836,7 +786,11 @@ export class OptionPlanService {
 
     // Before cliff: nothing vested
     if (now < cliffDate) {
-      const cliffVestAmount = this.calculateCliffVestAmount(totalQuantity, grant.cliffMonths, grant.vestingDurationMonths);
+      const cliffVestAmount = this.calculateCliffVestAmount(
+        totalQuantity,
+        grant.cliffMonths,
+        grant.vestingDurationMonths,
+      );
       return {
         vestedQuantity: '0',
         unvestedQuantity: totalQuantity.toString(),
@@ -865,7 +819,11 @@ export class OptionPlanService {
     }
 
     // Cliff vesting
-    const cliffVested = this.calculateCliffVestAmount(totalQuantity, grant.cliffMonths, grant.vestingDurationMonths);
+    const cliffVested = this.calculateCliffVestAmount(
+      totalQuantity,
+      grant.cliffMonths,
+      grant.vestingDurationMonths,
+    );
 
     // Post-cliff linear vesting
     const monthsSinceCliff = this.monthsBetween(cliffDate, now);
@@ -875,9 +833,10 @@ export class OptionPlanService {
     const postCliffMonths = grant.vestingDurationMonths - grant.cliffMonths;
     const totalPostCliffPeriods = Math.floor(postCliffMonths / periodMonths);
     const remainingAfterCliff = totalQuantity.sub(cliffVested);
-    const vestingPerPeriod = totalPostCliffPeriods > 0
-      ? remainingAfterCliff.div(totalPostCliffPeriods)
-      : new Prisma.Decimal(0);
+    const vestingPerPeriod =
+      totalPostCliffPeriods > 0
+        ? remainingAfterCliff.div(totalPostCliffPeriods)
+        : new Prisma.Decimal(0);
 
     const additionalVested = vestingPerPeriod.mul(periodsElapsed);
     let vestedQuantity = cliffVested.add(additionalVested);
@@ -909,7 +868,9 @@ export class OptionPlanService {
       cliffDate: cliffDate.toISOString(),
       cliffMet: true,
       nextVestingDate: isNextBeforeEnd ? nextVestingDate.toISOString() : null,
-      nextVestingAmount: isNextBeforeEnd ? vestingPerPeriod.toFixed(0, Prisma.Decimal.ROUND_DOWN) : '0',
+      nextVestingAmount: isNextBeforeEnd
+        ? vestingPerPeriod.toFixed(0, Prisma.Decimal.ROUND_DOWN)
+        : '0',
     };
   }
 
@@ -953,9 +914,8 @@ export class OptionPlanService {
     const postCliffMonths = grant.vestingDurationMonths - grant.cliffMonths;
     const totalPeriods = Math.floor(postCliffMonths / periodMonths);
     const remainingAfterCliff = totalQuantity.sub(cliffVested);
-    const vestingPerPeriod = totalPeriods > 0
-      ? remainingAfterCliff.div(totalPeriods)
-      : new Prisma.Decimal(0);
+    const vestingPerPeriod =
+      totalPeriods > 0 ? remainingAfterCliff.div(totalPeriods) : new Prisma.Decimal(0);
 
     let cumulative = cliffVested;
 
@@ -964,10 +924,7 @@ export class OptionPlanService {
       if (date > vestingEndDate) break;
 
       // Last period gets remainder to avoid rounding issues
-      const periodAmount =
-        i === totalPeriods
-          ? totalQuantity.sub(cumulative)
-          : vestingPerPeriod;
+      const periodAmount = i === totalPeriods ? totalQuantity.sub(cumulative) : vestingPerPeriod;
 
       cumulative = cumulative.add(periodAmount);
 
@@ -1015,10 +972,7 @@ export class OptionPlanService {
     if (member?.role === 'ADMIN') return; // Admin — allowed
 
     // Neither grantee nor admin — deny
-    throw new BusinessRuleException(
-      'OPT_NOT_GRANTEE',
-      'errors.opt.notGrantee',
-    );
+    throw new BusinessRuleException('OPT_NOT_GRANTEE', 'errors.opt.notGrantee');
   }
 
   // ========================
@@ -1031,9 +985,7 @@ export class OptionPlanService {
     vestingDurationMonths: number,
   ): Prisma.Decimal {
     if (vestingDurationMonths === 0) return totalQuantity;
-    return totalQuantity
-      .mul(cliffMonths)
-      .div(vestingDurationMonths);
+    return totalQuantity.mul(cliffMonths).div(vestingDurationMonths);
   }
 
   private addMonths(date: Date, months: number): Date {

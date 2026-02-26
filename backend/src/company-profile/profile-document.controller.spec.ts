@@ -1,14 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-  ProfileDocumentController,
-  PublicDocumentController,
-} from './profile-document.controller';
+import { ProfileDocumentController, PublicDocumentController } from './profile-document.controller';
 import { ProfileDocumentService } from './profile-document.service';
 import { CompanyProfileService } from './company-profile.service';
-import {
-  NotFoundException,
-  BusinessRuleException,
-} from '../common/filters/app-exception';
+import { NotFoundException, BusinessRuleException } from '../common/filters/app-exception';
 
 const mockUser = {
   id: 'user-1',
@@ -112,10 +106,7 @@ describe('ProfileDocumentController & PublicDocumentController', () => {
         const result = await docController.list(COMPANY_ID);
 
         expect(result).toEqual(mockDocumentList);
-        expect(mockDocumentService.findAll).toHaveBeenCalledWith(
-          COMPANY_ID,
-          undefined,
-        );
+        expect(mockDocumentService.findAll).toHaveBeenCalledWith(COMPANY_ID, undefined);
       });
 
       it('should pass category filter', async () => {
@@ -123,20 +114,13 @@ describe('ProfileDocumentController & PublicDocumentController', () => {
 
         await docController.list(COMPANY_ID, 'PITCH_DECK' as any);
 
-        expect(mockDocumentService.findAll).toHaveBeenCalledWith(
-          COMPANY_ID,
-          'PITCH_DECK',
-        );
+        expect(mockDocumentService.findAll).toHaveBeenCalledWith(COMPANY_ID, 'PITCH_DECK');
       });
 
       it('should propagate NotFoundException', async () => {
-        mockDocumentService.findAll.mockRejectedValue(
-          new NotFoundException('companyProfile'),
-        );
+        mockDocumentService.findAll.mockRejectedValue(new NotFoundException('companyProfile'));
 
-        await expect(docController.list(COMPANY_ID)).rejects.toThrow(
-          NotFoundException,
-        );
+        await expect(docController.list(COMPANY_ID)).rejects.toThrow(NotFoundException);
       });
     });
 
@@ -166,48 +150,27 @@ describe('ProfileDocumentController & PublicDocumentController', () => {
 
       it('should throw when no file provided', async () => {
         await expect(
-          docController.upload(
-            COMPANY_ID,
-            mockUser as any,
-            undefined as any,
-            'PITCH_DECK' as any,
-          ),
+          docController.upload(COMPANY_ID, mockUser as any, undefined as any, 'PITCH_DECK' as any),
         ).rejects.toThrow(BusinessRuleException);
       });
 
       it('should propagate storage limit error', async () => {
         mockDocumentService.upload.mockRejectedValue(
-          new BusinessRuleException(
-            'PROFILE_STORAGE_LIMIT',
-            'errors.profile.storageLimit',
-          ),
+          new BusinessRuleException('PROFILE_STORAGE_LIMIT', 'errors.profile.storageLimit'),
         );
 
         await expect(
-          docController.upload(
-            COMPANY_ID,
-            mockUser as any,
-            mockFile,
-            'PITCH_DECK' as any,
-          ),
+          docController.upload(COMPANY_ID, mockUser as any, mockFile, 'PITCH_DECK' as any),
         ).rejects.toThrow(BusinessRuleException);
       });
 
       it('should propagate invalid file type error', async () => {
         mockDocumentService.upload.mockRejectedValue(
-          new BusinessRuleException(
-            'PROFILE_DOC_INVALID_TYPE',
-            'errors.profile.docInvalidType',
-          ),
+          new BusinessRuleException('PROFILE_DOC_INVALID_TYPE', 'errors.profile.docInvalidType'),
         );
 
         await expect(
-          docController.upload(
-            COMPANY_ID,
-            mockUser as any,
-            mockFile,
-            'OTHER' as any,
-          ),
+          docController.upload(COMPANY_ID, mockUser as any, mockFile, 'OTHER' as any),
         ).rejects.toThrow(BusinessRuleException);
       });
     });
@@ -220,10 +183,7 @@ describe('ProfileDocumentController & PublicDocumentController', () => {
 
         await docController.delete(COMPANY_ID, DOCUMENT_ID);
 
-        expect(mockDocumentService.delete).toHaveBeenCalledWith(
-          COMPANY_ID,
-          DOCUMENT_ID,
-        );
+        expect(mockDocumentService.delete).toHaveBeenCalledWith(COMPANY_ID, DOCUMENT_ID);
       });
 
       it('should propagate NotFoundException', async () => {
@@ -231,9 +191,9 @@ describe('ProfileDocumentController & PublicDocumentController', () => {
           new NotFoundException('profileDocument', DOCUMENT_ID),
         );
 
-        await expect(
-          docController.delete(COMPANY_ID, DOCUMENT_ID),
-        ).rejects.toThrow(NotFoundException);
+        await expect(docController.delete(COMPANY_ID, DOCUMENT_ID)).rejects.toThrow(
+          NotFoundException,
+        );
       });
     });
 
@@ -255,13 +215,10 @@ describe('ProfileDocumentController & PublicDocumentController', () => {
         });
 
         expect(result).toEqual(reorderedDocs);
-        expect(mockDocumentService.reorder).toHaveBeenCalledWith(
-          COMPANY_ID,
-          [
-            { id: 'doc-2', order: 0 },
-            { id: DOCUMENT_ID, order: 1 },
-          ],
-        );
+        expect(mockDocumentService.reorder).toHaveBeenCalledWith(COMPANY_ID, [
+          { id: 'doc-2', order: 0 },
+          { id: DOCUMENT_ID, order: 1 },
+        ]);
       });
 
       it('should propagate NotFoundException for invalid document ID', async () => {
@@ -286,10 +243,7 @@ describe('ProfileDocumentController & PublicDocumentController', () => {
         const result = await docController.download(COMPANY_ID, DOCUMENT_ID);
 
         expect(result).toEqual(mockDownloadUrl);
-        expect(mockDocumentService.getDownloadUrl).toHaveBeenCalledWith(
-          COMPANY_ID,
-          DOCUMENT_ID,
-        );
+        expect(mockDocumentService.getDownloadUrl).toHaveBeenCalledWith(COMPANY_ID, DOCUMENT_ID);
       });
 
       it('should propagate NotFoundException', async () => {
@@ -297,9 +251,9 @@ describe('ProfileDocumentController & PublicDocumentController', () => {
           new NotFoundException('profileDocument', DOCUMENT_ID),
         );
 
-        await expect(
-          docController.download(COMPANY_ID, DOCUMENT_ID),
-        ).rejects.toThrow(NotFoundException);
+        await expect(docController.download(COMPANY_ID, DOCUMENT_ID)).rejects.toThrow(
+          NotFoundException,
+        );
       });
 
       it('should propagate S3 unavailable error', async () => {
@@ -307,9 +261,9 @@ describe('ProfileDocumentController & PublicDocumentController', () => {
           new BusinessRuleException('SYS_S3_UNAVAILABLE', 'errors.sys.s3Unavailable'),
         );
 
-        await expect(
-          docController.download(COMPANY_ID, DOCUMENT_ID),
-        ).rejects.toThrow(BusinessRuleException);
+        await expect(docController.download(COMPANY_ID, DOCUMENT_ID)).rejects.toThrow(
+          BusinessRuleException,
+        );
       });
     });
   });
@@ -401,20 +355,11 @@ describe('ProfileDocumentController & PublicDocumentController', () => {
 
       it('should reject access when profile requires password', async () => {
         mockProfileService.getPublicProfile.mockRejectedValue(
-          new BusinessRuleException(
-            'PROFILE_PASSWORD_REQUIRED',
-            'errors.profile.passwordRequired',
-          ),
+          new BusinessRuleException('PROFILE_PASSWORD_REQUIRED', 'errors.profile.passwordRequired'),
         );
 
         await expect(
-          publicController.downloadPublicDocument(
-            SLUG,
-            DOCUMENT_ID,
-            undefined,
-            undefined,
-            mockReq,
-          ),
+          publicController.downloadPublicDocument(SLUG, DOCUMENT_ID, undefined, undefined, mockReq),
         ).rejects.toThrow(BusinessRuleException);
 
         expect(mockDocumentService.getPublicDownloadUrl).not.toHaveBeenCalled();
@@ -427,13 +372,7 @@ describe('ProfileDocumentController & PublicDocumentController', () => {
         );
 
         await expect(
-          publicController.downloadPublicDocument(
-            SLUG,
-            DOCUMENT_ID,
-            undefined,
-            undefined,
-            mockReq,
-          ),
+          publicController.downloadPublicDocument(SLUG, DOCUMENT_ID, undefined, undefined, mockReq),
         ).rejects.toThrow(NotFoundException);
       });
     });

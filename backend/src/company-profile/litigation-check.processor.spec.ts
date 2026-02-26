@@ -8,10 +8,7 @@ import {
   BigDataCorpNotFoundError,
   BigDataCorpUnavailableError,
 } from './bigdatacorp.service';
-import {
-  LitigationCheckProcessor,
-  LitigationCheckPayload,
-} from './litigation-check.processor';
+import { LitigationCheckProcessor, LitigationCheckPayload } from './litigation-check.processor';
 
 // ═══════════════════════════════════════════════════════════════════════
 // MOCKS
@@ -122,9 +119,7 @@ describe('LitigationCheckProcessor', () => {
       ],
     }).compile();
 
-    processor = module.get<LitigationCheckProcessor>(
-      LitigationCheckProcessor,
-    );
+    processor = module.get<LitigationCheckProcessor>(LitigationCheckProcessor);
   });
 
   // ─── Happy Path ───────────────────────────────────────────────────
@@ -137,17 +132,13 @@ describe('LitigationCheckProcessor', () => {
       const job = createMockJob();
       await processor.handleFetchLitigation(job);
 
-      expect(bigDataCorpService.fetchLitigationData).toHaveBeenCalledWith(
-        CNPJ,
-      );
+      expect(bigDataCorpService.fetchLitigationData).toHaveBeenCalledWith(CNPJ);
 
       // Verify Prisma update call
       expect(prisma.companyProfile.update).toHaveBeenCalledTimes(1);
       const updateCall = prisma.companyProfile.update.mock.calls[0][0];
       expect(updateCall.where.id).toBe(PROFILE_ID);
-      expect(updateCall.data.litigationStatus).toBe(
-        VerificationStatus.COMPLETED,
-      );
+      expect(updateCall.data.litigationStatus).toBe(VerificationStatus.COMPLETED);
       expect(updateCall.data.litigationFetchedAt).toBeInstanceOf(Date);
       expect(updateCall.data.litigationError).toBeNull();
     });
@@ -263,9 +254,7 @@ describe('LitigationCheckProcessor', () => {
       await processor.handleFetchLitigation(createMockJob());
 
       const updateCall = prisma.companyProfile.update.mock.calls[0][0];
-      expect(updateCall.data.litigationStatus).toBe(
-        VerificationStatus.COMPLETED,
-      );
+      expect(updateCall.data.litigationStatus).toBe(VerificationStatus.COMPLETED);
     });
   });
 
@@ -281,9 +270,7 @@ describe('LitigationCheckProcessor', () => {
 
       expect(prisma.companyProfile.update).toHaveBeenCalledTimes(1);
       const updateCall = prisma.companyProfile.update.mock.calls[0][0];
-      expect(updateCall.data.litigationStatus).toBe(
-        VerificationStatus.COMPLETED,
-      );
+      expect(updateCall.data.litigationStatus).toBe(VerificationStatus.COMPLETED);
       expect(updateCall.data.litigationError).toBeNull();
 
       const litigationData = updateCall.data.litigationData;
@@ -319,9 +306,7 @@ describe('LitigationCheckProcessor', () => {
       );
 
       // Should resolve without throwing
-      await expect(
-        processor.handleFetchLitigation(createMockJob()),
-      ).resolves.toBeUndefined();
+      await expect(processor.handleFetchLitigation(createMockJob())).resolves.toBeUndefined();
     });
   });
 
@@ -338,9 +323,7 @@ describe('LitigationCheckProcessor', () => {
         opts: { attempts: 3 },
       } as any);
 
-      await expect(processor.handleFetchLitigation(job)).rejects.toThrow(
-        'Service unavailable',
-      );
+      await expect(processor.handleFetchLitigation(job)).rejects.toThrow('Service unavailable');
 
       // Should NOT update Prisma (let Bull retry)
       expect(prisma.companyProfile.update).not.toHaveBeenCalled();
@@ -356,9 +339,7 @@ describe('LitigationCheckProcessor', () => {
         opts: { attempts: 3 },
       } as any);
 
-      await expect(processor.handleFetchLitigation(job)).rejects.toThrow(
-        'Timeout',
-      );
+      await expect(processor.handleFetchLitigation(job)).rejects.toThrow('Timeout');
       expect(prisma.companyProfile.update).not.toHaveBeenCalled();
     });
 
@@ -373,25 +354,17 @@ describe('LitigationCheckProcessor', () => {
       } as any);
 
       // Should NOT re-throw — handled internally
-      await expect(
-        processor.handleFetchLitigation(job),
-      ).resolves.toBeUndefined();
+      await expect(processor.handleFetchLitigation(job)).resolves.toBeUndefined();
 
       // Should set FAILED status
       expect(prisma.companyProfile.update).toHaveBeenCalledTimes(1);
       const updateCall = prisma.companyProfile.update.mock.calls[0][0];
-      expect(updateCall.data.litigationStatus).toBe(
-        VerificationStatus.FAILED,
-      );
-      expect(updateCall.data.litigationError).toBe(
-        'Verification service temporarily unavailable',
-      );
+      expect(updateCall.data.litigationStatus).toBe(VerificationStatus.FAILED);
+      expect(updateCall.data.litigationError).toBe('Verification service temporarily unavailable');
     });
 
     it('should create an audit log on final failure', async () => {
-      bigDataCorpService.fetchLitigationData.mockRejectedValue(
-        new Error('Connection refused'),
-      );
+      bigDataCorpService.fetchLitigationData.mockRejectedValue(new Error('Connection refused'));
 
       const job = createMockJob(undefined, {
         attemptsMade: 2,
@@ -415,9 +388,7 @@ describe('LitigationCheckProcessor', () => {
     });
 
     it('should handle unknown error type on final attempt', async () => {
-      bigDataCorpService.fetchLitigationData.mockRejectedValue(
-        'string error',
-      );
+      bigDataCorpService.fetchLitigationData.mockRejectedValue('string error');
 
       const job = createMockJob(undefined, {
         attemptsMade: 2,
@@ -427,9 +398,7 @@ describe('LitigationCheckProcessor', () => {
       await processor.handleFetchLitigation(job);
 
       const updateCall = prisma.companyProfile.update.mock.calls[0][0];
-      expect(updateCall.data.litigationStatus).toBe(
-        VerificationStatus.FAILED,
-      );
+      expect(updateCall.data.litigationStatus).toBe(VerificationStatus.FAILED);
     });
 
     it('should default to 3 max attempts when job.opts.attempts is undefined', async () => {
@@ -447,9 +416,7 @@ describe('LitigationCheckProcessor', () => {
 
       expect(prisma.companyProfile.update).toHaveBeenCalledTimes(1);
       const updateCall = prisma.companyProfile.update.mock.calls[0][0];
-      expect(updateCall.data.litigationStatus).toBe(
-        VerificationStatus.FAILED,
-      );
+      expect(updateCall.data.litigationStatus).toBe(VerificationStatus.FAILED);
     });
   });
 
@@ -503,33 +470,23 @@ describe('LitigationCheckProcessor', () => {
     });
 
     it('should mask multi-part names', () => {
-      expect(processor.maskIndividualName('Ana Maria Santos')).toBe(
-        'A*** M*** S***',
-      );
+      expect(processor.maskIndividualName('Ana Maria Santos')).toBe('A*** M*** S***');
     });
 
     it('should NOT mask company names containing LTDA', () => {
-      expect(processor.maskIndividualName('Acme Empresa LTDA')).toBe(
-        'Acme Empresa LTDA',
-      );
+      expect(processor.maskIndividualName('Acme Empresa LTDA')).toBe('Acme Empresa LTDA');
     });
 
     it('should NOT mask company names containing S.A.', () => {
-      expect(processor.maskIndividualName('Petrobras S.A.')).toBe(
-        'Petrobras S.A.',
-      );
+      expect(processor.maskIndividualName('Petrobras S.A.')).toBe('Petrobras S.A.');
     });
 
     it('should NOT mask company names containing SA (without dots)', () => {
-      expect(processor.maskIndividualName('Petrobras SA')).toBe(
-        'Petrobras SA',
-      );
+      expect(processor.maskIndividualName('Petrobras SA')).toBe('Petrobras SA');
     });
 
     it('should NOT mask company names containing EIRELI', () => {
-      expect(processor.maskIndividualName('Serviços EIRELI')).toBe(
-        'Serviços EIRELI',
-      );
+      expect(processor.maskIndividualName('Serviços EIRELI')).toBe('Serviços EIRELI');
     });
 
     it('should NOT mask company names containing MEI', () => {
@@ -541,45 +498,31 @@ describe('LitigationCheckProcessor', () => {
     });
 
     it('should NOT mask company names containing EMPRESA', () => {
-      expect(processor.maskIndividualName('EMPRESA de Serviços')).toBe(
-        'EMPRESA de Serviços',
-      );
+      expect(processor.maskIndividualName('EMPRESA de Serviços')).toBe('EMPRESA de Serviços');
     });
 
     it('should NOT mask company names containing INC', () => {
-      expect(processor.maskIndividualName('Tech Solutions INC')).toBe(
-        'Tech Solutions INC',
-      );
+      expect(processor.maskIndividualName('Tech Solutions INC')).toBe('Tech Solutions INC');
     });
 
     it('should NOT mask company names containing LLC', () => {
-      expect(processor.maskIndividualName('Global Services LLC')).toBe(
-        'Global Services LLC',
-      );
+      expect(processor.maskIndividualName('Global Services LLC')).toBe('Global Services LLC');
     });
 
     it('should NOT mask company names containing CORP', () => {
-      expect(processor.maskIndividualName('Innovation CORP')).toBe(
-        'Innovation CORP',
-      );
+      expect(processor.maskIndividualName('Innovation CORP')).toBe('Innovation CORP');
     });
 
     it('should NOT mask company names containing CIA', () => {
-      expect(processor.maskIndividualName('CIA de Alimentos')).toBe(
-        'CIA de Alimentos',
-      );
+      expect(processor.maskIndividualName('CIA de Alimentos')).toBe('CIA de Alimentos');
     });
 
     it('should NOT mask company names containing COMPANHIA', () => {
-      expect(
-        processor.maskIndividualName('COMPANHIA Brasileira'),
-      ).toBe('COMPANHIA Brasileira');
+      expect(processor.maskIndividualName('COMPANHIA Brasileira')).toBe('COMPANHIA Brasileira');
     });
 
     it('should handle company keyword detection case-insensitively', () => {
-      expect(processor.maskIndividualName('empresa ltda')).toBe(
-        'empresa ltda',
-      );
+      expect(processor.maskIndividualName('empresa ltda')).toBe('empresa ltda');
     });
 
     it('should return empty string for empty input', () => {

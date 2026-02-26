@@ -1,13 +1,6 @@
-import {
-  Controller,
-  Get,
-  Param,
-  Query,
-  HttpCode,
-  HttpStatus,
-} from '@nestjs/common';
+import { Controller, Get, Param, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { ApiTags, ApiOperation, ApiParam, ApiResponse as SwaggerResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiParam } from '@nestjs/swagger';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { AuditLogService } from './audit-log.service';
 import { ListAuditLogsDto } from './dto/list-audit-logs.dto';
@@ -25,10 +18,7 @@ export class AuditLogController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'List audit logs for a company' })
   @ApiParam({ name: 'companyId', type: 'string', format: 'uuid' })
-  async list(
-    @Param('companyId') companyId: string,
-    @Query() dto: ListAuditLogsDto,
-  ) {
+  async list(@Param('companyId') companyId: string, @Query() dto: ListAuditLogsDto) {
     const { items, total } = await this.auditLogService.findAll(companyId, dto);
 
     // Log that audit logs were viewed
@@ -48,14 +38,8 @@ export class AuditLogController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verify hash chain integrity' })
   @ApiParam({ name: 'companyId', type: 'string', format: 'uuid' })
-  async verifyHashChain(
-    @Param('companyId') companyId: string,
-    @Query() dto: VerifyHashChainDto,
-  ) {
-    const result = await this.auditLogService.verifyHashChain(
-      dto.dateFrom,
-      dto.dateTo,
-    );
+  async verifyHashChain(@Param('companyId') companyId: string, @Query() dto: VerifyHashChainDto) {
+    const result = await this.auditLogService.verifyHashChain(dto.dateFrom, dto.dateTo);
 
     // Log that hash chain was verified
     await this.auditLogService.log({
@@ -79,10 +63,7 @@ export class AuditLogController {
   @ApiOperation({ summary: 'Get audit log detail' })
   @ApiParam({ name: 'companyId', type: 'string', format: 'uuid' })
   @ApiParam({ name: 'id', type: 'string', format: 'uuid' })
-  async getById(
-    @Param('companyId') companyId: string,
-    @Param('id') id: string,
-  ) {
+  async getById(@Param('companyId') companyId: string, @Param('id') id: string) {
     return this.auditLogService.findById(companyId, id);
   }
 }

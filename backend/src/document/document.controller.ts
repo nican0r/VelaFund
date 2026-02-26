@@ -46,10 +46,7 @@ export class DocumentController {
     @Param('companyId') companyId: string,
     @Query() query: ListTemplatesQueryDto,
   ) {
-    const { items, total } = await this.documentService.findAllTemplates(
-      companyId,
-      query,
-    );
+    const { items, total } = await this.documentService.findAllTemplates(companyId, query);
     return paginate(items, total, query.page, query.limit);
   }
 
@@ -80,10 +77,7 @@ export class DocumentController {
     @Param('companyId') companyId: string,
     @Query() query: ListDocumentsQueryDto,
   ) {
-    const { items, total } = await this.documentService.findAllDocuments(
-      companyId,
-      query,
-    );
+    const { items, total } = await this.documentService.findAllDocuments(companyId, query);
     return paginate(items, total, query.page, query.limit);
   }
 
@@ -204,10 +198,7 @@ export class DocumentController {
     @Param('documentId') documentId: string,
     @Res() res: Response,
   ) {
-    const html = await this.documentService.getPreviewHtml(
-      companyId,
-      documentId,
-    );
+    const html = await this.documentService.getPreviewHtml(companyId, documentId);
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.send(html);
   }
@@ -255,12 +246,7 @@ export class DocumentController {
     )
     file: Express.Multer.File,
   ) {
-    return this.documentService.uploadDocument(
-      companyId,
-      user.id,
-      title,
-      file,
-    );
+    return this.documentService.uploadDocument(companyId, user.id, title, file);
   }
 
   @Delete('documents/:documentId')

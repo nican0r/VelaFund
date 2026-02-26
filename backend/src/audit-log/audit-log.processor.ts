@@ -36,8 +36,8 @@ export class AuditLogProcessor {
         resourceType: event.resourceType,
         resourceId: event.resourceId,
         companyId: event.companyId,
-        changes: event.changes as Prisma.InputJsonValue ?? Prisma.JsonNull,
-        metadata: event.metadata as Prisma.InputJsonValue ?? Prisma.JsonNull,
+        changes: (event.changes as Prisma.InputJsonValue) ?? Prisma.JsonNull,
+        metadata: (event.metadata as Prisma.InputJsonValue) ?? Prisma.JsonNull,
       },
     });
 

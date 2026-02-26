@@ -6,10 +6,7 @@ import { CompanyService } from './company.service';
 import { CnpjValidationProcessor } from './processors/cnpj-validation.processor';
 
 @Module({
-  imports: [
-    BullModule.registerQueue({ name: 'company-setup' }),
-    KycModule,
-  ],
+  imports: [BullModule.registerQueue({ name: 'company-setup' }), KycModule],
   controllers: [CompanyController],
   providers: [CompanyService, CnpjValidationProcessor],
   exports: [CompanyService],

@@ -46,10 +46,7 @@ export class MemberService {
     private emailService: EmailService,
     private configService: ConfigService,
   ) {
-    this.frontendUrl = this.configService.get<string>(
-      'FRONTEND_URL',
-      'http://localhost:3000',
-    );
+    this.frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000');
   }
 
   /**
@@ -73,11 +70,9 @@ export class MemberService {
     }
 
     if (company.status === 'DISSOLVED') {
-      throw new BusinessRuleException(
-        'COMPANY_DISSOLVED',
-        'errors.company.dissolved',
-        { companyId },
-      );
+      throw new BusinessRuleException('COMPANY_DISSOLVED', 'errors.company.dissolved', {
+        companyId,
+      });
     }
 
     // Rate limit: max 50 invitations per company per day
@@ -106,11 +101,9 @@ export class MemberService {
 
     if (existingMember) {
       if (existingMember.status === 'ACTIVE') {
-        throw new ConflictException(
-          'COMPANY_MEMBER_EXISTS',
-          'errors.member.alreadyExists',
-          { email: dto.email },
-        );
+        throw new ConflictException('COMPANY_MEMBER_EXISTS', 'errors.member.alreadyExists', {
+          email: dto.email,
+        });
       }
 
       if (existingMember.status === 'PENDING') {
@@ -124,52 +117,43 @@ export class MemberService {
       // REMOVED: re-invite by updating the existing record.
       // The @@unique([companyId, email]) constraint prevents creating a new record,
       // so we reuse the existing one. This is a deliberate design choice.
-      return this.reinviteRemovedMember(
-        existingMember.id,
-        dto,
-        inviterId,
-        company.name,
-      );
+      return this.reinviteRemovedMember(existingMember.id, dto, inviterId, company.name);
     }
 
     // Create new member + invitation token atomically
     const token = randomBytes(32).toString('hex');
-    const expiresAt = new Date(
-      Date.now() + INVITATION_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
-    );
+    const expiresAt = new Date(Date.now() + INVITATION_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
 
-    const member = await this.prisma.$transaction(
-      async (tx: Prisma.TransactionClient) => {
-        const created = await tx.companyMember.create({
-          data: {
-            companyId,
-            email: dto.email,
-            role: dto.role,
-            status: 'PENDING',
-            invitedBy: inviterId,
-            invitedAt: new Date(),
-          },
-        });
+    const member = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const created = await tx.companyMember.create({
+        data: {
+          companyId,
+          email: dto.email,
+          role: dto.role,
+          status: 'PENDING',
+          invitedBy: inviterId,
+          invitedAt: new Date(),
+        },
+      });
 
-        await tx.invitationToken.create({
-          data: {
-            companyMemberId: created.id,
-            token,
-            expiresAt,
-          },
-        });
+      await tx.invitationToken.create({
+        data: {
+          companyMemberId: created.id,
+          token,
+          expiresAt,
+        },
+      });
 
-        return created;
-      },
-    );
+      return created;
+    });
 
     this.logger.log(
       `Invitation sent to ${dto.email} for company ${companyId} with role ${dto.role}`,
     );
 
     // Send invitation email asynchronously — don't block the response on email delivery
-    this.sendInvitationEmail(dto.email, token, company.name, dto.role, inviterId).catch(
-      (err) => this.logger.warn(`Failed to send invitation email to ${dto.email}: ${err.message}`),
+    this.sendInvitationEmail(dto.email, token, company.name, dto.role, inviterId).catch((err) =>
+      this.logger.warn(`Failed to send invitation email to ${dto.email}: ${err.message}`),
     );
 
     return member;
@@ -203,13 +187,7 @@ export class MemberService {
       ];
     }
 
-    const sortFields = parseSort(sort, [
-      'createdAt',
-      'email',
-      'role',
-      'invitedAt',
-      'acceptedAt',
-    ]);
+    const sortFields = parseSort(sort, ['createdAt', 'email', 'role', 'invitedAt', 'acceptedAt']);
     const orderBy = sortFields.map((f) => ({ [f.field]: f.direction }));
 
     const [items, total] = await Promise.all([
@@ -244,11 +222,7 @@ export class MemberService {
    * - Last admin cannot be demoted (last-admin guard)
    * - users:manage is a protected permission — cannot be granted to non-ADMIN roles
    */
-  async updateMember(
-    companyId: string,
-    memberId: string,
-    dto: UpdateMemberDto,
-  ) {
+  async updateMember(companyId: string, memberId: string, dto: UpdateMemberDto) {
     const member = await this.prisma.companyMember.findFirst({
       where: { id: memberId, companyId },
     });
@@ -258,11 +232,10 @@ export class MemberService {
     }
 
     if (member.status !== 'ACTIVE') {
-      throw new BusinessRuleException(
-        'MEMBER_NOT_ACTIVE',
-        'errors.member.notActive',
-        { memberId, status: member.status },
-      );
+      throw new BusinessRuleException('MEMBER_NOT_ACTIVE', 'errors.member.notActive', {
+        memberId,
+        status: member.status,
+      });
     }
 
     // Last admin guard: if demoting an ADMIN to a different role
@@ -302,11 +275,7 @@ export class MemberService {
    * - REMOVED status is terminal
    * - Both ACTIVE and PENDING members can be removed
    */
-  async removeMember(
-    companyId: string,
-    memberId: string,
-    removedById: string,
-  ) {
+  async removeMember(companyId: string, memberId: string, removedById: string) {
     const member = await this.prisma.companyMember.findFirst({
       where: { id: memberId, companyId },
     });
@@ -316,11 +285,9 @@ export class MemberService {
     }
 
     if (member.status === 'REMOVED') {
-      throw new BusinessRuleException(
-        'MEMBER_ALREADY_REMOVED',
-        'errors.member.alreadyRemoved',
-        { memberId },
-      );
+      throw new BusinessRuleException('MEMBER_ALREADY_REMOVED', 'errors.member.alreadyRemoved', {
+        memberId,
+      });
     }
 
     // Last admin guard for active ADMINs
@@ -355,17 +322,14 @@ export class MemberService {
     }
 
     if (member.status !== 'PENDING') {
-      throw new BusinessRuleException(
-        'MEMBER_NOT_PENDING',
-        'errors.member.notPending',
-        { memberId, status: member.status },
-      );
+      throw new BusinessRuleException('MEMBER_NOT_PENDING', 'errors.member.notPending', {
+        memberId,
+        status: member.status,
+      });
     }
 
     const token = randomBytes(32).toString('hex');
-    const expiresAt = new Date(
-      Date.now() + INVITATION_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
-    );
+    const expiresAt = new Date(Date.now() + INVITATION_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
 
     // Upsert: update existing token or create if somehow missing
     await this.prisma.invitationToken.upsert({
@@ -382,9 +346,7 @@ export class MemberService {
       },
     });
 
-    this.logger.log(
-      `Invitation resent for member ${memberId} in company ${companyId}`,
-    );
+    this.logger.log(`Invitation resent for member ${memberId} in company ${companyId}`);
 
     // Send invitation email asynchronously — look up company name for the email
     const company = await this.prisma.company.findUnique({
@@ -432,11 +394,9 @@ export class MemberService {
     }
 
     if (invitation.expiresAt < new Date()) {
-      throw new GoneException(
-        'INVITATION_EXPIRED',
-        'errors.member.invitationExpired',
-        { expiresAt: invitation.expiresAt.toISOString() },
-      );
+      throw new GoneException('INVITATION_EXPIRED', 'errors.member.invitationExpired', {
+        expiresAt: invitation.expiresAt.toISOString(),
+      });
     }
 
     const member = invitation.companyMember;
@@ -455,9 +415,7 @@ export class MemberService {
         select: { firstName: true, lastName: true },
       });
       if (inviter) {
-        invitedByName =
-          [inviter.firstName, inviter.lastName].filter(Boolean).join(' ') ||
-          null;
+        invitedByName = [inviter.firstName, inviter.lastName].filter(Boolean).join(' ') || null;
       }
     }
 
@@ -503,11 +461,9 @@ export class MemberService {
     }
 
     if (invitation.expiresAt < new Date()) {
-      throw new GoneException(
-        'INVITATION_EXPIRED',
-        'errors.member.invitationExpired',
-        { expiresAt: invitation.expiresAt.toISOString() },
-      );
+      throw new GoneException('INVITATION_EXPIRED', 'errors.member.invitationExpired', {
+        expiresAt: invitation.expiresAt.toISOString(),
+      });
     }
 
     const member = invitation.companyMember;
@@ -529,11 +485,9 @@ export class MemberService {
     });
 
     if (existingActiveMember) {
-      throw new ConflictException(
-        'COMPANY_MEMBER_EXISTS',
-        'errors.member.alreadyExists',
-        { companyId: member.companyId },
-      );
+      throw new ConflictException('COMPANY_MEMBER_EXISTS', 'errors.member.alreadyExists', {
+        companyId: member.companyId,
+      });
     }
 
     // Check 20-company membership limit
@@ -553,29 +507,27 @@ export class MemberService {
     }
 
     // Atomic: activate member + mark token as used
-    const result = await this.prisma.$transaction(
-      async (tx: Prisma.TransactionClient) => {
-        const updated = await tx.companyMember.update({
-          where: { id: member.id },
-          data: {
-            userId,
-            email: userEmail, // Update to accepting user's email (BR-6)
-            status: 'ACTIVE',
-            acceptedAt: new Date(),
-          },
-          include: {
-            company: { select: { id: true, name: true } },
-          },
-        });
+    const result = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const updated = await tx.companyMember.update({
+        where: { id: member.id },
+        data: {
+          userId,
+          email: userEmail, // Update to accepting user's email (BR-6)
+          status: 'ACTIVE',
+          acceptedAt: new Date(),
+        },
+        include: {
+          company: { select: { id: true, name: true } },
+        },
+      });
 
-        await tx.invitationToken.update({
-          where: { id: invitation.id },
-          data: { usedAt: new Date() },
-        });
+      await tx.invitationToken.update({
+        where: { id: invitation.id },
+        data: { usedAt: new Date() },
+      });
 
-        return updated;
-      },
-    );
+      return updated;
+    });
 
     this.logger.log(
       `Invitation accepted: user ${userId} joined company ${member.companyId} as ${member.role}`,
@@ -603,51 +555,45 @@ export class MemberService {
     companyName: string,
   ) {
     const token = randomBytes(32).toString('hex');
-    const expiresAt = new Date(
-      Date.now() + INVITATION_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
-    );
+    const expiresAt = new Date(Date.now() + INVITATION_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
 
-    const result = await this.prisma.$transaction(
-      async (tx: Prisma.TransactionClient) => {
-        const member = await tx.companyMember.update({
-          where: { id: existingId },
-          data: {
-            role: dto.role,
-            status: 'PENDING',
-            invitedBy: inviterId,
-            invitedAt: new Date(),
-            acceptedAt: null,
-            removedAt: null,
-            removedBy: null,
-            userId: null,
-          },
-        });
+    const result = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const member = await tx.companyMember.update({
+        where: { id: existingId },
+        data: {
+          role: dto.role,
+          status: 'PENDING',
+          invitedBy: inviterId,
+          invitedAt: new Date(),
+          acceptedAt: null,
+          removedAt: null,
+          removedBy: null,
+          userId: null,
+        },
+      });
 
-        await tx.invitationToken.upsert({
-          where: { companyMemberId: member.id },
-          create: {
-            companyMemberId: member.id,
-            token,
-            expiresAt,
-          },
-          update: {
-            token,
-            expiresAt,
-            usedAt: null,
-          },
-        });
+      await tx.invitationToken.upsert({
+        where: { companyMemberId: member.id },
+        create: {
+          companyMemberId: member.id,
+          token,
+          expiresAt,
+        },
+        update: {
+          token,
+          expiresAt,
+          usedAt: null,
+        },
+      });
 
-        return member;
-      },
-    );
+      return member;
+    });
 
-    this.logger.log(
-      `Re-invitation sent for ${dto.email} (previously removed member)`,
-    );
+    this.logger.log(`Re-invitation sent for ${dto.email} (previously removed member)`);
 
     // Send invitation email asynchronously
-    this.sendInvitationEmail(dto.email, token, companyName, dto.role, inviterId).catch(
-      (err) => this.logger.warn(`Failed to send re-invitation email to ${dto.email}: ${err.message}`),
+    this.sendInvitationEmail(dto.email, token, companyName, dto.role, inviterId).catch((err) =>
+      this.logger.warn(`Failed to send re-invitation email to ${dto.email}: ${err.message}`),
     );
 
     return result;
@@ -665,9 +611,7 @@ export class MemberService {
     inviterId: string | null,
   ): Promise<void> {
     if (!this.emailService.isAvailable()) {
-      this.logger.warn(
-        `Email service unavailable — invitation email to ${email} not sent`,
-      );
+      this.logger.warn(`Email service unavailable — invitation email to ${email} not sent`);
       return;
     }
 
@@ -680,8 +624,7 @@ export class MemberService {
       });
       if (inviter) {
         inviterName =
-          [inviter.firstName, inviter.lastName].filter(Boolean).join(' ') ||
-          'A team member';
+          [inviter.firstName, inviter.lastName].filter(Boolean).join(' ') || 'A team member';
       }
     }
 
@@ -719,10 +662,7 @@ export class MemberService {
    * Ensure that removing or demoting a member would not leave the company
    * with zero ADMINs. Throws COMPANY_LAST_ADMIN if it would.
    */
-  private async ensureNotLastAdmin(
-    companyId: string,
-    excludeMemberId: string,
-  ) {
+  private async ensureNotLastAdmin(companyId: string, excludeMemberId: string) {
     const adminCount = await this.prisma.companyMember.count({
       where: {
         companyId,
@@ -733,11 +673,9 @@ export class MemberService {
     });
 
     if (adminCount === 0) {
-      throw new BusinessRuleException(
-        'COMPANY_LAST_ADMIN',
-        'errors.member.lastAdmin',
-        { companyId },
-      );
+      throw new BusinessRuleException('COMPANY_LAST_ADMIN', 'errors.member.lastAdmin', {
+        companyId,
+      });
     }
   }
 
@@ -745,10 +683,7 @@ export class MemberService {
    * Validate that permission overrides don't grant protected permissions
    * to non-ADMIN roles. The users:manage permission can only be held by ADMINs.
    */
-  private validatePermissionOverrides(
-    permissions: Record<string, unknown>,
-    role: string,
-  ) {
+  private validatePermissionOverrides(permissions: Record<string, unknown>, role: string) {
     if (role !== 'ADMIN') {
       for (const protectedPerm of PROTECTED_PERMISSIONS) {
         if (permissions[protectedPerm] === true) {

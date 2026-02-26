@@ -169,9 +169,7 @@ describe('FundingRoundService', () => {
     it('should create a funding round in DRAFT status', async () => {
       prisma.company.findUnique.mockResolvedValue(mockCompany());
       prisma.shareClass.findFirst.mockResolvedValue(mockShareClass());
-      prisma.fundingRound.create.mockResolvedValue(
-        mockRound({ status: 'DRAFT' }),
-      );
+      prisma.fundingRound.create.mockResolvedValue(mockRound({ status: 'DRAFT' }));
 
       const result = await service.create('company-1', createDto, 'user-1');
       expect(result.status).toBe('DRAFT');
@@ -188,37 +186,31 @@ describe('FundingRoundService', () => {
 
     it('should throw NotFoundException if company does not exist', async () => {
       prisma.company.findUnique.mockResolvedValue(null);
-      await expect(
-        service.create('no-company', createDto, 'user-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.create('no-company', createDto, 'user-1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw if company is not ACTIVE', async () => {
-      prisma.company.findUnique.mockResolvedValue(
-        mockCompany({ status: 'DRAFT' }),
+      prisma.company.findUnique.mockResolvedValue(mockCompany({ status: 'DRAFT' }));
+      await expect(service.create('company-1', createDto, 'user-1')).rejects.toThrow(
+        BusinessRuleException,
       );
-      await expect(
-        service.create('company-1', createDto, 'user-1'),
-      ).rejects.toThrow(BusinessRuleException);
     });
 
     it('should throw NotFoundException if share class not in company', async () => {
       prisma.company.findUnique.mockResolvedValue(mockCompany());
       prisma.shareClass.findFirst.mockResolvedValue(null);
-      await expect(
-        service.create('company-1', createDto, 'user-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.create('company-1', createDto, 'user-1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw if targetAmount is zero or negative', async () => {
       prisma.company.findUnique.mockResolvedValue(mockCompany());
       prisma.shareClass.findFirst.mockResolvedValue(mockShareClass());
       await expect(
-        service.create(
-          'company-1',
-          { ...createDto, targetAmount: '0' },
-          'user-1',
-        ),
+        service.create('company-1', { ...createDto, targetAmount: '0' }, 'user-1'),
       ).rejects.toThrow(BusinessRuleException);
     });
 
@@ -226,11 +218,7 @@ describe('FundingRoundService', () => {
       prisma.company.findUnique.mockResolvedValue(mockCompany());
       prisma.shareClass.findFirst.mockResolvedValue(mockShareClass());
       await expect(
-        service.create(
-          'company-1',
-          { ...createDto, pricePerShare: '0' },
-          'user-1',
-        ),
+        service.create('company-1', { ...createDto, pricePerShare: '0' }, 'user-1'),
       ).rejects.toThrow(BusinessRuleException);
     });
 
@@ -238,11 +226,7 @@ describe('FundingRoundService', () => {
       prisma.company.findUnique.mockResolvedValue(mockCompany());
       prisma.shareClass.findFirst.mockResolvedValue(mockShareClass());
       await expect(
-        service.create(
-          'company-1',
-          { ...createDto, minimumCloseAmount: '9999999' },
-          'user-1',
-        ),
+        service.create('company-1', { ...createDto, minimumCloseAmount: '9999999' }, 'user-1'),
       ).rejects.toThrow(BusinessRuleException);
     });
 
@@ -250,11 +234,7 @@ describe('FundingRoundService', () => {
       prisma.company.findUnique.mockResolvedValue(mockCompany());
       prisma.shareClass.findFirst.mockResolvedValue(mockShareClass());
       await expect(
-        service.create(
-          'company-1',
-          { ...createDto, hardCap: '1000' },
-          'user-1',
-        ),
+        service.create('company-1', { ...createDto, hardCap: '1000' }, 'user-1'),
       ).rejects.toThrow(BusinessRuleException);
     });
   });
@@ -309,9 +289,7 @@ describe('FundingRoundService', () => {
 
     it('should throw NotFoundException if round not found', async () => {
       prisma.fundingRound.findFirst.mockResolvedValue(null);
-      await expect(
-        service.findById('company-1', 'bad-id'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.findById('company-1', 'bad-id')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -321,12 +299,8 @@ describe('FundingRoundService', () => {
 
   describe('update', () => {
     it('should update a DRAFT round', async () => {
-      prisma.fundingRound.findFirst.mockResolvedValue(
-        mockRound({ status: 'DRAFT' }),
-      );
-      prisma.fundingRound.update.mockResolvedValue(
-        mockRound({ name: 'Updated' }),
-      );
+      prisma.fundingRound.findFirst.mockResolvedValue(mockRound({ status: 'DRAFT' }));
+      prisma.fundingRound.update.mockResolvedValue(mockRound({ name: 'Updated' }));
 
       const result = await service.update('company-1', 'round-1', {
         name: 'Updated',
@@ -335,12 +309,8 @@ describe('FundingRoundService', () => {
     });
 
     it('should update an OPEN round', async () => {
-      prisma.fundingRound.findFirst.mockResolvedValue(
-        mockRound({ status: 'OPEN' }),
-      );
-      prisma.fundingRound.update.mockResolvedValue(
-        mockRound({ status: 'OPEN', name: 'Updated' }),
-      );
+      prisma.fundingRound.findFirst.mockResolvedValue(mockRound({ status: 'OPEN' }));
+      prisma.fundingRound.update.mockResolvedValue(mockRound({ status: 'OPEN', name: 'Updated' }));
 
       const result = await service.update('company-1', 'round-1', {
         name: 'Updated',
@@ -349,28 +319,24 @@ describe('FundingRoundService', () => {
     });
 
     it('should throw if round is CLOSED', async () => {
-      prisma.fundingRound.findFirst.mockResolvedValue(
-        mockRound({ status: 'CLOSED' }),
+      prisma.fundingRound.findFirst.mockResolvedValue(mockRound({ status: 'CLOSED' }));
+      await expect(service.update('company-1', 'round-1', { name: 'X' })).rejects.toThrow(
+        BusinessRuleException,
       );
-      await expect(
-        service.update('company-1', 'round-1', { name: 'X' }),
-      ).rejects.toThrow(BusinessRuleException);
     });
 
     it('should throw if round not found', async () => {
       prisma.fundingRound.findFirst.mockResolvedValue(null);
-      await expect(
-        service.update('company-1', 'bad', { name: 'X' }),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.update('company-1', 'bad', { name: 'X' })).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw if targetAmount is zero', async () => {
-      prisma.fundingRound.findFirst.mockResolvedValue(
-        mockRound({ status: 'DRAFT' }),
+      prisma.fundingRound.findFirst.mockResolvedValue(mockRound({ status: 'DRAFT' }));
+      await expect(service.update('company-1', 'round-1', { targetAmount: '0' })).rejects.toThrow(
+        BusinessRuleException,
       );
-      await expect(
-        service.update('company-1', 'round-1', { targetAmount: '0' }),
-      ).rejects.toThrow(BusinessRuleException);
     });
   });
 
@@ -380,9 +346,7 @@ describe('FundingRoundService', () => {
 
   describe('open', () => {
     it('should transition DRAFT → OPEN', async () => {
-      prisma.fundingRound.findFirst.mockResolvedValue(
-        mockRound({ status: 'DRAFT' }),
-      );
+      prisma.fundingRound.findFirst.mockResolvedValue(mockRound({ status: 'DRAFT' }));
       prisma.fundingRound.update.mockResolvedValue(
         mockRound({ status: 'OPEN', openedAt: new Date() }),
       );
@@ -392,19 +356,13 @@ describe('FundingRoundService', () => {
     });
 
     it('should throw if round is already CLOSED', async () => {
-      prisma.fundingRound.findFirst.mockResolvedValue(
-        mockRound({ status: 'CLOSED' }),
-      );
-      await expect(
-        service.open('company-1', 'round-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      prisma.fundingRound.findFirst.mockResolvedValue(mockRound({ status: 'CLOSED' }));
+      await expect(service.open('company-1', 'round-1')).rejects.toThrow(BusinessRuleException);
     });
 
     it('should throw if round not found', async () => {
       prisma.fundingRound.findFirst.mockResolvedValue(null);
-      await expect(
-        service.open('company-1', 'bad'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.open('company-1', 'bad')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -414,26 +372,18 @@ describe('FundingRoundService', () => {
 
   describe('cancel', () => {
     it('should cancel a DRAFT round', async () => {
-      prisma.fundingRound.findFirst.mockResolvedValue(
-        mockRound({ status: 'DRAFT' }),
-      );
+      prisma.fundingRound.findFirst.mockResolvedValue(mockRound({ status: 'DRAFT' }));
       prisma.roundCommitment.updateMany.mockResolvedValue({ count: 0 });
-      prisma.fundingRound.update.mockResolvedValue(
-        mockRound({ status: 'CANCELLED' }),
-      );
+      prisma.fundingRound.update.mockResolvedValue(mockRound({ status: 'CANCELLED' }));
 
       const result = await service.cancel('company-1', 'round-1');
       expect(result.status).toBe('CANCELLED');
     });
 
     it('should cancel an OPEN round and cancel all commitments', async () => {
-      prisma.fundingRound.findFirst.mockResolvedValue(
-        mockRound({ status: 'OPEN' }),
-      );
+      prisma.fundingRound.findFirst.mockResolvedValue(mockRound({ status: 'OPEN' }));
       prisma.roundCommitment.updateMany.mockResolvedValue({ count: 3 });
-      prisma.fundingRound.update.mockResolvedValue(
-        mockRound({ status: 'CANCELLED' }),
-      );
+      prisma.fundingRound.update.mockResolvedValue(mockRound({ status: 'CANCELLED' }));
 
       const result = await service.cancel('company-1', 'round-1');
       expect(result.status).toBe('CANCELLED');
@@ -445,12 +395,8 @@ describe('FundingRoundService', () => {
     });
 
     it('should throw if round is CLOSED', async () => {
-      prisma.fundingRound.findFirst.mockResolvedValue(
-        mockRound({ status: 'CLOSED' }),
-      );
-      await expect(
-        service.cancel('company-1', 'round-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      prisma.fundingRound.findFirst.mockResolvedValue(mockRound({ status: 'CLOSED' }));
+      await expect(service.cancel('company-1', 'round-1')).rejects.toThrow(BusinessRuleException);
     });
   });
 
@@ -510,9 +456,7 @@ describe('FundingRoundService', () => {
           shareClass: mockShareClass(),
         }),
       );
-      await expect(
-        service.close('company-1', 'round-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.close('company-1', 'round-1')).rejects.toThrow(BusinessRuleException);
     });
 
     it('should throw if there are unconfirmed payments', async () => {
@@ -531,9 +475,7 @@ describe('FundingRoundService', () => {
           shareClass: mockShareClass(),
         }),
       );
-      await expect(
-        service.close('company-1', 'round-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.close('company-1', 'round-1')).rejects.toThrow(BusinessRuleException);
     });
 
     it('should throw if minimum close amount not met', async () => {
@@ -545,24 +487,18 @@ describe('FundingRoundService', () => {
           shareClass: mockShareClass(),
         }),
       );
-      await expect(
-        service.close('company-1', 'round-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.close('company-1', 'round-1')).rejects.toThrow(BusinessRuleException);
     });
 
     it('should throw if no active commitments', async () => {
       prisma.fundingRound.findFirst.mockResolvedValue(
         mockRound({
           status: 'OPEN',
-          commitments: [
-            mockCommitment({ paymentStatus: 'CANCELLED' }),
-          ],
+          commitments: [mockCommitment({ paymentStatus: 'CANCELLED' })],
           shareClass: mockShareClass(),
         }),
       );
-      await expect(
-        service.close('company-1', 'round-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.close('company-1', 'round-1')).rejects.toThrow(BusinessRuleException);
     });
 
     it('should throw if issuance exceeds authorized shares', async () => {
@@ -576,9 +512,7 @@ describe('FundingRoundService', () => {
           }),
         }),
       );
-      await expect(
-        service.close('company-1', 'round-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.close('company-1', 'round-1')).rejects.toThrow(BusinessRuleException);
     });
 
     it('should update existing shareholding on close', async () => {
@@ -599,9 +533,7 @@ describe('FundingRoundService', () => {
       prisma.shareholding.update.mockResolvedValue({});
       prisma.shareClass.update.mockResolvedValue({});
       prisma.roundClose.create.mockResolvedValue({});
-      prisma.fundingRound.update.mockResolvedValue(
-        mockRound({ status: 'CLOSED' }),
-      );
+      prisma.fundingRound.update.mockResolvedValue(mockRound({ status: 'CLOSED' }));
 
       await service.close('company-1', 'round-1');
       expect(prisma.shareholding.update).toHaveBeenCalledWith(
@@ -627,9 +559,7 @@ describe('FundingRoundService', () => {
     };
 
     it('should add a commitment to an OPEN round', async () => {
-      prisma.fundingRound.findFirst.mockResolvedValue(
-        mockRound({ status: 'OPEN' }),
-      );
+      prisma.fundingRound.findFirst.mockResolvedValue(mockRound({ status: 'OPEN' }));
       prisma.shareholder.findFirst.mockResolvedValue(mockShareholder());
       prisma.roundCommitment.findFirst.mockResolvedValue(null);
       prisma.roundCommitment.aggregate.mockResolvedValue({
@@ -639,44 +569,32 @@ describe('FundingRoundService', () => {
         mockCommitment({ sharesAllocated: new Prisma.Decimal('50000') }),
       );
 
-      const result = await service.addCommitment(
-        'company-1',
-        'round-1',
-        commitDto,
-      );
+      const result = await service.addCommitment('company-1', 'round-1', commitDto);
       expect(result.sharesAllocated?.toString()).toBe('50000');
     });
 
     it('should throw if round is not OPEN', async () => {
-      prisma.fundingRound.findFirst.mockResolvedValue(
-        mockRound({ status: 'DRAFT' }),
+      prisma.fundingRound.findFirst.mockResolvedValue(mockRound({ status: 'DRAFT' }));
+      await expect(service.addCommitment('company-1', 'round-1', commitDto)).rejects.toThrow(
+        BusinessRuleException,
       );
-      await expect(
-        service.addCommitment('company-1', 'round-1', commitDto),
-      ).rejects.toThrow(BusinessRuleException);
     });
 
     it('should throw if shareholder not found', async () => {
-      prisma.fundingRound.findFirst.mockResolvedValue(
-        mockRound({ status: 'OPEN' }),
-      );
+      prisma.fundingRound.findFirst.mockResolvedValue(mockRound({ status: 'OPEN' }));
       prisma.shareholder.findFirst.mockResolvedValue(null);
-      await expect(
-        service.addCommitment('company-1', 'round-1', commitDto),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.addCommitment('company-1', 'round-1', commitDto)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw if commitment already exists', async () => {
-      prisma.fundingRound.findFirst.mockResolvedValue(
-        mockRound({ status: 'OPEN' }),
-      );
+      prisma.fundingRound.findFirst.mockResolvedValue(mockRound({ status: 'OPEN' }));
       prisma.shareholder.findFirst.mockResolvedValue(mockShareholder());
-      prisma.roundCommitment.findFirst.mockResolvedValue(
-        mockCommitment(),
+      prisma.roundCommitment.findFirst.mockResolvedValue(mockCommitment());
+      await expect(service.addCommitment('company-1', 'round-1', commitDto)).rejects.toThrow(
+        ConflictException,
       );
-      await expect(
-        service.addCommitment('company-1', 'round-1', commitDto),
-      ).rejects.toThrow(ConflictException);
     });
 
     it('should throw if hard cap would be exceeded', async () => {
@@ -688,15 +606,13 @@ describe('FundingRoundService', () => {
       prisma.roundCommitment.aggregate.mockResolvedValue({
         _sum: { amount: new Prisma.Decimal('800000') },
       });
-      await expect(
-        service.addCommitment('company-1', 'round-1', commitDto),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.addCommitment('company-1', 'round-1', commitDto)).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should throw if amount is zero', async () => {
-      prisma.fundingRound.findFirst.mockResolvedValue(
-        mockRound({ status: 'OPEN' }),
-      );
+      prisma.fundingRound.findFirst.mockResolvedValue(mockRound({ status: 'OPEN' }));
       prisma.shareholder.findFirst.mockResolvedValue(mockShareholder());
       await expect(
         service.addCommitment('company-1', 'round-1', {
@@ -708,9 +624,9 @@ describe('FundingRoundService', () => {
 
     it('should throw if round not found', async () => {
       prisma.fundingRound.findFirst.mockResolvedValue(null);
-      await expect(
-        service.addCommitment('company-1', 'bad', commitDto),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.addCommitment('company-1', 'bad', commitDto)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -768,12 +684,9 @@ describe('FundingRoundService', () => {
         mockCommitment({ paymentStatus: 'RECEIVED' }),
       );
 
-      const result = await service.updateCommitmentPayment(
-        'company-1',
-        'round-1',
-        'commit-1',
-        { paymentStatus: 'RECEIVED' as any },
-      );
+      const result = await service.updateCommitmentPayment('company-1', 'round-1', 'commit-1', {
+        paymentStatus: 'RECEIVED' as any,
+      });
       expect(result.paymentStatus).toBe('RECEIVED');
     });
 
@@ -786,12 +699,9 @@ describe('FundingRoundService', () => {
         mockCommitment({ paymentStatus: 'CONFIRMED' }),
       );
 
-      await service.updateCommitmentPayment(
-        'company-1',
-        'round-1',
-        'commit-1',
-        { paymentStatus: 'CONFIRMED' as any },
-      );
+      await service.updateCommitmentPayment('company-1', 'round-1', 'commit-1', {
+        paymentStatus: 'CONFIRMED' as any,
+      });
       expect(prisma.roundCommitment.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -860,19 +770,15 @@ describe('FundingRoundService', () => {
         mockCommitment({ paymentStatus: 'CANCELLED' }),
       );
 
-      const result = await service.cancelCommitment(
-        'company-1',
-        'round-1',
-        'commit-1',
-      );
+      const result = await service.cancelCommitment('company-1', 'round-1', 'commit-1');
       expect(result.paymentStatus).toBe('CANCELLED');
     });
 
     it('should throw if round is CLOSED', async () => {
       prisma.fundingRound.findFirst.mockResolvedValue({ id: 'round-1', status: 'CLOSED' });
-      await expect(
-        service.cancelCommitment('company-1', 'round-1', 'commit-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.cancelCommitment('company-1', 'round-1', 'commit-1')).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should throw if commitment already CANCELLED', async () => {
@@ -880,9 +786,9 @@ describe('FundingRoundService', () => {
       prisma.roundCommitment.findFirst.mockResolvedValue(
         mockCommitment({ paymentStatus: 'CANCELLED' }),
       );
-      await expect(
-        service.cancelCommitment('company-1', 'round-1', 'commit-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.cancelCommitment('company-1', 'round-1', 'commit-1')).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
   });
 
@@ -924,9 +830,7 @@ describe('FundingRoundService', () => {
 
     it('should throw if round not found', async () => {
       prisma.fundingRound.findFirst.mockResolvedValue(null);
-      await expect(
-        service.getProforma('company-1', 'bad'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getProforma('company-1', 'bad')).rejects.toThrow(NotFoundException);
     });
   });
 });

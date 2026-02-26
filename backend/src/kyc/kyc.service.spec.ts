@@ -183,9 +183,7 @@ describe('KycService', () => {
   describe('startVerification', () => {
     it('should create a new KYC record when no existing record', async () => {
       prisma.kycVerification.findUnique.mockResolvedValue(null);
-      prisma.kycVerification.create.mockResolvedValue(
-        createMockKyc({ attemptCount: 1 }),
-      );
+      prisma.kycVerification.create.mockResolvedValue(createMockKyc({ attemptCount: 1 }));
       prisma.user.update.mockResolvedValue(createMockUser());
 
       const result = await service.startVerification(USER_ID);
@@ -220,9 +218,7 @@ describe('KycService', () => {
         rejectionReason: 'Sanctions match',
       });
       prisma.kycVerification.findUnique.mockResolvedValue(rejectedKyc);
-      prisma.kycVerification.update.mockResolvedValue(
-        createMockKyc({ attemptCount: 2 }),
-      );
+      prisma.kycVerification.update.mockResolvedValue(createMockKyc({ attemptCount: 2 }));
       prisma.user.update.mockResolvedValue(createMockUser());
 
       const result = await service.startVerification(USER_ID);
@@ -253,9 +249,7 @@ describe('KycService', () => {
         attemptCount: 2,
       });
       prisma.kycVerification.findUnique.mockResolvedValue(resubKyc);
-      prisma.kycVerification.update.mockResolvedValue(
-        createMockKyc({ attemptCount: 3 }),
-      );
+      prisma.kycVerification.update.mockResolvedValue(createMockKyc({ attemptCount: 3 }));
       prisma.user.update.mockResolvedValue(createMockUser());
 
       const result = await service.startVerification(USER_ID);
@@ -275,9 +269,7 @@ describe('KycService', () => {
       const approvedKyc = createMockKyc({ status: KycStatus.APPROVED });
       prisma.kycVerification.findUnique.mockResolvedValue(approvedKyc);
 
-      await expect(service.startVerification(USER_ID)).rejects.toThrow(
-        ConflictException,
-      );
+      await expect(service.startVerification(USER_ID)).rejects.toThrow(ConflictException);
 
       try {
         await service.startVerification(USER_ID);
@@ -291,9 +283,7 @@ describe('KycService', () => {
       const pendingKyc = createMockKyc({ status: KycStatus.PENDING_REVIEW });
       prisma.kycVerification.findUnique.mockResolvedValue(pendingKyc);
 
-      await expect(service.startVerification(USER_ID)).rejects.toThrow(
-        ConflictException,
-      );
+      await expect(service.startVerification(USER_ID)).rejects.toThrow(ConflictException);
 
       try {
         await service.startVerification(USER_ID);
@@ -310,9 +300,7 @@ describe('KycService', () => {
       });
       prisma.kycVerification.findUnique.mockResolvedValue(maxedKyc);
 
-      await expect(service.startVerification(USER_ID)).rejects.toThrow(
-        BusinessRuleException,
-      );
+      await expect(service.startVerification(USER_ID)).rejects.toThrow(BusinessRuleException);
 
       try {
         await service.startVerification(USER_ID);
@@ -334,9 +322,7 @@ describe('KycService', () => {
       // allows restart — IN_PROGRESS is returned directly. However, looking
       // at the code, attemptCount >= MAX_ATTEMPTS is checked before status
       // branching, so it WILL throw.
-      await expect(service.startVerification(USER_ID)).rejects.toThrow(
-        BusinessRuleException,
-      );
+      await expect(service.startVerification(USER_ID)).rejects.toThrow(BusinessRuleException);
     });
   });
 
@@ -359,9 +345,7 @@ describe('KycService', () => {
       prisma.user.findFirst.mockResolvedValue(null); // No duplicate
       verifikService.verifyCpf.mockResolvedValue(verifikCpfResponse);
       prisma.user.update.mockResolvedValue(createMockUser());
-      prisma.kycVerification.update.mockResolvedValue(
-        createMockKyc({ cpfVerified: true }),
-      );
+      prisma.kycVerification.update.mockResolvedValue(createMockKyc({ cpfVerified: true }));
 
       const dto = createVerifyCpfDto();
       const result = await service.verifyCpf(USER_ID, dto);
@@ -369,18 +353,15 @@ describe('KycService', () => {
       expect(result.verified).toBe(true);
       expect(result.cpfData).toEqual(verifikCpfResponse.data);
       expect(result.verifikSignature).toBe('verifik-sig-123');
-      expect(verifikService.verifyCpf).toHaveBeenCalledWith(
-        VALID_CPF,
-        '15/05/1990',
-      );
+      expect(verifikService.verifyCpf).toHaveBeenCalledWith(VALID_CPF, '15/05/1990');
     });
 
     it('should throw NotFoundException when no KYC record exists', async () => {
       prisma.kycVerification.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.verifyCpf(USER_ID, createVerifyCpfDto()),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.verifyCpf(USER_ID, createVerifyCpfDto())).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw BusinessRuleException when KYC not IN_PROGRESS', async () => {
@@ -388,9 +369,9 @@ describe('KycService', () => {
         createMockKyc({ status: KycStatus.APPROVED }),
       );
 
-      await expect(
-        service.verifyCpf(USER_ID, createVerifyCpfDto()),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.verifyCpf(USER_ID, createVerifyCpfDto())).rejects.toThrow(
+        BusinessRuleException,
+      );
 
       try {
         await service.verifyCpf(USER_ID, createVerifyCpfDto());
@@ -404,9 +385,7 @@ describe('KycService', () => {
 
       const dto = createVerifyCpfDto({ cpf: INVALID_CHECKSUM_CPF });
 
-      await expect(service.verifyCpf(USER_ID, dto)).rejects.toThrow(
-        BusinessRuleException,
-      );
+      await expect(service.verifyCpf(USER_ID, dto)).rejects.toThrow(BusinessRuleException);
 
       try {
         await service.verifyCpf(USER_ID, dto);
@@ -421,9 +400,7 @@ describe('KycService', () => {
 
       const dto = createVerifyCpfDto({ cpf: ALL_SAME_CPF });
 
-      await expect(service.verifyCpf(USER_ID, dto)).rejects.toThrow(
-        BusinessRuleException,
-      );
+      await expect(service.verifyCpf(USER_ID, dto)).rejects.toThrow(BusinessRuleException);
 
       try {
         await service.verifyCpf(USER_ID, dto);
@@ -435,15 +412,11 @@ describe('KycService', () => {
     it('should throw BusinessRuleException when CPF belongs to another user', async () => {
       prisma.kycVerification.findUnique.mockResolvedValue(createMockKyc());
       // Another user with the same CPF blind index
-      prisma.user.findFirst.mockResolvedValue(
-        createMockUser({ id: 'other-user-uuid' }),
-      );
+      prisma.user.findFirst.mockResolvedValue(createMockUser({ id: 'other-user-uuid' }));
 
       const dto = createVerifyCpfDto();
 
-      await expect(service.verifyCpf(USER_ID, dto)).rejects.toThrow(
-        BusinessRuleException,
-      );
+      await expect(service.verifyCpf(USER_ID, dto)).rejects.toThrow(BusinessRuleException);
 
       try {
         await service.verifyCpf(USER_ID, dto);
@@ -458,9 +431,7 @@ describe('KycService', () => {
       prisma.user.findFirst.mockResolvedValue(null);
       verifikService.verifyCpf.mockResolvedValue(verifikCpfResponse);
       prisma.user.update.mockResolvedValue(createMockUser());
-      prisma.kycVerification.update.mockResolvedValue(
-        createMockKyc({ cpfVerified: true }),
-      );
+      prisma.kycVerification.update.mockResolvedValue(createMockKyc({ cpfVerified: true }));
 
       await service.verifyCpf(USER_ID, createVerifyCpfDto());
 
@@ -477,9 +448,7 @@ describe('KycService', () => {
       prisma.user.findFirst.mockResolvedValue(null);
       verifikService.verifyCpf.mockResolvedValue(verifikCpfResponse);
       prisma.user.update.mockResolvedValue(createMockUser());
-      prisma.kycVerification.update.mockResolvedValue(
-        createMockKyc({ cpfVerified: true }),
-      );
+      prisma.kycVerification.update.mockResolvedValue(createMockKyc({ cpfVerified: true }));
 
       await service.verifyCpf(USER_ID, createVerifyCpfDto());
 
@@ -503,9 +472,7 @@ describe('KycService', () => {
       verifikService.verifyCpf.mockResolvedValue(verifikCpfResponse);
       encryptionService.isEncryptionAvailable.mockReturnValue(false);
       prisma.user.update.mockResolvedValue(createMockUser());
-      prisma.kycVerification.update.mockResolvedValue(
-        createMockKyc({ cpfVerified: true }),
-      );
+      prisma.kycVerification.update.mockResolvedValue(createMockKyc({ cpfVerified: true }));
 
       const result = await service.verifyCpf(USER_ID, createVerifyCpfDto());
 
@@ -527,9 +494,7 @@ describe('KycService', () => {
       prisma.user.findFirst.mockResolvedValue(null);
       verifikService.verifyCpf.mockResolvedValue(verifikCpfResponse);
       prisma.user.update.mockResolvedValue(createMockUser());
-      prisma.kycVerification.update.mockResolvedValue(
-        createMockKyc({ cpfVerified: true }),
-      );
+      prisma.kycVerification.update.mockResolvedValue(createMockKyc({ cpfVerified: true }));
 
       await service.verifyCpf(USER_ID, createVerifyCpfDto());
 
@@ -544,9 +509,9 @@ describe('KycService', () => {
         createMockKyc({ status: KycStatus.PENDING_REVIEW }),
       );
 
-      await expect(
-        service.verifyCpf(USER_ID, createVerifyCpfDto()),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.verifyCpf(USER_ID, createVerifyCpfDto())).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
   });
 
@@ -581,12 +546,7 @@ describe('KycService', () => {
     });
 
     it('should successfully upload and verify document', async () => {
-      const result = await service.uploadDocument(
-        USER_ID,
-        'RG',
-        '12345678',
-        validJpeg,
-      );
+      const result = await service.uploadDocument(USER_ID, 'RG', '12345678', validJpeg);
 
       expect(result.verified).toBe(true);
       expect(result.extractedData).toEqual(verifikDocResponse.data);
@@ -599,20 +559,15 @@ describe('KycService', () => {
           serverSideEncryption: 'aws:kms',
         }),
       );
-      expect(verifikService.verifyDocument).toHaveBeenCalledWith(
-        validJpeg,
-        'RG',
-      );
+      expect(verifikService.verifyDocument).toHaveBeenCalledWith(validJpeg, 'RG');
     });
 
     it('should throw BusinessRuleException when CPF not verified (step order)', async () => {
-      prisma.kycVerification.findUnique.mockResolvedValue(
-        createMockKyc({ cpfVerified: false }),
-      );
+      prisma.kycVerification.findUnique.mockResolvedValue(createMockKyc({ cpfVerified: false }));
 
-      await expect(
-        service.uploadDocument(USER_ID, 'RG', '12345678', validJpeg),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.uploadDocument(USER_ID, 'RG', '12345678', validJpeg)).rejects.toThrow(
+        BusinessRuleException,
+      );
 
       try {
         await service.uploadDocument(USER_ID, 'RG', '12345678', validJpeg);
@@ -630,9 +585,9 @@ describe('KycService', () => {
         createMockKyc({ status: KycStatus.APPROVED, cpfVerified: true }),
       );
 
-      await expect(
-        service.uploadDocument(USER_ID, 'RG', '12345678', validJpeg),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.uploadDocument(USER_ID, 'RG', '12345678', validJpeg)).rejects.toThrow(
+        BusinessRuleException,
+      );
 
       try {
         await service.uploadDocument(USER_ID, 'RG', '12345678', validJpeg);
@@ -672,9 +627,9 @@ describe('KycService', () => {
     it('should throw BusinessRuleException when S3 KYC bucket not configured', async () => {
       s3Service.getKycBucket.mockReturnValue(null);
 
-      await expect(
-        service.uploadDocument(USER_ID, 'RG', '12345678', validJpeg),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.uploadDocument(USER_ID, 'RG', '12345678', validJpeg)).rejects.toThrow(
+        BusinessRuleException,
+      );
 
       try {
         await service.uploadDocument(USER_ID, 'RG', '12345678', validJpeg);
@@ -692,9 +647,9 @@ describe('KycService', () => {
         },
       });
 
-      await expect(
-        service.uploadDocument(USER_ID, 'RG', '12345678', validJpeg),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.uploadDocument(USER_ID, 'RG', '12345678', validJpeg)).rejects.toThrow(
+        BusinessRuleException,
+      );
 
       try {
         await service.uploadDocument(USER_ID, 'RG', '12345678', validJpeg);
@@ -708,13 +663,7 @@ describe('KycService', () => {
       const frontJpeg = createJpegBuffer();
       const backPng = createPngBuffer();
 
-      await service.uploadDocument(
-        USER_ID,
-        'RG',
-        '12345678',
-        frontJpeg,
-        backPng,
-      );
+      await service.uploadDocument(USER_ID, 'RG', '12345678', frontJpeg, backPng);
 
       // Should have uploaded twice (front + back)
       expect(s3Service.upload).toHaveBeenCalledTimes(2);
@@ -745,12 +694,7 @@ describe('KycService', () => {
     });
 
     it('should map PASSPORT to RNE document type', async () => {
-      await service.uploadDocument(
-        USER_ID,
-        'PASSPORT',
-        'AB123456',
-        validJpeg,
-      );
+      await service.uploadDocument(USER_ID, 'PASSPORT', 'AB123456', validJpeg);
 
       expect(prisma.kycVerification.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -764,9 +708,9 @@ describe('KycService', () => {
     it('should throw NotFoundException when no KYC record exists', async () => {
       prisma.kycVerification.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.uploadDocument(USER_ID, 'RG', '12345678', validJpeg),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.uploadDocument(USER_ID, 'RG', '12345678', validJpeg)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should store RG document type correctly', async () => {
@@ -802,12 +746,7 @@ describe('KycService', () => {
         },
       });
 
-      const result = await service.uploadDocument(
-        USER_ID,
-        'RG',
-        '12345678',
-        validJpeg,
-      );
+      const result = await service.uploadDocument(USER_ID, 'RG', '12345678', validJpeg);
 
       expect(result.verified).toBe(true);
     });
@@ -815,9 +754,9 @@ describe('KycService', () => {
     it('should throw for very small files (less than 4 bytes)', async () => {
       const tinyBuffer = Buffer.from([0xff, 0xd8]);
 
-      await expect(
-        service.uploadDocument(USER_ID, 'RG', '12345678', tinyBuffer),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.uploadDocument(USER_ID, 'RG', '12345678', tinyBuffer)).rejects.toThrow(
+        BusinessRuleException,
+      );
 
       try {
         await service.uploadDocument(USER_ID, 'RG', '12345678', tinyBuffer);
@@ -847,9 +786,7 @@ describe('KycService', () => {
       prisma.kycVerification.update.mockResolvedValue(
         createMockKyc({ faceVerified: true, status: KycStatus.PENDING_REVIEW }),
       );
-      prisma.user.update.mockResolvedValue(
-        createMockUser({ kycStatus: KycStatus.PENDING_REVIEW }),
-      );
+      prisma.user.update.mockResolvedValue(createMockUser({ kycStatus: KycStatus.PENDING_REVIEW }));
     });
 
     it('should successfully verify face and queue AML', async () => {
@@ -893,9 +830,7 @@ describe('KycService', () => {
         }),
       );
 
-      await expect(service.verifyFace(USER_ID, validSelfie)).rejects.toThrow(
-        BusinessRuleException,
-      );
+      await expect(service.verifyFace(USER_ID, validSelfie)).rejects.toThrow(BusinessRuleException);
 
       try {
         await service.verifyFace(USER_ID, validSelfie);
@@ -916,9 +851,7 @@ describe('KycService', () => {
         }),
       );
 
-      await expect(service.verifyFace(USER_ID, validSelfie)).rejects.toThrow(
-        BusinessRuleException,
-      );
+      await expect(service.verifyFace(USER_ID, validSelfie)).rejects.toThrow(BusinessRuleException);
 
       try {
         await service.verifyFace(USER_ID, validSelfie);
@@ -937,9 +870,7 @@ describe('KycService', () => {
         livenessScore: 70, // Below service threshold of 80
       });
 
-      await expect(service.verifyFace(USER_ID, validSelfie)).rejects.toThrow(
-        BusinessRuleException,
-      );
+      await expect(service.verifyFace(USER_ID, validSelfie)).rejects.toThrow(BusinessRuleException);
 
       try {
         await service.verifyFace(USER_ID, validSelfie);
@@ -958,9 +889,7 @@ describe('KycService', () => {
         livenessScore: 95,
       });
 
-      await expect(service.verifyFace(USER_ID, validSelfie)).rejects.toThrow(
-        BusinessRuleException,
-      );
+      await expect(service.verifyFace(USER_ID, validSelfie)).rejects.toThrow(BusinessRuleException);
 
       try {
         await service.verifyFace(USER_ID, validSelfie);
@@ -976,9 +905,7 @@ describe('KycService', () => {
     it('should throw BusinessRuleException when S3 KYC bucket not configured', async () => {
       s3Service.getKycBucket.mockReturnValue(null);
 
-      await expect(service.verifyFace(USER_ID, validSelfie)).rejects.toThrow(
-        BusinessRuleException,
-      );
+      await expect(service.verifyFace(USER_ID, validSelfie)).rejects.toThrow(BusinessRuleException);
 
       try {
         await service.verifyFace(USER_ID, validSelfie);
@@ -1022,17 +949,15 @@ describe('KycService', () => {
     it('should throw NotFoundException when no KYC record', async () => {
       prisma.kycVerification.findUnique.mockResolvedValue(null);
 
-      await expect(service.verifyFace(USER_ID, validSelfie)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.verifyFace(USER_ID, validSelfie)).rejects.toThrow(NotFoundException);
     });
 
     it('should throw BusinessRuleException for invalid selfie format', async () => {
       const invalidSelfie = createInvalidBuffer();
 
-      await expect(
-        service.verifyFace(USER_ID, invalidSelfie),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.verifyFace(USER_ID, invalidSelfie)).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should use front key from composite S3 key when document has front|back', async () => {
@@ -1348,9 +1273,7 @@ describe('KycService', () => {
       prisma.kycVerification.findUnique.mockResolvedValue(null);
 
       // Should not throw
-      await expect(
-        service.processAmlScreening('nonexistent-kyc-id'),
-      ).resolves.toBeUndefined();
+      await expect(service.processAmlScreening('nonexistent-kyc-id')).resolves.toBeUndefined();
 
       expect(verifikService.screenAml).not.toHaveBeenCalled();
       expect(prisma.$transaction).not.toHaveBeenCalled();
@@ -1362,9 +1285,7 @@ describe('KycService', () => {
         user: null,
       });
 
-      await expect(
-        service.processAmlScreening(KYC_ID),
-      ).resolves.toBeUndefined();
+      await expect(service.processAmlScreening(KYC_ID)).resolves.toBeUndefined();
 
       expect(verifikService.screenAml).not.toHaveBeenCalled();
     });
@@ -1395,9 +1316,7 @@ describe('KycService', () => {
 
       const updateCall = prisma.kycVerification.update.mock.calls[0][0];
       expect(updateCall.data.rejectedAt).toBeInstanceOf(Date);
-      expect(updateCall.data.rejectionReason).toBe(
-        'Sanctions list match detected',
-      );
+      expect(updateCall.data.rejectionReason).toBe('Sanctions list match detected');
     });
 
     it('should not set verifiedAt or rejectedAt for PENDING_REVIEW', async () => {
@@ -1425,20 +1344,12 @@ describe('KycService', () => {
 
       await service.processAmlScreening(KYC_ID);
 
-      expect(encryptionService.decrypt).toHaveBeenCalledWith(
-        expect.any(Buffer),
-      );
-      expect(verifikService.screenAml).toHaveBeenCalledWith(
-        'Joao Silva',
-        VALID_CPF,
-        'BR',
-      );
+      expect(encryptionService.decrypt).toHaveBeenCalledWith(expect.any(Buffer));
+      expect(verifikService.screenAml).toHaveBeenCalledWith('Joao Silva', VALID_CPF, 'BR');
     });
 
     it('should proceed with empty CPF string when decryption fails', async () => {
-      encryptionService.decrypt.mockRejectedValue(
-        new Error('KMS unavailable'),
-      );
+      encryptionService.decrypt.mockRejectedValue(new Error('KMS unavailable'));
 
       verifikService.screenAml.mockResolvedValue({
         riskScore: 'LOW',
@@ -1450,11 +1361,7 @@ describe('KycService', () => {
       await service.processAmlScreening(KYC_ID);
 
       // Should still call screenAml with empty string for CPF
-      expect(verifikService.screenAml).toHaveBeenCalledWith(
-        'Joao Silva',
-        '',
-        'BR',
-      );
+      expect(verifikService.screenAml).toHaveBeenCalledWith('Joao Silva', '', 'BR');
     });
 
     it('should proceed with empty CPF string when cpfEncrypted is null', async () => {
@@ -1473,11 +1380,7 @@ describe('KycService', () => {
       await service.processAmlScreening(KYC_ID);
 
       expect(encryptionService.decrypt).not.toHaveBeenCalled();
-      expect(verifikService.screenAml).toHaveBeenCalledWith(
-        expect.any(String),
-        '',
-        'BR',
-      );
+      expect(verifikService.screenAml).toHaveBeenCalledWith(expect.any(String), '', 'BR');
     });
 
     it('should map MEDIUM risk score to numeric 50', async () => {

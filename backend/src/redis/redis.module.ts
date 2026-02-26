@@ -1,10 +1,4 @@
-import {
-  Global,
-  Module,
-  Logger,
-  OnModuleDestroy,
-  Inject,
-} from '@nestjs/common';
+import { Global, Module, Logger, OnModuleDestroy, Inject } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import { REDIS_CLIENT } from './redis.constants';
@@ -53,9 +47,7 @@ import { REDIS_CLIENT } from './redis.constants';
 export class RedisModule implements OnModuleDestroy {
   private readonly logger = new Logger('RedisModule');
 
-  constructor(
-    @Inject(REDIS_CLIENT) private readonly redis: Redis | null,
-  ) {}
+  constructor(@Inject(REDIS_CLIENT) private readonly redis: Redis | null) {}
 
   async onModuleDestroy() {
     if (this.redis) {

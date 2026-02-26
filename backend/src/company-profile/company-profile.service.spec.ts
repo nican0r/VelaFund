@@ -93,7 +93,7 @@ const mockPublishedProfile = {
   _count: { views: 42 },
 };
 
-const mockMetric = {
+const _mockMetric = {
   label: 'Revenue',
   value: '500000',
   format: 'CURRENCY_BRL' as const,
@@ -101,7 +101,7 @@ const mockMetric = {
   order: 0,
 };
 
-const mockTeamMember = {
+const _mockTeamMember = {
   name: 'Maria Santos',
   title: 'CTO',
   photoUrl: null,
@@ -161,7 +161,10 @@ describe('CompanyProfileService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: S3Service, useValue: s3Service },
         { provide: ConfigService, useValue: configService },
-        { provide: getQueueToken('profile-litigation'), useValue: { add: jest.fn().mockResolvedValue(undefined) } },
+        {
+          provide: getQueueToken('profile-litigation'),
+          useValue: { add: jest.fn().mockResolvedValue(undefined) },
+        },
       ],
     }).compile();
 
@@ -264,9 +267,7 @@ describe('CompanyProfileService', () => {
 
     it('should use dto.foundedYear when explicitly provided', async () => {
       prisma.company.findUnique.mockResolvedValue(mockCompany);
-      prisma.companyProfile.findUnique
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(null);
+      prisma.companyProfile.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
       prisma.companyProfile.create.mockResolvedValue(mockProfile);
 
       await service.create('comp-1', { foundedYear: 2018 }, 'user-1');
@@ -280,9 +281,7 @@ describe('CompanyProfileService', () => {
         ...mockCompany,
         foundedDate: null,
       });
-      prisma.companyProfile.findUnique
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(null);
+      prisma.companyProfile.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
       prisma.companyProfile.create.mockResolvedValue(mockProfile);
 
       await service.create('comp-1', {}, 'user-1');
@@ -293,9 +292,7 @@ describe('CompanyProfileService', () => {
 
     it('should hash password when accessType is PASSWORD', async () => {
       prisma.company.findUnique.mockResolvedValue(mockCompany);
-      prisma.companyProfile.findUnique
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(null);
+      prisma.companyProfile.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
       prisma.companyProfile.create.mockResolvedValue(mockProfile);
 
       await service.create(
@@ -311,16 +308,10 @@ describe('CompanyProfileService', () => {
 
     it('should not hash password when accessType is PUBLIC', async () => {
       prisma.company.findUnique.mockResolvedValue(mockCompany);
-      prisma.companyProfile.findUnique
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(null);
+      prisma.companyProfile.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
       prisma.companyProfile.create.mockResolvedValue(mockProfile);
 
-      await service.create(
-        'comp-1',
-        { accessType: 'PUBLIC' as any },
-        'user-1',
-      );
+      await service.create('comp-1', { accessType: 'PUBLIC' as any }, 'user-1');
 
       expect(bcrypt.hash).not.toHaveBeenCalled();
       const createCall = prisma.companyProfile.create.mock.calls[0][0];
@@ -329,9 +320,7 @@ describe('CompanyProfileService', () => {
 
     it('should default accessType to PUBLIC when not provided', async () => {
       prisma.company.findUnique.mockResolvedValue(mockCompany);
-      prisma.companyProfile.findUnique
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(null);
+      prisma.companyProfile.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
       prisma.companyProfile.create.mockResolvedValue(mockProfile);
 
       await service.create('comp-1', {}, 'user-1');
@@ -357,9 +346,7 @@ describe('CompanyProfileService', () => {
 
     it('should strip sensitive fields from returned profile', async () => {
       prisma.company.findUnique.mockResolvedValue(mockCompany);
-      prisma.companyProfile.findUnique
-        .mockResolvedValueOnce(null)
-        .mockResolvedValueOnce(null);
+      prisma.companyProfile.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
       prisma.companyProfile.create.mockResolvedValue({
         ...mockProfile,
         accessPasswordHash: 'should-be-removed',
@@ -455,7 +442,9 @@ describe('CompanyProfileService', () => {
     it('should throw NotFoundException if profile not found', async () => {
       prisma.companyProfile.findUnique.mockResolvedValue(null);
 
-      await expect(service.update('comp-999', { headline: 'x' })).rejects.toThrow(NotFoundException);
+      await expect(service.update('comp-999', { headline: 'x' })).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should hash password when switching to PASSWORD access type', async () => {
@@ -562,7 +551,9 @@ describe('CompanyProfileService', () => {
     it('should throw BusinessRuleException for invalid slug format (uppercase)', async () => {
       prisma.companyProfile.findUnique.mockResolvedValue({ id: 'profile-1' });
 
-      await expect(service.updateSlug('comp-1', 'Invalid-Slug')).rejects.toThrow(BusinessRuleException);
+      await expect(service.updateSlug('comp-1', 'Invalid-Slug')).rejects.toThrow(
+        BusinessRuleException,
+      );
       await expect(service.updateSlug('comp-1', 'Invalid-Slug')).rejects.toMatchObject({
         code: 'PROFILE_SLUG_INVALID',
       });
@@ -592,13 +583,17 @@ describe('CompanyProfileService', () => {
     it('should throw BusinessRuleException for slug with leading hyphens', async () => {
       prisma.companyProfile.findUnique.mockResolvedValue({ id: 'profile-1' });
 
-      await expect(service.updateSlug('comp-1', '-invalid-slug')).rejects.toThrow(BusinessRuleException);
+      await expect(service.updateSlug('comp-1', '-invalid-slug')).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should throw BusinessRuleException for slug with trailing hyphens', async () => {
       prisma.companyProfile.findUnique.mockResolvedValue({ id: 'profile-1' });
 
-      await expect(service.updateSlug('comp-1', 'invalid-slug-')).rejects.toThrow(BusinessRuleException);
+      await expect(service.updateSlug('comp-1', 'invalid-slug-')).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should throw BusinessRuleException for reserved slug "admin"', async () => {
@@ -902,7 +897,9 @@ describe('CompanyProfileService', () => {
     it('should throw NotFoundException if profile not found', async () => {
       prisma.companyProfile.findUnique.mockResolvedValue(null);
 
-      await expect(service.replaceMetrics('comp-999', metricsDto)).rejects.toThrow(NotFoundException);
+      await expect(service.replaceMetrics('comp-999', metricsDto)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw BusinessRuleException when exceeding 6 metrics', async () => {
@@ -1013,7 +1010,9 @@ describe('CompanyProfileService', () => {
     it('should throw NotFoundException if profile not found', async () => {
       prisma.companyProfile.findUnique.mockResolvedValue(null);
 
-      await expect(service.replaceTeamMembers('comp-999', teamDto)).rejects.toThrow(NotFoundException);
+      await expect(service.replaceTeamMembers('comp-999', teamDto)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw BusinessRuleException when exceeding 10 team members', async () => {
@@ -1121,14 +1120,18 @@ describe('CompanyProfileService', () => {
     it('should throw NotFoundException if profile not found', async () => {
       prisma.companyProfile.findUnique.mockResolvedValue(null);
 
-      await expect(service.uploadTeamPhoto('comp-999', mockFile)).rejects.toThrow(NotFoundException);
+      await expect(service.uploadTeamPhoto('comp-999', mockFile)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw BusinessRuleException if S3 is not available', async () => {
       prisma.companyProfile.findUnique.mockResolvedValue({ id: 'profile-1' });
       s3Service.isAvailable.mockReturnValue(false);
 
-      await expect(service.uploadTeamPhoto('comp-1', mockFile)).rejects.toThrow(BusinessRuleException);
+      await expect(service.uploadTeamPhoto('comp-1', mockFile)).rejects.toThrow(
+        BusinessRuleException,
+      );
       await expect(service.uploadTeamPhoto('comp-1', mockFile)).rejects.toMatchObject({
         code: 'SYS_S3_UNAVAILABLE',
       });
@@ -1138,7 +1141,9 @@ describe('CompanyProfileService', () => {
       prisma.companyProfile.findUnique.mockResolvedValue({ id: 'profile-1' });
       s3Service.getDocumentsBucket.mockReturnValue(null);
 
-      await expect(service.uploadTeamPhoto('comp-1', mockFile)).rejects.toThrow(BusinessRuleException);
+      await expect(service.uploadTeamPhoto('comp-1', mockFile)).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should generate .png extension for image/png mimetype', async () => {
@@ -1172,7 +1177,10 @@ describe('CompanyProfileService', () => {
     it('should generate no extension for unknown mimetype', async () => {
       prisma.companyProfile.findUnique.mockResolvedValue({ id: 'profile-1' });
 
-      const unknownFile = { ...mockFile, mimetype: 'application/octet-stream' } as Express.Multer.File;
+      const unknownFile = {
+        ...mockFile,
+        mimetype: 'application/octet-stream',
+      } as Express.Multer.File;
       await service.uploadTeamPhoto('comp-1', unknownFile);
 
       expect(s3Service.upload).toHaveBeenCalledWith(
@@ -1218,7 +1226,9 @@ describe('CompanyProfileService', () => {
         status: 'DRAFT',
       });
 
-      await expect(service.getPublicProfile('navia-tecnologia-a1b2')).rejects.toThrow(NotFoundException);
+      await expect(service.getPublicProfile('navia-tecnologia-a1b2')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw NotFoundException if profile is ARCHIVED', async () => {
@@ -1227,7 +1237,9 @@ describe('CompanyProfileService', () => {
         status: 'ARCHIVED',
       });
 
-      await expect(service.getPublicProfile('navia-tecnologia-a1b2')).rejects.toThrow(NotFoundException);
+      await expect(service.getPublicProfile('navia-tecnologia-a1b2')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw UnauthorizedException when PASSWORD access and no password provided', async () => {
@@ -1237,9 +1249,9 @@ describe('CompanyProfileService', () => {
         accessPasswordHash: 'some-hash',
       });
 
-      await expect(
-        service.getPublicProfile('navia-tecnologia-a1b2', undefined),
-      ).rejects.toThrow(UnauthorizedException);
+      await expect(service.getPublicProfile('navia-tecnologia-a1b2', undefined)).rejects.toThrow(
+        UnauthorizedException,
+      );
 
       try {
         await service.getPublicProfile('navia-tecnologia-a1b2', undefined);
@@ -1294,10 +1306,7 @@ describe('CompanyProfileService', () => {
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       prisma.profileView.create.mockResolvedValue({});
 
-      const result = await service.getPublicProfile(
-        'navia-tecnologia-a1b2',
-        'correct-password',
-      );
+      const result = await service.getPublicProfile('navia-tecnologia-a1b2', 'correct-password');
 
       expect(bcrypt.compare).toHaveBeenCalledWith('correct-password', 'hashed-pwd');
       expect(result.slug).toBe('navia-tecnologia-a1b2');
@@ -1376,12 +1385,7 @@ describe('CompanyProfileService', () => {
       prisma.companyProfile.findUnique.mockResolvedValue(mockPublishedProfile);
       prisma.profileView.create.mockResolvedValue({});
 
-      await service.getPublicProfile(
-        'navia-tecnologia-a1b2',
-        undefined,
-        undefined,
-        '10.20.30.40',
-      );
+      await service.getPublicProfile('navia-tecnologia-a1b2', undefined, undefined, '10.20.30.40');
 
       await new Promise((r) => setTimeout(r, 10));
 
@@ -1619,8 +1623,22 @@ describe('CompanyProfileService', () => {
       prisma.companyProfile.findUnique.mockResolvedValue({ id: 'profile-1' });
       prisma.profileView.count.mockResolvedValue(2);
       prisma.profileView.findMany.mockResolvedValue([
-        { id: 'v1', viewerEmail: null, viewerIp: null, userAgent: null, referrer: null, viewedAt: yesterday },
-        { id: 'v2', viewerEmail: null, viewerIp: null, userAgent: null, referrer: null, viewedAt: yesterday },
+        {
+          id: 'v1',
+          viewerEmail: null,
+          viewerIp: null,
+          userAgent: null,
+          referrer: null,
+          viewedAt: yesterday,
+        },
+        {
+          id: 'v2',
+          viewerEmail: null,
+          viewerIp: null,
+          userAgent: null,
+          referrer: null,
+          viewedAt: yesterday,
+        },
       ]);
       prisma.profileView.groupBy.mockResolvedValue([]);
 

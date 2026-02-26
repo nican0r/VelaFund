@@ -64,15 +64,28 @@ ADMIN clicks "Edit Share Class"
   │
   ├─ [valid form] ─→ PUT /share-classes/:id
   │     │
+  │     ├─ [totalIssued > 0 + immutable field changed] ─→ 422 CAP_IMMUTABLE_AFTER_ISSUANCE
+  │     │     (immutable fields: className, type, votesPerShare, liquidationPreferenceMultiple, participatingRights)
+  │     │
+  │     ├─ [totalIssued = 0 + type changed + incompatible with entity type] ─→ 422 CAP_INVALID_SHARE_CLASS_TYPE
+  │     │
   │     ├─ [all rules pass] ─→ 200 OK
   │     │
   │     ├─ [totalAuthorized decreased] ─→ 422 CAP_TOTAL_AUTHORIZED_CANNOT_DECREASE
   │     │
-  │     ├─ [totalAuthorized < totalIssued] ─→ 422 CAP_INVALID_TOTAL_AUTHORIZED
+  │     ├─ [totalAuthorized < totalIssued] ─→ 422 CAP_INSUFFICIENT_SHARES
   │     │
-  │     └─ [preferred limit exceeded after increase] ─→ 422 CAP_PREFERRED_SHARE_LIMIT_EXCEEDED
+  │     ├─ [preferred limit exceeded after increase] ─→ 422 CAP_PREFERRED_SHARE_LIMIT_EXCEEDED
+  │     │
+  │     └─ [duplicate className] ─→ 409 CAP_SHARE_CLASS_DUPLICATE
   │
   └─ [no changes] ─→ Submit disabled
+
+
+System: Ltda Company Created
+  │
+  └─ [entityType = LTDA] ─→ Auto-create "Quotas Ordinárias" QUOTA share class
+        (inside $transaction with company + ADMIN member creation)
 
 
 ADMIN clicks "Delete Share Class"
@@ -249,22 +262,51 @@ TRIGGER: User clicks edit on a share class
 
 1. [UI] User clicks edit icon/button on a share class row
 2. [UI] Edit form opens with current values pre-filled
-3. [UI] Only mutable fields are editable: totalAuthorized, lockUpPeriodMonths, tagAlongPercentage, rightOfFirstRefusal
+3. [UI] Fields shown depend on issuance state:
+   - Always mutable: totalAuthorized (increase only), lockUpPeriodMonths, tagAlongPercentage, rightOfFirstRefusal
+   - Pre-issuance only (totalIssued = 0): className, type, votesPerShare, liquidationPreferenceMultiple, participatingRights
 4. [UI] User modifies fields and clicks "Save"
 5. [Frontend] Validates input client-side
 6. [Frontend] Sends PUT /api/v1/companies/:companyId/share-classes/:id
 7. [Backend] Validates auth, role, request body
 8. [Backend] Validates company is ACTIVE
-9. [Backend] If totalAuthorized changed:
-   → IF decreased: return 422 CAP_TOTAL_AUTHORIZED_CANNOT_DECREASE
-   → IF new value < totalIssued: return 422 CAP_INVALID_TOTAL_AUTHORIZED
-   → IF PREFERRED and new total exceeds 2/3: return 422 CAP_PREFERRED_SHARE_LIMIT_EXCEEDED
-10. [Backend] Updates share class record
-11. [Backend] Returns 200 with updated share class
-12. [UI] Shows success toast, list refreshes
+9. [Backend] EC-3: If totalIssued > 0, checks for immutable fields:
+   → IF className, type, votesPerShare, liquidationPreferenceMultiple, or participatingRights present in request:
+     return 422 CAP_IMMUTABLE_AFTER_ISSUANCE (includes field name and totalIssued in details)
+10. [Backend] If type changed (pre-issuance only):
+    → IF incompatible with company entity type: return 422 CAP_INVALID_SHARE_CLASS_TYPE
+11. [Backend] If totalAuthorized changed:
+    → IF decreased: return 422 CAP_TOTAL_AUTHORIZED_CANNOT_DECREASE
+    → IF new value < totalIssued: return 422 CAP_INSUFFICIENT_SHARES
+    → IF PREFERRED and new total exceeds 2/3: return 422 CAP_PREFERRED_SHARE_LIMIT_EXCEEDED
+12. [Backend] If type changed to PREFERRED_SHARES (pre-issuance): validates 2/3 limit
+13. [Backend] Updates share class record
+    → IF duplicate className: return 409 CAP_SHARE_CLASS_DUPLICATE
+14. [Backend] Returns 200 with updated share class
+15. [UI] Shows success toast, list refreshes
 
 POSTCONDITION: Share class updated with new values
-SIDE EFFECTS: Audit log (future: SHARE_CLASS_UPDATED)
+SIDE EFFECTS: Audit log (SHARE_CLASS_UPDATED)
+```
+
+### System Flow: Auto-Create QUOTA for Ltda Companies
+
+```
+PRECONDITION: User creates a new company with entityType = LTDA
+ACTOR: SYSTEM (triggered inside CompanyService.create())
+TRIGGER: Company creation $transaction for LTDA entity type
+
+1. [Backend] CompanyService.create() runs inside Prisma $transaction:
+   a. Creates Company record
+   b. Creates CompanyMember (ADMIN) record
+   c. [System] Checks if created.entityType === 'LTDA'
+      → IF LTDA: creates ShareClass { className: "Quotas Ordinárias", type: QUOTA,
+        totalAuthorized: 0, votesPerShare: 1, rightOfFirstRefusal: true }
+      → IF S.A.: no auto-creation (admin must manually create COMMON_SHARES)
+2. [Backend] Transaction commits atomically (company + member + share class)
+
+POSTCONDITION: Ltda company has a default "Quotas Ordinárias" QUOTA class with totalAuthorized = 0
+SIDE EFFECTS: All created within same $transaction — atomic rollback on failure
 ```
 
 ### Happy Path: Delete Share Class
@@ -342,9 +384,13 @@ POSTCONDITION: No share class created/updated
 | 12 | Type compatibility | S.A. + QUOTA | Error | 422 CAP_INVALID_SHARE_CLASS_TYPE |
 | 13 | Preferred limit | Preferred > 2/3 total | Error | 422 CAP_PREFERRED_SHARE_LIMIT_EXCEEDED |
 | 14 | Unique constraint | Duplicate className | Error | 409 CAP_SHARE_CLASS_DUPLICATE |
-| 9 (update) | Authorized decrease | totalAuthorized lowered | Error | 422 CAP_TOTAL_AUTHORIZED_CANNOT_DECREASE |
-| 9 (update) | Below issued | totalAuthorized < totalIssued | Error | 422 CAP_INVALID_TOTAL_AUTHORIZED |
+| 9 (update) | EC-3 immutability | totalIssued > 0 + immutable field | Error | 422 CAP_IMMUTABLE_AFTER_ISSUANCE |
+| 10 (update) | Type compatibility | Type changed to incompatible | Error | 422 CAP_INVALID_SHARE_CLASS_TYPE |
+| 11 (update) | Authorized decrease | totalAuthorized lowered | Error | 422 CAP_TOTAL_AUTHORIZED_CANNOT_DECREASE |
+| 11 (update) | Below issued | totalAuthorized < totalIssued | Error | 422 CAP_INSUFFICIENT_SHARES |
+| 13 (update) | Duplicate name | className already taken | Error | 409 CAP_SHARE_CLASS_DUPLICATE |
 | 7 (delete) | Shares in use | totalIssued > 0 or active shareholdings | Error | 422 CAP_SHARE_CLASS_IN_USE |
+| — (create) | Auto QUOTA | Company entityType = LTDA | System | Auto-create "Quotas Ordinárias" QUOTA class |
 
 ---
 
@@ -353,10 +399,14 @@ POSTCONDITION: No share class created/updated
 | Entity | Field | Before | After | Trigger |
 |--------|-------|--------|-------|---------|
 | ShareClass | — | — | Created (totalIssued=0) | ADMIN creates share class |
+| ShareClass | — | — | Created (totalIssued=0, type=QUOTA) | SYSTEM auto-creates for Ltda company |
 | ShareClass | totalAuthorized | X | Y (Y > X) | ADMIN increases authorized |
 | ShareClass | lockUpPeriodMonths | X | Y | ADMIN updates lock-up |
 | ShareClass | tagAlongPercentage | X | Y | ADMIN updates tag-along |
 | ShareClass | rightOfFirstRefusal | X | Y | ADMIN updates ROFR |
+| ShareClass | className | X | Y | ADMIN renames (pre-issuance only) |
+| ShareClass | type | X | Y | ADMIN changes type (pre-issuance only) |
+| ShareClass | votesPerShare | X | Y | ADMIN changes votes (pre-issuance only) |
 | ShareClass | — | Exists | Deleted | ADMIN deletes (if unused) |
 
 ---

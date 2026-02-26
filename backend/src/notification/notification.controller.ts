@@ -12,7 +12,6 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { paginate } from '../common/helpers/paginate';
 import { NotificationService } from './notification.service';
 import { UpdatePreferencesDto } from './dto/update-preferences.dto';
@@ -27,10 +26,7 @@ export class NotificationController {
   @Throttle({ read: { ttl: 60000, limit: 100 } })
   @ApiOperation({ summary: 'List notifications for the authenticated user' })
   @ApiResponse({ status: 200, description: 'Paginated list of notifications' })
-  async list(
-    @CurrentUser('id') userId: string,
-    @Query() query: ListNotificationsDto,
-  ) {
+  async list(@CurrentUser('id') userId: string, @Query() query: ListNotificationsDto) {
     const { items, total } = await this.notificationService.findAll(userId, query);
     return paginate(items, total, query.page ?? 1, query.limit ?? 20);
   }
@@ -56,10 +52,7 @@ export class NotificationController {
   @Throttle({ write: { ttl: 60000, limit: 30 } })
   @ApiOperation({ summary: 'Update notification preferences' })
   @ApiResponse({ status: 200, description: 'Updated preferences' })
-  async updatePreferences(
-    @CurrentUser('id') userId: string,
-    @Body() dto: UpdatePreferencesDto,
-  ) {
+  async updatePreferences(@CurrentUser('id') userId: string, @Body() dto: UpdatePreferencesDto) {
     return this.notificationService.updatePreferences(userId, dto);
   }
 
@@ -76,10 +69,7 @@ export class NotificationController {
   @ApiOperation({ summary: 'Get a single notification' })
   @ApiResponse({ status: 200, description: 'Notification detail' })
   @ApiResponse({ status: 404, description: 'Notification not found' })
-  async getOne(
-    @CurrentUser('id') userId: string,
-    @Param('id') id: string,
-  ) {
+  async getOne(@CurrentUser('id') userId: string, @Param('id') id: string) {
     return this.notificationService.findById(userId, id);
   }
 
@@ -88,10 +78,7 @@ export class NotificationController {
   @ApiOperation({ summary: 'Mark a notification as read' })
   @ApiResponse({ status: 200, description: 'Notification marked as read' })
   @ApiResponse({ status: 404, description: 'Notification not found' })
-  async markAsRead(
-    @CurrentUser('id') userId: string,
-    @Param('id') id: string,
-  ) {
+  async markAsRead(@CurrentUser('id') userId: string, @Param('id') id: string) {
     return this.notificationService.markAsRead(userId, id);
   }
 
@@ -101,10 +88,7 @@ export class NotificationController {
   @ApiOperation({ summary: 'Delete a notification' })
   @ApiResponse({ status: 204, description: 'Notification deleted' })
   @ApiResponse({ status: 404, description: 'Notification not found' })
-  async delete(
-    @CurrentUser('id') userId: string,
-    @Param('id') id: string,
-  ) {
+  async delete(@CurrentUser('id') userId: string, @Param('id') id: string) {
     await this.notificationService.delete(userId, id);
   }
 }

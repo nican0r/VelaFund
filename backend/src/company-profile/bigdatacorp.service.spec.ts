@@ -41,28 +41,22 @@ function buildService(apiToken = 'test-api-token'): BigDataCorpService {
   const mockConfig = {
     get: jest.fn().mockImplementation((key: string, defaultValue?: string) => {
       if (key === 'BIGDATACORP_API_TOKEN') return apiToken;
-      if (key === 'BIGDATACORP_BASE_URL')
-        return defaultValue ?? 'https://api.bigdatacorp.com.br';
+      if (key === 'BIGDATACORP_BASE_URL') return defaultValue ?? 'https://api.bigdatacorp.com.br';
       return defaultValue;
     }),
   };
-  return new BigDataCorpService(
-    mockConfig as unknown as ConfigService,
-  );
+  return new BigDataCorpService(mockConfig as unknown as ConfigService);
 }
 
 function buildUnconfiguredService(): BigDataCorpService {
   const mockConfig = {
     get: jest.fn().mockImplementation((key: string, defaultValue?: string) => {
       if (key === 'BIGDATACORP_API_TOKEN') return undefined;
-      if (key === 'BIGDATACORP_BASE_URL')
-        return defaultValue ?? 'https://api.bigdatacorp.com.br';
+      if (key === 'BIGDATACORP_BASE_URL') return defaultValue ?? 'https://api.bigdatacorp.com.br';
       return defaultValue;
     }),
   };
-  return new BigDataCorpService(
-    mockConfig as unknown as ConfigService,
-  );
+  return new BigDataCorpService(mockConfig as unknown as ConfigService);
 }
 
 function buildMockLitigationResponse() {
@@ -220,12 +214,12 @@ describe('BigDataCorpService', () => {
       await service.fetchLitigationData(VALID_CNPJ);
 
       const fetchOptions = mockFetch.mock.calls[0][1] as RequestInit;
-      expect(
-        (fetchOptions.headers as Record<string, string>).Authorization,
-      ).toBe('Bearer test-api-token');
-      expect(
-        (fetchOptions.headers as Record<string, string>)['Content-Type'],
-      ).toBe('application/json');
+      expect((fetchOptions.headers as Record<string, string>).Authorization).toBe(
+        'Bearer test-api-token',
+      );
+      expect((fetchOptions.headers as Record<string, string>)['Content-Type']).toBe(
+        'application/json',
+      );
     });
 
     it('should include AbortController signal for timeout', async () => {
@@ -303,73 +297,73 @@ describe('BigDataCorpService', () => {
     it('should throw BigDataCorpUnavailableError when API token is not configured', async () => {
       const unconfigured = buildUnconfiguredService();
 
-      await expect(
-        unconfigured.fetchLitigationData(VALID_CNPJ),
-      ).rejects.toThrow(BigDataCorpUnavailableError);
-      await expect(
-        unconfigured.fetchLitigationData(VALID_CNPJ),
-      ).rejects.toThrow('BigDataCorp API token not configured');
+      await expect(unconfigured.fetchLitigationData(VALID_CNPJ)).rejects.toThrow(
+        BigDataCorpUnavailableError,
+      );
+      await expect(unconfigured.fetchLitigationData(VALID_CNPJ)).rejects.toThrow(
+        'BigDataCorp API token not configured',
+      );
     });
 
     it('should throw BigDataCorpNotFoundError on 404 response', async () => {
       mockFetchResponse(404, { error: 'Not Found' });
 
-      await expect(
-        service.fetchLitigationData(VALID_CNPJ),
-      ).rejects.toThrow(BigDataCorpNotFoundError);
+      await expect(service.fetchLitigationData(VALID_CNPJ)).rejects.toThrow(
+        BigDataCorpNotFoundError,
+      );
     });
 
     it('should throw BigDataCorpNotFoundError on 400 response', async () => {
       mockFetchResponse(400, { error: 'Bad Request' });
 
-      await expect(
-        service.fetchLitigationData(VALID_CNPJ),
-      ).rejects.toThrow(BigDataCorpNotFoundError);
+      await expect(service.fetchLitigationData(VALID_CNPJ)).rejects.toThrow(
+        BigDataCorpNotFoundError,
+      );
     });
 
     it('should throw BigDataCorpUnavailableError on 401 response', async () => {
       mockFetchResponse(401, { error: 'Unauthorized' });
 
-      await expect(
-        service.fetchLitigationData(VALID_CNPJ),
-      ).rejects.toThrow(BigDataCorpUnavailableError);
+      await expect(service.fetchLitigationData(VALID_CNPJ)).rejects.toThrow(
+        BigDataCorpUnavailableError,
+      );
     });
 
     it('should throw BigDataCorpUnavailableError on 403 response', async () => {
       mockFetchResponse(403, { error: 'Forbidden' });
 
-      await expect(
-        service.fetchLitigationData(VALID_CNPJ),
-      ).rejects.toThrow(BigDataCorpUnavailableError);
+      await expect(service.fetchLitigationData(VALID_CNPJ)).rejects.toThrow(
+        BigDataCorpUnavailableError,
+      );
     });
 
     it('should throw BigDataCorpUnavailableError on 500 response', async () => {
       mockFetchResponse(500, { error: 'Internal Server Error' });
 
-      await expect(
-        service.fetchLitigationData(VALID_CNPJ),
-      ).rejects.toThrow(BigDataCorpUnavailableError);
+      await expect(service.fetchLitigationData(VALID_CNPJ)).rejects.toThrow(
+        BigDataCorpUnavailableError,
+      );
     });
 
     it('should throw BigDataCorpUnavailableError on network error', async () => {
       mockFetchNetworkError('ECONNREFUSED');
 
-      await expect(
-        service.fetchLitigationData(VALID_CNPJ),
-      ).rejects.toThrow(BigDataCorpUnavailableError);
+      await expect(service.fetchLitigationData(VALID_CNPJ)).rejects.toThrow(
+        BigDataCorpUnavailableError,
+      );
     });
 
     it('should throw BigDataCorpUnavailableError on timeout', async () => {
       mockFetchTimeout();
 
-      await expect(
-        service.fetchLitigationData(VALID_CNPJ),
-      ).rejects.toThrow(BigDataCorpUnavailableError);
+      await expect(service.fetchLitigationData(VALID_CNPJ)).rejects.toThrow(
+        BigDataCorpUnavailableError,
+      );
 
       mockFetchTimeout();
-      await expect(
-        service.fetchLitigationData(VALID_CNPJ),
-      ).rejects.toThrow('BigDataCorp request timed out after 30 seconds');
+      await expect(service.fetchLitigationData(VALID_CNPJ)).rejects.toThrow(
+        'BigDataCorp request timed out after 30 seconds',
+      );
     });
   });
 
@@ -380,15 +374,13 @@ describe('BigDataCorpService', () => {
       // Trigger 5 failures
       for (let i = 0; i < 5; i++) {
         mockFetchResponse(500, { error: 'Server Error' });
-        await expect(
-          service.fetchLitigationData(VALID_CNPJ),
-        ).rejects.toThrow(BigDataCorpUnavailableError);
+        await expect(service.fetchLitigationData(VALID_CNPJ)).rejects.toThrow(
+          BigDataCorpUnavailableError,
+        );
       }
 
       // 6th call should fail immediately without hitting the API
-      await expect(
-        service.fetchLitigationData(VALID_CNPJ),
-      ).rejects.toThrow('Circuit breaker open');
+      await expect(service.fetchLitigationData(VALID_CNPJ)).rejects.toThrow('Circuit breaker open');
 
       // Verify that fetch was NOT called for the 6th attempt
       expect(mockFetch).toHaveBeenCalledTimes(5);
@@ -398,9 +390,9 @@ describe('BigDataCorpService', () => {
       // Trigger 4 failures (just under the threshold)
       for (let i = 0; i < 4; i++) {
         mockFetchResponse(500, { error: 'Server Error' });
-        await expect(
-          service.fetchLitigationData(VALID_CNPJ),
-        ).rejects.toThrow(BigDataCorpUnavailableError);
+        await expect(service.fetchLitigationData(VALID_CNPJ)).rejects.toThrow(
+          BigDataCorpUnavailableError,
+        );
       }
 
       // 5th call succeeds — resets the counter
@@ -410,25 +402,23 @@ describe('BigDataCorpService', () => {
       // 4 more failures should NOT open the circuit
       for (let i = 0; i < 4; i++) {
         mockFetchResponse(500, { error: 'Server Error' });
-        await expect(
-          service.fetchLitigationData(VALID_CNPJ),
-        ).rejects.toThrow(BigDataCorpUnavailableError);
+        await expect(service.fetchLitigationData(VALID_CNPJ)).rejects.toThrow(
+          BigDataCorpUnavailableError,
+        );
       }
 
       // Should still be able to make API calls (circuit not open)
       mockFetchResponse(200, { lawsuits: [] });
-      await expect(
-        service.fetchLitigationData(VALID_CNPJ),
-      ).resolves.toBeDefined();
+      await expect(service.fetchLitigationData(VALID_CNPJ)).resolves.toBeDefined();
     });
 
     it('should NOT count 404 as a failure (definitive result)', async () => {
       // 404 is a NotFoundError, not a circuit breaker failure
       for (let i = 0; i < 5; i++) {
         mockFetchResponse(404, { error: 'Not Found' });
-        await expect(
-          service.fetchLitigationData(VALID_CNPJ),
-        ).rejects.toThrow(BigDataCorpNotFoundError);
+        await expect(service.fetchLitigationData(VALID_CNPJ)).rejects.toThrow(
+          BigDataCorpNotFoundError,
+        );
       }
 
       // Circuit should NOT be open — 404 calls recordSuccess()
@@ -442,9 +432,9 @@ describe('BigDataCorpService', () => {
       // Trigger 5 failures to open circuit
       for (let i = 0; i < 5; i++) {
         mockFetchResponse(500, { error: 'Server Error' });
-        await expect(
-          service.fetchLitigationData(VALID_CNPJ),
-        ).rejects.toThrow(BigDataCorpUnavailableError);
+        await expect(service.fetchLitigationData(VALID_CNPJ)).rejects.toThrow(
+          BigDataCorpUnavailableError,
+        );
       }
 
       // Circuit is open — fast-forward past the reset timeout

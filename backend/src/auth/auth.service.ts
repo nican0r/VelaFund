@@ -15,21 +15,13 @@ import { REDIS_CLIENT } from '../redis/redis.constants';
 
 export class AccountLockedException extends AppException {
   constructor() {
-    super(
-      'AUTH_ACCOUNT_LOCKED',
-      'errors.auth.accountLocked',
-      HttpStatus.TOO_MANY_REQUESTS,
-    );
+    super('AUTH_ACCOUNT_LOCKED', 'errors.auth.accountLocked', HttpStatus.TOO_MANY_REQUESTS);
   }
 }
 
 export class PrivyUnavailableException extends AppException {
   constructor() {
-    super(
-      'AUTH_PRIVY_UNAVAILABLE',
-      'errors.auth.privyUnavailable',
-      HttpStatus.BAD_GATEWAY,
-    );
+    super('AUTH_PRIVY_UNAVAILABLE', 'errors.auth.privyUnavailable', HttpStatus.BAD_GATEWAY);
   }
 }
 
@@ -74,10 +66,7 @@ export class AuthService {
     let privyUserId: string;
 
     try {
-      const verifiedClaims = await this.privyClient
-        .utils()
-        .auth()
-        .verifyAccessToken(token);
+      const verifiedClaims = await this.privyClient.utils().auth().verifyAccessToken(token);
       privyUserId = verifiedClaims.user_id;
     } catch (error) {
       this.logger.debug(
@@ -128,9 +117,7 @@ export class AuthService {
       privyUserId = verifiedClaims.user_id;
     } catch (error) {
       await this.recordFailedAttempt(ipAddress);
-      this.logger.warn(
-        `Login failed - invalid Privy token from IP: ${maskIp(ipAddress)}`,
-      );
+      this.logger.warn(`Login failed - invalid Privy token from IP: ${maskIp(ipAddress)}`);
       throw new UnauthorizedException('errors.auth.invalidToken');
     }
 
@@ -194,9 +181,7 @@ export class AuthService {
           },
         });
         isNewUser = true;
-        this.logger.log(
-          `New user created: ${dbUser.id} (${maskEmail(email)})`,
-        );
+        this.logger.log(`New user created: ${dbUser.id} (${maskEmail(email)})`);
       } else {
         // BUG-10 fix: Check if synced email conflicts with another user before updating
         const emailUpdateData: Record<string, unknown> = {
@@ -272,11 +257,9 @@ export class AuthService {
         where: { email: data.email },
       });
       if (existingWithEmail && existingWithEmail.id !== userId) {
-        throw new ConflictException(
-          'AUTH_DUPLICATE_EMAIL',
-          'errors.auth.duplicateEmail',
-          { email: data.email },
-        );
+        throw new ConflictException('AUTH_DUPLICATE_EMAIL', 'errors.auth.duplicateEmail', {
+          email: data.email,
+        });
       }
     }
 
@@ -416,11 +399,7 @@ export class AuthService {
     }
     // Try Apple OAuth name
     for (const account of privyUser.linked_accounts) {
-      if (
-        account.type === 'apple_oauth' &&
-        'first_name' in account &&
-        account.first_name
-      ) {
+      if (account.type === 'apple_oauth' && 'first_name' in account && account.first_name) {
         return {
           first: account.first_name as string,
           last: ('last_name' in account ? (account.last_name as string) : null) || null,
@@ -444,10 +423,7 @@ export class AuthService {
       try {
         const key = `${AuthService.LOCKOUT_PREFIX}${ipAddress}`;
         const countStr = await this.redis.get(key);
-        if (
-          countStr !== null &&
-          parseInt(countStr, 10) >= AuthService.MAX_FAILED_ATTEMPTS
-        ) {
+        if (countStr !== null && parseInt(countStr, 10) >= AuthService.MAX_FAILED_ATTEMPTS) {
           throw new AccountLockedException();
         }
         return;
@@ -512,12 +488,8 @@ export class AuthService {
     attempt.count += 1;
 
     if (attempt.count >= AuthService.MAX_FAILED_ATTEMPTS) {
-      attempt.lockedUntil = new Date(
-        Date.now() + AuthService.LOCKOUT_DURATION_MS,
-      );
-      this.logger.warn(
-        `IP ${maskIp(ipAddress)} locked out after ${attempt.count} failed attempts`,
-      );
+      attempt.lockedUntil = new Date(Date.now() + AuthService.LOCKOUT_DURATION_MS);
+      this.logger.warn(`IP ${maskIp(ipAddress)} locked out after ${attempt.count} failed attempts`);
     }
 
     this.failedAttempts.set(ipAddress, attempt);
@@ -554,5 +526,4 @@ export class AuthService {
     // In-memory fallback
     this.failedAttempts.delete(ipAddress);
   }
-
 }

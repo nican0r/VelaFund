@@ -28,10 +28,7 @@ describe('SessionService', () => {
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        SessionService,
-        { provide: REDIS_CLIENT, useValue: mockRedis },
-      ],
+      providers: [SessionService, { provide: REDIS_CLIENT, useValue: mockRedis }],
     }).compile();
 
     service = module.get<SessionService>(SessionService);
@@ -66,10 +63,7 @@ describe('SessionService', () => {
       expect(storedData.lastActivityAt).toBe(storedData.createdAt);
 
       // Verify user-sessions tracking
-      expect(mockRedis.sadd).toHaveBeenCalledWith(
-        'user-sessions:user-1',
-        sessionId,
-      );
+      expect(mockRedis.sadd).toHaveBeenCalledWith('user-sessions:user-1', sessionId);
       expect(mockRedis.expire).toHaveBeenCalledWith(
         'user-sessions:user-1',
         SessionService.ABSOLUTE_TIMEOUT_S + 3600,
@@ -78,10 +72,7 @@ describe('SessionService', () => {
 
     it('should return null when Redis is not available', async () => {
       const module: TestingModule = await Test.createTestingModule({
-        providers: [
-          SessionService,
-          { provide: REDIS_CLIENT, useValue: null },
-        ],
+        providers: [SessionService, { provide: REDIS_CLIENT, useValue: null }],
       }).compile();
 
       const nullRedisService = module.get<SessionService>(SessionService);
@@ -133,10 +124,7 @@ describe('SessionService', () => {
 
     it('should return null when Redis is not available', async () => {
       const module: TestingModule = await Test.createTestingModule({
-        providers: [
-          SessionService,
-          { provide: REDIS_CLIENT, useValue: null },
-        ],
+        providers: [SessionService, { provide: REDIS_CLIENT, useValue: null }],
       }).compile();
 
       const nullRedisService = module.get<SessionService>(SessionService);
@@ -274,17 +262,12 @@ describe('SessionService', () => {
       };
 
       // Should not throw
-      await expect(
-        service.touchSession('session-id', session),
-      ).resolves.not.toThrow();
+      await expect(service.touchSession('session-id', session)).resolves.not.toThrow();
     });
 
     it('should be a no-op when Redis is not available', async () => {
       const module: TestingModule = await Test.createTestingModule({
-        providers: [
-          SessionService,
-          { provide: REDIS_CLIENT, useValue: null },
-        ],
+        providers: [SessionService, { provide: REDIS_CLIENT, useValue: null }],
       }).compile();
 
       const nullRedisService = module.get<SessionService>(SessionService);
@@ -296,9 +279,7 @@ describe('SessionService', () => {
         userAgent: 'test',
       };
 
-      await expect(
-        nullRedisService.touchSession('session-id', session),
-      ).resolves.not.toThrow();
+      await expect(nullRedisService.touchSession('session-id', session)).resolves.not.toThrow();
     });
   });
 
@@ -318,10 +299,7 @@ describe('SessionService', () => {
       await service.destroySession('session-id');
 
       expect(mockRedis.get).toHaveBeenCalledWith('session:session-id');
-      expect(mockRedis.srem).toHaveBeenCalledWith(
-        'user-sessions:user-1',
-        'session-id',
-      );
+      expect(mockRedis.srem).toHaveBeenCalledWith('user-sessions:user-1', 'session-id');
       expect(mockRedis.del).toHaveBeenCalledWith('session:session-id');
     });
 
@@ -336,23 +314,16 @@ describe('SessionService', () => {
     it('should handle Redis errors gracefully', async () => {
       mockRedis.get.mockRejectedValue(new Error('Connection error'));
 
-      await expect(
-        service.destroySession('session-id'),
-      ).resolves.not.toThrow();
+      await expect(service.destroySession('session-id')).resolves.not.toThrow();
     });
 
     it('should be a no-op when Redis is not available', async () => {
       const module: TestingModule = await Test.createTestingModule({
-        providers: [
-          SessionService,
-          { provide: REDIS_CLIENT, useValue: null },
-        ],
+        providers: [SessionService, { provide: REDIS_CLIENT, useValue: null }],
       }).compile();
 
       const nullRedisService = module.get<SessionService>(SessionService);
-      await expect(
-        nullRedisService.destroySession('session-id'),
-      ).resolves.not.toThrow();
+      await expect(nullRedisService.destroySession('session-id')).resolves.not.toThrow();
     });
   });
 
@@ -388,23 +359,16 @@ describe('SessionService', () => {
     it('should handle Redis errors gracefully', async () => {
       mockRedis.smembers.mockRejectedValue(new Error('Connection error'));
 
-      await expect(
-        service.destroyAllUserSessions('user-1'),
-      ).resolves.not.toThrow();
+      await expect(service.destroyAllUserSessions('user-1')).resolves.not.toThrow();
     });
 
     it('should be a no-op when Redis is not available', async () => {
       const module: TestingModule = await Test.createTestingModule({
-        providers: [
-          SessionService,
-          { provide: REDIS_CLIENT, useValue: null },
-        ],
+        providers: [SessionService, { provide: REDIS_CLIENT, useValue: null }],
       }).compile();
 
       const nullRedisService = module.get<SessionService>(SessionService);
-      await expect(
-        nullRedisService.destroyAllUserSessions('user-1'),
-      ).resolves.not.toThrow();
+      await expect(nullRedisService.destroyAllUserSessions('user-1')).resolves.not.toThrow();
     });
   });
 
@@ -415,10 +379,7 @@ describe('SessionService', () => {
 
     it('should return false when Redis client is null', async () => {
       const module: TestingModule = await Test.createTestingModule({
-        providers: [
-          SessionService,
-          { provide: REDIS_CLIENT, useValue: null },
-        ],
+        providers: [SessionService, { provide: REDIS_CLIENT, useValue: null }],
       }).compile();
 
       const nullRedisService = module.get<SessionService>(SessionService);

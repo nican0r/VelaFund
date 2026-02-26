@@ -12,12 +12,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor, FileFieldsInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiConsumes,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiConsumes } from '@nestjs/swagger';
 import { memoryStorage } from 'multer';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Auditable } from '../audit-log/decorators/auditable.decorator';
@@ -79,10 +74,7 @@ export class KycController {
   @ApiResponse({ status: 404, description: 'CPF not found in registry' })
   @ApiResponse({ status: 422, description: 'Date of birth mismatch or CPF step already completed' })
   @ApiResponse({ status: 502, description: 'Verifik service unavailable' })
-  async verifyCpf(
-    @CurrentUser('id') userId: string,
-    @Body() dto: VerifyCpfDto,
-  ) {
+  async verifyCpf(@CurrentUser('id') userId: string, @Body() dto: VerifyCpfDto) {
     return this.kycService.verifyCpf(userId, dto);
   }
 
@@ -178,10 +170,7 @@ export class KycController {
     description: 'Liveness check failed, face match failed, or prerequisite steps incomplete',
   })
   @ApiResponse({ status: 502, description: 'Verifik service unavailable' })
-  async verifyFace(
-    @CurrentUser('id') userId: string,
-    @UploadedFile() selfie: Express.Multer.File,
-  ) {
+  async verifyFace(@CurrentUser('id') userId: string, @UploadedFile() selfie: Express.Multer.File) {
     if (!selfie) {
       throw new BadRequestException({
         code: 'VAL_INVALID_INPUT',

@@ -14,10 +14,7 @@ import { HttpStatus } from '@nestjs/common';
 import { ReportsService } from './reports.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../aws/s3.service';
-import {
-  NotFoundException,
-  AppException,
-} from '../common/filters/app-exception';
+import { NotFoundException, AppException } from '../common/filters/app-exception';
 
 // ── helpers ──────────────────────────────────────────────────────────────
 
@@ -200,9 +197,9 @@ describe('ReportsService', () => {
     it('should throw NotFoundException when company not found', async () => {
       prisma.company.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.getOwnershipReport('nonexistent', {}),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getOwnershipReport('nonexistent', {})).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should filter by shareClassId when provided', async () => {
@@ -273,7 +270,10 @@ describe('ReportsService', () => {
       prisma.company.findUnique.mockResolvedValue({ id: 'comp-1', name: 'Test Company' });
       prisma.shareholding.findMany.mockResolvedValue([mockShareholding()]);
       prisma.optionPlan.findMany.mockResolvedValue([
-        mockOptionPlan({ totalGranted: new Prisma.Decimal(1000), totalExercised: new Prisma.Decimal(0) }),
+        mockOptionPlan({
+          totalGranted: new Prisma.Decimal(1000),
+          totalExercised: new Prisma.Decimal(0),
+        }),
       ]);
       // Grant date far in future — cliff not yet reached
       prisma.optionGrant.findMany.mockResolvedValue([
@@ -298,7 +298,10 @@ describe('ReportsService', () => {
 
   describe('getDilutionReport', () => {
     it('should return dilution report with data points from snapshots', async () => {
-      prisma.company.findUnique.mockResolvedValue({ id: 'comp-1', createdAt: new Date('2025-01-01') });
+      prisma.company.findUnique.mockResolvedValue({
+        id: 'comp-1',
+        createdAt: new Date('2025-01-01'),
+      });
 
       const snapshotDate = new Date('2025-06-15');
       prisma.capTableSnapshot.findMany.mockResolvedValue([
@@ -339,13 +342,14 @@ describe('ReportsService', () => {
     it('should throw NotFoundException when company not found', async () => {
       prisma.company.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.getDilutionReport('nonexistent', {}),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getDilutionReport('nonexistent', {})).rejects.toThrow(NotFoundException);
     });
 
     it('should use default date range (1 year) when no dates provided', async () => {
-      prisma.company.findUnique.mockResolvedValue({ id: 'comp-1', createdAt: new Date('2025-01-01') });
+      prisma.company.findUnique.mockResolvedValue({
+        id: 'comp-1',
+        createdAt: new Date('2025-01-01'),
+      });
       prisma.capTableSnapshot.findMany.mockResolvedValue([]);
       prisma.shareholding.findMany
         .mockResolvedValueOnce([]) // Gini
@@ -369,11 +373,12 @@ describe('ReportsService', () => {
     });
 
     it('should return empty data points when no snapshots exist', async () => {
-      prisma.company.findUnique.mockResolvedValue({ id: 'comp-1', createdAt: new Date('2025-01-01') });
+      prisma.company.findUnique.mockResolvedValue({
+        id: 'comp-1',
+        createdAt: new Date('2025-01-01'),
+      });
       prisma.capTableSnapshot.findMany.mockResolvedValue([]);
-      prisma.shareholding.findMany
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([]);
+      prisma.shareholding.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
       const result = await service.getDilutionReport('comp-1', {
         dateFrom: '2025-06-01',
@@ -387,7 +392,10 @@ describe('ReportsService', () => {
     });
 
     it('should compute 0 foreign ownership when all domestic', async () => {
-      prisma.company.findUnique.mockResolvedValue({ id: 'comp-1', createdAt: new Date('2025-01-01') });
+      prisma.company.findUnique.mockResolvedValue({
+        id: 'comp-1',
+        createdAt: new Date('2025-01-01'),
+      });
       prisma.capTableSnapshot.findMany.mockResolvedValue([]);
       prisma.shareholding.findMany
         .mockResolvedValueOnce([{ quantity: new Prisma.Decimal(1000) }])
@@ -593,17 +601,17 @@ describe('ReportsService', () => {
     it('should throw NotFoundException when company not found', async () => {
       prisma.company.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.exportCapTable('nonexistent', 'user-1', 'csv'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.exportCapTable('nonexistent', 'user-1', 'csv')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw AppException for unsupported format', async () => {
       prisma.company.findUnique.mockResolvedValue({ id: 'comp-1' });
 
-      await expect(
-        service.exportCapTable('comp-1', 'user-1', 'docx'),
-      ).rejects.toThrow(AppException);
+      await expect(service.exportCapTable('comp-1', 'user-1', 'docx')).rejects.toThrow(
+        AppException,
+      );
 
       try {
         await service.exportCapTable('comp-1', 'user-1', 'docx');
@@ -716,9 +724,9 @@ describe('ReportsService', () => {
     it('should throw NotFoundException when company not found', async () => {
       prisma.company.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.generateDueDiligence('nonexistent', 'user-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.generateDueDiligence('nonexistent', 'user-1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should use company createdAt as default dateFrom and current time as dateTo', async () => {
@@ -734,9 +742,7 @@ describe('ReportsService', () => {
       await service.generateDueDiligence('comp-1', 'user-1');
 
       const createCallData = prisma.exportJob.create.mock.calls[0][0].data;
-      expect((createCallData.parameters as any).dateFrom).toBe(
-        companyCreatedAt.toISOString(),
-      );
+      expect((createCallData.parameters as any).dateFrom).toBe(companyCreatedAt.toISOString());
       expect((createCallData.parameters as any).dateTo).toBeDefined();
     });
   });
@@ -758,9 +764,9 @@ describe('ReportsService', () => {
     it('should throw NotFoundException when job not found', async () => {
       prisma.exportJob.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.getExportJobStatus('comp-1', 'nonexistent'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getExportJobStatus('comp-1', 'nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw GONE when download URL has expired', async () => {
@@ -848,9 +854,7 @@ describe('ReportsService', () => {
       const lines = content.replace('\uFEFF', '').split('\r\n');
 
       // Header
-      expect(lines[0]).toBe(
-        'Acionista;Classe de Ação;Ações;Porcentagem;Porcentagem Diluída',
-      );
+      expect(lines[0]).toBe('Acionista;Classe de Ação;Ações;Porcentagem;Porcentagem Diluída');
       // Data rows
       expect(lines[1]).toContain('Holder A');
       expect(lines[2]).toContain('Holder B');
@@ -901,9 +905,7 @@ describe('ReportsService', () => {
       ExcelJS.Workbook = jest.fn().mockReturnValue(mockWorkbook);
 
       prisma.company.findUnique.mockResolvedValue({ id: 'comp-1', name: 'Test Company' });
-      prisma.shareholding.findMany.mockResolvedValue([
-        mockShareholding(),
-      ]);
+      prisma.shareholding.findMany.mockResolvedValue([mockShareholding()]);
       prisma.optionPlan.findMany.mockResolvedValue([mockOptionPlan()]);
       prisma.optionGrant.findMany.mockResolvedValue([mockGrant()]);
     });
@@ -932,9 +934,7 @@ describe('ReportsService', () => {
 
       await service.generateCapTableXlsx('comp-1');
 
-      const worksheetNames = mockWorkbook.addWorksheet.mock.calls.map(
-        (c: any[]) => c[0],
-      );
+      const worksheetNames = mockWorkbook.addWorksheet.mock.calls.map((c: any[]) => c[0]);
       // Option pool summary exists (all zeros) so the sheet is created
       expect(worksheetNames).toContain('Pool de Opções');
     });
@@ -996,9 +996,7 @@ describe('ReportsService', () => {
     it('should throw NotFoundException when company not found', async () => {
       prisma.company.findUnique.mockResolvedValue(null);
 
-      await expect(service.generateCapTableOct('nonexistent')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.generateCapTableOct('nonexistent')).rejects.toThrow(NotFoundException);
     });
 
     it('should map PREFERRED_SHARES type to PREFERRED class type', async () => {
@@ -1046,16 +1044,9 @@ describe('ReportsService', () => {
 
   describe('completeExportJob', () => {
     it('should upload to S3 and update job status when S3 available', async () => {
-      prisma.exportJob.findUnique.mockResolvedValue(
-        mockExportJob({ companyId: 'comp-1' }),
-      );
+      prisma.exportJob.findUnique.mockResolvedValue(mockExportJob({ companyId: 'comp-1' }));
 
-      await service.completeExportJob(
-        'job-1',
-        Buffer.from('test data'),
-        'text/csv',
-        'csv',
-      );
+      await service.completeExportJob('job-1', Buffer.from('test data'), 'text/csv', 'csv');
 
       expect(s3Service.upload).toHaveBeenCalledWith(
         'navia-exports',
@@ -1084,16 +1075,9 @@ describe('ReportsService', () => {
 
     it('should mark completed without download URL when S3 unavailable', async () => {
       s3Service.isAvailable.mockReturnValue(false);
-      prisma.exportJob.findUnique.mockResolvedValue(
-        mockExportJob({ companyId: 'comp-1' }),
-      );
+      prisma.exportJob.findUnique.mockResolvedValue(mockExportJob({ companyId: 'comp-1' }));
 
-      await service.completeExportJob(
-        'job-1',
-        Buffer.from('test data'),
-        'text/csv',
-        'csv',
-      );
+      await service.completeExportJob('job-1', Buffer.from('test data'), 'text/csv', 'csv');
 
       expect(s3Service.upload).not.toHaveBeenCalled();
       expect(prisma.exportJob.update).toHaveBeenCalledWith(
@@ -1113,28 +1097,16 @@ describe('ReportsService', () => {
     it('should silently return when export job not found', async () => {
       prisma.exportJob.findUnique.mockResolvedValue(null);
 
-      await service.completeExportJob(
-        'nonexistent',
-        Buffer.from('data'),
-        'text/csv',
-        'csv',
-      );
+      await service.completeExportJob('nonexistent', Buffer.from('data'), 'text/csv', 'csv');
 
       expect(s3Service.upload).not.toHaveBeenCalled();
       expect(prisma.exportJob.update).not.toHaveBeenCalled();
     });
 
     it('should use "user" folder in S3 key when companyId is null', async () => {
-      prisma.exportJob.findUnique.mockResolvedValue(
-        mockExportJob({ companyId: null }),
-      );
+      prisma.exportJob.findUnique.mockResolvedValue(mockExportJob({ companyId: null }));
 
-      await service.completeExportJob(
-        'job-1',
-        Buffer.from('data'),
-        'application/json',
-        'json',
-      );
+      await service.completeExportJob('job-1', Buffer.from('data'), 'application/json', 'json');
 
       expect(s3Service.upload).toHaveBeenCalledWith(
         'navia-exports',
@@ -1210,7 +1182,10 @@ describe('ReportsService', () => {
     });
 
     it('dilution report: multiple share classes in same snapshot', async () => {
-      prisma.company.findUnique.mockResolvedValue({ id: 'comp-1', createdAt: new Date('2025-01-01') });
+      prisma.company.findUnique.mockResolvedValue({
+        id: 'comp-1',
+        createdAt: new Date('2025-01-01'),
+      });
       prisma.capTableSnapshot.findMany.mockResolvedValue([
         {
           snapshotDate: new Date('2025-03-01'),

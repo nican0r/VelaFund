@@ -3,14 +3,8 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CapTableService } from '../cap-table/cap-table.service';
 import { parseSort } from '../common/helpers/sort-parser';
-import {
-  NotFoundException,
-  BusinessRuleException,
-} from '../common/filters/app-exception';
-import {
-  CreateTransactionDto,
-  TransactionTypeDto,
-} from './dto/create-transaction.dto';
+import { NotFoundException, BusinessRuleException } from '../common/filters/app-exception';
+import { CreateTransactionDto, TransactionTypeDto } from './dto/create-transaction.dto';
 import { ListTransactionsQueryDto } from './dto/list-transactions-query.dto';
 
 /** Valid status transitions for transactions. */
@@ -45,23 +39,35 @@ export class TransactionService {
    * - CONVERSION: fromShareholderId + toShareClassId required, sufficient balance
    * - If requiresBoardApproval, starts as PENDING_APPROVAL; otherwise DRAFT
    */
-  async create(
-    companyId: string,
-    dto: CreateTransactionDto,
-    createdBy: string,
-  ) {
+  async create(companyId: string, dto: CreateTransactionDto, createdBy: string) {
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },
-      select: { id: true, status: true },
+      select: { id: true, status: true, entityType: true },
     });
     if (!company) throw new NotFoundException('company', companyId);
 
     if (company.status !== 'ACTIVE') {
-      throw new BusinessRuleException(
-        'TXN_COMPANY_NOT_ACTIVE',
-        'errors.txn.companyNotActive',
-        { companyId, status: company.status },
-      );
+      throw new BusinessRuleException('TXN_COMPANY_NOT_ACTIVE', 'errors.txn.companyNotActive', {
+        companyId,
+        status: company.status,
+      });
+    }
+
+    // BR-2: S.A. companies must have at least one COMMON_SHARES class before any issuance
+    if (
+      dto.type === TransactionTypeDto.ISSUANCE &&
+      (company.entityType === 'SA_CAPITAL_FECHADO' || company.entityType === 'SA_CAPITAL_ABERTO')
+    ) {
+      const commonSharesCount = await this.prisma.shareClass.count({
+        where: { companyId, type: 'COMMON_SHARES' },
+      });
+      if (commonSharesCount === 0) {
+        throw new BusinessRuleException(
+          'CAP_MISSING_COMMON_SHARES',
+          'errors.cap.missingCommonShares',
+          { companyId, entityType: company.entityType },
+        );
+      }
     }
 
     // Validate share class belongs to company
@@ -75,20 +81,16 @@ export class TransactionService {
     // Parse and validate quantity
     const quantity = new Prisma.Decimal(dto.quantity);
     if (quantity.lte(0)) {
-      throw new BusinessRuleException(
-        'TXN_INVALID_QUANTITY',
-        'errors.txn.invalidQuantity',
-        { quantity: dto.quantity },
-      );
+      throw new BusinessRuleException('TXN_INVALID_QUANTITY', 'errors.txn.invalidQuantity', {
+        quantity: dto.quantity,
+      });
     }
 
     // Type-specific validations
     await this.validateByType(companyId, dto, quantity, shareClass);
 
     // Calculate total value
-    const pricePerShare = dto.pricePerShare
-      ? new Prisma.Decimal(dto.pricePerShare)
-      : null;
+    const pricePerShare = dto.pricePerShare ? new Prisma.Decimal(dto.pricePerShare) : null;
     const totalValue = pricePerShare ? quantity.mul(pricePerShare) : null;
 
     // Build notes: merge user-provided notes with metadata for CONVERSION/SPLIT
@@ -161,11 +163,10 @@ export class TransactionService {
       }
     }
 
-    const sortFields = parseSort(
-      query.sort,
-      ['createdAt', 'type', 'status', 'quantity'],
-      { field: 'createdAt', direction: 'desc' },
-    );
+    const sortFields = parseSort(query.sort, ['createdAt', 'type', 'status', 'quantity'], {
+      field: 'createdAt',
+      direction: 'desc',
+    });
 
     const skip = (query.page - 1) * query.limit;
     const take = query.limit;
@@ -240,11 +241,7 @@ export class TransactionService {
    * If the transaction is in DRAFT and does not require board approval,
    * this will also work (DRAFT -> SUBMITTED).
    */
-  async approve(
-    companyId: string,
-    transactionId: string,
-    approvedBy: string,
-  ) {
+  async approve(companyId: string, transactionId: string, approvedBy: string) {
     const transaction = await this.prisma.transaction.findFirst({
       where: { id: transactionId, companyId },
     });
@@ -253,10 +250,7 @@ export class TransactionService {
       throw new NotFoundException('transaction', transactionId);
     }
 
-    if (
-      transaction.status !== 'PENDING_APPROVAL' &&
-      transaction.status !== 'DRAFT'
-    ) {
+    if (transaction.status !== 'PENDING_APPROVAL' && transaction.status !== 'DRAFT') {
       throw new BusinessRuleException(
         'TXN_INVALID_STATUS_TRANSITION',
         'errors.txn.invalidStatusTransition',
@@ -344,9 +338,7 @@ export class TransactionService {
       `Transaction ${transaction.type} confirmed`,
     );
 
-    this.logger.log(
-      `Transaction ${transactionId} confirmed in company ${companyId}`,
-    );
+    this.logger.log(`Transaction ${transactionId} confirmed in company ${companyId}`);
 
     return this.findById(companyId, transactionId);
   }
@@ -356,11 +348,7 @@ export class TransactionService {
    *
    * CONFIRMED transactions cannot be cancelled.
    */
-  async cancel(
-    companyId: string,
-    transactionId: string,
-    cancelledBy: string,
-  ) {
+  async cancel(companyId: string, transactionId: string, cancelledBy: string) {
     const transaction = await this.prisma.transaction.findFirst({
       where: { id: transactionId, companyId },
     });
@@ -378,11 +366,9 @@ export class TransactionService {
     }
 
     if (transaction.status === 'CANCELLED') {
-      throw new BusinessRuleException(
-        'TXN_ALREADY_CANCELLED',
-        'errors.txn.alreadyCancelled',
-        { transactionId },
-      );
+      throw new BusinessRuleException('TXN_ALREADY_CANCELLED', 'errors.txn.alreadyCancelled', {
+        transactionId,
+      });
     }
 
     const allowed = STATUS_TRANSITIONS[transaction.status] ?? [];
@@ -442,16 +428,12 @@ export class TransactionService {
         'errors.txn.invalidStatusTransition',
         {
           currentStatus: transaction.status,
-          targetStatus: transaction.requiresBoardApproval
-            ? 'PENDING_APPROVAL'
-            : 'SUBMITTED',
+          targetStatus: transaction.requiresBoardApproval ? 'PENDING_APPROVAL' : 'SUBMITTED',
         },
       );
     }
 
-    const targetStatus = transaction.requiresBoardApproval
-      ? 'PENDING_APPROVAL'
-      : 'SUBMITTED';
+    const targetStatus = transaction.requiresBoardApproval ? 'PENDING_APPROVAL' : 'SUBMITTED';
 
     const updated = await this.prisma.transaction.update({
       where: { id: transactionId },
@@ -484,7 +466,12 @@ export class TransactionService {
     companyId: string,
     dto: CreateTransactionDto,
     quantity: Prisma.Decimal,
-    shareClass: { id: string; totalAuthorized: Prisma.Decimal; totalIssued: Prisma.Decimal; className: string },
+    shareClass: {
+      id: string;
+      totalAuthorized: Prisma.Decimal;
+      totalIssued: Prisma.Decimal;
+      className: string;
+    },
   ) {
     switch (dto.type) {
       case TransactionTypeDto.ISSUANCE:
@@ -531,17 +518,13 @@ export class TransactionService {
     // Check authorized shares limit (totalIssued + quantity <= totalAuthorized)
     const newTotal = shareClass.totalIssued.plus(quantity);
     if (newTotal.gt(shareClass.totalAuthorized)) {
-      throw new BusinessRuleException(
-        'TXN_EXCEEDS_AUTHORIZED',
-        'errors.txn.exceedsAuthorized',
-        {
-          shareClassName: shareClass.className,
-          authorized: shareClass.totalAuthorized.toString(),
-          currentIssued: shareClass.totalIssued.toString(),
-          requested: quantity.toString(),
-          wouldBe: newTotal.toString(),
-        },
-      );
+      throw new BusinessRuleException('TXN_EXCEEDS_AUTHORIZED', 'errors.txn.exceedsAuthorized', {
+        shareClassName: shareClass.className,
+        authorized: shareClass.totalAuthorized.toString(),
+        currentIssued: shareClass.totalIssued.toString(),
+        requested: quantity.toString(),
+        wouldBe: newTotal.toString(),
+      });
     }
   }
 
@@ -563,10 +546,7 @@ export class TransactionService {
       );
     }
     if (dto.fromShareholderId === dto.toShareholderId) {
-      throw new BusinessRuleException(
-        'TXN_SAME_SHAREHOLDER',
-        'errors.txn.sameShareholder',
-      );
+      throw new BusinessRuleException('TXN_SAME_SHAREHOLDER', 'errors.txn.sameShareholder');
     }
 
     await this.validateShareholder(companyId, dto.fromShareholderId, 'from');
@@ -639,11 +619,7 @@ export class TransactionService {
     );
   }
 
-  private async validateShareholder(
-    companyId: string,
-    shareholderId: string,
-    role: 'from' | 'to',
-  ) {
+  private async validateShareholder(companyId: string, shareholderId: string, _role: 'from' | 'to') {
     const shareholder = await this.prisma.shareholder.findFirst({
       where: { id: shareholderId, companyId, status: 'ACTIVE' },
     });
@@ -664,16 +640,12 @@ export class TransactionService {
 
     const available = shareholding?.quantity ?? new Prisma.Decimal(0);
     if (available.lt(quantity)) {
-      throw new BusinessRuleException(
-        'TXN_INSUFFICIENT_SHARES',
-        'errors.txn.insufficientShares',
-        {
-          available: available.toString(),
-          requested: quantity.toString(),
-          shareholderId,
-          shareClassId,
-        },
-      );
+      throw new BusinessRuleException('TXN_INSUFFICIENT_SHARES', 'errors.txn.insufficientShares', {
+        available: available.toString(),
+        requested: quantity.toString(),
+        shareholderId,
+        shareClassId,
+      });
     }
   }
 
@@ -681,10 +653,7 @@ export class TransactionService {
   // Private: Execute transaction (cap table mutations)
   // ---------------------------------------------------------------------------
 
-  private async executeTransaction(
-    tx: Prisma.TransactionClient,
-    transaction: any,
-  ) {
+  private async executeTransaction(tx: Prisma.TransactionClient, transaction: any) {
     switch (transaction.type) {
       case 'ISSUANCE':
         await this.executeIssuance(tx, transaction);
@@ -704,10 +673,7 @@ export class TransactionService {
     }
   }
 
-  private async executeIssuance(
-    tx: Prisma.TransactionClient,
-    transaction: any,
-  ) {
+  private async executeIssuance(tx: Prisma.TransactionClient, transaction: any) {
     // Upsert shareholding for the destination shareholder
     const existing = await tx.shareholding.findFirst({
       where: {
@@ -748,10 +714,7 @@ export class TransactionService {
     });
   }
 
-  private async executeTransfer(
-    tx: Prisma.TransactionClient,
-    transaction: any,
-  ) {
+  private async executeTransfer(tx: Prisma.TransactionClient, transaction: any) {
     // Deduct from source
     const fromHolding = await tx.shareholding.findFirst({
       where: {
@@ -762,14 +725,10 @@ export class TransactionService {
     });
 
     if (!fromHolding || fromHolding.quantity.lt(transaction.quantity)) {
-      throw new BusinessRuleException(
-        'TXN_INSUFFICIENT_SHARES',
-        'errors.txn.insufficientShares',
-        {
-          available: fromHolding?.quantity.toString() ?? '0',
-          requested: transaction.quantity.toString(),
-        },
-      );
+      throw new BusinessRuleException('TXN_INSUFFICIENT_SHARES', 'errors.txn.insufficientShares', {
+        available: fromHolding?.quantity.toString() ?? '0',
+        requested: transaction.quantity.toString(),
+      });
     }
 
     const newFromQty = fromHolding.quantity.minus(transaction.quantity);
@@ -813,10 +772,7 @@ export class TransactionService {
     // totalIssued unchanged for transfers
   }
 
-  private async executeCancellation(
-    tx: Prisma.TransactionClient,
-    transaction: any,
-  ) {
+  private async executeCancellation(tx: Prisma.TransactionClient, transaction: any) {
     const holding = await tx.shareholding.findFirst({
       where: {
         companyId: transaction.companyId,
@@ -826,14 +782,10 @@ export class TransactionService {
     });
 
     if (!holding || holding.quantity.lt(transaction.quantity)) {
-      throw new BusinessRuleException(
-        'TXN_INSUFFICIENT_SHARES',
-        'errors.txn.insufficientShares',
-        {
-          available: holding?.quantity.toString() ?? '0',
-          requested: transaction.quantity.toString(),
-        },
-      );
+      throw new BusinessRuleException('TXN_INSUFFICIENT_SHARES', 'errors.txn.insufficientShares', {
+        available: holding?.quantity.toString() ?? '0',
+        requested: transaction.quantity.toString(),
+      });
     }
 
     const newQty = holding.quantity.minus(transaction.quantity);
@@ -857,10 +809,7 @@ export class TransactionService {
     });
   }
 
-  private async executeConversion(
-    tx: Prisma.TransactionClient,
-    transaction: any,
-  ) {
+  private async executeConversion(tx: Prisma.TransactionClient, transaction: any) {
     // Remove from source share class
     await this.executeCancellation(tx, transaction);
 
@@ -914,17 +863,11 @@ export class TransactionService {
     });
   }
 
-  private async executeSplit(
-    tx: Prisma.TransactionClient,
-    transaction: any,
-  ) {
+  private async executeSplit(tx: Prisma.TransactionClient, transaction: any) {
     // Split multiplies all shareholdings in this share class by the ratio
     const ratio = this.extractSplitRatio(transaction);
     if (!ratio || ratio.lte(0)) {
-      throw new BusinessRuleException(
-        'TXN_SPLIT_RATIO_REQUIRED',
-        'errors.txn.splitRatioRequired',
-      );
+      throw new BusinessRuleException('TXN_SPLIT_RATIO_REQUIRED', 'errors.txn.splitRatioRequired');
     }
 
     const holdings = await tx.shareholding.findMany({
@@ -998,9 +941,7 @@ export class TransactionService {
     if (!transaction.notes) return null;
     try {
       const meta = JSON.parse(transaction.notes);
-      return meta.splitRatio
-        ? new Prisma.Decimal(meta.splitRatio)
-        : null;
+      return meta.splitRatio ? new Prisma.Decimal(meta.splitRatio) : null;
     } catch {
       return null;
     }
@@ -1051,14 +992,12 @@ export class TransactionService {
     const base = this.formatTransactionResponse(transaction);
     return {
       ...base,
-      blockchainTransactions: (transaction.blockchainTransactions ?? []).map(
-        (bt: any) => ({
-          id: bt.id,
-          txHash: bt.txHash,
-          status: bt.status,
-          confirmedAt: bt.confirmedAt?.toISOString() ?? null,
-        }),
-      ),
+      blockchainTransactions: (transaction.blockchainTransactions ?? []).map((bt: any) => ({
+        id: bt.id,
+        txHash: bt.txHash,
+        status: bt.status,
+        confirmedAt: bt.confirmedAt?.toISOString() ?? null,
+      })),
     };
   }
 }

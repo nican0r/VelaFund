@@ -201,9 +201,7 @@ describe('ShareholderService', () => {
     it('should throw NotFoundException for missing company', async () => {
       prisma.company.findUnique.mockResolvedValue(null);
 
-      await expect(service.create('comp-1', createDto)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.create('comp-1', createDto)).rejects.toThrow(NotFoundException);
     });
 
     it('should throw BusinessRuleException for inactive company', async () => {
@@ -212,9 +210,7 @@ describe('ShareholderService', () => {
         status: 'DRAFT',
       });
 
-      await expect(service.create('comp-1', createDto)).rejects.toThrow(
-        BusinessRuleException,
-      );
+      await expect(service.create('comp-1', createDto)).rejects.toThrow(BusinessRuleException);
     });
 
     it('should throw BusinessRuleException for invalid CPF checksum', async () => {
@@ -259,9 +255,7 @@ describe('ShareholderService', () => {
         }),
       );
 
-      await expect(service.create('comp-1', createDto)).rejects.toThrow(
-        ConflictException,
-      );
+      await expect(service.create('comp-1', createDto)).rejects.toThrow(ConflictException);
     });
 
     it('should create shareholder without CPF/CNPJ (foreign)', async () => {
@@ -290,9 +284,9 @@ describe('ShareholderService', () => {
     it('should reject invalid document format', async () => {
       prisma.company.findUnique.mockResolvedValue(mockCompany);
 
-      await expect(
-        service.create('comp-1', { ...createDto, cpfCnpj: '12345' }),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.create('comp-1', { ...createDto, cpfCnpj: '12345' })).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should encrypt CPF when KMS is available', async () => {
@@ -460,9 +454,7 @@ describe('ShareholderService', () => {
     it('should throw NotFoundException if not found', async () => {
       prisma.shareholder.findFirst.mockResolvedValue(null);
 
-      await expect(service.findById('comp-1', 'sh-999')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.findById('comp-1', 'sh-999')).rejects.toThrow(NotFoundException);
     });
 
     it('should decrypt CPF when stored encrypted', async () => {
@@ -477,9 +469,7 @@ describe('ShareholderService', () => {
 
       const result = await service.findById('comp-1', 'sh-1');
 
-      expect(encryptionService.decrypt).toHaveBeenCalledWith(
-        Buffer.from('encrypted-cpf-data'),
-      );
+      expect(encryptionService.decrypt).toHaveBeenCalledWith(Buffer.from('encrypted-cpf-data'));
       expect(result.cpfCnpj).toBe('529.982.247-25');
     });
 
@@ -647,17 +637,13 @@ describe('ShareholderService', () => {
       prisma.shareholding.count.mockResolvedValue(5);
       prisma.transaction.count.mockResolvedValue(0);
 
-      await expect(service.remove('comp-1', 'sh-1')).rejects.toThrow(
-        BusinessRuleException,
-      );
+      await expect(service.remove('comp-1', 'sh-1')).rejects.toThrow(BusinessRuleException);
     });
 
     it('should throw NotFoundException for missing shareholder', async () => {
       prisma.shareholder.findFirst.mockResolvedValue(null);
 
-      await expect(service.remove('comp-1', 'sh-999')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.remove('comp-1', 'sh-999')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -675,15 +661,32 @@ describe('ShareholderService', () => {
       prisma.shareholder.findFirst.mockResolvedValue(mockCorporateShareholder);
 
       const createdOwners = [
-        { id: 'bo-1', shareholderId: 'sh-2', name: 'Maria Souza', cpf: '529.982.247-25', ownershipPct: new Prisma.Decimal('60.00'), createdAt: new Date(), updatedAt: new Date() },
-        { id: 'bo-2', shareholderId: 'sh-2', name: 'Pedro Santos', cpf: null, ownershipPct: new Prisma.Decimal('40.00'), createdAt: new Date(), updatedAt: new Date() },
+        {
+          id: 'bo-1',
+          shareholderId: 'sh-2',
+          name: 'Maria Souza',
+          cpf: '529.982.247-25',
+          ownershipPct: new Prisma.Decimal('60.00'),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'bo-2',
+          shareholderId: 'sh-2',
+          name: 'Pedro Santos',
+          cpf: null,
+          ownershipPct: new Prisma.Decimal('40.00'),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
       ];
 
-      prisma.$transaction.mockImplementation(async (fn: Function) => {
+      prisma.$transaction.mockImplementation(async (fn: (...args: unknown[]) => unknown) => {
         const tx = {
           beneficialOwner: {
             deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
-            create: jest.fn()
+            create: jest
+              .fn()
               .mockResolvedValueOnce(createdOwners[0])
               .mockResolvedValueOnce(createdOwners[1]),
           },
@@ -699,17 +702,17 @@ describe('ShareholderService', () => {
     it('should throw NotFoundException for missing shareholder', async () => {
       prisma.shareholder.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.setBeneficialOwners('comp-1', 'sh-999', uboDto),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.setBeneficialOwners('comp-1', 'sh-999', uboDto)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw BusinessRuleException for non-corporate shareholder', async () => {
       prisma.shareholder.findFirst.mockResolvedValue(mockShareholder); // FOUNDER type
 
-      await expect(
-        service.setBeneficialOwners('comp-1', 'sh-1', uboDto),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.setBeneficialOwners('comp-1', 'sh-1', uboDto)).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should throw BusinessRuleException when percentages exceed 100%', async () => {

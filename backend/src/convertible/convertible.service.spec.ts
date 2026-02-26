@@ -123,9 +123,7 @@ describe('ConvertibleService', () => {
     it('should throw if company not found', async () => {
       prisma.company.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.create(companyId, createDto, userId),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.create(companyId, createDto, userId)).rejects.toThrow(NotFoundException);
     });
 
     it('should throw if company not active', async () => {
@@ -134,9 +132,9 @@ describe('ConvertibleService', () => {
         status: 'DRAFT',
       });
 
-      await expect(
-        service.create(companyId, createDto, userId),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.create(companyId, createDto, userId)).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should throw if shareholder not found', async () => {
@@ -146,9 +144,7 @@ describe('ConvertibleService', () => {
       });
       prisma.shareholder.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.create(companyId, createDto, userId),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.create(companyId, createDto, userId)).rejects.toThrow(NotFoundException);
     });
 
     it('should throw if maturity date before issue date', async () => {
@@ -159,11 +155,7 @@ describe('ConvertibleService', () => {
       prisma.shareholder.findFirst.mockResolvedValue({ id: shareholderId });
 
       await expect(
-        service.create(
-          companyId,
-          { ...createDto, maturityDate: '2023-01-01' },
-          userId,
-        ),
+        service.create(companyId, { ...createDto, maturityDate: '2023-01-01' }, userId),
       ).rejects.toThrow(BusinessRuleException);
     });
 
@@ -175,11 +167,7 @@ describe('ConvertibleService', () => {
       prisma.shareholder.findFirst.mockResolvedValue({ id: shareholderId });
 
       await expect(
-        service.create(
-          companyId,
-          { ...createDto, interestRate: '0.35' },
-          userId,
-        ),
+        service.create(companyId, { ...createDto, interestRate: '0.35' }, userId),
       ).rejects.toThrow(BusinessRuleException);
     });
 
@@ -191,11 +179,7 @@ describe('ConvertibleService', () => {
       prisma.shareholder.findFirst.mockResolvedValue({ id: shareholderId });
 
       await expect(
-        service.create(
-          companyId,
-          { ...createDto, principalAmount: '0' },
-          userId,
-        ),
+        service.create(companyId, { ...createDto, principalAmount: '0' }, userId),
       ).rejects.toThrow(BusinessRuleException);
     });
 
@@ -208,11 +192,7 @@ describe('ConvertibleService', () => {
       prisma.shareClass.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.create(
-          companyId,
-          { ...createDto, targetShareClassId: 'bad-uuid' },
-          userId,
-        ),
+        service.create(companyId, { ...createDto, targetShareClassId: 'bad-uuid' }, userId),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -221,9 +201,7 @@ describe('ConvertibleService', () => {
 
   describe('findAll', () => {
     it('should return paginated list with summary', async () => {
-      prisma.convertibleInstrument.findMany.mockResolvedValue([
-        mockConvertible,
-      ]);
+      prisma.convertibleInstrument.findMany.mockResolvedValue([mockConvertible]);
       prisma.convertibleInstrument.count.mockResolvedValue(1);
       prisma.convertibleInstrument.aggregate.mockResolvedValue({
         _sum: {
@@ -308,9 +286,7 @@ describe('ConvertibleService', () => {
     it('should throw if not found', async () => {
       prisma.convertibleInstrument.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.findById(companyId, 'bad-uuid'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.findById(companyId, 'bad-uuid')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -320,10 +296,7 @@ describe('ConvertibleService', () => {
     it('should return interest calculation for SIMPLE interest', async () => {
       prisma.convertibleInstrument.findFirst.mockResolvedValue(mockConvertible);
 
-      const result = await service.getInterestBreakdown(
-        companyId,
-        convertibleId,
-      );
+      const result = await service.getInterestBreakdown(companyId, convertibleId);
 
       expect(result.convertibleId).toBe(convertibleId);
       expect(result.principalAmount).toBe('100000');
@@ -339,10 +312,7 @@ describe('ConvertibleService', () => {
         interestType: 'COMPOUND',
       });
 
-      const result = await service.getInterestBreakdown(
-        companyId,
-        convertibleId,
-      );
+      const result = await service.getInterestBreakdown(companyId, convertibleId);
 
       expect(result.interestType).toBe('COMPOUND');
       expect(parseFloat(result.accruedInterest)).toBeGreaterThan(0);
@@ -351,9 +321,9 @@ describe('ConvertibleService', () => {
     it('should throw if not found', async () => {
       prisma.convertibleInstrument.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.getInterestBreakdown(companyId, 'bad-uuid'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getInterestBreakdown(companyId, 'bad-uuid')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -367,7 +337,7 @@ describe('ConvertibleService', () => {
         discountRate: new Prisma.Decimal('0.25'),
       });
 
-      const result = await service.update(companyId, convertibleId, {
+      await service.update(companyId, convertibleId, {
         discountRate: '0.25',
       });
 
@@ -403,9 +373,9 @@ describe('ConvertibleService', () => {
     it('should throw if not found', async () => {
       prisma.convertibleInstrument.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.update(companyId, 'bad-uuid', { discountRate: '0.25' }),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.update(companyId, 'bad-uuid', { discountRate: '0.25' })).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should reset MATURED to OUTSTANDING on maturity extension', async () => {
@@ -465,7 +435,7 @@ describe('ConvertibleService', () => {
         redeemedAt: new Date(),
       });
 
-      const result = await service.redeem(companyId, convertibleId, {
+      await service.redeem(companyId, convertibleId, {
         redemptionAmount: '108000.00',
       });
 
@@ -574,10 +544,7 @@ describe('ConvertibleService', () => {
     });
 
     it('should return default 5 scenarios', async () => {
-      const result = await service.getConversionScenarios(
-        companyId,
-        convertibleId,
-      );
+      const result = await service.getConversionScenarios(companyId, convertibleId);
 
       expect(result.scenarios).toHaveLength(5);
       expect(result.convertibleId).toBe(convertibleId);
@@ -601,30 +568,24 @@ describe('ConvertibleService', () => {
 
     it('should throw if valuation <= 0', async () => {
       await expect(
-        service.getConversionScenarios(
-          companyId,
-          convertibleId,
-          '-1000',
-        ),
+        service.getConversionScenarios(companyId, convertibleId, '-1000'),
       ).rejects.toThrow(BusinessRuleException);
     });
 
     it('should throw if no pre-money shares', async () => {
-      prisma.shareClass.findMany.mockResolvedValue([
-        { totalIssued: new Prisma.Decimal('0') },
-      ]);
+      prisma.shareClass.findMany.mockResolvedValue([{ totalIssued: new Prisma.Decimal('0') }]);
 
-      await expect(
-        service.getConversionScenarios(companyId, convertibleId),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.getConversionScenarios(companyId, convertibleId)).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should throw if convertible not found', async () => {
       prisma.convertibleInstrument.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.getConversionScenarios(companyId, 'bad-uuid'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getConversionScenarios(companyId, 'bad-uuid')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should handle no discount rate', async () => {
@@ -633,11 +594,7 @@ describe('ConvertibleService', () => {
         discountRate: null,
       });
 
-      const result = await service.getConversionScenarios(
-        companyId,
-        convertibleId,
-        '5000000',
-      );
+      const result = await service.getConversionScenarios(companyId, convertibleId, '5000000');
 
       expect(result.scenarios[0].discountMethod).toBeNull();
     });
@@ -648,33 +605,21 @@ describe('ConvertibleService', () => {
         valuationCap: null,
       });
 
-      const result = await service.getConversionScenarios(
-        companyId,
-        convertibleId,
-        '5000000',
-      );
+      const result = await service.getConversionScenarios(companyId, convertibleId, '5000000');
 
       expect(result.scenarios[0].capMethod).toBeNull();
     });
 
     it('should pick CAP as best method when cap gives more shares', async () => {
       // High valuation (10M) → cap (5M) gives much more shares than discount (20%)
-      const result = await service.getConversionScenarios(
-        companyId,
-        convertibleId,
-        '10000000',
-      );
+      const result = await service.getConversionScenarios(companyId, convertibleId, '10000000');
 
       expect(result.scenarios[0].bestMethod).toBe('CAP');
     });
 
     it('should pick DISCOUNT as best method at lower valuations', async () => {
       // Low valuation (3M) → discount (20%) gives more than cap (5M)
-      const result = await service.getConversionScenarios(
-        companyId,
-        convertibleId,
-        '3000000',
-      );
+      const result = await service.getConversionScenarios(companyId, convertibleId, '3000000');
 
       expect(result.scenarios[0].bestMethod).toBe('DISCOUNT');
     });
@@ -733,12 +678,7 @@ describe('ConvertibleService', () => {
     });
 
     it('should execute conversion atomically', async () => {
-      const result = await service.convert(
-        companyId,
-        convertibleId,
-        convertDto,
-        userId,
-      );
+      const result = await service.convert(companyId, convertibleId, convertDto, userId);
 
       expect(prisma.$transaction).toHaveBeenCalled();
       expect(prisma.transaction.create).toHaveBeenCalled();
@@ -759,9 +699,9 @@ describe('ConvertibleService', () => {
     it('should throw if convertible not found', async () => {
       prisma.convertibleInstrument.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.convert(companyId, 'bad-uuid', convertDto, userId),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.convert(companyId, 'bad-uuid', convertDto, userId)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw if already converted', async () => {
@@ -771,17 +711,17 @@ describe('ConvertibleService', () => {
         shareholder: { id: shareholderId, name: 'Test Investor' },
       });
 
-      await expect(
-        service.convert(companyId, convertibleId, convertDto, userId),
-      ).rejects.toThrow(ConflictException);
+      await expect(service.convert(companyId, convertibleId, convertDto, userId)).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('should throw if funding round not found', async () => {
       prisma.fundingRound.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.convert(companyId, convertibleId, convertDto, userId),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.convert(companyId, convertibleId, convertDto, userId)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw if qualified financing threshold not met', async () => {
@@ -791,18 +731,17 @@ describe('ConvertibleService', () => {
         status: 'OPEN',
       });
 
-      await expect(
-        service.convert(companyId, convertibleId, convertDto, userId),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.convert(companyId, convertibleId, convertDto, userId)).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should throw if share class not found', async () => {
-      prisma.shareClass.findFirst
-        .mockResolvedValueOnce(null); // First call for shareClass check
+      prisma.shareClass.findFirst.mockResolvedValueOnce(null); // First call for shareClass check
 
-      await expect(
-        service.convert(companyId, convertibleId, convertDto, userId),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.convert(companyId, convertibleId, convertDto, userId)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw if no pre-money shares', async () => {
@@ -812,13 +751,11 @@ describe('ConvertibleService', () => {
         totalIssued: new Prisma.Decimal('100000'),
         totalAuthorized: new Prisma.Decimal('10000000'),
       });
-      prisma.shareClass.findMany.mockResolvedValue([
-        { totalIssued: new Prisma.Decimal('0') },
-      ]);
+      prisma.shareClass.findMany.mockResolvedValue([{ totalIssued: new Prisma.Decimal('0') }]);
 
-      await expect(
-        service.convert(companyId, convertibleId, convertDto, userId),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.convert(companyId, convertibleId, convertDto, userId)).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should update existing shareholding on conversion', async () => {
@@ -848,9 +785,9 @@ describe('ConvertibleService', () => {
         totalAuthorized: new Prisma.Decimal('10000000'),
       });
 
-      await expect(
-        service.convert(companyId, convertibleId, convertDto, userId),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.convert(companyId, convertibleId, convertDto, userId)).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
   });
 });

@@ -1,10 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CapTableController } from './cap-table.controller';
 import { CapTableService } from './cap-table.service';
-import {
-  NotFoundException,
-  BusinessRuleException,
-} from '../common/filters/app-exception';
+import { NotFoundException, BusinessRuleException } from '../common/filters/app-exception';
 
 // ─── MOCK SERVICE ───────────────────────────────────────────────
 
@@ -180,13 +177,11 @@ describe('CapTableController', () => {
     });
 
     it('should propagate NotFoundException', async () => {
-      service.getCurrentCapTable.mockRejectedValue(
-        new NotFoundException('company', 'comp-1'),
-      );
+      service.getCurrentCapTable.mockRejectedValue(new NotFoundException('company', 'comp-1'));
 
-      await expect(
-        controller.getCurrentCapTable('comp-1', { view: 'current' }),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.getCurrentCapTable('comp-1', { view: 'current' })).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -203,13 +198,9 @@ describe('CapTableController', () => {
     });
 
     it('should propagate NotFoundException', async () => {
-      service.getFullyDilutedCapTable.mockRejectedValue(
-        new NotFoundException('company', 'comp-1'),
-      );
+      service.getFullyDilutedCapTable.mockRejectedValue(new NotFoundException('company', 'comp-1'));
 
-      await expect(
-        controller.getFullyDilutedCapTable('comp-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.getFullyDilutedCapTable('comp-1')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -226,26 +217,21 @@ describe('CapTableController', () => {
     });
 
     it('should propagate NotFoundException when no snapshot found', async () => {
-      service.getSnapshot.mockRejectedValue(
-        new NotFoundException('capTableSnapshot'),
-      );
+      service.getSnapshot.mockRejectedValue(new NotFoundException('capTableSnapshot'));
 
-      await expect(
-        controller.getSnapshot('comp-1', '2025-12-31'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.getSnapshot('comp-1', '2025-12-31')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should propagate BusinessRuleException for date before company creation', async () => {
       service.getSnapshot.mockRejectedValue(
-        new BusinessRuleException(
-          'CAP_NO_DATA_FOR_DATE',
-          'errors.cap.noDataForDate',
-        ),
+        new BusinessRuleException('CAP_NO_DATA_FOR_DATE', 'errors.cap.noDataForDate'),
       );
 
-      await expect(
-        controller.getSnapshot('comp-1', '2024-01-01'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(controller.getSnapshot('comp-1', '2024-01-01')).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
   });
 
@@ -281,13 +267,11 @@ describe('CapTableController', () => {
     });
 
     it('should propagate NotFoundException', async () => {
-      service.getSnapshotHistory.mockRejectedValue(
-        new NotFoundException('company', 'comp-1'),
-      );
+      service.getSnapshotHistory.mockRejectedValue(new NotFoundException('company', 'comp-1'));
 
-      await expect(
-        controller.getHistory('comp-1', { page: 1, limit: 20 }),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.getHistory('comp-1', { page: 1, limit: 20 })).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -305,13 +289,9 @@ describe('CapTableController', () => {
     });
 
     it('should propagate NotFoundException', async () => {
-      service.exportOct.mockRejectedValue(
-        new NotFoundException('company', 'comp-1'),
-      );
+      service.exportOct.mockRejectedValue(new NotFoundException('company', 'comp-1'));
 
-      await expect(controller.exportOct('comp-1')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(controller.exportOct('comp-1')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -335,10 +315,7 @@ describe('CapTableController', () => {
 
     it('should propagate BusinessRuleException for future date', async () => {
       service.createSnapshot.mockRejectedValue(
-        new BusinessRuleException(
-          'CAP_FUTURE_SNAPSHOT_DATE',
-          'errors.cap.futureSnapshotDate',
-        ),
+        new BusinessRuleException('CAP_FUTURE_SNAPSHOT_DATE', 'errors.cap.futureSnapshotDate'),
       );
 
       await expect(
@@ -350,10 +327,7 @@ describe('CapTableController', () => {
 
     it('should propagate BusinessRuleException when company not active', async () => {
       service.createSnapshot.mockRejectedValue(
-        new BusinessRuleException(
-          'CAP_COMPANY_NOT_ACTIVE',
-          'errors.cap.companyNotActive',
-        ),
+        new BusinessRuleException('CAP_COMPANY_NOT_ACTIVE', 'errors.cap.companyNotActive'),
       );
 
       await expect(
@@ -364,9 +338,7 @@ describe('CapTableController', () => {
     });
 
     it('should propagate NotFoundException', async () => {
-      service.createSnapshot.mockRejectedValue(
-        new NotFoundException('company', 'comp-1'),
-      );
+      service.createSnapshot.mockRejectedValue(new NotFoundException('company', 'comp-1'));
 
       await expect(
         controller.createSnapshot('comp-1', {

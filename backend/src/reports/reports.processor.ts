@@ -27,9 +27,7 @@ export class ReportExportProcessor {
     }>,
   ) {
     const { jobId, companyId, format } = job.data;
-    this.logger.log(
-      `Processing cap table export ${jobId} (${format}) for company ${companyId}`,
-    );
+    this.logger.log(`Processing cap table export ${jobId} (${format}) for company ${companyId}`);
 
     // Mark as processing
     await this.prisma.exportJob.update({
@@ -49,10 +47,8 @@ export class ReportExportProcessor {
           fileExtension = 'csv';
           break;
         case 'xlsx':
-          fileBuffer =
-            await this.reportsService.generateCapTableXlsx(companyId);
-          contentType =
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+          fileBuffer = await this.reportsService.generateCapTableXlsx(companyId);
+          contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
           fileExtension = 'xlsx';
           break;
         case 'pdf':
@@ -69,12 +65,7 @@ export class ReportExportProcessor {
           throw new Error(`Unsupported format: ${format}`);
       }
 
-      await this.reportsService.completeExportJob(
-        jobId,
-        fileBuffer,
-        contentType,
-        fileExtension,
-      );
+      await this.reportsService.completeExportJob(jobId, fileBuffer, contentType, fileExtension);
 
       // Send email notification
       await this.sendExportReadyEmail(jobId);
@@ -83,14 +74,8 @@ export class ReportExportProcessor {
         `Cap table export ${jobId} completed (${format}, ${fileBuffer.length} bytes)`,
       );
     } catch (error) {
-      this.logger.error(
-        `Cap table export ${jobId} failed: ${error.message}`,
-        error.stack,
-      );
-      await this.reportsService.failExportJob(
-        jobId,
-        'REPORT_EXPORT_FAILED',
-      );
+      this.logger.error(`Cap table export ${jobId} failed: ${error.message}`, error.stack);
+      await this.reportsService.failExportJob(jobId, 'REPORT_EXPORT_FAILED');
       throw error;
     }
   }
@@ -105,9 +90,7 @@ export class ReportExportProcessor {
     }>,
   ) {
     const { jobId, companyId, dateFrom, dateTo } = job.data;
-    this.logger.log(
-      `Processing due diligence package ${jobId} for company ${companyId}`,
-    );
+    this.logger.log(`Processing due diligence package ${jobId} for company ${companyId}`);
 
     await this.prisma.exportJob.update({
       where: { id: jobId },
@@ -116,23 +99,17 @@ export class ReportExportProcessor {
 
     try {
       // Generate all CSV components
-      const csvs = await this.reportsService.generateDueDiligenceCsvs(
+      const csvs = await this.reportsService.generateDueDiligenceCsvs(companyId, dateFrom, dateTo);
+
+      // Generate cap table PDF
+      const capTablePdf = await this.reportsService.generateCapTablePdf(companyId);
+
+      // Generate metadata
+      const metadata = await this.reportsService.generateDueDiligenceMetadata(
         companyId,
         dateFrom,
         dateTo,
       );
-
-      // Generate cap table PDF
-      const capTablePdf =
-        await this.reportsService.generateCapTablePdf(companyId);
-
-      // Generate metadata
-      const metadata =
-        await this.reportsService.generateDueDiligenceMetadata(
-          companyId,
-          dateFrom,
-          dateTo,
-        );
 
       // Package into ZIP
       const zipBuffer = await this.createZipArchive({
@@ -146,34 +123,19 @@ export class ReportExportProcessor {
         'metadata.json': metadata,
       });
 
-      await this.reportsService.completeExportJob(
-        jobId,
-        zipBuffer,
-        'application/zip',
-        'zip',
-      );
+      await this.reportsService.completeExportJob(jobId, zipBuffer, 'application/zip', 'zip');
 
       await this.sendExportReadyEmail(jobId);
 
-      this.logger.log(
-        `Due diligence package ${jobId} completed (${zipBuffer.length} bytes)`,
-      );
+      this.logger.log(`Due diligence package ${jobId} completed (${zipBuffer.length} bytes)`);
     } catch (error) {
-      this.logger.error(
-        `Due diligence package ${jobId} failed: ${error.message}`,
-        error.stack,
-      );
-      await this.reportsService.failExportJob(
-        jobId,
-        'REPORT_EXPORT_FAILED',
-      );
+      this.logger.error(`Due diligence package ${jobId} failed: ${error.message}`, error.stack);
+      await this.reportsService.failExportJob(jobId, 'REPORT_EXPORT_FAILED');
       throw error;
     }
   }
 
-  private async createZipArchive(
-    files: Record<string, Buffer>,
-  ): Promise<Buffer> {
+  private async createZipArchive(files: Record<string, Buffer>): Promise<Buffer> {
     return new Promise<Buffer>((resolve, reject) => {
       const chunks: Buffer[] = [];
       const passthrough = new PassThrough();
@@ -226,9 +188,7 @@ export class ReportExportProcessor {
         },
       });
     } catch (error) {
-      this.logger.warn(
-        `Failed to send export-ready email for job ${jobId}: ${error.message}`,
-      );
+      this.logger.warn(`Failed to send export-ready email for job ${jobId}: ${error.message}`);
     }
   }
 }

@@ -31,10 +31,7 @@ export class EmailService {
     private readonly configService: ConfigService,
   ) {
     this.templatesDir = path.resolve(__dirname, '../../templates/email');
-    this.frontendUrl = this.configService.get<string>(
-      'FRONTEND_URL',
-      'http://localhost:3000',
-    );
+    this.frontendUrl = this.configService.get<string>('FRONTEND_URL', 'http://localhost:3000');
   }
 
   isAvailable(): boolean {
@@ -44,11 +41,7 @@ export class EmailService {
   async sendEmail(options: SendEmailOptions): Promise<string | null> {
     const locale = options.locale || this.defaultLocale;
 
-    const compiled = this.compileTemplate(
-      options.templateName,
-      locale,
-      options.variables,
-    );
+    const compiled = this.compileTemplate(options.templateName, locale, options.variables);
 
     return this.sesService.sendEmail({
       to: options.to,
@@ -92,16 +85,8 @@ export class EmailService {
   }
 
   private loadTemplate(templateName: string, locale: string): string {
-    const primaryPath = path.join(
-      this.templatesDir,
-      templateName,
-      `${locale}.mjml`,
-    );
-    const fallbackPath = path.join(
-      this.templatesDir,
-      templateName,
-      `${this.defaultLocale}.mjml`,
-    );
+    const primaryPath = path.join(this.templatesDir, templateName, `${locale}.mjml`);
+    const fallbackPath = path.join(this.templatesDir, templateName, `${this.defaultLocale}.mjml`);
 
     if (fs.existsSync(primaryPath)) {
       return fs.readFileSync(primaryPath, 'utf-8');
@@ -114,15 +99,10 @@ export class EmailService {
       return fs.readFileSync(fallbackPath, 'utf-8');
     }
 
-    throw new Error(
-      `Email template not found: ${templateName}/${locale}.mjml`,
-    );
+    throw new Error(`Email template not found: ${templateName}/${locale}.mjml`);
   }
 
-  private interpolateVariables(
-    template: string,
-    variables: Record<string, string>,
-  ): string {
+  private interpolateVariables(template: string, variables: Record<string, string>): string {
     let result = template;
     for (const [key, value] of Object.entries(variables)) {
       const placeholder = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
@@ -131,13 +111,8 @@ export class EmailService {
     return result;
   }
 
-  private extractSubject(
-    mjmlSource: string,
-    variables: Record<string, string>,
-  ): string {
-    const match = mjmlSource.match(
-      /<!--\s*subject:\s*(.*?)\s*-->/i,
-    );
+  private extractSubject(mjmlSource: string, variables: Record<string, string>): string {
+    const match = mjmlSource.match(/<!--\s*subject:\s*(.*?)\s*-->/i);
     if (!match) {
       return 'Navia';
     }

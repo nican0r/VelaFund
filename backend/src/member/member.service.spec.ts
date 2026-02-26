@@ -101,9 +101,7 @@ describe('MemberService', () => {
       },
       $transaction: jest
         .fn()
-        .mockImplementation((fn: (tx: typeof prisma) => Promise<unknown>) =>
-          fn(prisma),
-        ),
+        .mockImplementation((fn: (tx: typeof prisma) => Promise<unknown>) => fn(prisma)),
     };
 
     const mockEmailService = {
@@ -167,9 +165,7 @@ describe('MemberService', () => {
     it('should throw NotFoundException if company does not exist', async () => {
       prisma.company.findUnique.mockResolvedValue(null);
 
-      await expect(service.invite('bad-id', dto, 'user-1')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.invite('bad-id', dto, 'user-1')).rejects.toThrow(NotFoundException);
     });
 
     it('should throw BusinessRuleException if company is DISSOLVED', async () => {
@@ -178,21 +174,19 @@ describe('MemberService', () => {
         status: 'DISSOLVED',
       });
 
-      await expect(
-        service.invite('comp-1', dto, 'user-1'),
-      ).rejects.toThrow(BusinessRuleException);
-      await expect(
-        service.invite('comp-1', dto, 'user-1'),
-      ).rejects.toMatchObject({ code: 'COMPANY_DISSOLVED' });
+      await expect(service.invite('comp-1', dto, 'user-1')).rejects.toThrow(BusinessRuleException);
+      await expect(service.invite('comp-1', dto, 'user-1')).rejects.toMatchObject({
+        code: 'COMPANY_DISSOLVED',
+      });
     });
 
     it('should throw BusinessRuleException if daily invitation limit exceeded', async () => {
       prisma.company.findUnique.mockResolvedValue(mockCompany);
       prisma.companyMember.count.mockResolvedValue(50);
 
-      await expect(
-        service.invite('comp-1', dto, 'user-1'),
-      ).rejects.toMatchObject({ code: 'COMPANY_INVITATION_RATE_LIMIT' });
+      await expect(service.invite('comp-1', dto, 'user-1')).rejects.toMatchObject({
+        code: 'COMPANY_INVITATION_RATE_LIMIT',
+      });
     });
 
     it('should throw ConflictException if email has an ACTIVE membership', async () => {
@@ -203,12 +197,10 @@ describe('MemberService', () => {
         status: 'ACTIVE',
       });
 
-      await expect(
-        service.invite('comp-1', dto, 'user-1'),
-      ).rejects.toThrow(ConflictException);
-      await expect(
-        service.invite('comp-1', dto, 'user-1'),
-      ).rejects.toMatchObject({ code: 'COMPANY_MEMBER_EXISTS' });
+      await expect(service.invite('comp-1', dto, 'user-1')).rejects.toThrow(ConflictException);
+      await expect(service.invite('comp-1', dto, 'user-1')).rejects.toMatchObject({
+        code: 'COMPANY_MEMBER_EXISTS',
+      });
     });
 
     it('should throw ConflictException if email has a PENDING invitation', async () => {
@@ -219,9 +211,9 @@ describe('MemberService', () => {
         status: 'PENDING',
       });
 
-      await expect(
-        service.invite('comp-1', dto, 'user-1'),
-      ).rejects.toMatchObject({ code: 'COMPANY_INVITATION_PENDING' });
+      await expect(service.invite('comp-1', dto, 'user-1')).rejects.toMatchObject({
+        code: 'COMPANY_INVITATION_PENDING',
+      });
     });
 
     it('should re-invite a REMOVED member by updating the existing record', async () => {
@@ -321,9 +313,7 @@ describe('MemberService', () => {
       expect(prisma.companyMember.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            OR: expect.arrayContaining([
-              { email: { contains: 'john', mode: 'insensitive' } },
-            ]),
+            OR: expect.arrayContaining([{ email: { contains: 'john', mode: 'insensitive' } }]),
           }),
         }),
       );
@@ -490,9 +480,9 @@ describe('MemberService', () => {
     it('should throw NotFoundException if member does not exist', async () => {
       prisma.companyMember.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.removeMember('comp-1', 'bad-id', 'user-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.removeMember('comp-1', 'bad-id', 'user-1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw BusinessRuleException if member is already REMOVED', async () => {
@@ -501,9 +491,9 @@ describe('MemberService', () => {
         status: 'REMOVED',
       });
 
-      await expect(
-        service.removeMember('comp-1', 'member-1', 'user-1'),
-      ).rejects.toMatchObject({ code: 'MEMBER_ALREADY_REMOVED' });
+      await expect(service.removeMember('comp-1', 'member-1', 'user-1')).rejects.toMatchObject({
+        code: 'MEMBER_ALREADY_REMOVED',
+      });
     });
 
     it('should throw COMPANY_LAST_ADMIN when removing the last admin', async () => {
@@ -514,9 +504,9 @@ describe('MemberService', () => {
       });
       prisma.companyMember.count.mockResolvedValue(0); // no other admins
 
-      await expect(
-        service.removeMember('comp-1', 'member-1', 'user-1'),
-      ).rejects.toMatchObject({ code: 'COMPANY_LAST_ADMIN' });
+      await expect(service.removeMember('comp-1', 'member-1', 'user-1')).rejects.toMatchObject({
+        code: 'COMPANY_LAST_ADMIN',
+      });
     });
 
     it('should allow removing an admin when another admin exists', async () => {
@@ -556,9 +546,7 @@ describe('MemberService', () => {
     it('should throw NotFoundException if member does not exist', async () => {
       prisma.companyMember.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.resendInvitation('comp-1', 'bad-id'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.resendInvitation('comp-1', 'bad-id')).rejects.toThrow(NotFoundException);
     });
 
     it('should throw BusinessRuleException if member is not PENDING', async () => {
@@ -567,9 +555,9 @@ describe('MemberService', () => {
         status: 'ACTIVE',
       });
 
-      await expect(
-        service.resendInvitation('comp-1', 'member-1'),
-      ).rejects.toMatchObject({ code: 'MEMBER_NOT_PENDING' });
+      await expect(service.resendInvitation('comp-1', 'member-1')).rejects.toMatchObject({
+        code: 'MEMBER_NOT_PENDING',
+      });
     });
   });
 
@@ -596,9 +584,7 @@ describe('MemberService', () => {
     it('should throw NotFoundException if token does not exist', async () => {
       prisma.invitationToken.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.getInvitationDetails('bad-token'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getInvitationDetails('bad-token')).rejects.toThrow(NotFoundException);
     });
 
     it('should throw NotFoundException if token is already used', async () => {
@@ -607,9 +593,7 @@ describe('MemberService', () => {
         usedAt: new Date(),
       });
 
-      await expect(
-        service.getInvitationDetails('used-token'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getInvitationDetails('used-token')).rejects.toThrow(NotFoundException);
     });
 
     it('should throw GoneException if token is expired', async () => {
@@ -618,12 +602,10 @@ describe('MemberService', () => {
         expiresAt: new Date('2020-01-01'),
       });
 
-      await expect(
-        service.getInvitationDetails('expired-token'),
-      ).rejects.toThrow(GoneException);
-      await expect(
-        service.getInvitationDetails('expired-token'),
-      ).rejects.toMatchObject({ code: 'INVITATION_EXPIRED' });
+      await expect(service.getInvitationDetails('expired-token')).rejects.toThrow(GoneException);
+      await expect(service.getInvitationDetails('expired-token')).rejects.toMatchObject({
+        code: 'INVITATION_EXPIRED',
+      });
     });
 
     it('should return hasExistingAccount=false if no user with that email', async () => {
@@ -706,11 +688,7 @@ describe('MemberService', () => {
       });
 
       await expect(
-        service.acceptInvitation(
-          'expired-token',
-          'user-2',
-          'user2@example.com',
-        ),
+        service.acceptInvitation('expired-token', 'user-2', 'user2@example.com'),
       ).rejects.toThrow(GoneException);
     });
 
@@ -724,11 +702,7 @@ describe('MemberService', () => {
       });
 
       await expect(
-        service.acceptInvitation(
-          'valid-token',
-          'user-2',
-          'user2@example.com',
-        ),
+        service.acceptInvitation('valid-token', 'user-2', 'user2@example.com'),
       ).rejects.toMatchObject({ code: 'INVITATION_ALREADY_ACCEPTED' });
     });
 
@@ -739,11 +713,7 @@ describe('MemberService', () => {
       }); // already active
 
       await expect(
-        service.acceptInvitation(
-          'valid-token',
-          'user-2',
-          'user2@example.com',
-        ),
+        service.acceptInvitation('valid-token', 'user-2', 'user2@example.com'),
       ).rejects.toMatchObject({ code: 'COMPANY_MEMBER_EXISTS' });
     });
 
@@ -753,11 +723,7 @@ describe('MemberService', () => {
       prisma.companyMember.count.mockResolvedValue(20);
 
       await expect(
-        service.acceptInvitation(
-          'valid-token',
-          'user-2',
-          'user2@example.com',
-        ),
+        service.acceptInvitation('valid-token', 'user-2', 'user2@example.com'),
       ).rejects.toMatchObject({ code: 'COMPANY_MEMBER_LIMIT_REACHED' });
     });
 

@@ -2,14 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { TransactionService } from './transaction.service';
 import { CapTableService } from '../cap-table/cap-table.service';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  NotFoundException,
-  BusinessRuleException,
-} from '../common/filters/app-exception';
-import {
-  CreateTransactionDto,
-  TransactionTypeDto,
-} from './dto/create-transaction.dto';
+import { NotFoundException, BusinessRuleException } from '../common/filters/app-exception';
+import { CreateTransactionDto, TransactionTypeDto } from './dto/create-transaction.dto';
 import { Prisma } from '@prisma/client';
 
 // ---------------------------------------------------------------------------
@@ -20,6 +14,7 @@ const mockCompany = {
   id: 'comp-1',
   name: 'Test Company Ltda',
   status: 'ACTIVE' as const,
+  entityType: 'LTDA' as const,
 };
 
 const mockShareClass = {
@@ -106,10 +101,22 @@ describe('TransactionService', () => {
   beforeEach(async () => {
     prisma = {
       company: { findUnique: jest.fn() },
-      shareClass: { findFirst: jest.fn(), findUnique: jest.fn(), update: jest.fn() },
+      shareClass: { findFirst: jest.fn(), findUnique: jest.fn(), update: jest.fn(), count: jest.fn() },
       shareholder: { findFirst: jest.fn() },
-      shareholding: { findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn(), delete: jest.fn() },
-      transaction: { create: jest.fn(), findMany: jest.fn(), findFirst: jest.fn(), update: jest.fn(), count: jest.fn() },
+      shareholding: {
+        findFirst: jest.fn(),
+        findMany: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        delete: jest.fn(),
+      },
+      transaction: {
+        create: jest.fn(),
+        findMany: jest.fn(),
+        findFirst: jest.fn(),
+        update: jest.fn(),
+        count: jest.fn(),
+      },
       blockchainTransaction: {},
       $transaction: jest.fn(),
     };
@@ -182,9 +189,7 @@ describe('TransactionService', () => {
       prisma.company.findUnique.mockResolvedValue(mockCompany);
       prisma.shareClass.findFirst.mockResolvedValue(mockShareClass);
       prisma.shareholder.findFirst.mockResolvedValue(mockShareholder1);
-      prisma.transaction.create.mockResolvedValue(
-        mockTransaction({ status: 'PENDING_APPROVAL' }),
-      );
+      prisma.transaction.create.mockResolvedValue(mockTransaction({ status: 'PENDING_APPROVAL' }));
 
       const result = await service.create('comp-1', dto, 'user-1');
 
@@ -199,9 +204,9 @@ describe('TransactionService', () => {
     it('should throw NotFoundException if company not found', async () => {
       prisma.company.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.create('comp-999', issuanceDto, 'user-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.create('comp-999', issuanceDto, 'user-1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw BusinessRuleException if company not active', async () => {
@@ -210,18 +215,18 @@ describe('TransactionService', () => {
         status: 'DRAFT',
       });
 
-      await expect(
-        service.create('comp-1', issuanceDto, 'user-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.create('comp-1', issuanceDto, 'user-1')).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should throw NotFoundException if share class not found', async () => {
       prisma.company.findUnique.mockResolvedValue(mockCompany);
       prisma.shareClass.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.create('comp-1', issuanceDto, 'user-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.create('comp-1', issuanceDto, 'user-1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw BusinessRuleException if quantity is zero', async () => {
@@ -230,9 +235,7 @@ describe('TransactionService', () => {
 
       const dto = { ...issuanceDto, quantity: '0' };
 
-      await expect(
-        service.create('comp-1', dto, 'user-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.create('comp-1', dto, 'user-1')).rejects.toThrow(BusinessRuleException);
     });
 
     // ISSUANCE-specific validation
@@ -246,9 +249,7 @@ describe('TransactionService', () => {
         quantity: '10000',
       };
 
-      await expect(
-        service.create('comp-1', dto, 'user-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.create('comp-1', dto, 'user-1')).rejects.toThrow(BusinessRuleException);
     });
 
     it('should throw if ISSUANCE exceeds authorized shares', async () => {
@@ -259,9 +260,9 @@ describe('TransactionService', () => {
       });
       prisma.shareholder.findFirst.mockResolvedValue(mockShareholder1);
 
-      await expect(
-        service.create('comp-1', issuanceDto, 'user-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.create('comp-1', issuanceDto, 'user-1')).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should throw if ISSUANCE destination shareholder not found', async () => {
@@ -269,12 +270,73 @@ describe('TransactionService', () => {
       prisma.shareClass.findFirst.mockResolvedValue(mockShareClass);
       prisma.shareholder.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.create('comp-1', issuanceDto, 'user-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.create('comp-1', issuanceDto, 'user-1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
-    // TRANSFER validation
+    // S.A. COMMON_SHARES validation
+    it('should reject issuance for S.A. company without COMMON_SHARES class', async () => {
+      const saCompany = { ...mockCompany, entityType: 'SA_CAPITAL_FECHADO' as const };
+      prisma.company.findUnique.mockResolvedValue(saCompany);
+      prisma.shareClass.count.mockResolvedValue(0);
+
+      const dto: CreateTransactionDto = {
+        type: TransactionTypeDto.ISSUANCE,
+        shareClassId: 'sc-1',
+        quantity: '10000',
+        toShareholderId: 'sh-1',
+      };
+
+      await expect(service.create('comp-1', dto, 'user-1')).rejects.toThrow(
+        BusinessRuleException,
+      );
+      expect(prisma.shareClass.count).toHaveBeenCalledWith({
+        where: { companyId: 'comp-1', type: 'COMMON_SHARES' },
+      });
+    });
+
+    it('should allow issuance for S.A. company with COMMON_SHARES class', async () => {
+      const saCompany = { ...mockCompany, entityType: 'SA_CAPITAL_FECHADO' as const };
+      prisma.company.findUnique.mockResolvedValue(saCompany);
+      prisma.shareClass.count.mockResolvedValue(1);
+      prisma.shareClass.findFirst.mockResolvedValue(mockShareClass);
+      prisma.shareholder.findFirst.mockResolvedValue(mockShareholder1);
+      prisma.transaction.create.mockResolvedValue(mockTransaction());
+
+      const dto: CreateTransactionDto = {
+        type: TransactionTypeDto.ISSUANCE,
+        shareClassId: 'sc-1',
+        quantity: '10000',
+        toShareholderId: 'sh-1',
+      };
+
+      const result = await service.create('comp-1', dto, 'user-1');
+      expect(result).toBeDefined();
+      expect(prisma.shareClass.count).toHaveBeenCalledWith({
+        where: { companyId: 'comp-1', type: 'COMMON_SHARES' },
+      });
+    });
+
+    it('should skip COMMON_SHARES check for Ltda companies', async () => {
+      prisma.company.findUnique.mockResolvedValue(mockCompany);
+      prisma.shareClass.findFirst.mockResolvedValue(mockShareClass);
+      prisma.shareholder.findFirst.mockResolvedValue(mockShareholder1);
+      prisma.transaction.create.mockResolvedValue(mockTransaction());
+
+      const dto: CreateTransactionDto = {
+        type: TransactionTypeDto.ISSUANCE,
+        shareClassId: 'sc-1',
+        quantity: '10000',
+        toShareholderId: 'sh-1',
+      };
+
+      const result = await service.create('comp-1', dto, 'user-1');
+      expect(result).toBeDefined();
+      expect(prisma.shareClass.count).not.toHaveBeenCalled();
+    });
+
+        // TRANSFER validation
     it('should create a TRANSFER transaction', async () => {
       const dto: CreateTransactionDto = {
         type: TransactionTypeDto.TRANSFER,
@@ -318,9 +380,7 @@ describe('TransactionService', () => {
       prisma.company.findUnique.mockResolvedValue(mockCompany);
       prisma.shareClass.findFirst.mockResolvedValue(mockShareClass);
 
-      await expect(
-        service.create('comp-1', dto, 'user-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.create('comp-1', dto, 'user-1')).rejects.toThrow(BusinessRuleException);
     });
 
     it('should throw if TRANSFER without toShareholderId', async () => {
@@ -334,9 +394,7 @@ describe('TransactionService', () => {
       prisma.company.findUnique.mockResolvedValue(mockCompany);
       prisma.shareClass.findFirst.mockResolvedValue(mockShareClass);
 
-      await expect(
-        service.create('comp-1', dto, 'user-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.create('comp-1', dto, 'user-1')).rejects.toThrow(BusinessRuleException);
     });
 
     it('should throw if TRANSFER from and to same shareholder', async () => {
@@ -351,9 +409,7 @@ describe('TransactionService', () => {
       prisma.company.findUnique.mockResolvedValue(mockCompany);
       prisma.shareClass.findFirst.mockResolvedValue(mockShareClass);
 
-      await expect(
-        service.create('comp-1', dto, 'user-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.create('comp-1', dto, 'user-1')).rejects.toThrow(BusinessRuleException);
     });
 
     it('should throw if TRANSFER with insufficient shares', async () => {
@@ -372,9 +428,7 @@ describe('TransactionService', () => {
         .mockResolvedValueOnce(mockShareholder2);
       prisma.shareholding.findFirst.mockResolvedValue(mockShareholding);
 
-      await expect(
-        service.create('comp-1', dto, 'user-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.create('comp-1', dto, 'user-1')).rejects.toThrow(BusinessRuleException);
     });
 
     // CANCELLATION validation
@@ -388,9 +442,7 @@ describe('TransactionService', () => {
       prisma.company.findUnique.mockResolvedValue(mockCompany);
       prisma.shareClass.findFirst.mockResolvedValue(mockShareClass);
 
-      await expect(
-        service.create('comp-1', dto, 'user-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.create('comp-1', dto, 'user-1')).rejects.toThrow(BusinessRuleException);
     });
 
     // CONVERSION validation
@@ -405,9 +457,7 @@ describe('TransactionService', () => {
       prisma.company.findUnique.mockResolvedValue(mockCompany);
       prisma.shareClass.findFirst.mockResolvedValue(mockShareClass);
 
-      await expect(
-        service.create('comp-1', dto, 'user-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.create('comp-1', dto, 'user-1')).rejects.toThrow(BusinessRuleException);
     });
 
     // SPLIT validation
@@ -421,9 +471,7 @@ describe('TransactionService', () => {
       prisma.company.findUnique.mockResolvedValue(mockCompany);
       prisma.shareClass.findFirst.mockResolvedValue(mockShareClass);
 
-      await expect(
-        service.create('comp-1', dto, 'user-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.create('comp-1', dto, 'user-1')).rejects.toThrow(BusinessRuleException);
     });
   });
 
@@ -450,9 +498,9 @@ describe('TransactionService', () => {
     it('should throw NotFoundException if company not found', async () => {
       prisma.company.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.findAll('comp-999', { page: 1, limit: 20 }),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.findAll('comp-999', { page: 1, limit: 20 })).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should apply type filter', async () => {
@@ -490,10 +538,7 @@ describe('TransactionService', () => {
       expect(prisma.transaction.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            OR: [
-              { fromShareholderId: 'sh-1' },
-              { toShareholderId: 'sh-1' },
-            ],
+            OR: [{ fromShareholderId: 'sh-1' }, { toShareholderId: 'sh-1' }],
           }),
         }),
       );
@@ -552,9 +597,7 @@ describe('TransactionService', () => {
     it('should throw NotFoundException if transaction not found', async () => {
       prisma.transaction.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.findById('comp-1', 'txn-999'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.findById('comp-1', 'txn-999')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -589,12 +632,8 @@ describe('TransactionService', () => {
     });
 
     it('should approve a DRAFT transaction', async () => {
-      prisma.transaction.findFirst.mockResolvedValue(
-        mockTransaction({ status: 'DRAFT' }),
-      );
-      prisma.transaction.update.mockResolvedValue(
-        mockTransaction({ status: 'SUBMITTED' }),
-      );
+      prisma.transaction.findFirst.mockResolvedValue(mockTransaction({ status: 'DRAFT' }));
+      prisma.transaction.update.mockResolvedValue(mockTransaction({ status: 'SUBMITTED' }));
 
       const result = await service.approve('comp-1', 'txn-1', 'admin-1');
 
@@ -604,29 +643,25 @@ describe('TransactionService', () => {
     it('should throw if transaction not found', async () => {
       prisma.transaction.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.approve('comp-1', 'txn-999', 'admin-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.approve('comp-1', 'txn-999', 'admin-1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw if transaction is already CONFIRMED', async () => {
-      prisma.transaction.findFirst.mockResolvedValue(
-        mockTransaction({ status: 'CONFIRMED' }),
-      );
+      prisma.transaction.findFirst.mockResolvedValue(mockTransaction({ status: 'CONFIRMED' }));
 
-      await expect(
-        service.approve('comp-1', 'txn-1', 'admin-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.approve('comp-1', 'txn-1', 'admin-1')).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should throw if transaction is CANCELLED', async () => {
-      prisma.transaction.findFirst.mockResolvedValue(
-        mockTransaction({ status: 'CANCELLED' }),
-      );
+      prisma.transaction.findFirst.mockResolvedValue(mockTransaction({ status: 'CANCELLED' }));
 
-      await expect(
-        service.approve('comp-1', 'txn-1', 'admin-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.approve('comp-1', 'txn-1', 'admin-1')).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
   });
 
@@ -646,7 +681,8 @@ describe('TransactionService', () => {
       });
       prisma.transaction.findFirst
         .mockResolvedValueOnce(txn) // first call: confirm lookup
-        .mockResolvedValueOnce({ // second call: findById after confirm
+        .mockResolvedValueOnce({
+          // second call: findById after confirm
           ...txn,
           status: 'CONFIRMED',
           confirmedAt: new Date(),
@@ -679,19 +715,13 @@ describe('TransactionService', () => {
     it('should throw if transaction not found', async () => {
       prisma.transaction.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.confirm('comp-1', 'txn-999'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.confirm('comp-1', 'txn-999')).rejects.toThrow(NotFoundException);
     });
 
     it('should throw if transaction is not SUBMITTED', async () => {
-      prisma.transaction.findFirst.mockResolvedValue(
-        mockTransaction({ status: 'DRAFT' }),
-      );
+      prisma.transaction.findFirst.mockResolvedValue(mockTransaction({ status: 'DRAFT' }));
 
-      await expect(
-        service.confirm('comp-1', 'txn-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.confirm('comp-1', 'txn-1')).rejects.toThrow(BusinessRuleException);
     });
   });
 
@@ -701,9 +731,7 @@ describe('TransactionService', () => {
 
   describe('cancel', () => {
     it('should cancel a DRAFT transaction', async () => {
-      prisma.transaction.findFirst.mockResolvedValue(
-        mockTransaction({ status: 'DRAFT' }),
-      );
+      prisma.transaction.findFirst.mockResolvedValue(mockTransaction({ status: 'DRAFT' }));
       prisma.transaction.update.mockResolvedValue(
         mockTransaction({
           status: 'CANCELLED',
@@ -721,9 +749,7 @@ describe('TransactionService', () => {
       prisma.transaction.findFirst.mockResolvedValue(
         mockTransaction({ status: 'PENDING_APPROVAL' }),
       );
-      prisma.transaction.update.mockResolvedValue(
-        mockTransaction({ status: 'CANCELLED' }),
-      );
+      prisma.transaction.update.mockResolvedValue(mockTransaction({ status: 'CANCELLED' }));
 
       const result = await service.cancel('comp-1', 'txn-1', 'user-1');
 
@@ -731,12 +757,8 @@ describe('TransactionService', () => {
     });
 
     it('should cancel a SUBMITTED transaction', async () => {
-      prisma.transaction.findFirst.mockResolvedValue(
-        mockTransaction({ status: 'SUBMITTED' }),
-      );
-      prisma.transaction.update.mockResolvedValue(
-        mockTransaction({ status: 'CANCELLED' }),
-      );
+      prisma.transaction.findFirst.mockResolvedValue(mockTransaction({ status: 'SUBMITTED' }));
+      prisma.transaction.update.mockResolvedValue(mockTransaction({ status: 'CANCELLED' }));
 
       const result = await service.cancel('comp-1', 'txn-1', 'user-1');
 
@@ -744,12 +766,8 @@ describe('TransactionService', () => {
     });
 
     it('should cancel a FAILED transaction', async () => {
-      prisma.transaction.findFirst.mockResolvedValue(
-        mockTransaction({ status: 'FAILED' }),
-      );
-      prisma.transaction.update.mockResolvedValue(
-        mockTransaction({ status: 'CANCELLED' }),
-      );
+      prisma.transaction.findFirst.mockResolvedValue(mockTransaction({ status: 'FAILED' }));
+      prisma.transaction.update.mockResolvedValue(mockTransaction({ status: 'CANCELLED' }));
 
       const result = await service.cancel('comp-1', 'txn-1', 'user-1');
 
@@ -757,31 +775,27 @@ describe('TransactionService', () => {
     });
 
     it('should throw if cancelling a CONFIRMED transaction', async () => {
-      prisma.transaction.findFirst.mockResolvedValue(
-        mockTransaction({ status: 'CONFIRMED' }),
-      );
+      prisma.transaction.findFirst.mockResolvedValue(mockTransaction({ status: 'CONFIRMED' }));
 
-      await expect(
-        service.cancel('comp-1', 'txn-1', 'user-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.cancel('comp-1', 'txn-1', 'user-1')).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should throw if already CANCELLED', async () => {
-      prisma.transaction.findFirst.mockResolvedValue(
-        mockTransaction({ status: 'CANCELLED' }),
-      );
+      prisma.transaction.findFirst.mockResolvedValue(mockTransaction({ status: 'CANCELLED' }));
 
-      await expect(
-        service.cancel('comp-1', 'txn-1', 'user-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.cancel('comp-1', 'txn-1', 'user-1')).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should throw if transaction not found', async () => {
       prisma.transaction.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.cancel('comp-1', 'txn-999', 'user-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.cancel('comp-1', 'txn-999', 'user-1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -794,9 +808,7 @@ describe('TransactionService', () => {
       prisma.transaction.findFirst.mockResolvedValue(
         mockTransaction({ status: 'DRAFT', requiresBoardApproval: false }),
       );
-      prisma.transaction.update.mockResolvedValue(
-        mockTransaction({ status: 'SUBMITTED' }),
-      );
+      prisma.transaction.update.mockResolvedValue(mockTransaction({ status: 'SUBMITTED' }));
 
       const result = await service.submit('comp-1', 'txn-1');
 
@@ -812,9 +824,7 @@ describe('TransactionService', () => {
       prisma.transaction.findFirst.mockResolvedValue(
         mockTransaction({ status: 'DRAFT', requiresBoardApproval: true }),
       );
-      prisma.transaction.update.mockResolvedValue(
-        mockTransaction({ status: 'PENDING_APPROVAL' }),
-      );
+      prisma.transaction.update.mockResolvedValue(mockTransaction({ status: 'PENDING_APPROVAL' }));
 
       const result = await service.submit('comp-1', 'txn-1');
 
@@ -827,21 +837,15 @@ describe('TransactionService', () => {
     });
 
     it('should throw if not in DRAFT status', async () => {
-      prisma.transaction.findFirst.mockResolvedValue(
-        mockTransaction({ status: 'SUBMITTED' }),
-      );
+      prisma.transaction.findFirst.mockResolvedValue(mockTransaction({ status: 'SUBMITTED' }));
 
-      await expect(
-        service.submit('comp-1', 'txn-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.submit('comp-1', 'txn-1')).rejects.toThrow(BusinessRuleException);
     });
 
     it('should throw if transaction not found', async () => {
       prisma.transaction.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.submit('comp-1', 'txn-999'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.submit('comp-1', 'txn-999')).rejects.toThrow(NotFoundException);
     });
   });
 });

@@ -1,10 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  KMSClient,
-  EncryptCommand,
-  DecryptCommand,
-} from '@aws-sdk/client-kms';
+import { KMSClient, EncryptCommand, DecryptCommand } from '@aws-sdk/client-kms';
 
 @Injectable()
 export class KmsService {
@@ -15,9 +11,7 @@ export class KmsService {
   constructor(private readonly configService: ConfigService) {
     const region = this.configService.get<string>('AWS_REGION');
     const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
-    const secretAccessKey = this.configService.get<string>(
-      'AWS_SECRET_ACCESS_KEY',
-    );
+    const secretAccessKey = this.configService.get<string>('AWS_SECRET_ACCESS_KEY');
 
     this.keyArn = this.configService.get<string>('AWS_KMS_KEY_ARN');
 
@@ -29,9 +23,7 @@ export class KmsService {
       this.logger.log(`KMS client initialized (region: ${region})`);
     } else {
       this.client = null;
-      this.logger.warn(
-        'AWS credentials not configured. KMS encryption will be unavailable.',
-      );
+      this.logger.warn('AWS credentials not configured. KMS encryption will be unavailable.');
     }
   }
 
@@ -85,9 +77,7 @@ export class KmsService {
       );
     }
     if (!this.keyArn) {
-      throw new Error(
-        'KMS key ARN not configured. Set AWS_KMS_KEY_ARN environment variable.',
-      );
+      throw new Error('KMS key ARN not configured. Set AWS_KMS_KEY_ARN environment variable.');
     }
   }
 }

@@ -4,7 +4,6 @@ import { getQueueToken } from '@nestjs/bull';
 import { ExecutionContext, CallHandler } from '@nestjs/common';
 import { of } from 'rxjs';
 import { AuditInterceptor } from './audit.interceptor';
-import { AUDITABLE_KEY } from '../decorators/auditable.decorator';
 
 const mockQueue = {
   add: jest.fn().mockResolvedValue({ id: 'job-1' }),

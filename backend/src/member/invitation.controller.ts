@@ -1,16 +1,6 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Param,
-} from '@nestjs/common';
+import { Controller, Get, Post, Param } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiParam,
-  ApiResponse,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
 import { MemberService } from './member.service';
 import { Public } from '../auth/decorators/public.decorator';
 import { CurrentUser, AuthenticatedUser } from '../auth/decorators/current-user.decorator';
@@ -46,10 +36,7 @@ export class InvitationController {
   @ApiResponse({ status: 404, description: 'Invitation not found or already used' })
   @ApiResponse({ status: 409, description: 'User is already a member of this company' })
   @ApiResponse({ status: 410, description: 'Invitation expired' })
-  async acceptInvitation(
-    @Param('token') token: string,
-    @CurrentUser() user: AuthenticatedUser,
-  ) {
+  async acceptInvitation(@Param('token') token: string, @CurrentUser() user: AuthenticatedUser) {
     return this.memberService.acceptInvitation(token, user.id, user.email);
   }
 }

@@ -65,9 +65,7 @@ describe('ConvertibleController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ConvertibleController],
-      providers: [
-        { provide: ConvertibleService, useValue: mockService },
-      ],
+      providers: [{ provide: ConvertibleService, useValue: mockService }],
     }).compile();
 
     controller = module.get<ConvertibleController>(ConvertibleController);
@@ -105,9 +103,7 @@ describe('ConvertibleController', () => {
     });
 
     it('should propagate NotFoundException for missing company', async () => {
-      mockService.create.mockRejectedValue(
-        new NotFoundException('company', 'comp-1'),
-      );
+      mockService.create.mockRejectedValue(new NotFoundException('company', 'comp-1'));
 
       await expect(
         controller.create(
@@ -186,7 +182,12 @@ describe('ConvertibleController', () => {
       mockService.findAll.mockResolvedValue({
         items: [],
         total: 0,
-        summary: { totalOutstanding: 0, totalPrincipal: '0', totalAccruedInterest: '0', totalValue: '0' },
+        summary: {
+          totalOutstanding: 0,
+          totalPrincipal: '0',
+          totalAccruedInterest: '0',
+          totalValue: '0',
+        },
       });
 
       await controller.list('comp-1', {
@@ -227,13 +228,9 @@ describe('ConvertibleController', () => {
     });
 
     it('should propagate NotFoundException', async () => {
-      mockService.findById.mockRejectedValue(
-        new NotFoundException('convertible', 'conv-1'),
-      );
+      mockService.findById.mockRejectedValue(new NotFoundException('convertible', 'conv-1'));
 
-      await expect(
-        controller.findById('comp-1', 'conv-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.findById('comp-1', 'conv-1')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -253,9 +250,7 @@ describe('ConvertibleController', () => {
         daysElapsed: 730,
         accruedInterest: '16000.00',
         totalValue: '116000.00',
-        interestBreakdown: [
-          { month: '2024-01', interest: '657.53', cumulative: '657.53' },
-        ],
+        interestBreakdown: [{ month: '2024-01', interest: '657.53', cumulative: '657.53' }],
       };
       mockService.getInterestBreakdown.mockResolvedValue(breakdown);
 
@@ -270,9 +265,7 @@ describe('ConvertibleController', () => {
         new NotFoundException('convertible', 'conv-1'),
       );
 
-      await expect(
-        controller.getInterest('comp-1', 'conv-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.getInterest('comp-1', 'conv-1')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -295,8 +288,16 @@ describe('ConvertibleController', () => {
             hypotheticalValuation: '3000000.00',
             preMoneyShares: 1000000,
             roundPricePerShare: '3.00',
-            discountMethod: { conversionPrice: '2.40', sharesIssued: '43333', ownershipPercentage: '4.15' },
-            capMethod: { conversionPrice: '5.00', sharesIssued: '20800', ownershipPercentage: '2.04' },
+            discountMethod: {
+              conversionPrice: '2.40',
+              sharesIssued: '43333',
+              ownershipPercentage: '4.15',
+            },
+            capMethod: {
+              conversionPrice: '5.00',
+              sharesIssued: '20800',
+              ownershipPercentage: '2.04',
+            },
             bestMethod: 'DISCOUNT',
             finalConversionPrice: '2.40',
             finalSharesIssued: '43333',
@@ -307,11 +308,7 @@ describe('ConvertibleController', () => {
       };
       mockService.getConversionScenarios.mockResolvedValue(scenarios);
 
-      const result = await controller.getScenarios(
-        'comp-1',
-        'conv-1',
-        '3000000,5000000,10000000',
-      );
+      const result = await controller.getScenarios('comp-1', 'conv-1', '3000000,5000000,10000000');
 
       expect(result.scenarios).toHaveLength(1);
       expect(result.summary.capTriggersAbove).toBe('6250000.00');
@@ -356,19 +353,17 @@ describe('ConvertibleController', () => {
         new BusinessRuleException('CONV_CANNOT_UPDATE', 'errors.conv.cannotUpdate'),
       );
 
-      await expect(
-        controller.update('comp-1', 'conv-1', { discountRate: '0.25' }),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(controller.update('comp-1', 'conv-1', { discountRate: '0.25' })).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should propagate NotFoundException', async () => {
-      mockService.update.mockRejectedValue(
-        new NotFoundException('convertible', 'conv-1'),
-      );
+      mockService.update.mockRejectedValue(new NotFoundException('convertible', 'conv-1'));
 
-      await expect(
-        controller.update('comp-1', 'conv-1', { notes: 'test' }),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.update('comp-1', 'conv-1', { notes: 'test' })).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -394,7 +389,10 @@ describe('ConvertibleController', () => {
 
     it('should propagate BusinessRuleException for invalid status transition', async () => {
       mockService.redeem.mockRejectedValue(
-        new BusinessRuleException('CONV_INVALID_STATUS_TRANSITION', 'errors.conv.invalidStatusTransition'),
+        new BusinessRuleException(
+          'CONV_INVALID_STATUS_TRANSITION',
+          'errors.conv.invalidStatusTransition',
+        ),
       );
 
       await expect(
@@ -512,9 +510,7 @@ describe('ConvertibleController', () => {
     });
 
     it('should propagate NotFoundException for missing share class', async () => {
-      mockService.convert.mockRejectedValue(
-        new NotFoundException('shareClass', 'sc-1'),
-      );
+      mockService.convert.mockRejectedValue(new NotFoundException('shareClass', 'sc-1'));
 
       await expect(
         controller.convert(

@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, Matches, IsDateString } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, Matches } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class RedeemConvertibleDto {

@@ -1,10 +1,4 @@
-import {
-  Injectable,
-  NestInterceptor,
-  ExecutionContext,
-  CallHandler,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, NestInterceptor, ExecutionContext, CallHandler, Logger } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Observable, tap } from 'rxjs';
 import { InjectQueue } from '@nestjs/bull';
@@ -22,10 +16,7 @@ export class AuditInterceptor implements NestInterceptor {
   ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
-    const options = this.reflector.get<AuditableOptions>(
-      AUDITABLE_KEY,
-      context.getHandler(),
-    );
+    const options = this.reflector.get<AuditableOptions>(AUDITABLE_KEY, context.getHandler());
 
     if (!options) return next.handle();
 
@@ -53,10 +44,7 @@ export class AuditInterceptor implements NestInterceptor {
             resourceType: options.resourceType,
             resourceId: this.extractResourceId(responseData, request, options),
             companyId,
-            changes:
-              beforeState || afterState
-                ? { before: beforeState, after: afterState }
-                : null,
+            changes: beforeState || afterState ? { before: beforeState, after: afterState } : null,
             metadata: {
               ipAddress: this.redactIp(request.ip),
               userAgent: request.headers?.['user-agent'] || '',
@@ -89,11 +77,7 @@ export class AuditInterceptor implements NestInterceptor {
     if (responseData && typeof responseData === 'object' && 'id' in responseData) {
       return (responseData as Record<string, unknown>).id as string;
     }
-    if (
-      responseData &&
-      typeof responseData === 'object' &&
-      'data' in responseData
-    ) {
+    if (responseData && typeof responseData === 'object' && 'data' in responseData) {
       const data = (responseData as Record<string, unknown>).data;
       if (data && typeof data === 'object' && 'id' in data) {
         return (data as Record<string, unknown>).id as string;

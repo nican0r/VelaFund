@@ -1,29 +1,12 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Param,
-  Query,
-  Body,
-  HttpCode,
-  HttpStatus,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiParam,
-} from '@nestjs/swagger';
+import { Controller, Get, Post, Param, Query, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { TransactionService } from './transaction.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { ListTransactionsQueryDto } from './dto/list-transactions-query.dto';
 import { paginate } from '../common/helpers/paginate';
 import { Roles } from '../auth/decorators/roles.decorator';
-import {
-  CurrentUser,
-  AuthenticatedUser,
-} from '../auth/decorators/current-user.decorator';
+import { CurrentUser, AuthenticatedUser } from '../auth/decorators/current-user.decorator';
 import { Auditable } from '../audit-log/decorators/auditable.decorator';
 
 @ApiTags('Transactions')
@@ -61,14 +44,8 @@ export class TransactionController {
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiResponse({ status: 200, description: 'Paginated list of transactions' })
   @ApiResponse({ status: 404, description: 'Company not found' })
-  async list(
-    @Param('companyId') companyId: string,
-    @Query() query: ListTransactionsQueryDto,
-  ) {
-    const { items, total } = await this.transactionService.findAll(
-      companyId,
-      query,
-    );
+  async list(@Param('companyId') companyId: string, @Query() query: ListTransactionsQueryDto) {
+    const { items, total } = await this.transactionService.findAll(companyId, query);
     return paginate(items, total, query.page, query.limit);
   }
 
@@ -129,11 +106,7 @@ export class TransactionController {
     @Param('transactionId') transactionId: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.transactionService.approve(
-      companyId,
-      transactionId,
-      user.id,
-    );
+    return this.transactionService.approve(companyId, transactionId, user.id);
   }
 
   @Post(':transactionId/confirm')
@@ -181,10 +154,6 @@ export class TransactionController {
     @Param('transactionId') transactionId: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.transactionService.cancel(
-      companyId,
-      transactionId,
-      user.id,
-    );
+    return this.transactionService.cancel(companyId, transactionId, user.id);
   }
 }

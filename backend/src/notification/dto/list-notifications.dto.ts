@@ -1,5 +1,4 @@
 import { IsOptional, IsString, IsIn } from 'class-validator';
-import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 
@@ -15,7 +14,10 @@ export class ListNotificationsDto extends PaginationQueryDto {
   @IsString()
   notificationType?: string;
 
-  @ApiPropertyOptional({ description: 'Sort field (prefix with - for descending)', default: '-createdAt' })
+  @ApiPropertyOptional({
+    description: 'Sort field (prefix with - for descending)',
+    default: '-createdAt',
+  })
   @IsOptional()
   @IsString()
   sort?: string;

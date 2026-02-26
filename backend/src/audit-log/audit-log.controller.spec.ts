@@ -31,9 +31,7 @@ describe('AuditLogController', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuditLogController],
-      providers: [
-        { provide: AuditLogService, useValue: mockService },
-      ],
+      providers: [{ provide: AuditLogService, useValue: mockService }],
     }).compile();
 
     controller = module.get<AuditLogController>(AuditLogController);
@@ -140,20 +138,15 @@ describe('AuditLogController', () => {
       const result = await controller.getById('company-uuid-1', 'audit-uuid-1');
 
       expect(result).toEqual(mockAuditLogItem);
-      expect(mockService.findById).toHaveBeenCalledWith(
-        'company-uuid-1',
-        'audit-uuid-1',
-      );
+      expect(mockService.findById).toHaveBeenCalledWith('company-uuid-1', 'audit-uuid-1');
     });
 
     it('should propagate NotFoundException', async () => {
-      mockService.findById.mockRejectedValue(
-        new Error('errors.auditLog.notFound'),
-      );
+      mockService.findById.mockRejectedValue(new Error('errors.auditLog.notFound'));
 
-      await expect(
-        controller.getById('company-uuid-1', 'nonexistent'),
-      ).rejects.toThrow('errors.auditLog.notFound');
+      await expect(controller.getById('company-uuid-1', 'nonexistent')).rejects.toThrow(
+        'errors.auditLog.notFound',
+      );
     });
   });
 
@@ -174,10 +167,7 @@ describe('AuditLogController', () => {
       });
 
       expect(result).toEqual(verifyResult);
-      expect(mockService.verifyHashChain).toHaveBeenCalledWith(
-        '2026-01-01',
-        '2026-01-31',
-      );
+      expect(mockService.verifyHashChain).toHaveBeenCalledWith('2026-01-01', '2026-01-31');
     });
 
     it('should log AUDIT_LOG_INTEGRITY_VERIFIED event', async () => {

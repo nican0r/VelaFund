@@ -68,9 +68,7 @@ describe('KmsService', () => {
         const { EncryptCommand } = require('@aws-sdk/client-kms');
         const call = EncryptCommand.mock.calls[0][0];
         expect(call.KeyId).toBe(testKeyArn);
-        expect(Buffer.from(call.Plaintext).toString('utf-8')).toBe(
-          'sensitive-data',
-        );
+        expect(Buffer.from(call.Plaintext).toString('utf-8')).toBe('sensitive-data');
       });
 
       it('should encrypt using custom key ARN', async () => {
@@ -95,13 +93,9 @@ describe('KmsService', () => {
       });
 
       it('should propagate KMS errors', async () => {
-        mockSend.mockRejectedValue(
-          new Error('DisabledException: Key is disabled'),
-        );
+        mockSend.mockRejectedValue(new Error('DisabledException: Key is disabled'));
 
-        await expect(service.encrypt('data')).rejects.toThrow(
-          'DisabledException',
-        );
+        await expect(service.encrypt('data')).rejects.toThrow('DisabledException');
       });
     });
 
@@ -119,19 +113,17 @@ describe('KmsService', () => {
       it('should throw on empty Plaintext', async () => {
         mockSend.mockResolvedValue({ Plaintext: null });
 
-        await expect(
-          service.decrypt(Buffer.from('encrypted')),
-        ).rejects.toThrow('KMS decrypt returned empty Plaintext');
+        await expect(service.decrypt(Buffer.from('encrypted'))).rejects.toThrow(
+          'KMS decrypt returned empty Plaintext',
+        );
       });
 
       it('should propagate KMS decrypt errors', async () => {
-        mockSend.mockRejectedValue(
-          new Error('InvalidCiphertextException'),
-        );
+        mockSend.mockRejectedValue(new Error('InvalidCiphertextException'));
 
-        await expect(
-          service.decrypt(Buffer.from('bad-data')),
-        ).rejects.toThrow('InvalidCiphertextException');
+        await expect(service.decrypt(Buffer.from('bad-data'))).rejects.toThrow(
+          'InvalidCiphertextException',
+        );
       });
     });
 
@@ -194,9 +186,7 @@ describe('KmsService', () => {
     });
 
     it('should throw on encrypt with missing key ARN', async () => {
-      await expect(service.encrypt('data')).rejects.toThrow(
-        'KMS key ARN not configured',
-      );
+      await expect(service.encrypt('data')).rejects.toThrow('KMS key ARN not configured');
     });
   });
 
@@ -224,15 +214,13 @@ describe('KmsService', () => {
     });
 
     it('should throw on encrypt when not configured', async () => {
-      await expect(service.encrypt('data')).rejects.toThrow(
-        'KMS client not initialized',
-      );
+      await expect(service.encrypt('data')).rejects.toThrow('KMS client not initialized');
     });
 
     it('should throw on decrypt when not configured', async () => {
-      await expect(
-        service.decrypt(Buffer.from('encrypted')),
-      ).rejects.toThrow('KMS client not initialized');
+      await expect(service.decrypt(Buffer.from('encrypted'))).rejects.toThrow(
+        'KMS client not initialized',
+      );
     });
   });
 });

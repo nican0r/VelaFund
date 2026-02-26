@@ -39,9 +39,7 @@ describe('ReportExportProcessor', () => {
       documentsCsv: Buffer.from('docs'),
       capTableHistoryCsv: Buffer.from('history'),
     }),
-    generateDueDiligenceMetadata: jest
-      .fn()
-      .mockResolvedValue(Buffer.from('{"metadata":true}')),
+    generateDueDiligenceMetadata: jest.fn().mockResolvedValue(Buffer.from('{"metadata":true}')),
     completeExportJob: jest.fn().mockResolvedValue(undefined),
     failExportJob: jest.fn().mockResolvedValue(undefined),
   };
@@ -122,9 +120,7 @@ describe('ReportExportProcessor', () => {
     it('should generate CSV and complete export for csv format', async () => {
       await processor.handleCapTableExport(makeJob('csv'));
 
-      expect(reportsService.generateCapTableCsv).toHaveBeenCalledWith(
-        'company-1',
-      );
+      expect(reportsService.generateCapTableCsv).toHaveBeenCalledWith('company-1');
       expect(reportsService.completeExportJob).toHaveBeenCalledWith(
         'job-1',
         Buffer.from('csv-data'),
@@ -136,9 +132,7 @@ describe('ReportExportProcessor', () => {
     it('should generate XLSX and complete export for xlsx format', async () => {
       await processor.handleCapTableExport(makeJob('xlsx'));
 
-      expect(reportsService.generateCapTableXlsx).toHaveBeenCalledWith(
-        'company-1',
-      );
+      expect(reportsService.generateCapTableXlsx).toHaveBeenCalledWith('company-1');
       expect(reportsService.completeExportJob).toHaveBeenCalledWith(
         'job-1',
         Buffer.from('xlsx-data'),
@@ -150,9 +144,7 @@ describe('ReportExportProcessor', () => {
     it('should generate PDF and complete export for pdf format', async () => {
       await processor.handleCapTableExport(makeJob('pdf'));
 
-      expect(reportsService.generateCapTablePdf).toHaveBeenCalledWith(
-        'company-1',
-      );
+      expect(reportsService.generateCapTablePdf).toHaveBeenCalledWith('company-1');
       expect(reportsService.completeExportJob).toHaveBeenCalledWith(
         'job-1',
         Buffer.from('pdf-data'),
@@ -164,9 +156,7 @@ describe('ReportExportProcessor', () => {
     it('should generate OCT JSON and complete export for oct format', async () => {
       await processor.handleCapTableExport(makeJob('oct'));
 
-      expect(reportsService.generateCapTableOct).toHaveBeenCalledWith(
-        'company-1',
-      );
+      expect(reportsService.generateCapTableOct).toHaveBeenCalledWith('company-1');
       expect(reportsService.completeExportJob).toHaveBeenCalledWith(
         'job-1',
         Buffer.from('oct-data'),
@@ -199,14 +189,11 @@ describe('ReportExportProcessor', () => {
     });
 
     it('should fail export job and re-throw on unsupported format', async () => {
-      await expect(
-        processor.handleCapTableExport(makeJob('html')),
-      ).rejects.toThrow('Unsupported format: html');
-
-      expect(reportsService.failExportJob).toHaveBeenCalledWith(
-        'job-1',
-        'REPORT_EXPORT_FAILED',
+      await expect(processor.handleCapTableExport(makeJob('html'))).rejects.toThrow(
+        'Unsupported format: html',
       );
+
+      expect(reportsService.failExportJob).toHaveBeenCalledWith('job-1', 'REPORT_EXPORT_FAILED');
       expect(reportsService.completeExportJob).not.toHaveBeenCalled();
     });
 
@@ -214,14 +201,11 @@ describe('ReportExportProcessor', () => {
       const error = new Error('PDF engine crashed');
       mockReportsService.generateCapTablePdf.mockRejectedValueOnce(error);
 
-      await expect(
-        processor.handleCapTableExport(makeJob('pdf')),
-      ).rejects.toThrow('PDF engine crashed');
-
-      expect(reportsService.failExportJob).toHaveBeenCalledWith(
-        'job-1',
-        'REPORT_EXPORT_FAILED',
+      await expect(processor.handleCapTableExport(makeJob('pdf'))).rejects.toThrow(
+        'PDF engine crashed',
       );
+
+      expect(reportsService.failExportJob).toHaveBeenCalledWith('job-1', 'REPORT_EXPORT_FAILED');
       expect(reportsService.completeExportJob).not.toHaveBeenCalled();
     });
   });
@@ -259,9 +243,7 @@ describe('ReportExportProcessor', () => {
         '2025-01-01',
         '2025-12-31',
       );
-      expect(reportsService.generateCapTablePdf).toHaveBeenCalledWith(
-        'company-1',
-      );
+      expect(reportsService.generateCapTablePdf).toHaveBeenCalledWith('company-1');
       expect(reportsService.generateDueDiligenceMetadata).toHaveBeenCalledWith(
         'company-1',
         '2025-01-01',
@@ -296,31 +278,21 @@ describe('ReportExportProcessor', () => {
       const error = new Error('Database timeout');
       mockReportsService.generateDueDiligenceCsvs.mockRejectedValueOnce(error);
 
-      await expect(
-        processor.handleDueDiligence(makeDdJob()),
-      ).rejects.toThrow('Database timeout');
+      await expect(processor.handleDueDiligence(makeDdJob())).rejects.toThrow('Database timeout');
 
-      expect(reportsService.failExportJob).toHaveBeenCalledWith(
-        'dd-job-1',
-        'REPORT_EXPORT_FAILED',
-      );
+      expect(reportsService.failExportJob).toHaveBeenCalledWith('dd-job-1', 'REPORT_EXPORT_FAILED');
       expect(reportsService.completeExportJob).not.toHaveBeenCalled();
     });
 
     it('should fail export job and re-throw when metadata generation fails', async () => {
       const error = new Error('Metadata build error');
-      mockReportsService.generateDueDiligenceMetadata.mockRejectedValueOnce(
-        error,
+      mockReportsService.generateDueDiligenceMetadata.mockRejectedValueOnce(error);
+
+      await expect(processor.handleDueDiligence(makeDdJob())).rejects.toThrow(
+        'Metadata build error',
       );
 
-      await expect(
-        processor.handleDueDiligence(makeDdJob()),
-      ).rejects.toThrow('Metadata build error');
-
-      expect(reportsService.failExportJob).toHaveBeenCalledWith(
-        'dd-job-1',
-        'REPORT_EXPORT_FAILED',
-      );
+      expect(reportsService.failExportJob).toHaveBeenCalledWith('dd-job-1', 'REPORT_EXPORT_FAILED');
     });
   });
 
@@ -351,14 +323,10 @@ describe('ReportExportProcessor', () => {
     });
 
     it('should not throw when email sending fails (fire-and-forget)', async () => {
-      mockEmailService.sendEmail.mockRejectedValueOnce(
-        new Error('SMTP connection refused'),
-      );
+      mockEmailService.sendEmail.mockRejectedValueOnce(new Error('SMTP connection refused'));
 
       // Should complete without throwing
-      await expect(
-        processor.handleCapTableExport(makeJob('csv')),
-      ).resolves.toBeUndefined();
+      await expect(processor.handleCapTableExport(makeJob('csv'))).resolves.toBeUndefined();
 
       // completeExportJob was still called successfully before email attempt
       expect(reportsService.completeExportJob).toHaveBeenCalled();

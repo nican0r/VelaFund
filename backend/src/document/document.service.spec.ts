@@ -3,10 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { DocumentService } from './document.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../aws/s3.service';
-import {
-  NotFoundException,
-  BusinessRuleException,
-} from '../common/filters/app-exception';
+import { NotFoundException } from '../common/filters/app-exception';
 
 // Mock puppeteer at module level
 jest.mock('puppeteer', () => ({
@@ -197,9 +194,9 @@ describe('DocumentService', () => {
     it('should throw NotFoundException when template not found', async () => {
       prisma.documentTemplate.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.findTemplateById(COMPANY_ID, 'nonexistent'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.findTemplateById(COMPANY_ID, 'nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -243,9 +240,7 @@ describe('DocumentService', () => {
     });
 
     it('should throw BusinessRuleException when template is inactive', async () => {
-      prisma.documentTemplate.findFirst.mockResolvedValue(
-        createMockTemplate({ isActive: false }),
-      );
+      prisma.documentTemplate.findFirst.mockResolvedValue(createMockTemplate({ isActive: false }));
 
       await expect(
         service.createDraft(COMPANY_ID, USER_ID, {
@@ -273,9 +268,7 @@ describe('DocumentService', () => {
     });
 
     it('should throw BusinessRuleException when template is inactive', async () => {
-      prisma.documentTemplate.findFirst.mockResolvedValue(
-        createMockTemplate({ isActive: false }),
-      );
+      prisma.documentTemplate.findFirst.mockResolvedValue(createMockTemplate({ isActive: false }));
 
       await expect(
         service.createAndGenerate(COMPANY_ID, USER_ID, {
@@ -453,9 +446,9 @@ describe('DocumentService', () => {
     it('should throw NotFoundException when document not found', async () => {
       prisma.document.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.findDocumentById(COMPANY_ID, 'nonexistent'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.findDocumentById(COMPANY_ID, 'nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -483,9 +476,7 @@ describe('DocumentService', () => {
     });
 
     it('should throw DOC_NOT_DRAFT when document is not in DRAFT status', async () => {
-      prisma.document.findFirst.mockResolvedValue(
-        createMockDocument({ status: 'GENERATED' }),
-      );
+      prisma.document.findFirst.mockResolvedValue(createMockDocument({ status: 'GENERATED' }));
 
       await expect(
         service.updateDraft(COMPANY_ID, DOCUMENT_ID, { title: 'test' }),
@@ -501,9 +492,9 @@ describe('DocumentService', () => {
     it('should throw NotFoundException when document not found', async () => {
       prisma.document.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.generateFromDraft(COMPANY_ID, 'nonexistent'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.generateFromDraft(COMPANY_ID, 'nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw DOC_NOT_DRAFT when document is already generated', async () => {
@@ -511,9 +502,7 @@ describe('DocumentService', () => {
         createMockDocument({ status: 'GENERATED', template: createMockTemplate() }),
       );
 
-      await expect(
-        service.generateFromDraft(COMPANY_ID, DOCUMENT_ID),
-      ).rejects.toMatchObject({
+      await expect(service.generateFromDraft(COMPANY_ID, DOCUMENT_ID)).rejects.toMatchObject({
         code: 'DOC_NOT_DRAFT',
       });
     });
@@ -526,9 +515,7 @@ describe('DocumentService', () => {
         }),
       );
 
-      await expect(
-        service.generateFromDraft(COMPANY_ID, DOCUMENT_ID),
-      ).rejects.toMatchObject({
+      await expect(service.generateFromDraft(COMPANY_ID, DOCUMENT_ID)).rejects.toMatchObject({
         code: 'DOC_INCOMPLETE_FORM',
       });
     });
@@ -591,19 +578,17 @@ describe('DocumentService', () => {
     it('should throw NotFoundException when document not found', async () => {
       prisma.document.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.getPreviewHtml(COMPANY_ID, 'nonexistent'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getPreviewHtml(COMPANY_ID, 'nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw NotFoundException when template not found', async () => {
-      prisma.document.findFirst.mockResolvedValue(
-        createMockDocument({ template: null }),
-      );
+      prisma.document.findFirst.mockResolvedValue(createMockDocument({ template: null }));
 
-      await expect(
-        service.getPreviewHtml(COMPANY_ID, DOCUMENT_ID),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getPreviewHtml(COMPANY_ID, DOCUMENT_ID)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -625,19 +610,15 @@ describe('DocumentService', () => {
     it('should throw NotFoundException when document not found', async () => {
       prisma.document.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.getDownloadUrl(COMPANY_ID, 'nonexistent'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getDownloadUrl(COMPANY_ID, 'nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw DOC_NOT_GENERATED when no s3Key', async () => {
-      prisma.document.findFirst.mockResolvedValue(
-        createMockDocument({ s3Key: null }),
-      );
+      prisma.document.findFirst.mockResolvedValue(createMockDocument({ s3Key: null }));
 
-      await expect(
-        service.getDownloadUrl(COMPANY_ID, DOCUMENT_ID),
-      ).rejects.toMatchObject({
+      await expect(service.getDownloadUrl(COMPANY_ID, DOCUMENT_ID)).rejects.toMatchObject({
         code: 'DOC_NOT_GENERATED',
       });
     });
@@ -732,9 +713,7 @@ describe('DocumentService', () => {
 
   describe('deleteDocument', () => {
     it('should delete a DRAFT document', async () => {
-      prisma.document.findFirst.mockResolvedValue(
-        createMockDocument({ _count: { signers: 0 } }),
-      );
+      prisma.document.findFirst.mockResolvedValue(createMockDocument({ _count: { signers: 0 } }));
       prisma.document.delete.mockResolvedValue(undefined);
 
       await service.deleteDocument(COMPANY_ID, DOCUMENT_ID);
@@ -756,29 +735,22 @@ describe('DocumentService', () => {
 
       await service.deleteDocument(COMPANY_ID, DOCUMENT_ID);
 
-      expect(s3Service.delete).toHaveBeenCalledWith(
-        'navia-documents',
-        'documents/test.pdf',
-      );
+      expect(s3Service.delete).toHaveBeenCalledWith('navia-documents', 'documents/test.pdf');
       expect(prisma.document.delete).toHaveBeenCalled();
     });
 
     it('should throw NotFoundException when document not found', async () => {
       prisma.document.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.deleteDocument(COMPANY_ID, 'nonexistent'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.deleteDocument(COMPANY_ID, 'nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw DOC_HAS_SIGNATURES when signers exist', async () => {
-      prisma.document.findFirst.mockResolvedValue(
-        createMockDocument({ _count: { signers: 2 } }),
-      );
+      prisma.document.findFirst.mockResolvedValue(createMockDocument({ _count: { signers: 2 } }));
 
-      await expect(
-        service.deleteDocument(COMPANY_ID, DOCUMENT_ID),
-      ).rejects.toMatchObject({
+      await expect(service.deleteDocument(COMPANY_ID, DOCUMENT_ID)).rejects.toMatchObject({
         code: 'DOC_HAS_SIGNATURES',
       });
     });
@@ -791,9 +763,7 @@ describe('DocumentService', () => {
         }),
       );
 
-      await expect(
-        service.deleteDocument(COMPANY_ID, DOCUMENT_ID),
-      ).rejects.toMatchObject({
+      await expect(service.deleteDocument(COMPANY_ID, DOCUMENT_ID)).rejects.toMatchObject({
         code: 'DOC_HAS_SIGNATURES',
       });
     });
@@ -946,9 +916,7 @@ describe('DocumentService', () => {
     it('should reject empty arrays for required array fields', async () => {
       const template = createMockTemplate({
         formSchema: {
-          fields: [
-            { name: 'items', type: 'array', required: true },
-          ],
+          fields: [{ name: 'items', type: 'array', required: true }],
         },
       });
       prisma.documentTemplate.findFirst.mockResolvedValue(template);

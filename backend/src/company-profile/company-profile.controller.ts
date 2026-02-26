@@ -69,10 +69,7 @@ export class CompanyProfileController {
     captureBeforeState: true,
     captureAfterState: true,
   })
-  async update(
-    @Param('companyId') companyId: string,
-    @Body() dto: UpdateProfileDto,
-  ) {
+  async update(@Param('companyId') companyId: string, @Body() dto: UpdateProfileDto) {
     return this.profileService.update(companyId, dto);
   }
 
@@ -87,10 +84,7 @@ export class CompanyProfileController {
     captureBeforeState: true,
     captureAfterState: true,
   })
-  async updateSlug(
-    @Param('companyId') companyId: string,
-    @Body() dto: UpdateSlugDto,
-  ) {
+  async updateSlug(@Param('companyId') companyId: string, @Body() dto: UpdateSlugDto) {
     return this.profileService.updateSlug(companyId, dto.slug);
   }
 
@@ -146,10 +140,7 @@ export class CompanyProfileController {
     resourceType: 'CompanyProfile',
     captureAfterState: true,
   })
-  async replaceMetrics(
-    @Param('companyId') companyId: string,
-    @Body() dto: UpdateMetricsDto,
-  ) {
+  async replaceMetrics(@Param('companyId') companyId: string, @Body() dto: UpdateMetricsDto) {
     return this.profileService.replaceMetrics(companyId, dto);
   }
 
@@ -163,10 +154,7 @@ export class CompanyProfileController {
     resourceType: 'CompanyProfile',
     captureAfterState: true,
   })
-  async replaceTeamMembers(
-    @Param('companyId') companyId: string,
-    @Body() dto: UpdateTeamDto,
-  ) {
+  async replaceTeamMembers(@Param('companyId') companyId: string, @Body() dto: UpdateTeamDto) {
     return this.profileService.replaceTeamMembers(companyId, dto);
   }
 

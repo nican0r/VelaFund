@@ -19,10 +19,7 @@ export class HealthController {
   @Public()
   @ApiOperation({ summary: 'Health check' })
   async check() {
-    const [dbHealthy, redisHealthy] = await Promise.all([
-      this.checkDatabase(),
-      this.checkRedis(),
-    ]);
+    const [dbHealthy, redisHealthy] = await Promise.all([this.checkDatabase(), this.checkRedis()]);
 
     const allHealthy = dbHealthy && redisHealthy;
 

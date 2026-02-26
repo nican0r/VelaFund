@@ -245,23 +245,14 @@ export function redactPiiFromString(message: string): string {
   let result = message;
 
   // CPF pattern: 123.456.789-09 → ***.***.***-09
-  result = result.replace(
-    /\b\d{3}\.\d{3}\.\d{3}-(\d{2})\b/g,
-    '***.***.***-$1',
-  );
+  result = result.replace(/\b\d{3}\.\d{3}\.\d{3}-(\d{2})\b/g, '***.***.***-$1');
 
   // Unformatted CPF (11 consecutive digits that look like CPF in context)
   // Only match if preceded/followed by non-digit to avoid matching random numbers
-  result = result.replace(
-    /(?<=\D|^)\d{9}(\d{2})(?=\D|$)/g,
-    '***********$1',
-  );
+  result = result.replace(/(?<=\D|^)\d{9}(\d{2})(?=\D|$)/g, '***********$1');
 
   // CNPJ pattern: 12.345.678/0001-90 → **.***.****/****-90
-  result = result.replace(
-    /\b\d{2}\.\d{3}\.\d{3}\/\d{4}-(\d{2})\b/g,
-    '**.***.****/****-$1',
-  );
+  result = result.replace(/\b\d{2}\.\d{3}\.\d{3}\/\d{4}-(\d{2})\b/g, '**.***.****/****-$1');
 
   // Email pattern
   result = result.replace(
@@ -270,10 +261,7 @@ export function redactPiiFromString(message: string): string {
   );
 
   // Ethereum wallet addresses: 0x followed by 40 hex chars
-  result = result.replace(
-    /\b(0x[a-fA-F0-9]{4})[a-fA-F0-9]{32}([a-fA-F0-9]{4})\b/g,
-    '$1...$2',
-  );
+  result = result.replace(/\b(0x[a-fA-F0-9]{4})[a-fA-F0-9]{32}([a-fA-F0-9]{4})\b/g, '$1...$2');
 
   return result;
 }

@@ -15,19 +15,13 @@ describe('KycProcessor', () => {
     jest.clearAllMocks();
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        KycProcessor,
-        { provide: KycService, useValue: mockKycService },
-      ],
+      providers: [KycProcessor, { provide: KycService, useValue: mockKycService }],
     }).compile();
 
     processor = module.get<KycProcessor>(KycProcessor);
 
     // Spy on the logger to verify logging behavior
-    loggerDebugSpy = jest.spyOn(
-      (processor as any).logger,
-      'debug',
-    );
+    loggerDebugSpy = jest.spyOn((processor as any).logger, 'debug');
   });
 
   describe('handleAmlScreening', () => {
@@ -56,18 +50,14 @@ describe('KycProcessor', () => {
       await processor.handleAmlScreening(mockJob);
 
       expect(mockKycService.processAmlScreening).toHaveBeenCalledTimes(1);
-      expect(mockKycService.processAmlScreening).toHaveBeenCalledWith(
-        'kyc-uuid-123',
-      );
+      expect(mockKycService.processAmlScreening).toHaveBeenCalledWith('kyc-uuid-123');
     });
 
     it('should handle successful processing without throwing', async () => {
       const mockJob = createMockJob(fullPayload);
       mockKycService.processAmlScreening.mockResolvedValueOnce(undefined);
 
-      await expect(
-        processor.handleAmlScreening(mockJob),
-      ).resolves.toBeUndefined();
+      await expect(processor.handleAmlScreening(mockJob)).resolves.toBeUndefined();
     });
 
     it('should propagate errors from service for Bull retry', async () => {
@@ -75,9 +65,9 @@ describe('KycProcessor', () => {
       const error = new Error('Database connection lost');
       mockKycService.processAmlScreening.mockRejectedValueOnce(error);
 
-      await expect(
-        processor.handleAmlScreening(mockJob),
-      ).rejects.toThrow('Database connection lost');
+      await expect(processor.handleAmlScreening(mockJob)).rejects.toThrow(
+        'Database connection lost',
+      );
     });
 
     it('should log job processing start with job id, kycVerificationId, and userId', async () => {
@@ -86,15 +76,9 @@ describe('KycProcessor', () => {
 
       await processor.handleAmlScreening(mockJob);
 
-      expect(loggerDebugSpy).toHaveBeenCalledWith(
-        expect.stringContaining('job-42'),
-      );
-      expect(loggerDebugSpy).toHaveBeenCalledWith(
-        expect.stringContaining('kyc-uuid-123'),
-      );
-      expect(loggerDebugSpy).toHaveBeenCalledWith(
-        expect.stringContaining('user-uuid-456'),
-      );
+      expect(loggerDebugSpy).toHaveBeenCalledWith(expect.stringContaining('job-42'));
+      expect(loggerDebugSpy).toHaveBeenCalledWith(expect.stringContaining('kyc-uuid-123'));
+      expect(loggerDebugSpy).toHaveBeenCalledWith(expect.stringContaining('user-uuid-456'));
     });
 
     it('should log job completion after successful processing', async () => {
@@ -105,12 +89,8 @@ describe('KycProcessor', () => {
 
       // The second debug call should indicate completion
       expect(loggerDebugSpy).toHaveBeenCalledTimes(2);
-      expect(loggerDebugSpy).toHaveBeenLastCalledWith(
-        expect.stringContaining('completed'),
-      );
-      expect(loggerDebugSpy).toHaveBeenLastCalledWith(
-        expect.stringContaining('job-99'),
-      );
+      expect(loggerDebugSpy).toHaveBeenLastCalledWith(expect.stringContaining('completed'));
+      expect(loggerDebugSpy).toHaveBeenLastCalledWith(expect.stringContaining('job-99'));
     });
 
     it('should work with minimal job data (only kycVerificationId and userId)', async () => {
@@ -123,20 +103,14 @@ describe('KycProcessor', () => {
 
       await processor.handleAmlScreening(mockJob);
 
-      expect(mockKycService.processAmlScreening).toHaveBeenCalledWith(
-        'kyc-minimal-id',
-      );
+      expect(mockKycService.processAmlScreening).toHaveBeenCalledWith('kyc-minimal-id');
     });
 
     it('should not log completion when service throws', async () => {
       const mockJob = createMockJob(fullPayload, 'job-err');
-      mockKycService.processAmlScreening.mockRejectedValueOnce(
-        new Error('Verifik timeout'),
-      );
+      mockKycService.processAmlScreening.mockRejectedValueOnce(new Error('Verifik timeout'));
 
-      await expect(
-        processor.handleAmlScreening(mockJob),
-      ).rejects.toThrow('Verifik timeout');
+      await expect(processor.handleAmlScreening(mockJob)).rejects.toThrow('Verifik timeout');
 
       // Only the start log should have been called, not the completion log
       expect(loggerDebugSpy).toHaveBeenCalledTimes(1);
@@ -147,13 +121,9 @@ describe('KycProcessor', () => {
 
     it('should propagate non-Error exceptions from service', async () => {
       const mockJob = createMockJob(fullPayload, 'job-str');
-      mockKycService.processAmlScreening.mockRejectedValueOnce(
-        'unexpected string error',
-      );
+      mockKycService.processAmlScreening.mockRejectedValueOnce('unexpected string error');
 
-      await expect(
-        processor.handleAmlScreening(mockJob),
-      ).rejects.toBe('unexpected string error');
+      await expect(processor.handleAmlScreening(mockJob)).rejects.toBe('unexpected string error');
     });
   });
 });

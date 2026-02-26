@@ -28,9 +28,7 @@ import { Auditable } from '../audit-log/decorators/auditable.decorator';
 
 @Controller('api/v1/companies/:companyId/profile/documents')
 export class ProfileDocumentController {
-  constructor(
-    private readonly documentService: ProfileDocumentService,
-  ) {}
+  constructor(private readonly documentService: ProfileDocumentService) {}
 
   // ─── 1. LIST DOCUMENTS ───────────────────────────────────────────────
 
@@ -84,10 +82,7 @@ export class ProfileDocumentController {
     resourceIdParam: 'documentId',
     captureBeforeState: true,
   })
-  async delete(
-    @Param('companyId') companyId: string,
-    @Param('documentId') documentId: string,
-  ) {
+  async delete(@Param('companyId') companyId: string, @Param('documentId') documentId: string) {
     await this.documentService.delete(companyId, documentId);
   }
 
@@ -96,10 +91,7 @@ export class ProfileDocumentController {
   @Put('order')
   @Roles('ADMIN', 'FINANCE')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
-  async reorder(
-    @Param('companyId') companyId: string,
-    @Body() dto: ReorderDocumentsDto,
-  ) {
+  async reorder(@Param('companyId') companyId: string, @Body() dto: ReorderDocumentsDto) {
     return this.documentService.reorder(companyId, dto.documents);
   }
 
@@ -108,10 +100,7 @@ export class ProfileDocumentController {
   @Get(':documentId/download')
   @Roles('ADMIN', 'FINANCE', 'LEGAL', 'INVESTOR', 'EMPLOYEE')
   @Throttle({ read: { ttl: 60000, limit: 100 } })
-  async download(
-    @Param('companyId') companyId: string,
-    @Param('documentId') documentId: string,
-  ) {
+  async download(@Param('companyId') companyId: string, @Param('documentId') documentId: string) {
     return this.documentService.getDownloadUrl(companyId, documentId);
   }
 }
@@ -150,11 +139,6 @@ export class PublicDocumentController {
     );
 
     const viewerIp = req?.ip;
-    return this.documentService.getPublicDownloadUrl(
-      slug,
-      documentId,
-      email,
-      viewerIp,
-    );
+    return this.documentService.getPublicDownloadUrl(slug, documentId, email, viewerIp);
   }
 }

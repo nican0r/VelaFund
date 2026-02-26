@@ -2,10 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ProfileDocumentService } from './profile-document.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../aws/s3.service';
-import {
-  NotFoundException,
-  BusinessRuleException,
-} from '../common/filters/app-exception';
+import { NotFoundException, BusinessRuleException } from '../common/filters/app-exception';
 
 // ─── Mock Data ────────────────────────────────────────────────────────
 
@@ -77,9 +74,7 @@ function createMockXlsxBuffer(): Buffer {
   return Buffer.concat([header, Buffer.alloc(100)]);
 }
 
-function createMockFile(
-  overrides: Partial<Express.Multer.File> = {},
-): Express.Multer.File {
+function createMockFile(overrides: Partial<Express.Multer.File> = {}): Express.Multer.File {
   const pdfBuffer = createMockPdfBuffer();
   return {
     fieldname: 'file',
@@ -284,9 +279,9 @@ describe('ProfileDocumentService', () => {
     it('should throw NotFoundException when profile not found', async () => {
       prisma.companyProfile.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.upload('comp-1', 'user-1', file, 'PITCH_DECK' as any),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.upload('comp-1', 'user-1', file, 'PITCH_DECK' as any)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw when file type is not allowed', async () => {
@@ -296,9 +291,9 @@ describe('ProfileDocumentService', () => {
       });
       prisma.companyProfile.findUnique.mockResolvedValue(mockProfile);
 
-      await expect(
-        service.upload('comp-1', 'user-1', badFile, 'OTHER' as any),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.upload('comp-1', 'user-1', badFile, 'OTHER' as any)).rejects.toThrow(
+        BusinessRuleException,
+      );
 
       try {
         await service.upload('comp-1', 'user-1', badFile, 'OTHER' as any);
@@ -350,9 +345,9 @@ describe('ProfileDocumentService', () => {
         _sum: { fileSize: 0 },
       });
 
-      await expect(
-        service.upload('comp-1', 'user-1', file, 'PITCH_DECK' as any),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.upload('comp-1', 'user-1', file, 'PITCH_DECK' as any)).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should throw when S3 bucket is not configured', async () => {
@@ -362,9 +357,9 @@ describe('ProfileDocumentService', () => {
         _sum: { fileSize: 0 },
       });
 
-      await expect(
-        service.upload('comp-1', 'user-1', file, 'PITCH_DECK' as any),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.upload('comp-1', 'user-1', file, 'PITCH_DECK' as any)).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should upload XLSX files with correct extension', async () => {
@@ -486,10 +481,7 @@ describe('ProfileDocumentService', () => {
 
       await service.delete('comp-1', 'doc-1');
 
-      expect(s3Service.delete).toHaveBeenCalledWith(
-        'navia-documents',
-        mockDocument.fileKey,
-      );
+      expect(s3Service.delete).toHaveBeenCalledWith('navia-documents', mockDocument.fileKey);
       expect(prisma.profileDocument.delete).toHaveBeenCalledWith({
         where: { id: 'doc-1' },
       });
@@ -539,27 +531,21 @@ describe('ProfileDocumentService', () => {
     it('should throw NotFoundException when profile not found', async () => {
       prisma.companyProfile.findUnique.mockResolvedValue(null);
 
-      await expect(service.delete('comp-1', 'doc-1')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.delete('comp-1', 'doc-1')).rejects.toThrow(NotFoundException);
     });
 
     it('should throw NotFoundException when document not found', async () => {
       prisma.companyProfile.findUnique.mockResolvedValue(mockProfile);
       prisma.profileDocument.findFirst.mockResolvedValue(null);
 
-      await expect(service.delete('comp-1', 'doc-1')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.delete('comp-1', 'doc-1')).rejects.toThrow(NotFoundException);
     });
 
     it('should not delete document from different profile', async () => {
       prisma.companyProfile.findUnique.mockResolvedValue(mockProfile);
       prisma.profileDocument.findFirst.mockResolvedValue(null); // Not found for this profile
 
-      await expect(service.delete('comp-1', 'doc-other')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.delete('comp-1', 'doc-other')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -570,10 +556,7 @@ describe('ProfileDocumentService', () => {
   describe('reorder', () => {
     it('should reorder documents successfully', async () => {
       prisma.companyProfile.findUnique.mockResolvedValue(mockProfile);
-      prisma.profileDocument.findMany.mockResolvedValueOnce([
-        { id: 'doc-1' },
-        { id: 'doc-2' },
-      ]);
+      prisma.profileDocument.findMany.mockResolvedValueOnce([{ id: 'doc-1' }, { id: 'doc-2' }]);
       prisma.$transaction.mockResolvedValue([]);
       prisma.profileDocument.findMany.mockResolvedValueOnce([
         { ...mockDocument, order: 1 },
@@ -592,9 +575,9 @@ describe('ProfileDocumentService', () => {
     it('should throw NotFoundException when profile not found', async () => {
       prisma.companyProfile.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.reorder('comp-1', [{ id: 'doc-1', order: 0 }]),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.reorder('comp-1', [{ id: 'doc-1', order: 0 }])).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw NotFoundException for invalid document ID', async () => {
@@ -635,18 +618,14 @@ describe('ProfileDocumentService', () => {
     it('should throw NotFoundException when profile not found', async () => {
       prisma.companyProfile.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.getDownloadUrl('comp-1', 'doc-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getDownloadUrl('comp-1', 'doc-1')).rejects.toThrow(NotFoundException);
     });
 
     it('should throw NotFoundException when document not found', async () => {
       prisma.companyProfile.findUnique.mockResolvedValue(mockProfile);
       prisma.profileDocument.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.getDownloadUrl('comp-1', 'doc-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getDownloadUrl('comp-1', 'doc-1')).rejects.toThrow(NotFoundException);
     });
 
     it('should throw when S3 is unavailable', async () => {
@@ -654,9 +633,9 @@ describe('ProfileDocumentService', () => {
       prisma.companyProfile.findUnique.mockResolvedValue(mockProfile);
       prisma.profileDocument.findFirst.mockResolvedValue(mockDocument);
 
-      await expect(
-        service.getDownloadUrl('comp-1', 'doc-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.getDownloadUrl('comp-1', 'doc-1')).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
   });
 
@@ -692,12 +671,7 @@ describe('ProfileDocumentService', () => {
       });
       prisma.profileDocumentDownload.create.mockResolvedValue({});
 
-      await service.getPublicDownloadUrl(
-        'navia-tech-a1b2',
-        'doc-1',
-        undefined,
-        '192.168.1.42',
-      );
+      await service.getPublicDownloadUrl('navia-tech-a1b2', 'doc-1', undefined, '192.168.1.42');
 
       // Wait for the async download record
       await new Promise((r) => setTimeout(r, 50));
@@ -712,9 +686,9 @@ describe('ProfileDocumentService', () => {
     it('should throw NotFoundException when document not found', async () => {
       prisma.profileDocument.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.getPublicDownloadUrl('navia-tech-a1b2', 'doc-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getPublicDownloadUrl('navia-tech-a1b2', 'doc-1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw when document does not belong to slug', async () => {
@@ -723,9 +697,9 @@ describe('ProfileDocumentService', () => {
         profile: { id: 'profile-1', slug: 'other-company-xyz' },
       });
 
-      await expect(
-        service.getPublicDownloadUrl('navia-tech-a1b2', 'doc-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getPublicDownloadUrl('navia-tech-a1b2', 'doc-1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw when S3 is unavailable', async () => {
@@ -735,9 +709,9 @@ describe('ProfileDocumentService', () => {
         profile: { id: 'profile-1', slug: 'navia-tech-a1b2' },
       });
 
-      await expect(
-        service.getPublicDownloadUrl('navia-tech-a1b2', 'doc-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.getPublicDownloadUrl('navia-tech-a1b2', 'doc-1')).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should not fail if download recording fails', async () => {
@@ -745,15 +719,10 @@ describe('ProfileDocumentService', () => {
         ...mockDocument,
         profile: { id: 'profile-1', slug: 'navia-tech-a1b2' },
       });
-      prisma.profileDocumentDownload.create.mockRejectedValue(
-        new Error('DB error'),
-      );
+      prisma.profileDocumentDownload.create.mockRejectedValue(new Error('DB error'));
 
       // Should not throw — download recording is fire-and-forget
-      const result = await service.getPublicDownloadUrl(
-        'navia-tech-a1b2',
-        'doc-1',
-      );
+      const result = await service.getPublicDownloadUrl('navia-tech-a1b2', 'doc-1');
 
       expect(result.downloadUrl).toBeDefined();
     });
@@ -792,9 +761,7 @@ describe('ProfileDocumentService', () => {
     it('should throw NotFoundException when profile not found', async () => {
       prisma.companyProfile.findUnique.mockResolvedValue(null);
 
-      await expect(service.getStorageUsage('comp-1')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.getStorageUsage('comp-1')).rejects.toThrow(NotFoundException);
     });
   });
 });

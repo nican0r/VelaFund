@@ -116,8 +116,8 @@ describe('RedisModule', () => {
       const retryStrategy = lastCall[1]?.retryStrategy;
 
       expect(retryStrategy).toBeDefined();
-      expect(retryStrategy(1)).toBe(200);   // min(200, 3000)
-      expect(retryStrategy(5)).toBe(1000);  // min(1000, 3000)
+      expect(retryStrategy(1)).toBe(200); // min(200, 3000)
+      expect(retryStrategy(5)).toBe(1000); // min(1000, 3000)
       expect(retryStrategy(10)).toBe(2000); // min(2000, 3000), last valid attempt
       expect(retryStrategy(11)).toBeNull(); // times > 10 → stop retrying
       expect(retryStrategy(15)).toBeNull(); // also stopped

@@ -1,10 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DocumentController } from './document.controller';
 import { DocumentService } from './document.service';
-import {
-  NotFoundException,
-  BusinessRuleException,
-} from '../common/filters/app-exception';
+import { NotFoundException, BusinessRuleException } from '../common/filters/app-exception';
 
 const mockUser = {
   id: 'user-1',
@@ -68,9 +65,7 @@ describe('DocumentController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [DocumentController],
-      providers: [
-        { provide: DocumentService, useValue: mockService },
-      ],
+      providers: [{ provide: DocumentService, useValue: mockService }],
     }).compile();
 
     controller = module.get<DocumentController>(DocumentController);
@@ -137,20 +132,15 @@ describe('DocumentController', () => {
       const result = await controller.getTemplate(COMPANY_ID, TEMPLATE_ID);
 
       expect(result).toEqual(mockTemplate);
-      expect(mockService.findTemplateById).toHaveBeenCalledWith(
-        COMPANY_ID,
-        TEMPLATE_ID,
-      );
+      expect(mockService.findTemplateById).toHaveBeenCalledWith(COMPANY_ID, TEMPLATE_ID);
     });
 
     it('should propagate NotFoundException', async () => {
-      mockService.findTemplateById.mockRejectedValue(
-        new NotFoundException('documentTemplate'),
-      );
+      mockService.findTemplateById.mockRejectedValue(new NotFoundException('documentTemplate'));
 
-      await expect(
-        controller.getTemplate(COMPANY_ID, 'nonexistent'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.getTemplate(COMPANY_ID, 'nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -210,20 +200,15 @@ describe('DocumentController', () => {
       const result = await controller.getDocument(COMPANY_ID, DOCUMENT_ID);
 
       expect(result).toEqual(mockDocument);
-      expect(mockService.findDocumentById).toHaveBeenCalledWith(
-        COMPANY_ID,
-        DOCUMENT_ID,
-      );
+      expect(mockService.findDocumentById).toHaveBeenCalledWith(COMPANY_ID, DOCUMENT_ID);
     });
 
     it('should propagate NotFoundException', async () => {
-      mockService.findDocumentById.mockRejectedValue(
-        new NotFoundException('document'),
-      );
+      mockService.findDocumentById.mockRejectedValue(new NotFoundException('document'));
 
-      await expect(
-        controller.getDocument(COMPANY_ID, 'nonexistent'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.getDocument(COMPANY_ID, 'nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -248,11 +233,7 @@ describe('DocumentController', () => {
       };
       mockService.createAndGenerate.mockResolvedValue(generated);
 
-      const result = await controller.createDocument(
-        COMPANY_ID,
-        mockUser as any,
-        createDto,
-      );
+      const result = await controller.createDocument(COMPANY_ID, mockUser as any, createDto);
 
       expect(result).toEqual(generated);
       expect(mockService.createAndGenerate).toHaveBeenCalledWith(
@@ -263,9 +244,7 @@ describe('DocumentController', () => {
     });
 
     it('should propagate NotFoundException for missing template', async () => {
-      mockService.createAndGenerate.mockRejectedValue(
-        new NotFoundException('documentTemplate'),
-      );
+      mockService.createAndGenerate.mockRejectedValue(new NotFoundException('documentTemplate'));
 
       await expect(
         controller.createDocument(COMPANY_ID, mockUser as any, createDto),
@@ -274,11 +253,9 @@ describe('DocumentController', () => {
 
     it('should propagate BusinessRuleException for incomplete form', async () => {
       mockService.createAndGenerate.mockRejectedValue(
-        new BusinessRuleException(
-          'DOC_INCOMPLETE_FORM',
-          'errors.doc.incompleteForm',
-          { missingFields: ['companyName'] },
-        ),
+        new BusinessRuleException('DOC_INCOMPLETE_FORM', 'errors.doc.incompleteForm', {
+          missingFields: ['companyName'],
+        }),
       );
 
       await expect(
@@ -301,28 +278,18 @@ describe('DocumentController', () => {
     it('should create a draft document', async () => {
       mockService.createDraft.mockResolvedValue(mockDocument);
 
-      const result = await controller.createDraft(
-        COMPANY_ID,
-        mockUser as any,
-        createDto,
-      );
+      const result = await controller.createDraft(COMPANY_ID, mockUser as any, createDto);
 
       expect(result).toEqual(mockDocument);
-      expect(mockService.createDraft).toHaveBeenCalledWith(
-        COMPANY_ID,
-        mockUser.id,
-        createDto,
-      );
+      expect(mockService.createDraft).toHaveBeenCalledWith(COMPANY_ID, mockUser.id, createDto);
     });
 
     it('should propagate NotFoundException for missing template', async () => {
-      mockService.createDraft.mockRejectedValue(
-        new NotFoundException('documentTemplate'),
-      );
+      mockService.createDraft.mockRejectedValue(new NotFoundException('documentTemplate'));
 
-      await expect(
-        controller.createDraft(COMPANY_ID, mockUser as any, createDto),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.createDraft(COMPANY_ID, mockUser as any, createDto)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -337,28 +304,18 @@ describe('DocumentController', () => {
       const updated = { ...mockDocument, title: 'Updated Title' };
       mockService.updateDraft.mockResolvedValue(updated);
 
-      const result = await controller.updateDraft(
-        COMPANY_ID,
-        DOCUMENT_ID,
-        updateDto,
-      );
+      const result = await controller.updateDraft(COMPANY_ID, DOCUMENT_ID, updateDto);
 
       expect(result).toEqual(updated);
-      expect(mockService.updateDraft).toHaveBeenCalledWith(
-        COMPANY_ID,
-        DOCUMENT_ID,
-        updateDto,
-      );
+      expect(mockService.updateDraft).toHaveBeenCalledWith(COMPANY_ID, DOCUMENT_ID, updateDto);
     });
 
     it('should propagate NotFoundException', async () => {
-      mockService.updateDraft.mockRejectedValue(
-        new NotFoundException('document'),
-      );
+      mockService.updateDraft.mockRejectedValue(new NotFoundException('document'));
 
-      await expect(
-        controller.updateDraft(COMPANY_ID, 'nonexistent', updateDto),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.updateDraft(COMPANY_ID, 'nonexistent', updateDto)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should propagate BusinessRuleException for non-draft', async () => {
@@ -366,9 +323,9 @@ describe('DocumentController', () => {
         new BusinessRuleException('DOC_NOT_DRAFT', 'errors.doc.notDraft'),
       );
 
-      await expect(
-        controller.updateDraft(COMPANY_ID, DOCUMENT_ID, updateDto),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(controller.updateDraft(COMPANY_ID, DOCUMENT_ID, updateDto)).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
   });
 
@@ -387,16 +344,10 @@ describe('DocumentController', () => {
       };
       mockService.generateFromDraft.mockResolvedValue(generated);
 
-      const result = await controller.generateFromDraft(
-        COMPANY_ID,
-        DOCUMENT_ID,
-      );
+      const result = await controller.generateFromDraft(COMPANY_ID, DOCUMENT_ID);
 
       expect(result).toEqual(generated);
-      expect(mockService.generateFromDraft).toHaveBeenCalledWith(
-        COMPANY_ID,
-        DOCUMENT_ID,
-      );
+      expect(mockService.generateFromDraft).toHaveBeenCalledWith(COMPANY_ID, DOCUMENT_ID);
     });
 
     it('should propagate BusinessRuleException for non-draft', async () => {
@@ -404,9 +355,9 @@ describe('DocumentController', () => {
         new BusinessRuleException('DOC_NOT_DRAFT', 'errors.doc.notDraft'),
       );
 
-      await expect(
-        controller.generateFromDraft(COMPANY_ID, DOCUMENT_ID),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(controller.generateFromDraft(COMPANY_ID, DOCUMENT_ID)).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
   });
 
@@ -424,23 +375,14 @@ describe('DocumentController', () => {
         send: jest.fn(),
       };
 
-      await controller.getPreview(
-        COMPANY_ID,
-        DOCUMENT_ID,
-        mockRes as any,
-      );
+      await controller.getPreview(COMPANY_ID, DOCUMENT_ID, mockRes as any);
 
-      expect(mockRes.setHeader).toHaveBeenCalledWith(
-        'Content-Type',
-        'text/html; charset=utf-8',
-      );
+      expect(mockRes.setHeader).toHaveBeenCalledWith('Content-Type', 'text/html; charset=utf-8');
       expect(mockRes.send).toHaveBeenCalledWith(html);
     });
 
     it('should propagate NotFoundException', async () => {
-      mockService.getPreviewHtml.mockRejectedValue(
-        new NotFoundException('document'),
-      );
+      mockService.getPreviewHtml.mockRejectedValue(new NotFoundException('document'));
 
       const mockRes = {
         setHeader: jest.fn(),
@@ -469,23 +411,17 @@ describe('DocumentController', () => {
       const result = await controller.getDownload(COMPANY_ID, DOCUMENT_ID);
 
       expect(result).toEqual(downloadData);
-      expect(mockService.getDownloadUrl).toHaveBeenCalledWith(
-        COMPANY_ID,
-        DOCUMENT_ID,
-      );
+      expect(mockService.getDownloadUrl).toHaveBeenCalledWith(COMPANY_ID, DOCUMENT_ID);
     });
 
     it('should propagate BusinessRuleException for non-generated', async () => {
       mockService.getDownloadUrl.mockRejectedValue(
-        new BusinessRuleException(
-          'DOC_NOT_GENERATED',
-          'errors.doc.notGenerated',
-        ),
+        new BusinessRuleException('DOC_NOT_GENERATED', 'errors.doc.notGenerated'),
       );
 
-      await expect(
-        controller.getDownload(COMPANY_ID, DOCUMENT_ID),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(controller.getDownload(COMPANY_ID, DOCUMENT_ID)).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
   });
 
@@ -530,19 +466,11 @@ describe('DocumentController', () => {
 
     it('should propagate BusinessRuleException for invalid file type', async () => {
       mockService.uploadDocument.mockRejectedValue(
-        new BusinessRuleException(
-          'DOC_INVALID_FILE_TYPE',
-          'errors.doc.invalidFileType',
-        ),
+        new BusinessRuleException('DOC_INVALID_FILE_TYPE', 'errors.doc.invalidFileType'),
       );
 
       await expect(
-        controller.uploadDocument(
-          COMPANY_ID,
-          mockUser as any,
-          'Bad File',
-          mockFile,
-        ),
+        controller.uploadDocument(COMPANY_ID, mockUser as any, 'Bad File', mockFile),
       ).rejects.toThrow(BusinessRuleException);
     });
   });
@@ -557,33 +485,25 @@ describe('DocumentController', () => {
 
       await controller.deleteDocument(COMPANY_ID, DOCUMENT_ID);
 
-      expect(mockService.deleteDocument).toHaveBeenCalledWith(
-        COMPANY_ID,
-        DOCUMENT_ID,
-      );
+      expect(mockService.deleteDocument).toHaveBeenCalledWith(COMPANY_ID, DOCUMENT_ID);
     });
 
     it('should propagate NotFoundException', async () => {
-      mockService.deleteDocument.mockRejectedValue(
-        new NotFoundException('document'),
-      );
+      mockService.deleteDocument.mockRejectedValue(new NotFoundException('document'));
 
-      await expect(
-        controller.deleteDocument(COMPANY_ID, 'nonexistent'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.deleteDocument(COMPANY_ID, 'nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should propagate BusinessRuleException for document with signatures', async () => {
       mockService.deleteDocument.mockRejectedValue(
-        new BusinessRuleException(
-          'DOC_HAS_SIGNATURES',
-          'errors.doc.hasSignatures',
-        ),
+        new BusinessRuleException('DOC_HAS_SIGNATURES', 'errors.doc.hasSignatures'),
       );
 
-      await expect(
-        controller.deleteDocument(COMPANY_ID, DOCUMENT_ID),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(controller.deleteDocument(COMPANY_ID, DOCUMENT_ID)).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
   });
 });

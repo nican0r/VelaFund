@@ -418,9 +418,9 @@ describe('AuditLogService', () => {
     it('should throw NotFoundException when log not found', async () => {
       mockPrisma.auditLog.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.findById('company-uuid-1', 'nonexistent-uuid'),
-      ).rejects.toThrow('errors.auditlog.notFound');
+      await expect(service.findById('company-uuid-1', 'nonexistent-uuid')).rejects.toThrow(
+        'errors.auditlog.notFound',
+      );
     });
   });
 

@@ -288,6 +288,15 @@ const MESSAGES: Record<string, Record<string, string>> = {
     'pt-BR': 'O total autorizado deve ser um valor não-negativo',
     en: 'Total authorized must be a non-negative value',
   },
+  'errors.cap.missingCommonShares': {
+    'pt-BR':
+      'Empresas S.A. devem ter pelo menos uma classe de ações ordinárias antes de emitir ações',
+    en: 'S.A. companies must have at least one common shares class before issuing shares',
+  },
+  'errors.cap.immutableAfterIssuance': {
+    'pt-BR': 'Este campo não pode ser alterado após ações terem sido emitidas',
+    en: 'This field cannot be changed after shares have been issued',
+  },
   'errors.auth.forbidden': {
     'pt-BR': 'Permissão insuficiente para esta operação',
     en: 'Insufficient permission for this operation',
@@ -825,7 +834,13 @@ export class BusinessRuleException extends AppException {
 
 export class ValidationException extends AppException {
   constructor(errors: ValidationErrorDetail[]) {
-    super('VAL_INVALID_INPUT', 'errors.val.invalidInput', HttpStatus.BAD_REQUEST, undefined, errors);
+    super(
+      'VAL_INVALID_INPUT',
+      'errors.val.invalidInput',
+      HttpStatus.BAD_REQUEST,
+      undefined,
+      errors,
+    );
   }
 }
 

@@ -123,10 +123,7 @@ describe('AuthGuard', () => {
       expect(sessionService.isAvailable).toHaveBeenCalled();
       expect(sessionService.getSession).toHaveBeenCalledWith('valid-session-id');
       expect(sessionService.isInactive).toHaveBeenCalledWith(mockSession);
-      expect(sessionService.touchSession).toHaveBeenCalledWith(
-        'valid-session-id',
-        mockSession,
-      );
+      expect(sessionService.touchSession).toHaveBeenCalledWith('valid-session-id', mockSession);
       expect(authService.getUserById).toHaveBeenCalledWith('user-uuid-1');
       expect(ctx._request.user).toEqual(mockAuthenticatedUser);
     });
@@ -271,9 +268,7 @@ describe('AuthGuard', () => {
         headers: { authorization: 'Bearer valid-token' },
       });
       jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(false);
-      authService.verifyTokenAndGetUser.mockRejectedValue(
-        new Error('Unexpected DB error'),
-      );
+      authService.verifyTokenAndGetUser.mockRejectedValue(new Error('Unexpected DB error'));
 
       await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
     });

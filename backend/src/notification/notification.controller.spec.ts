@@ -49,20 +49,18 @@ const mockService = {
 
 describe('NotificationController', () => {
   let controller: NotificationController;
-  let service: jest.Mocked<NotificationService>;
+  let _service: jest.Mocked<NotificationService>;
 
   beforeEach(async () => {
     jest.clearAllMocks();
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [NotificationController],
-      providers: [
-        { provide: NotificationService, useValue: mockService },
-      ],
+      providers: [{ provide: NotificationService, useValue: mockService }],
     }).compile();
 
     controller = module.get<NotificationController>(NotificationController);
-    service = module.get(NotificationService) as jest.Mocked<NotificationService>;
+    _service = module.get(NotificationService) as jest.Mocked<NotificationService>;
   });
 
   // ==========================================================================
@@ -217,13 +215,9 @@ describe('NotificationController', () => {
     });
 
     it('should propagate NotFoundException', async () => {
-      mockService.findById.mockRejectedValue(
-        new NotFoundException('notification', 'nonexistent'),
-      );
+      mockService.findById.mockRejectedValue(new NotFoundException('notification', 'nonexistent'));
 
-      await expect(
-        controller.getOne(USER_ID, 'nonexistent'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.getOne(USER_ID, 'nonexistent')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -251,9 +245,9 @@ describe('NotificationController', () => {
         new NotFoundException('notification', 'nonexistent'),
       );
 
-      await expect(
-        controller.markAsRead(USER_ID, 'nonexistent'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.markAsRead(USER_ID, 'nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -271,13 +265,9 @@ describe('NotificationController', () => {
     });
 
     it('should propagate NotFoundException', async () => {
-      mockService.delete.mockRejectedValue(
-        new NotFoundException('notification', 'nonexistent'),
-      );
+      mockService.delete.mockRejectedValue(new NotFoundException('notification', 'nonexistent'));
 
-      await expect(
-        controller.delete(USER_ID, 'nonexistent'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.delete(USER_ID, 'nonexistent')).rejects.toThrow(NotFoundException);
     });
   });
 });

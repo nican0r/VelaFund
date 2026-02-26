@@ -1,10 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { TransactionController } from './transaction.controller';
 import { TransactionService } from './transaction.service';
-import {
-  NotFoundException,
-  BusinessRuleException,
-} from '../common/filters/app-exception';
+import { NotFoundException, BusinessRuleException } from '../common/filters/app-exception';
 import { TransactionTypeDto } from './dto/create-transaction.dto';
 import { AuthenticatedUser } from '../auth/decorators/current-user.decorator';
 
@@ -87,17 +84,11 @@ describe('TransactionController', () => {
       const result = await controller.create('comp-1', dto, mockUser);
 
       expect(result).toEqual(mockTransactionResponse);
-      expect(mockService.create).toHaveBeenCalledWith(
-        'comp-1',
-        dto,
-        'user-1',
-      );
+      expect(mockService.create).toHaveBeenCalledWith('comp-1', dto, 'user-1');
     });
 
     it('should propagate NotFoundException', async () => {
-      mockService.create.mockRejectedValue(
-        new NotFoundException('company', 'comp-1'),
-      );
+      mockService.create.mockRejectedValue(new NotFoundException('company', 'comp-1'));
 
       await expect(
         controller.create(
@@ -115,10 +106,7 @@ describe('TransactionController', () => {
 
     it('should propagate BusinessRuleException', async () => {
       mockService.create.mockRejectedValue(
-        new BusinessRuleException(
-          'TXN_COMPANY_NOT_ACTIVE',
-          'errors.txn.companyNotActive',
-        ),
+        new BusinessRuleException('TXN_COMPANY_NOT_ACTIVE', 'errors.txn.companyNotActive'),
       );
 
       await expect(
@@ -175,13 +163,11 @@ describe('TransactionController', () => {
     });
 
     it('should propagate NotFoundException for invalid company', async () => {
-      mockService.findAll.mockRejectedValue(
-        new NotFoundException('company', 'comp-999'),
-      );
+      mockService.findAll.mockRejectedValue(new NotFoundException('company', 'comp-999'));
 
-      await expect(
-        controller.list('comp-999', { page: 1, limit: 20 }),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.list('comp-999', { page: 1, limit: 20 })).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -204,13 +190,9 @@ describe('TransactionController', () => {
     });
 
     it('should throw NotFoundException', async () => {
-      mockService.findById.mockRejectedValue(
-        new NotFoundException('transaction', 'txn-999'),
-      );
+      mockService.findById.mockRejectedValue(new NotFoundException('transaction', 'txn-999'));
 
-      await expect(
-        controller.getOne('comp-1', 'txn-999'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.getOne('comp-1', 'txn-999')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -239,9 +221,7 @@ describe('TransactionController', () => {
         ),
       );
 
-      await expect(
-        controller.submit('comp-1', 'txn-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(controller.submit('comp-1', 'txn-1')).rejects.toThrow(BusinessRuleException);
     });
   });
 
@@ -260,11 +240,7 @@ describe('TransactionController', () => {
       const result = await controller.approve('comp-1', 'txn-1', mockUser);
 
       expect(result.status).toBe('SUBMITTED');
-      expect(mockService.approve).toHaveBeenCalledWith(
-        'comp-1',
-        'txn-1',
-        'user-1',
-      );
+      expect(mockService.approve).toHaveBeenCalledWith('comp-1', 'txn-1', 'user-1');
     });
   });
 
@@ -303,11 +279,7 @@ describe('TransactionController', () => {
       const result = await controller.cancel('comp-1', 'txn-1', mockUser);
 
       expect(result.status).toBe('CANCELLED');
-      expect(mockService.cancel).toHaveBeenCalledWith(
-        'comp-1',
-        'txn-1',
-        'user-1',
-      );
+      expect(mockService.cancel).toHaveBeenCalledWith('comp-1', 'txn-1', 'user-1');
     });
 
     it('should throw when cancelling confirmed transaction', async () => {
@@ -318,9 +290,9 @@ describe('TransactionController', () => {
         ),
       );
 
-      await expect(
-        controller.cancel('comp-1', 'txn-1', mockUser),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(controller.cancel('comp-1', 'txn-1', mockUser)).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
   });
 });

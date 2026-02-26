@@ -16,10 +16,7 @@ describe('AuditLogProcessor', () => {
     jest.clearAllMocks();
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        AuditLogProcessor,
-        { provide: PrismaService, useValue: mockPrisma },
-      ],
+      providers: [AuditLogProcessor, { provide: PrismaService, useValue: mockPrisma }],
     }).compile();
 
     processor = module.get<AuditLogProcessor>(AuditLogProcessor);
@@ -163,9 +160,9 @@ describe('AuditLogProcessor', () => {
       const dbError = new Error('Connection refused');
       mockPrisma.auditLog.create.mockRejectedValue(dbError);
 
-      await expect(
-        processor.handlePersist({ id: 'job-5', data: event } as any),
-      ).rejects.toThrow('Connection refused');
+      await expect(processor.handlePersist({ id: 'job-5', data: event } as any)).rejects.toThrow(
+        'Connection refused',
+      );
     });
   });
 });

@@ -10,12 +10,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiParam,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { FundingRoundService } from './funding-round.service';
 import { CreateFundingRoundDto } from './dto/create-funding-round.dto';
@@ -28,18 +23,13 @@ import {
 import { UpdateCommitmentPaymentDto } from './dto/update-commitment-payment.dto';
 import { paginate } from '../common/helpers/paginate';
 import { Roles } from '../auth/decorators/roles.decorator';
-import {
-  CurrentUser,
-  AuthenticatedUser,
-} from '../auth/decorators/current-user.decorator';
+import { CurrentUser, AuthenticatedUser } from '../auth/decorators/current-user.decorator';
 import { Auditable } from '../audit-log/decorators/auditable.decorator';
 
 @ApiTags('Funding Rounds')
 @Controller('api/v1/companies/:companyId/funding-rounds')
 export class FundingRoundController {
-  constructor(
-    private readonly fundingRoundService: FundingRoundService,
-  ) {}
+  constructor(private readonly fundingRoundService: FundingRoundService) {}
 
   // ========================
   // Funding Round Endpoints
@@ -74,14 +64,8 @@ export class FundingRoundController {
   @ApiOperation({ summary: 'List funding rounds with pagination and filtering' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiResponse({ status: 200, description: 'Paginated list of funding rounds' })
-  async list(
-    @Param('companyId') companyId: string,
-    @Query() query: ListFundingRoundsQueryDto,
-  ) {
-    const { items, total } = await this.fundingRoundService.findAll(
-      companyId,
-      query,
-    );
+  async list(@Param('companyId') companyId: string, @Query() query: ListFundingRoundsQueryDto) {
+    const { items, total } = await this.fundingRoundService.findAll(companyId, query);
     return paginate(items, total, query.page, query.limit);
   }
 
@@ -93,10 +77,7 @@ export class FundingRoundController {
   @ApiParam({ name: 'roundId', description: 'Funding round UUID' })
   @ApiResponse({ status: 200, description: 'Funding round detail' })
   @ApiResponse({ status: 404, description: 'Round not found' })
-  async getOne(
-    @Param('companyId') companyId: string,
-    @Param('roundId') roundId: string,
-  ) {
+  async getOne(@Param('companyId') companyId: string, @Param('roundId') roundId: string) {
     return this.fundingRoundService.findById(companyId, roundId);
   }
 
@@ -139,10 +120,7 @@ export class FundingRoundController {
   @ApiResponse({ status: 200, description: 'Funding round opened' })
   @ApiResponse({ status: 404, description: 'Round not found' })
   @ApiResponse({ status: 422, description: 'Invalid status transition' })
-  async open(
-    @Param('companyId') companyId: string,
-    @Param('roundId') roundId: string,
-  ) {
+  async open(@Param('companyId') companyId: string, @Param('roundId') roundId: string) {
     return this.fundingRoundService.open(companyId, roundId);
   }
 
@@ -160,11 +138,11 @@ export class FundingRoundController {
   @ApiParam({ name: 'roundId', description: 'Funding round UUID' })
   @ApiResponse({ status: 200, description: 'Funding round closed, shares issued' })
   @ApiResponse({ status: 404, description: 'Round not found' })
-  @ApiResponse({ status: 422, description: 'Cannot close — unconfirmed payments or minimum not met' })
-  async close(
-    @Param('companyId') companyId: string,
-    @Param('roundId') roundId: string,
-  ) {
+  @ApiResponse({
+    status: 422,
+    description: 'Cannot close — unconfirmed payments or minimum not met',
+  })
+  async close(@Param('companyId') companyId: string, @Param('roundId') roundId: string) {
     return this.fundingRoundService.close(companyId, roundId);
   }
 
@@ -183,10 +161,7 @@ export class FundingRoundController {
   @ApiResponse({ status: 200, description: 'Funding round cancelled' })
   @ApiResponse({ status: 404, description: 'Round not found' })
   @ApiResponse({ status: 422, description: 'Cannot cancel closed round' })
-  async cancel(
-    @Param('companyId') companyId: string,
-    @Param('roundId') roundId: string,
-  ) {
+  async cancel(@Param('companyId') companyId: string, @Param('roundId') roundId: string) {
     return this.fundingRoundService.cancel(companyId, roundId);
   }
 
@@ -198,10 +173,7 @@ export class FundingRoundController {
   @ApiParam({ name: 'roundId', description: 'Funding round UUID' })
   @ApiResponse({ status: 200, description: 'Pro-forma cap table' })
   @ApiResponse({ status: 404, description: 'Round not found' })
-  async getProforma(
-    @Param('companyId') companyId: string,
-    @Param('roundId') roundId: string,
-  ) {
+  async getProforma(@Param('companyId') companyId: string, @Param('roundId') roundId: string) {
     return this.fundingRoundService.getProforma(companyId, roundId);
   }
 
@@ -230,11 +202,7 @@ export class FundingRoundController {
     @Param('roundId') roundId: string,
     @Body() dto: CreateCommitmentDto,
   ) {
-    return this.fundingRoundService.addCommitment(
-      companyId,
-      roundId,
-      dto,
-    );
+    return this.fundingRoundService.addCommitment(companyId, roundId, dto);
   }
 
   @Get(':roundId/commitments')
@@ -250,12 +218,11 @@ export class FundingRoundController {
     @Param('roundId') roundId: string,
     @Query() query: ListCommitmentsQueryDto,
   ) {
-    const { items, total } =
-      await this.fundingRoundService.findCommitments(
-        companyId,
-        roundId,
-        query,
-      );
+    const { items, total } = await this.fundingRoundService.findCommitments(
+      companyId,
+      roundId,
+      query,
+    );
     return paginate(items, total, query.page, query.limit);
   }
 
@@ -282,12 +249,7 @@ export class FundingRoundController {
     @Param('commitmentId') commitmentId: string,
     @Body() dto: UpdateCommitmentPaymentDto,
   ) {
-    return this.fundingRoundService.updateCommitmentPayment(
-      companyId,
-      roundId,
-      commitmentId,
-      dto,
-    );
+    return this.fundingRoundService.updateCommitmentPayment(companyId, roundId, commitmentId, dto);
   }
 
   @Delete(':roundId/commitments/:commitmentId')
@@ -312,10 +274,6 @@ export class FundingRoundController {
     @Param('roundId') roundId: string,
     @Param('commitmentId') commitmentId: string,
   ) {
-    return this.fundingRoundService.cancelCommitment(
-      companyId,
-      roundId,
-      commitmentId,
-    );
+    return this.fundingRoundService.cancelCommitment(companyId, roundId, commitmentId);
   }
 }

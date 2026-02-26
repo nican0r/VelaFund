@@ -6,10 +6,7 @@ import {
   ConflictException,
   BusinessRuleException,
 } from '../common/filters/app-exception';
-import {
-  CreateShareClassDto,
-  ShareClassTypeDto,
-} from './dto/create-share-class.dto';
+import { CreateShareClassDto, ShareClassTypeDto } from './dto/create-share-class.dto';
 import { Prisma } from '@prisma/client';
 
 const mockCompanyLtda = {
@@ -72,10 +69,7 @@ describe('ShareClassService', () => {
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        ShareClassService,
-        { provide: PrismaService, useValue: prisma },
-      ],
+      providers: [ShareClassService, { provide: PrismaService, useValue: prisma }],
     }).compile();
 
     service = module.get<ShareClassService>(ShareClassService);
@@ -170,9 +164,7 @@ describe('ShareClassService', () => {
     it('should reject if company not found', async () => {
       prisma.company.findUnique.mockResolvedValue(null);
 
-      await expect(service.create('non-existent', createDto)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.create('non-existent', createDto)).rejects.toThrow(NotFoundException);
     });
 
     it('should reject if company is not ACTIVE', async () => {
@@ -181,9 +173,7 @@ describe('ShareClassService', () => {
         status: 'DRAFT',
       });
 
-      await expect(service.create('comp-1', createDto)).rejects.toThrow(
-        BusinessRuleException,
-      );
+      await expect(service.create('comp-1', createDto)).rejects.toThrow(BusinessRuleException);
       await expect(service.create('comp-1', createDto)).rejects.toThrow(
         'errors.cap.companyNotActive',
       );
@@ -197,9 +187,7 @@ describe('ShareClassService', () => {
         type: ShareClassTypeDto.COMMON_SHARES,
       };
 
-      await expect(service.create('comp-1', dto)).rejects.toThrow(
-        BusinessRuleException,
-      );
+      await expect(service.create('comp-1', dto)).rejects.toThrow(BusinessRuleException);
       await expect(service.create('comp-1', dto)).rejects.toThrow(
         'errors.cap.invalidShareClassType',
       );
@@ -213,9 +201,7 @@ describe('ShareClassService', () => {
         type: ShareClassTypeDto.QUOTA,
       };
 
-      await expect(service.create('comp-2', dto)).rejects.toThrow(
-        BusinessRuleException,
-      );
+      await expect(service.create('comp-2', dto)).rejects.toThrow(BusinessRuleException);
       await expect(service.create('comp-2', dto)).rejects.toThrow(
         'errors.cap.invalidShareClassType',
       );
@@ -242,9 +228,7 @@ describe('ShareClassService', () => {
         votesPerShare: 0,
       };
 
-      await expect(service.create('comp-2', dto)).rejects.toThrow(
-        BusinessRuleException,
-      );
+      await expect(service.create('comp-2', dto)).rejects.toThrow(BusinessRuleException);
       await expect(service.create('comp-2', dto)).rejects.toThrow(
         'errors.cap.preferredShareLimitExceeded',
       );
@@ -277,19 +261,14 @@ describe('ShareClassService', () => {
 
     it('should reject duplicate className with ConflictException', async () => {
       prisma.company.findUnique.mockResolvedValue(mockCompanyLtda);
-      const prismaError = new Prisma.PrismaClientKnownRequestError(
-        'Unique constraint failed',
-        {
-          code: 'P2002',
-          clientVersion: '5.0.0',
-          meta: { target: ['company_id', 'class_name'] },
-        },
-      );
+      const prismaError = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '5.0.0',
+        meta: { target: ['company_id', 'class_name'] },
+      });
       prisma.shareClass.create.mockRejectedValue(prismaError);
 
-      await expect(service.create('comp-1', createDto)).rejects.toThrow(
-        ConflictException,
-      );
+      await expect(service.create('comp-1', createDto)).rejects.toThrow(ConflictException);
     });
 
     it('should handle zero totalAuthorized', async () => {
@@ -422,17 +401,13 @@ describe('ShareClassService', () => {
     it('should throw NotFoundException when not found', async () => {
       prisma.shareClass.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.findById('comp-1', 'non-existent'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.findById('comp-1', 'non-existent')).rejects.toThrow(NotFoundException);
     });
 
     it('should not return share class from another company', async () => {
       prisma.shareClass.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.findById('other-company', 'sc-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.findById('other-company', 'sc-1')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -531,12 +506,12 @@ describe('ShareClassService', () => {
       prisma.company.findUnique.mockResolvedValue(mockCompanyLtda);
       prisma.shareClass.findFirst.mockResolvedValue(mockShareClass);
 
-      await expect(
-        service.update('comp-1', 'sc-1', { totalAuthorized: '500000' }),
-      ).rejects.toThrow(BusinessRuleException);
-      await expect(
-        service.update('comp-1', 'sc-1', { totalAuthorized: '500000' }),
-      ).rejects.toThrow('errors.cap.totalAuthorizedCannotDecrease');
+      await expect(service.update('comp-1', 'sc-1', { totalAuthorized: '500000' })).rejects.toThrow(
+        BusinessRuleException,
+      );
+      await expect(service.update('comp-1', 'sc-1', { totalAuthorized: '500000' })).rejects.toThrow(
+        'errors.cap.totalAuthorizedCannotDecrease',
+      );
     });
 
     it('should reject totalAuthorized below totalIssued', async () => {
@@ -549,9 +524,9 @@ describe('ShareClassService', () => {
 
       // Trying to set to 700000 which is below 800000 issued
       // But since it's also below 1000000 current, it'll hit "cannot decrease" first
-      await expect(
-        service.update('comp-1', 'sc-1', { totalAuthorized: '700000' }),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.update('comp-1', 'sc-1', { totalAuthorized: '700000' })).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should reject if share class not found', async () => {
@@ -564,6 +539,137 @@ describe('ShareClassService', () => {
         }),
       ).rejects.toThrow(NotFoundException);
     });
+
+    // ─── IMMUTABLE FIELD ENFORCEMENT (EC-3) ─────────────────────────
+
+    it('should reject changing className after shares are issued', async () => {
+      prisma.company.findUnique.mockResolvedValue(mockCompanyLtda);
+      prisma.shareClass.findFirst.mockResolvedValue({
+        ...mockShareClass,
+        totalIssued: new Prisma.Decimal('5000'),
+      });
+
+      await expect(
+        service.update('comp-1', 'sc-1', { className: 'New Name' }),
+      ).rejects.toThrow(BusinessRuleException);
+      await expect(
+        service.update('comp-1', 'sc-1', { className: 'New Name' }),
+      ).rejects.toThrow('errors.cap.immutableAfterIssuance');
+    });
+
+    it('should reject changing type after shares are issued', async () => {
+      prisma.company.findUnique.mockResolvedValue(mockCompanySA);
+      prisma.shareClass.findFirst.mockResolvedValue({
+        ...mockShareClass,
+        companyId: 'comp-2',
+        type: 'COMMON_SHARES',
+        totalIssued: new Prisma.Decimal('5000'),
+      });
+
+      await expect(
+        service.update('comp-2', 'sc-1', { type: ShareClassTypeDto.PREFERRED_SHARES }),
+      ).rejects.toThrow('errors.cap.immutableAfterIssuance');
+    });
+
+    it('should reject changing votesPerShare after shares are issued', async () => {
+      prisma.company.findUnique.mockResolvedValue(mockCompanyLtda);
+      prisma.shareClass.findFirst.mockResolvedValue({
+        ...mockShareClass,
+        totalIssued: new Prisma.Decimal('5000'),
+      });
+
+      await expect(
+        service.update('comp-1', 'sc-1', { votesPerShare: 2 }),
+      ).rejects.toThrow('errors.cap.immutableAfterIssuance');
+    });
+
+    it('should reject changing liquidationPreferenceMultiple after shares are issued', async () => {
+      prisma.company.findUnique.mockResolvedValue(mockCompanyLtda);
+      prisma.shareClass.findFirst.mockResolvedValue({
+        ...mockShareClass,
+        totalIssued: new Prisma.Decimal('5000'),
+      });
+
+      await expect(
+        service.update('comp-1', 'sc-1', { liquidationPreferenceMultiple: 2.0 }),
+      ).rejects.toThrow('errors.cap.immutableAfterIssuance');
+    });
+
+    it('should reject changing participatingRights after shares are issued', async () => {
+      prisma.company.findUnique.mockResolvedValue(mockCompanyLtda);
+      prisma.shareClass.findFirst.mockResolvedValue({
+        ...mockShareClass,
+        totalIssued: new Prisma.Decimal('5000'),
+      });
+
+      await expect(
+        service.update('comp-1', 'sc-1', { participatingRights: true }),
+      ).rejects.toThrow('errors.cap.immutableAfterIssuance');
+    });
+
+    it('should allow updating always-mutable fields after shares are issued', async () => {
+      prisma.company.findUnique.mockResolvedValue(mockCompanyLtda);
+      prisma.shareClass.findFirst.mockResolvedValue({
+        ...mockShareClass,
+        totalIssued: new Prisma.Decimal('5000'),
+      });
+      prisma.shareClass.update.mockResolvedValue({
+        ...mockShareClass,
+        totalIssued: new Prisma.Decimal('5000'),
+        totalAuthorized: new Prisma.Decimal('2000000'),
+        lockUpPeriodMonths: 12,
+        tagAlongPercentage: new Prisma.Decimal('100'),
+        rightOfFirstRefusal: false,
+      });
+
+      const result = await service.update('comp-1', 'sc-1', {
+        totalAuthorized: '2000000',
+        lockUpPeriodMonths: 12,
+        tagAlongPercentage: 100,
+        rightOfFirstRefusal: false,
+      });
+
+      expect(result).toBeDefined();
+      expect(result.lockUpPeriodMonths).toBe(12);
+    });
+
+    it('should allow changing className before shares are issued', async () => {
+      prisma.company.findUnique.mockResolvedValue(mockCompanyLtda);
+      prisma.shareClass.findFirst.mockResolvedValue(mockShareClass); // totalIssued = 0
+      prisma.shareClass.update.mockResolvedValue({
+        ...mockShareClass,
+        className: 'New Name',
+      });
+
+      const result = await service.update('comp-1', 'sc-1', { className: 'New Name' });
+      expect(result.className).toBe('New Name');
+    });
+
+    it('should reject changing type to incompatible entity type', async () => {
+      prisma.company.findUnique.mockResolvedValue(mockCompanyLtda);
+      prisma.shareClass.findFirst.mockResolvedValue(mockShareClass); // totalIssued = 0
+
+      await expect(
+        service.update('comp-1', 'sc-1', { type: ShareClassTypeDto.COMMON_SHARES }),
+      ).rejects.toThrow('errors.cap.invalidShareClassType');
+    });
+
+    it('should handle duplicate className conflict on update', async () => {
+      prisma.company.findUnique.mockResolvedValue(mockCompanyLtda);
+      prisma.shareClass.findFirst.mockResolvedValue(mockShareClass); // totalIssued = 0
+      const prismaError = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '5.0.0',
+        meta: { target: ['company_id', 'class_name'] },
+      });
+      prisma.shareClass.update.mockRejectedValue(prismaError);
+
+      await expect(
+        service.update('comp-1', 'sc-1', { className: 'Duplicate Name' }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    // ─── PREFERRED SHARE LIMIT ────────────────────────────────────
 
     it('should check preferred share limit when increasing preferred totalAuthorized', async () => {
       prisma.company.findUnique.mockResolvedValue(mockCompanySA);
@@ -583,9 +689,9 @@ describe('ShareClassService', () => {
       ]);
 
       // Increasing to 500 would make preferred 500/(100+300 increase)=500/400 > 2/3
-      await expect(
-        service.update('comp-2', 'sc-1', { totalAuthorized: '500' }),
-      ).rejects.toThrow('errors.cap.preferredShareLimitExceeded');
+      await expect(service.update('comp-2', 'sc-1', { totalAuthorized: '500' })).rejects.toThrow(
+        'errors.cap.preferredShareLimitExceeded',
+      );
     });
   });
 
@@ -610,32 +716,22 @@ describe('ShareClassService', () => {
         totalIssued: new Prisma.Decimal('5000'),
       });
 
-      await expect(service.delete('comp-1', 'sc-1')).rejects.toThrow(
-        BusinessRuleException,
-      );
-      await expect(service.delete('comp-1', 'sc-1')).rejects.toThrow(
-        'errors.cap.shareClassInUse',
-      );
+      await expect(service.delete('comp-1', 'sc-1')).rejects.toThrow(BusinessRuleException);
+      await expect(service.delete('comp-1', 'sc-1')).rejects.toThrow('errors.cap.shareClassInUse');
     });
 
     it('should reject deletion if active shareholdings exist', async () => {
       prisma.shareClass.findFirst.mockResolvedValue(mockShareClass);
       prisma.shareholding.count.mockResolvedValue(3);
 
-      await expect(service.delete('comp-1', 'sc-1')).rejects.toThrow(
-        BusinessRuleException,
-      );
-      await expect(service.delete('comp-1', 'sc-1')).rejects.toThrow(
-        'errors.cap.shareClassInUse',
-      );
+      await expect(service.delete('comp-1', 'sc-1')).rejects.toThrow(BusinessRuleException);
+      await expect(service.delete('comp-1', 'sc-1')).rejects.toThrow('errors.cap.shareClassInUse');
     });
 
     it('should throw NotFoundException for non-existent share class', async () => {
       prisma.shareClass.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.delete('comp-1', 'non-existent'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.delete('comp-1', 'non-existent')).rejects.toThrow(NotFoundException);
     });
   });
 });

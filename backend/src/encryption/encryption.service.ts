@@ -37,9 +37,7 @@ export class EncryptionService {
     if (this.kmsService.isAvailable()) {
       this.logger.log('KMS encryption available for PII field encryption');
     } else {
-      this.logger.warn(
-        'KMS not available. Application-level PII encryption will be unavailable.',
-      );
+      this.logger.warn('KMS not available. Application-level PII encryption will be unavailable.');
     }
   }
 
@@ -91,16 +89,10 @@ export class EncryptionService {
     const normalized = value.replace(/\D/g, '');
 
     if (this.blindIndexKey) {
-      return createHmac('sha256', this.blindIndexKey)
-        .update(normalized)
-        .digest('hex')
-        .slice(0, 32);
+      return createHmac('sha256', this.blindIndexKey).update(normalized).digest('hex').slice(0, 32);
     }
 
     // Fallback: SHA-256 without key (development only)
-    return createHash('sha256')
-      .update(normalized)
-      .digest('hex')
-      .slice(0, 32);
+    return createHash('sha256').update(normalized).digest('hex').slice(0, 32);
   }
 }

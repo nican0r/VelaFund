@@ -28,9 +28,7 @@ export class CnpjValidationProcessor {
   ) {}
 
   @Process('validate-cnpj')
-  async handleCnpjValidation(
-    job: Job<CnpjValidationPayload>,
-  ): Promise<void> {
+  async handleCnpjValidation(job: Job<CnpjValidationPayload>): Promise<void> {
     const { companyId, cnpj, creatorUserId, companyName } = job.data;
 
     this.logger.debug(
@@ -59,11 +57,14 @@ export class CnpjValidationProcessor {
       }
 
       // CNPJ is active — activate the company
-      await this.activateCompany(companyId, { ...result } as Record<string, unknown>, creatorUserId, companyName);
-
-      this.logger.debug(
-        `CNPJ validation job ${job.id} completed — company ${companyId} activated`,
+      await this.activateCompany(
+        companyId,
+        { ...result } as Record<string, unknown>,
+        creatorUserId,
+        companyName,
       );
+
+      this.logger.debug(`CNPJ validation job ${job.id} completed — company ${companyId} activated`);
     } catch (error) {
       // Transient errors (Verifik unavailable, network issues) — Bull will retry.
       // On final attempt, mark validation as failed so the user sees the error.
@@ -71,8 +72,7 @@ export class CnpjValidationProcessor {
       const isLastAttempt = job.attemptsMade + 1 >= maxAttempts;
 
       if (isLastAttempt) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
 
         await this.markValidationFailed(
           companyId,

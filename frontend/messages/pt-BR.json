@@ -558,7 +558,9 @@
       "unauthorized": "Não autorizado"
     },
     "cap": {
-      "insufficientShares": "Ações insuficientes para completar a operação"
+      "immutableAfterIssuance": "Este campo não pode ser alterado após ações terem sido emitidas",
+      "insufficientShares": "Ações insuficientes para completar a operação",
+      "missingCommonShares": "Empresas S.A. devem ter pelo menos uma classe de ações ordinárias antes de emitir ações"
     },
     "company": {
       "cnpjDuplicate": "CNPJ já cadastrado",

@@ -13,10 +13,7 @@ describe('NotificationProcessor', () => {
     jest.clearAllMocks();
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        NotificationProcessor,
-        { provide: NotificationService, useValue: mockService },
-      ],
+      providers: [NotificationProcessor, { provide: NotificationService, useValue: mockService }],
     }).compile();
 
     processor = module.get<NotificationProcessor>(NotificationProcessor);
@@ -61,9 +58,9 @@ describe('NotificationProcessor', () => {
       const error = new Error('Database error');
       mockService.persistNotification.mockRejectedValue(error);
 
-      await expect(
-        processor.handleCreateNotification(mockJob as any),
-      ).rejects.toThrow('Database error');
+      await expect(processor.handleCreateNotification(mockJob as any)).rejects.toThrow(
+        'Database error',
+      );
     });
   });
 });

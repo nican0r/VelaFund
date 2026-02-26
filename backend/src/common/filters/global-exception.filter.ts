@@ -20,9 +20,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
-    const lang = this.normalizeLanguage(
-      request.headers['accept-language'] as string,
-    );
+    const lang = this.normalizeLanguage(request.headers['accept-language'] as string);
 
     if (exception instanceof AppException) {
       return response.status(exception.statusCode).json({
@@ -44,27 +42,22 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       const messageArray = body.message;
 
       if (Array.isArray(messageArray)) {
-        const validationErrors: ValidationErrorDetail[] = messageArray.map(
-          (msg: string) => {
-            // class-validator messages follow the pattern: "fieldName constraint description"
-            // Extract the field name from the beginning if possible
-            const field = this.extractFieldFromMessage(msg);
-            return {
-              field,
-              message: msg,
-              messageKey: 'errors.val.fieldInvalid',
-            };
-          },
-        );
+        const validationErrors: ValidationErrorDetail[] = messageArray.map((msg: string) => {
+          // class-validator messages follow the pattern: "fieldName constraint description"
+          // Extract the field name from the beginning if possible
+          const field = this.extractFieldFromMessage(msg);
+          return {
+            field,
+            message: msg,
+            messageKey: 'errors.val.fieldInvalid',
+          };
+        });
 
         return response.status(HttpStatus.BAD_REQUEST).json({
           success: false,
           error: {
             code: 'VAL_INVALID_INPUT',
-            message:
-              lang === 'en'
-                ? 'Invalid input data'
-                : 'Dados de entrada inválidos',
+            message: lang === 'en' ? 'Invalid input data' : 'Dados de entrada inválidos',
             messageKey: 'errors.val.invalidInput',
             validationErrors,
           },
@@ -75,10 +68,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       const status = exception.getStatus();
       const body = exception.getResponse();
-      const message =
-        typeof body === 'string'
-          ? body
-          : (body as Record<string, unknown>).message;
+      const message = typeof body === 'string' ? body : (body as Record<string, unknown>).message;
 
       return response.status(status).json({
         success: false,
@@ -101,10 +91,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       success: false,
       error: {
         code: 'SYS_INTERNAL_ERROR',
-        message:
-          lang === 'en'
-            ? 'Internal server error'
-            : 'Erro interno do servidor',
+        message: lang === 'en' ? 'Internal server error' : 'Erro interno do servidor',
         messageKey: 'errors.sys.internalError',
       },
     });
@@ -128,9 +115,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
    */
   private extractFieldFromMessage(message: string): string {
     // Match patterns like "property fieldName ..." or "fieldName must be ..." or "fieldName should not ..."
-    const match = message.match(
-      /^(?:property\s+)?(\w+)\s+(?:must|should|is|has|each)/i,
-    );
+    const match = message.match(/^(?:property\s+)?(\w+)\s+(?:must|should|is|has|each)/i);
     if (match) return match[1];
     // If it includes "should not be empty" or similar, try extracting first word
     const firstWord = message.split(' ')[0];

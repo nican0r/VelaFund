@@ -46,10 +46,7 @@ export class ShareClassController {
   @ApiResponse({ status: 400, description: 'Invalid input' })
   @ApiResponse({ status: 409, description: 'Duplicate class name' })
   @ApiResponse({ status: 422, description: 'Business rule violation' })
-  async create(
-    @Param('companyId') companyId: string,
-    @Body() dto: CreateShareClassDto,
-  ) {
+  async create(@Param('companyId') companyId: string, @Body() dto: CreateShareClassDto) {
     return this.shareClassService.create(companyId, dto);
   }
 
@@ -64,14 +61,8 @@ export class ShareClassController {
   @ApiOperation({ summary: 'List share classes' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiResponse({ status: 200, description: 'Paginated list of share classes' })
-  async list(
-    @Param('companyId') companyId: string,
-    @Query() query: ListShareClassesQueryDto,
-  ) {
-    const { items, total } = await this.shareClassService.findAll(
-      companyId,
-      query,
-    );
+  async list(@Param('companyId') companyId: string, @Query() query: ListShareClassesQueryDto) {
+    const { items, total } = await this.shareClassService.findAll(companyId, query);
     return paginate(items, total, query.page, query.limit);
   }
 
@@ -88,10 +79,7 @@ export class ShareClassController {
   @ApiParam({ name: 'id', description: 'Share class UUID' })
   @ApiResponse({ status: 200, description: 'Share class details' })
   @ApiResponse({ status: 404, description: 'Share class not found' })
-  async getOne(
-    @Param('companyId') companyId: string,
-    @Param('id') id: string,
-  ) {
+  async getOne(@Param('companyId') companyId: string, @Param('id') id: string) {
     return this.shareClassService.findById(companyId, id);
   }
 
@@ -148,10 +136,7 @@ export class ShareClassController {
   @ApiResponse({ status: 204, description: 'Share class deleted' })
   @ApiResponse({ status: 404, description: 'Share class not found' })
   @ApiResponse({ status: 422, description: 'Share class has issued shares' })
-  async delete(
-    @Param('companyId') companyId: string,
-    @Param('id') id: string,
-  ) {
+  async delete(@Param('companyId') companyId: string, @Param('id') id: string) {
     await this.shareClassService.delete(companyId, id);
   }
 }

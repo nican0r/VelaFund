@@ -11,12 +11,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiParam,
-  ApiResponse,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiParam, ApiResponse } from '@nestjs/swagger';
 import { MemberService } from './member.service';
 import { InviteMemberDto } from './dto/invite-member.dto';
 import { UpdateMemberDto } from './dto/update-member.dto';
@@ -58,14 +53,8 @@ export class MemberController {
   @ApiOperation({ summary: 'List company members' })
   @ApiParam({ name: 'companyId', description: 'Company ID' })
   @ApiResponse({ status: 200, description: 'Paginated list of members' })
-  async list(
-    @Param('companyId') companyId: string,
-    @Query() query: ListMembersQueryDto,
-  ) {
-    const { items, total } = await this.memberService.listMembers(
-      companyId,
-      query,
-    );
+  async list(@Param('companyId') companyId: string, @Query() query: ListMembersQueryDto) {
+    const { items, total } = await this.memberService.listMembers(companyId, query);
     return paginate(items, total, query.page, query.limit);
   }
 

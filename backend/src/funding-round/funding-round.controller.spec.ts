@@ -109,17 +109,11 @@ describe('FundingRoundController', () => {
       const result = await controller.create('comp-1', dto, mockUser);
 
       expect(result).toEqual(mockRound);
-      expect(mockService.create).toHaveBeenCalledWith(
-        'comp-1',
-        dto,
-        'user-1',
-      );
+      expect(mockService.create).toHaveBeenCalledWith('comp-1', dto, 'user-1');
     });
 
     it('should propagate NotFoundException', async () => {
-      mockService.create.mockRejectedValue(
-        new NotFoundException('company', 'comp-1'),
-      );
+      mockService.create.mockRejectedValue(new NotFoundException('company', 'comp-1'));
 
       await expect(
         controller.create(
@@ -139,10 +133,7 @@ describe('FundingRoundController', () => {
 
     it('should propagate BusinessRuleException', async () => {
       mockService.create.mockRejectedValue(
-        new BusinessRuleException(
-          'ROUND_COMPANY_NOT_ACTIVE',
-          'errors.round.companyNotActive',
-        ),
+        new BusinessRuleException('ROUND_COMPANY_NOT_ACTIVE', 'errors.round.companyNotActive'),
       );
 
       await expect(
@@ -222,13 +213,9 @@ describe('FundingRoundController', () => {
     });
 
     it('should throw NotFoundException', async () => {
-      mockService.findById.mockRejectedValue(
-        new NotFoundException('fundingRound', 'round-999'),
-      );
+      mockService.findById.mockRejectedValue(new NotFoundException('fundingRound', 'round-999'));
 
-      await expect(
-        controller.getOne('comp-1', 'round-999'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.getOne('comp-1', 'round-999')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -246,24 +233,19 @@ describe('FundingRoundController', () => {
       });
 
       expect(result.name).toBe('Updated Seed Round');
-      expect(mockService.update).toHaveBeenCalledWith(
-        'comp-1',
-        'round-1',
-        { name: 'Updated Seed Round' },
-      );
+      expect(mockService.update).toHaveBeenCalledWith('comp-1', 'round-1', {
+        name: 'Updated Seed Round',
+      });
     });
 
     it('should propagate BusinessRuleException for closed round', async () => {
       mockService.update.mockRejectedValue(
-        new BusinessRuleException(
-          'ROUND_ALREADY_CLOSED',
-          'errors.round.alreadyClosed',
-        ),
+        new BusinessRuleException('ROUND_ALREADY_CLOSED', 'errors.round.alreadyClosed'),
       );
 
-      await expect(
-        controller.update('comp-1', 'round-1', { name: 'Fail' }),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(controller.update('comp-1', 'round-1', { name: 'Fail' })).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
   });
 
@@ -294,9 +276,7 @@ describe('FundingRoundController', () => {
         ),
       );
 
-      await expect(
-        controller.open('comp-1', 'round-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(controller.open('comp-1', 'round-1')).rejects.toThrow(BusinessRuleException);
     });
   });
 
@@ -321,15 +301,10 @@ describe('FundingRoundController', () => {
 
     it('should propagate BusinessRuleException for unconfirmed payments', async () => {
       mockService.close.mockRejectedValue(
-        new BusinessRuleException(
-          'ROUND_UNCONFIRMED_PAYMENTS',
-          'errors.round.unconfirmedPayments',
-        ),
+        new BusinessRuleException('ROUND_UNCONFIRMED_PAYMENTS', 'errors.round.unconfirmedPayments'),
       );
 
-      await expect(
-        controller.close('comp-1', 'round-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(controller.close('comp-1', 'round-1')).rejects.toThrow(BusinessRuleException);
     });
   });
 
@@ -354,15 +329,10 @@ describe('FundingRoundController', () => {
 
     it('should propagate BusinessRuleException for closed round', async () => {
       mockService.cancel.mockRejectedValue(
-        new BusinessRuleException(
-          'ROUND_ALREADY_CLOSED',
-          'errors.round.alreadyClosed',
-        ),
+        new BusinessRuleException('ROUND_ALREADY_CLOSED', 'errors.round.alreadyClosed'),
       );
 
-      await expect(
-        controller.cancel('comp-1', 'round-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(controller.cancel('comp-1', 'round-1')).rejects.toThrow(BusinessRuleException);
     });
   });
 
@@ -392,13 +362,11 @@ describe('FundingRoundController', () => {
     });
 
     it('should throw NotFoundException', async () => {
-      mockService.getProforma.mockRejectedValue(
-        new NotFoundException('fundingRound', 'round-999'),
-      );
+      mockService.getProforma.mockRejectedValue(new NotFoundException('fundingRound', 'round-999'));
 
-      await expect(
-        controller.getProforma('comp-1', 'round-999'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.getProforma('comp-1', 'round-999')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -418,19 +386,12 @@ describe('FundingRoundController', () => {
       const result = await controller.addCommitment('comp-1', 'round-1', dto);
 
       expect(result).toEqual(mockCommitment);
-      expect(mockService.addCommitment).toHaveBeenCalledWith(
-        'comp-1',
-        'round-1',
-        dto,
-      );
+      expect(mockService.addCommitment).toHaveBeenCalledWith('comp-1', 'round-1', dto);
     });
 
     it('should propagate ConflictException for duplicate', async () => {
       mockService.addCommitment.mockRejectedValue(
-        new ConflictException(
-          'ROUND_COMMITMENT_EXISTS',
-          'errors.round.commitmentExists',
-        ),
+        new ConflictException('ROUND_COMMITMENT_EXISTS', 'errors.round.commitmentExists'),
       );
 
       await expect(
@@ -493,12 +454,9 @@ describe('FundingRoundController', () => {
       const updated = { ...mockCommitment, paymentStatus: 'RECEIVED' as const };
       mockService.updateCommitmentPayment.mockResolvedValue(updated);
 
-      const result = await controller.updatePayment(
-        'comp-1',
-        'round-1',
-        'commit-1',
-        { paymentStatus: PaymentStatusUpdateDto.RECEIVED },
-      );
+      const result = await controller.updatePayment('comp-1', 'round-1', 'commit-1', {
+        paymentStatus: PaymentStatusUpdateDto.RECEIVED,
+      });
 
       expect(result.paymentStatus).toBe('RECEIVED');
       expect(mockService.updateCommitmentPayment).toHaveBeenCalledWith(
@@ -538,31 +496,20 @@ describe('FundingRoundController', () => {
       };
       mockService.cancelCommitment.mockResolvedValue(cancelled);
 
-      const result = await controller.cancelCommitment(
-        'comp-1',
-        'round-1',
-        'commit-1',
-      );
+      const result = await controller.cancelCommitment('comp-1', 'round-1', 'commit-1');
 
       expect(result.paymentStatus).toBe('CANCELLED');
-      expect(mockService.cancelCommitment).toHaveBeenCalledWith(
-        'comp-1',
-        'round-1',
-        'commit-1',
-      );
+      expect(mockService.cancelCommitment).toHaveBeenCalledWith('comp-1', 'round-1', 'commit-1');
     });
 
     it('should propagate BusinessRuleException for closed round', async () => {
       mockService.cancelCommitment.mockRejectedValue(
-        new BusinessRuleException(
-          'ROUND_ALREADY_CLOSED',
-          'errors.round.alreadyClosed',
-        ),
+        new BusinessRuleException('ROUND_ALREADY_CLOSED', 'errors.round.alreadyClosed'),
       );
 
-      await expect(
-        controller.cancelCommitment('comp-1', 'round-1', 'commit-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(controller.cancelCommitment('comp-1', 'round-1', 'commit-1')).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
   });
 });

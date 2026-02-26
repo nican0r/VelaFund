@@ -24,12 +24,7 @@ export class VerifikUnavailableException extends AppException {
 
 export class KycCpfNotFoundException extends AppException {
   constructor(details?: Record<string, unknown>) {
-    super(
-      'KYC_CPF_NOT_FOUND',
-      'errors.kyc.cpfNotFound',
-      HttpStatus.NOT_FOUND,
-      details,
-    );
+    super('KYC_CPF_NOT_FOUND', 'errors.kyc.cpfNotFound', HttpStatus.NOT_FOUND, details);
   }
 }
 
@@ -174,15 +169,10 @@ export class VerifikService {
 
   constructor(private readonly configService: ConfigService) {
     this.apiToken = this.configService.get<string>('VERIFIK_API_TOKEN');
-    this.baseUrl = this.configService.get<string>(
-      'VERIFIK_BASE_URL',
-      'https://api.verifik.co/v2',
-    );
+    this.baseUrl = this.configService.get<string>('VERIFIK_BASE_URL', 'https://api.verifik.co/v2');
 
     if (this.apiToken) {
-      this.logger.log(
-        `VerifikService initialized (baseUrl: ${this.baseUrl})`,
-      );
+      this.logger.log(`VerifikService initialized (baseUrl: ${this.baseUrl})`);
     } else {
       this.logger.warn(
         'VERIFIK_API_TOKEN is not configured. KYC verification will be unavailable.',
@@ -211,10 +201,7 @@ export class VerifikService {
    * @throws KycCpfNotFoundException      — CPF not found in registry
    * @throws KycCpfDobMismatchException   — date of birth does not match
    */
-  async verifyCpf(
-    cpf: string,
-    dateOfBirth: string,
-  ): Promise<VerifikCpfResponse> {
+  async verifyCpf(cpf: string, dateOfBirth: string): Promise<VerifikCpfResponse> {
     this.ensureAvailable();
 
     // Normalise CPF to digits only for the query parameter
@@ -222,9 +209,7 @@ export class VerifikService {
 
     const url = `${this.baseUrl}/br/cedula?cpf=${encodeURIComponent(cpfDigits)}&birthDate=${encodeURIComponent(dateOfBirth)}`;
 
-    this.logger.debug(
-      `[verifyCpf] GET ${this.baseUrl}/br/cedula cpf=***${cpfDigits.slice(-2)}`,
-    );
+    this.logger.debug(`[verifyCpf] GET ${this.baseUrl}/br/cedula cpf=***${cpfDigits.slice(-2)}`);
 
     const raw = await this.request<RawVerifikCpfApiResponse>('GET', url);
 
@@ -252,9 +237,7 @@ export class VerifikService {
       signature,
     };
 
-    this.logger.debug(
-      `[verifyCpf] Success — cpfStatus=${cpfStatus} name="${fullName}"`,
-    );
+    this.logger.debug(`[verifyCpf] Success — cpfStatus=${cpfStatus} name="${fullName}"`);
 
     return response;
   }
@@ -277,9 +260,7 @@ export class VerifikService {
 
     const url = `${this.baseUrl}/br/cnpj?cnpj=${encodeURIComponent(cnpjDigits)}`;
 
-    this.logger.debug(
-      `[validateCnpj] GET ${this.baseUrl}/br/cnpj cnpj=***${cnpjDigits.slice(-4)}`,
-    );
+    this.logger.debug(`[validateCnpj] GET ${this.baseUrl}/br/cnpj cnpj=***${cnpjDigits.slice(-4)}`);
 
     const raw = await this.request<RawVerifikCnpjApiResponse>('GET', url);
 
@@ -334,10 +315,7 @@ export class VerifikService {
    * @throws VerifikUnavailableException   — service not configured or network failure
    * @throws KycDocumentUnreadableException — OCR failed or authenticity too low
    */
-  async verifyDocument(
-    file: Buffer,
-    documentType: string,
-  ): Promise<VerifikDocumentResponse> {
+  async verifyDocument(file: Buffer, documentType: string): Promise<VerifikDocumentResponse> {
     this.ensureAvailable();
 
     const url = `${this.baseUrl}/documents/verify`;
@@ -382,9 +360,7 @@ export class VerifikService {
       authenticity,
     };
 
-    this.logger.debug(
-      `[verifyDocument] Success — authenticity=${authenticity}`,
-    );
+    this.logger.debug(`[verifyDocument] Success — authenticity=${authenticity}`);
 
     return response;
   }
@@ -402,24 +378,15 @@ export class VerifikService {
    * @throws KycLivenessCheckFailedException — liveness score below threshold
    * @throws KycFaceMatchFailedException     — face similarity score below threshold
    */
-  async matchFace(
-    selfie: Buffer,
-    documentImageUrl: string,
-  ): Promise<VerifikFaceMatchResponse> {
+  async matchFace(selfie: Buffer, documentImageUrl: string): Promise<VerifikFaceMatchResponse> {
     this.ensureAvailable();
 
     const url = `${this.baseUrl}/face/match`;
 
-    this.logger.debug(
-      `[matchFace] POST ${url} selfieSize=${selfie.length}B`,
-    );
+    this.logger.debug(`[matchFace] POST ${url} selfieSize=${selfie.length}B`);
 
     const boundary = `----VerifikBoundary${Date.now()}`;
-    const body = this.buildFaceMatchFormData(
-      boundary,
-      selfie,
-      documentImageUrl,
-    );
+    const body = this.buildFaceMatchFormData(boundary, selfie, documentImageUrl);
 
     const raw = await this.request<RawVerifikFaceMatchApiResponse>(
       'POST',
@@ -428,10 +395,8 @@ export class VerifikService {
       `multipart/form-data; boundary=${boundary}`,
     );
 
-    const livenessScore =
-      raw.livenessScore ?? raw.pontuacaoVivacidade ?? 0;
-    const matchScore =
-      raw.matchScore ?? raw.pontuacaoCorrespondencia ?? 0;
+    const livenessScore = raw.livenessScore ?? raw.pontuacaoVivacidade ?? 0;
+    const matchScore = raw.matchScore ?? raw.pontuacaoCorrespondencia ?? 0;
 
     if (livenessScore < LIVENESS_THRESHOLD) {
       this.logger.debug(
@@ -477,11 +442,7 @@ export class VerifikService {
    * @returns Normalised VerifikAmlResponse
    * @throws VerifikUnavailableException — service not configured or network failure
    */
-  async screenAml(
-    fullName: string,
-    cpf: string,
-    nationality: string,
-  ): Promise<VerifikAmlResponse> {
+  async screenAml(fullName: string, cpf: string, nationality: string): Promise<VerifikAmlResponse> {
     this.ensureAvailable();
 
     const url = `${this.baseUrl}/screening`;
@@ -510,8 +471,7 @@ export class VerifikService {
     const response: VerifikAmlResponse = {
       riskScore: raw.riskScore ?? raw.pontuacaoRisco ?? 'LOW',
       isPEP: raw.isPEP ?? raw.ePEP ?? false,
-      sanctionsMatch:
-        raw.sanctionsMatch ?? raw.correspondenciaSancoes ?? false,
+      sanctionsMatch: raw.sanctionsMatch ?? raw.correspondenciaSancoes ?? false,
       details: raw.details ?? raw.detalhes ?? {},
     };
 
@@ -535,10 +495,7 @@ export class VerifikService {
     contentType?: string,
   ): Promise<T> {
     const controller = new AbortController();
-    const timeoutHandle = setTimeout(
-      () => controller.abort(),
-      REQUEST_TIMEOUT_MS,
-    );
+    const timeoutHandle = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
     let response: Response;
 
@@ -573,13 +530,10 @@ export class VerifikService {
     } catch (err: unknown) {
       clearTimeout(timeoutHandle);
 
-      const isTimeout =
-        err instanceof Error && err.name === 'AbortError';
+      const isTimeout = err instanceof Error && err.name === 'AbortError';
 
       if (isTimeout) {
-        this.logger.error(
-          `[request] Timeout after ${REQUEST_TIMEOUT_MS}ms — ${method} ${url}`,
-        );
+        this.logger.error(`[request] Timeout after ${REQUEST_TIMEOUT_MS}ms — ${method} ${url}`);
         throw new VerifikUnavailableException({
           reason: 'timeout',
           timeoutMs: REQUEST_TIMEOUT_MS,
@@ -587,9 +541,7 @@ export class VerifikService {
       }
 
       const message = err instanceof Error ? err.message : String(err);
-      this.logger.error(
-        `[request] Network error — ${method} ${url}: ${message}`,
-      );
+      this.logger.error(`[request] Network error — ${method} ${url}: ${message}`);
       throw new VerifikUnavailableException({
         reason: 'networkError',
         message,
@@ -608,9 +560,7 @@ export class VerifikService {
       responseBody = {};
     }
 
-    this.logger.debug(
-      `[request] ${method} ${url} → HTTP ${response.status}`,
-    );
+    this.logger.debug(`[request] ${method} ${url} → HTTP ${response.status}`);
 
     if (response.status === 404) {
       throw new KycCpfNotFoundException({
@@ -620,8 +570,7 @@ export class VerifikService {
     }
 
     if (!response.ok) {
-      const errorMessage =
-        this.extractErrorMessage(responseBody) ?? `HTTP ${response.status}`;
+      const errorMessage = this.extractErrorMessage(responseBody) ?? `HTTP ${response.status}`;
 
       this.logger.error(
         `[request] Verifik API error — ${method} ${url} status=${response.status} message="${errorMessage}"`,
@@ -689,11 +638,7 @@ export class VerifikService {
    * Builds a minimal multipart/form-data body for document verification.
    * Includes the raw file bytes and the document type as a form field.
    */
-  private buildMultipartFormData(
-    boundary: string,
-    file: Buffer,
-    documentType: string,
-  ): Buffer {
+  private buildMultipartFormData(boundary: string, file: Buffer, documentType: string): Buffer {
     const CRLF = '\r\n';
     const parts: Buffer[] = [];
 

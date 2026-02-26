@@ -2,10 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { parseSort } from '../common/helpers/sort-parser';
-import {
-  NotFoundException,
-  BusinessRuleException,
-} from '../common/filters/app-exception';
+import { NotFoundException, BusinessRuleException } from '../common/filters/app-exception';
 import { CapTableQueryDto } from './dto/cap-table-query.dto';
 import { CreateSnapshotDto } from './dto/create-snapshot.dto';
 import { SnapshotHistoryQueryDto } from './dto/snapshot-history-query.dto';
@@ -96,11 +93,13 @@ export class CapTableService {
     });
 
     // Find the most recent update
-    const lastUpdated = shareholdings.length > 0
-      ? shareholdings.reduce((latest, sh) =>
-          sh.updatedAt > latest ? sh.updatedAt : latest,
-        shareholdings[0].updatedAt)
-      : company.createdAt;
+    const lastUpdated =
+      shareholdings.length > 0
+        ? shareholdings.reduce(
+            (latest, sh) => (sh.updatedAt > latest ? sh.updatedAt : latest),
+            shareholdings[0].updatedAt,
+          )
+        : company.createdAt;
 
     return {
       company: {
@@ -164,15 +163,12 @@ export class CapTableService {
     );
 
     // Calculate total options outstanding
-    const totalOptionsOutstanding = optionGrants.reduce(
-      (sum, grant) => {
-        const remaining = new Prisma.Decimal(grant.quantity).minus(
-          new Prisma.Decimal(grant.exercised),
-        );
-        return sum.plus(remaining.greaterThan(0) ? remaining : new Prisma.Decimal(0));
-      },
-      new Prisma.Decimal(0),
-    );
+    const totalOptionsOutstanding = optionGrants.reduce((sum, grant) => {
+      const remaining = new Prisma.Decimal(grant.quantity).minus(
+        new Prisma.Decimal(grant.exercised),
+      );
+      return sum.plus(remaining.greaterThan(0) ? remaining : new Prisma.Decimal(0));
+    }, new Prisma.Decimal(0));
 
     const fullyDilutedShares = totalSharesOutstanding.plus(totalOptionsOutstanding);
 
@@ -216,9 +212,7 @@ export class CapTableService {
       const optionsVested = vested.minus(exercised).greaterThan(0)
         ? vested.minus(exercised)
         : new Prisma.Decimal(0);
-      const optionsUnvested = new Prisma.Decimal(grant.quantity)
-        .minus(vested)
-        .greaterThan(0)
+      const optionsUnvested = new Prisma.Decimal(grant.quantity).minus(vested).greaterThan(0)
         ? new Prisma.Decimal(grant.quantity).minus(vested)
         : new Prisma.Decimal(0);
 
@@ -244,9 +238,7 @@ export class CapTableService {
         ? new Prisma.Decimal(0)
         : sh.currentShares.div(totalSharesOutstanding).mul(100);
 
-      const fdShares = sh.currentShares
-        .plus(sh.optionsVested)
-        .plus(sh.optionsUnvested);
+      const fdShares = sh.currentShares.plus(sh.optionsVested).plus(sh.optionsUnvested);
       const fdPercentage = fullyDilutedShares.isZero()
         ? new Prisma.Decimal(0)
         : fdShares.div(fullyDilutedShares).mul(100);
@@ -302,11 +294,10 @@ export class CapTableService {
 
     // Check if date is before company creation
     if (snapshotDate < company.createdAt) {
-      throw new BusinessRuleException(
-        'CAP_NO_DATA_FOR_DATE',
-        'errors.cap.noDataForDate',
-        { date, companyCreatedAt: company.createdAt.toISOString() },
-      );
+      throw new BusinessRuleException('CAP_NO_DATA_FOR_DATE', 'errors.cap.noDataForDate', {
+        date,
+        companyCreatedAt: company.createdAt.toISOString(),
+      });
     }
 
     // Find closest snapshot on or before the requested date
@@ -405,21 +396,16 @@ export class CapTableService {
     if (!company) throw new NotFoundException('company', companyId);
 
     if (company.status !== 'ACTIVE') {
-      throw new BusinessRuleException(
-        'CAP_COMPANY_NOT_ACTIVE',
-        'errors.cap.companyNotActive',
-      );
+      throw new BusinessRuleException('CAP_COMPANY_NOT_ACTIVE', 'errors.cap.companyNotActive');
     }
 
     const snapshotDate = new Date(dto.snapshotDate);
     const now = new Date();
 
     if (snapshotDate > now) {
-      throw new BusinessRuleException(
-        'CAP_FUTURE_SNAPSHOT_DATE',
-        'errors.cap.futureSnapshotDate',
-        { snapshotDate: dto.snapshotDate },
-      );
+      throw new BusinessRuleException('CAP_FUTURE_SNAPSHOT_DATE', 'errors.cap.futureSnapshotDate', {
+        snapshotDate: dto.snapshotDate,
+      });
     }
 
     // Get current cap table state
@@ -469,11 +455,7 @@ export class CapTableService {
    *
    * Fire-and-forget: errors are logged but never propagated to the caller.
    */
-  async createAutoSnapshot(
-    companyId: string,
-    trigger: string,
-    notes?: string,
-  ): Promise<void> {
+  async createAutoSnapshot(companyId: string, trigger: string, notes?: string): Promise<void> {
     try {
       const capTableData = await this.getCurrentCapTable(companyId, {
         view: 'current',
@@ -692,8 +674,7 @@ export class CapTableService {
 
     // Calculate months elapsed since grant
     const monthsElapsed =
-      (now.getFullYear() - grantDate.getFullYear()) * 12 +
-      (now.getMonth() - grantDate.getMonth());
+      (now.getFullYear() - grantDate.getFullYear()) * 12 + (now.getMonth() - grantDate.getMonth());
 
     // Check cliff
     if (grant.cliffMonths && monthsElapsed < grant.cliffMonths) {
@@ -740,10 +721,7 @@ export class CapTableService {
   }): string {
     const content = capTableData.entries
       .sort((a, b) => a.shareholderId.localeCompare(b.shareholderId))
-      .map(
-        (e) =>
-          `${e.shareholderId}|${e.shares}|${e.ownershipPercentage}`,
-      )
+      .map((e) => `${e.shareholderId}|${e.shares}|${e.ownershipPercentage}`)
       .join('\n');
 
     return createHash('sha256')

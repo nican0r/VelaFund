@@ -53,28 +53,22 @@ describe('VerifikService', () => {
 
   function buildService(): VerifikService {
     const mockConfig = {
-      get: jest
-        .fn()
-        .mockImplementation((key: string, defaultValue?: string) => {
-          if (key === 'VERIFIK_API_TOKEN') return 'test-api-token';
-          if (key === 'VERIFIK_BASE_URL')
-            return defaultValue ?? 'https://api.verifik.co/v2';
-          return defaultValue;
-        }),
+      get: jest.fn().mockImplementation((key: string, defaultValue?: string) => {
+        if (key === 'VERIFIK_API_TOKEN') return 'test-api-token';
+        if (key === 'VERIFIK_BASE_URL') return defaultValue ?? 'https://api.verifik.co/v2';
+        return defaultValue;
+      }),
     };
     return new VerifikService(mockConfig as unknown as ConfigService);
   }
 
   function buildUnconfiguredService(): VerifikService {
     const mockConfig = {
-      get: jest
-        .fn()
-        .mockImplementation((key: string, defaultValue?: string) => {
-          if (key === 'VERIFIK_API_TOKEN') return undefined;
-          if (key === 'VERIFIK_BASE_URL')
-            return defaultValue ?? 'https://api.verifik.co/v2';
-          return defaultValue;
-        }),
+      get: jest.fn().mockImplementation((key: string, defaultValue?: string) => {
+        if (key === 'VERIFIK_API_TOKEN') return undefined;
+        if (key === 'VERIFIK_BASE_URL') return defaultValue ?? 'https://api.verifik.co/v2';
+        return defaultValue;
+      }),
     };
     return new VerifikService(mockConfig as unknown as ConfigService);
   }
@@ -145,14 +139,11 @@ describe('VerifikService', () => {
 
     it('returns false when API token is empty string', () => {
       const mockConfig = {
-        get: jest
-          .fn()
-          .mockImplementation((key: string, defaultValue?: string) => {
-            if (key === 'VERIFIK_API_TOKEN') return '';
-            if (key === 'VERIFIK_BASE_URL')
-              return defaultValue ?? 'https://api.verifik.co/v2';
-            return defaultValue;
-          }),
+        get: jest.fn().mockImplementation((key: string, defaultValue?: string) => {
+          if (key === 'VERIFIK_API_TOKEN') return '';
+          if (key === 'VERIFIK_BASE_URL') return defaultValue ?? 'https://api.verifik.co/v2';
+          return defaultValue;
+        }),
       };
       const svc = new VerifikService(mockConfig as unknown as ConfigService);
       expect(svc.isAvailable()).toBe(false);
@@ -282,9 +273,9 @@ describe('VerifikService', () => {
     it('throws VerifikUnavailableException when not configured', async () => {
       const svc = buildUnconfiguredService();
 
-      await expect(
-        svc.verifyCpf(VALID_CPF, VALID_DOB),
-      ).rejects.toThrow(VerifikUnavailableException);
+      await expect(svc.verifyCpf(VALID_CPF, VALID_DOB)).rejects.toThrow(
+        VerifikUnavailableException,
+      );
 
       try {
         await svc.verifyCpf(VALID_CPF, VALID_DOB);
@@ -415,9 +406,9 @@ describe('VerifikService', () => {
       await service.verifyCpf(VALID_CPF, VALID_DOB);
 
       const fetchOptions = mockFetch.mock.calls[0][1] as RequestInit;
-      expect(
-        (fetchOptions.headers as Record<string, string>).Authorization,
-      ).toBe('Bearer test-api-token');
+      expect((fetchOptions.headers as Record<string, string>).Authorization).toBe(
+        'Bearer test-api-token',
+      );
     });
 
     it('sends GET request for CPF verification', async () => {
@@ -507,9 +498,9 @@ describe('VerifikService', () => {
         authenticity: 90,
       });
 
-      await expect(
-        service.verifyDocument(DOCUMENT_FILE, 'CNH'),
-      ).rejects.toThrow(KycDocumentUnreadableException);
+      await expect(service.verifyDocument(DOCUMENT_FILE, 'CNH')).rejects.toThrow(
+        KycDocumentUnreadableException,
+      );
     });
 
     it('throws KycDocumentUnreadableException when authenticity<50', async () => {
@@ -520,9 +511,9 @@ describe('VerifikService', () => {
         authenticity: 49,
       });
 
-      await expect(
-        service.verifyDocument(DOCUMENT_FILE, 'CNH'),
-      ).rejects.toThrow(KycDocumentUnreadableException);
+      await expect(service.verifyDocument(DOCUMENT_FILE, 'CNH')).rejects.toThrow(
+        KycDocumentUnreadableException,
+      );
     });
 
     it('includes verified, authenticity, and documentType in exception details', async () => {
@@ -550,9 +541,9 @@ describe('VerifikService', () => {
         authenticity: 10,
       });
 
-      await expect(
-        service.verifyDocument(DOCUMENT_FILE, 'RNE'),
-      ).rejects.toThrow(KycDocumentUnreadableException);
+      await expect(service.verifyDocument(DOCUMENT_FILE, 'RNE')).rejects.toThrow(
+        KycDocumentUnreadableException,
+      );
     });
 
     it('defaults verified to false and authenticity to 0 when fields missing', async () => {
@@ -562,9 +553,9 @@ describe('VerifikService', () => {
       });
 
       // verified defaults to false, authenticity defaults to 0 -> should throw
-      await expect(
-        service.verifyDocument(DOCUMENT_FILE, 'CNH'),
-      ).rejects.toThrow(KycDocumentUnreadableException);
+      await expect(service.verifyDocument(DOCUMENT_FILE, 'CNH')).rejects.toThrow(
+        KycDocumentUnreadableException,
+      );
     });
 
     it('handles null issueDate and expiryDate gracefully', async () => {
@@ -586,9 +577,9 @@ describe('VerifikService', () => {
     it('throws VerifikUnavailableException when not configured', async () => {
       const svc = buildUnconfiguredService();
 
-      await expect(
-        svc.verifyDocument(DOCUMENT_FILE, 'CNH'),
-      ).rejects.toThrow(VerifikUnavailableException);
+      await expect(svc.verifyDocument(DOCUMENT_FILE, 'CNH')).rejects.toThrow(
+        VerifikUnavailableException,
+      );
     });
 
     it('sends POST request with multipart/form-data content type', async () => {
@@ -603,9 +594,7 @@ describe('VerifikService', () => {
 
       const fetchOptions = mockFetch.mock.calls[0][1] as RequestInit;
       expect(fetchOptions.method).toBe('POST');
-      const contentType = (fetchOptions.headers as Record<string, string>)[
-        'Content-Type'
-      ];
+      const contentType = (fetchOptions.headers as Record<string, string>)['Content-Type'];
       expect(contentType).toContain('multipart/form-data');
       expect(contentType).toContain('boundary=');
     });
@@ -660,9 +649,9 @@ describe('VerifikService', () => {
         livenessScore: 69,
       });
 
-      await expect(
-        service.matchFace(SELFIE_FILE, DOCUMENT_IMAGE_URL),
-      ).rejects.toThrow(KycLivenessCheckFailedException);
+      await expect(service.matchFace(SELFIE_FILE, DOCUMENT_IMAGE_URL)).rejects.toThrow(
+        KycLivenessCheckFailedException,
+      );
     });
 
     it('includes livenessScore and threshold in KycLivenessCheckFailedException details', async () => {
@@ -689,9 +678,9 @@ describe('VerifikService', () => {
         livenessScore: 85,
       });
 
-      await expect(
-        service.matchFace(SELFIE_FILE, DOCUMENT_IMAGE_URL),
-      ).rejects.toThrow(KycFaceMatchFailedException);
+      await expect(service.matchFace(SELFIE_FILE, DOCUMENT_IMAGE_URL)).rejects.toThrow(
+        KycFaceMatchFailedException,
+      );
     });
 
     it('includes matchScore and threshold in KycFaceMatchFailedException details', async () => {
@@ -719,9 +708,9 @@ describe('VerifikService', () => {
         livenessScore: 30,
       });
 
-      await expect(
-        service.matchFace(SELFIE_FILE, DOCUMENT_IMAGE_URL),
-      ).rejects.toThrow(KycLivenessCheckFailedException);
+      await expect(service.matchFace(SELFIE_FILE, DOCUMENT_IMAGE_URL)).rejects.toThrow(
+        KycLivenessCheckFailedException,
+      );
     });
 
     it('handles Portuguese response fields (pontuacaoCorrespondencia, pontuacaoVivacidade)', async () => {
@@ -755,17 +744,17 @@ describe('VerifikService', () => {
     it('defaults scores to 0 when fields are missing (throws liveness exception)', async () => {
       mockFetchResponse(200, {});
 
-      await expect(
-        service.matchFace(SELFIE_FILE, DOCUMENT_IMAGE_URL),
-      ).rejects.toThrow(KycLivenessCheckFailedException);
+      await expect(service.matchFace(SELFIE_FILE, DOCUMENT_IMAGE_URL)).rejects.toThrow(
+        KycLivenessCheckFailedException,
+      );
     });
 
     it('throws VerifikUnavailableException when not configured', async () => {
       const svc = buildUnconfiguredService();
 
-      await expect(
-        svc.matchFace(SELFIE_FILE, DOCUMENT_IMAGE_URL),
-      ).rejects.toThrow(VerifikUnavailableException);
+      await expect(svc.matchFace(SELFIE_FILE, DOCUMENT_IMAGE_URL)).rejects.toThrow(
+        VerifikUnavailableException,
+      );
     });
 
     it('sends POST request to face/match endpoint', async () => {
@@ -795,11 +784,7 @@ describe('VerifikService', () => {
         details: { source: 'global-screening-db' },
       });
 
-      const result = await service.screenAml(
-        VALID_NAME,
-        VALID_CPF,
-        VALID_NATIONALITY,
-      );
+      const result = await service.screenAml(VALID_NAME, VALID_CPF, VALID_NATIONALITY);
 
       expect(result).toEqual({
         riskScore: 'LOW',
@@ -817,11 +802,7 @@ describe('VerifikService', () => {
         detalhes: { cargo: 'Deputado Federal' },
       });
 
-      const result = await service.screenAml(
-        VALID_NAME,
-        VALID_CPF,
-        VALID_NATIONALITY,
-      );
+      const result = await service.screenAml(VALID_NAME, VALID_CPF, VALID_NATIONALITY);
 
       expect(result).toEqual({
         riskScore: 'MEDIUM',
@@ -843,11 +824,7 @@ describe('VerifikService', () => {
         detalhes: { pt: true },
       });
 
-      const result = await service.screenAml(
-        VALID_NAME,
-        VALID_CPF,
-        VALID_NATIONALITY,
-      );
+      const result = await service.screenAml(VALID_NAME, VALID_CPF, VALID_NATIONALITY);
 
       expect(result.riskScore).toBe('HIGH');
       expect(result.isPEP).toBe(true);
@@ -858,11 +835,7 @@ describe('VerifikService', () => {
     it('handles missing/undefined fields gracefully with defaults', async () => {
       mockFetchResponse(200, {});
 
-      const result = await service.screenAml(
-        VALID_NAME,
-        VALID_CPF,
-        VALID_NATIONALITY,
-      );
+      const result = await service.screenAml(VALID_NAME, VALID_CPF, VALID_NATIONALITY);
 
       expect(result).toEqual({
         riskScore: 'LOW',
@@ -895,9 +868,9 @@ describe('VerifikService', () => {
     it('throws VerifikUnavailableException when not configured', async () => {
       const svc = buildUnconfiguredService();
 
-      await expect(
-        svc.screenAml(VALID_NAME, VALID_CPF, VALID_NATIONALITY),
-      ).rejects.toThrow(VerifikUnavailableException);
+      await expect(svc.screenAml(VALID_NAME, VALID_CPF, VALID_NATIONALITY)).rejects.toThrow(
+        VerifikUnavailableException,
+      );
     });
 
     it('sends POST request to screening endpoint', async () => {
@@ -915,9 +888,9 @@ describe('VerifikService', () => {
 
       const fetchOptions = mockFetch.mock.calls[0][1] as RequestInit;
       expect(fetchOptions.method).toBe('POST');
-      expect(
-        (fetchOptions.headers as Record<string, string>)['Content-Type'],
-      ).toBe('application/json');
+      expect((fetchOptions.headers as Record<string, string>)['Content-Type']).toBe(
+        'application/json',
+      );
     });
 
     it('handles HIGH risk score with sanctions match', async () => {
@@ -931,11 +904,7 @@ describe('VerifikService', () => {
         },
       });
 
-      const result = await service.screenAml(
-        VALID_NAME,
-        VALID_CPF,
-        VALID_NATIONALITY,
-      );
+      const result = await service.screenAml(VALID_NAME, VALID_CPF, VALID_NATIONALITY);
 
       expect(result.riskScore).toBe('HIGH');
       expect(result.isPEP).toBe(true);
@@ -1101,9 +1070,7 @@ describe('VerifikService', () => {
       await service.verifyCpf(VALID_CPF, VALID_DOB);
 
       const fetchOptions = mockFetch.mock.calls[0][1] as RequestInit;
-      expect(
-        (fetchOptions.headers as Record<string, string>).Accept,
-      ).toBe('application/json');
+      expect((fetchOptions.headers as Record<string, string>).Accept).toBe('application/json');
     });
 
     it('handles non-Error thrown objects in catch block', async () => {
@@ -1121,18 +1088,14 @@ describe('VerifikService', () => {
   describe('constructor', () => {
     it('uses default base URL when VERIFIK_BASE_URL is not set', async () => {
       const customConfigService = {
-        get: jest
-          .fn()
-          .mockImplementation((key: string, defaultValue?: string) => {
-            if (key === 'VERIFIK_API_TOKEN') return 'test-token';
-            if (key === 'VERIFIK_BASE_URL') return defaultValue; // falls back to default
-            return defaultValue;
-          }),
+        get: jest.fn().mockImplementation((key: string, defaultValue?: string) => {
+          if (key === 'VERIFIK_API_TOKEN') return 'test-token';
+          if (key === 'VERIFIK_BASE_URL') return defaultValue; // falls back to default
+          return defaultValue;
+        }),
       };
 
-      const svc = new VerifikService(
-        customConfigService as unknown as ConfigService,
-      );
+      const svc = new VerifikService(customConfigService as unknown as ConfigService);
       expect(svc.isAvailable()).toBe(true);
 
       // Verify the default base URL is used by making a call

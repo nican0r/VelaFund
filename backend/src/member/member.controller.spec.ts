@@ -65,9 +65,7 @@ describe('MemberController', () => {
       const dto = { email: 'bad@example.com', role: MemberRoleDto.ADMIN };
       service.invite.mockRejectedValue(new Error('test'));
 
-      await expect(controller.invite('comp-1', dto, 'user-1')).rejects.toThrow(
-        'test',
-      );
+      await expect(controller.invite('comp-1', dto, 'user-1')).rejects.toThrow('test');
     });
   });
 
@@ -127,11 +125,7 @@ describe('MemberController', () => {
 
       const result = await controller.update('comp-1', 'member-1', dto);
 
-      expect(service.updateMember).toHaveBeenCalledWith(
-        'comp-1',
-        'member-1',
-        dto,
-      );
+      expect(service.updateMember).toHaveBeenCalledWith('comp-1', 'member-1', dto);
       expect(result.role).toBe('FINANCE');
     });
   });
@@ -144,11 +138,7 @@ describe('MemberController', () => {
 
       const result = await controller.remove('comp-1', 'member-1', 'user-1');
 
-      expect(service.removeMember).toHaveBeenCalledWith(
-        'comp-1',
-        'member-1',
-        'user-1',
-      );
+      expect(service.removeMember).toHaveBeenCalledWith('comp-1', 'member-1', 'user-1');
       expect(result).toBeUndefined();
     });
   });
@@ -167,10 +157,7 @@ describe('MemberController', () => {
 
       const result = await controller.resendInvitation('comp-1', 'member-1');
 
-      expect(service.resendInvitation).toHaveBeenCalledWith(
-        'comp-1',
-        'member-1',
-      );
+      expect(service.resendInvitation).toHaveBeenCalledWith('comp-1', 'member-1');
       expect(result).toEqual(resendResult);
     });
   });

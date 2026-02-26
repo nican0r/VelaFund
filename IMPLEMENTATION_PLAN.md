@@ -1,6 +1,6 @@
-# Navia MVP — Implementation Plan v61.0
+# Navia MVP — Implementation Plan v62.0
 
-> **Generated**: 2026-02-26 | **Tests**: 2734 passing (1717 backend + 1017 frontend) | **Backend modules**: 22 of 23 built
+> **Generated**: 2026-02-26 | **Tests**: 2748 passing (1731 backend + 1017 frontend) | **Backend modules**: 22 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -130,10 +130,10 @@ Gaps in the 12 built modules, ordered by module.
 
 ### Share Class Module
 
-- [ ] S.A. company type validation: require at least one COMMON_SHARES class before first issuance
-- [ ] Ltda. auto-create QUOTA class on company creation (currently no auto-creation logic)
-- [ ] Immutable field error: return specific error code when trying to change fields after shares are issued (currently may silently succeed or give generic error)
-- [ ] `DELETE` endpoint — only when totalIssued = 0
+- [x] S.A. company type validation: require at least one COMMON_SHARES class before first issuance — DONE (v0.0.66): TransactionService.create() checks for COMMON_SHARES class count before ISSUANCE for SA_CAPITAL_FECHADO/SA_CAPITAL_ABERTO companies. Throws CAP_MISSING_COMMON_SHARES if none found. 3 tests.
+- [x] Ltda. auto-create QUOTA class on company creation — DONE (v0.0.66): CompanyService.create() auto-creates "Quotas Ordinárias" QUOTA share class inside $transaction for LTDA companies. 2 tests.
+- [x] Immutable field enforcement after shares are issued — DONE (v0.0.66): ShareClassService.update() enforces EC-3 immutability for className, type, votesPerShare, liquidationPreferenceMultiple, participatingRights when totalIssued > 0. Throws CAP_IMMUTABLE_AFTER_ISSUANCE. Pre-issuance mutation of all fields supported. Entity type compatibility validation on type change. Duplicate className conflict handling. 9 tests.
+- [x] `DELETE` endpoint — only when totalIssued = 0 — DONE (already implemented in ShareClassService.delete() and ShareClassController with full validation)
 
 ### Shareholder Module
 

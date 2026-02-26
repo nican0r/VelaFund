@@ -88,33 +88,21 @@ describe('CompanyController', () => {
 
     it('should propagate ConflictException for duplicate CNPJ', async () => {
       service.create.mockRejectedValue(
-        new ConflictException(
-          'COMPANY_CNPJ_DUPLICATE',
-          'errors.company.cnpjDuplicate',
-        ),
+        new ConflictException('COMPANY_CNPJ_DUPLICATE', 'errors.company.cnpjDuplicate'),
       );
 
       await expect(
-        controller.create(
-          { name: 'Test', entityType: 'LTDA' as any, cnpj: VALID_CNPJ },
-          'user-1',
-        ),
+        controller.create({ name: 'Test', entityType: 'LTDA' as any, cnpj: VALID_CNPJ }, 'user-1'),
       ).rejects.toThrow(ConflictException);
     });
 
     it('should propagate BusinessRuleException for membership limit', async () => {
       service.create.mockRejectedValue(
-        new BusinessRuleException(
-          'COMPANY_MEMBERSHIP_LIMIT',
-          'errors.company.membershipLimit',
-        ),
+        new BusinessRuleException('COMPANY_MEMBERSHIP_LIMIT', 'errors.company.membershipLimit'),
       );
 
       await expect(
-        controller.create(
-          { name: 'Test', entityType: 'LTDA' as any, cnpj: VALID_CNPJ },
-          'user-1',
-        ),
+        controller.create({ name: 'Test', entityType: 'LTDA' as any, cnpj: VALID_CNPJ }, 'user-1'),
       ).rejects.toThrow(BusinessRuleException);
     });
   });
@@ -128,12 +116,7 @@ describe('CompanyController', () => {
         total: 1,
       });
 
-      const result = await controller.list(
-        'user-1',
-        { page: 1, limit: 20 },
-        undefined,
-        undefined,
-      );
+      const result = await controller.list('user-1', { page: 1, limit: 20 }, undefined, undefined);
 
       expect(result).toEqual({
         success: true,
@@ -180,13 +163,9 @@ describe('CompanyController', () => {
     });
 
     it('should propagate NotFoundException', async () => {
-      service.findById.mockRejectedValue(
-        new NotFoundException('company', 'comp-1'),
-      );
+      service.findById.mockRejectedValue(new NotFoundException('company', 'comp-1'));
 
-      await expect(controller.getOne('comp-1')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(controller.getOne('comp-1')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -213,9 +192,9 @@ describe('CompanyController', () => {
         ),
       );
 
-      await expect(
-        controller.update('comp-1', { name: 'Foo' }),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(controller.update('comp-1', { name: 'Foo' })).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
   });
 
@@ -255,13 +234,9 @@ describe('CompanyController', () => {
     });
 
     it('should propagate NotFoundException', async () => {
-      service.getSetupStatus.mockRejectedValue(
-        new NotFoundException('company', 'comp-1'),
-      );
+      service.getSetupStatus.mockRejectedValue(new NotFoundException('company', 'comp-1'));
 
-      await expect(controller.getSetupStatus('comp-1')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(controller.getSetupStatus('comp-1')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -274,36 +249,27 @@ describe('CompanyController', () => {
       const result = await controller.retryValidation('comp-1', 'user-1');
 
       expect(result).toEqual({ message: 'CNPJ validation retry dispatched' });
-      expect(service.retryCnpjValidation).toHaveBeenCalledWith(
-        'comp-1',
-        'user-1',
-      );
+      expect(service.retryCnpjValidation).toHaveBeenCalledWith('comp-1', 'user-1');
     });
 
     it('should propagate BusinessRuleException for non-DRAFT company', async () => {
       service.retryCnpjValidation.mockRejectedValue(
-        new BusinessRuleException(
-          'COMPANY_NOT_DRAFT',
-          'errors.company.notDraft',
-        ),
+        new BusinessRuleException('COMPANY_NOT_DRAFT', 'errors.company.notDraft'),
       );
 
-      await expect(
-        controller.retryValidation('comp-1', 'user-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(controller.retryValidation('comp-1', 'user-1')).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should propagate BusinessRuleException when validation is not failed', async () => {
       service.retryCnpjValidation.mockRejectedValue(
-        new BusinessRuleException(
-          'COMPANY_CNPJ_NOT_FAILED',
-          'errors.company.cnpjNotFailed',
-        ),
+        new BusinessRuleException('COMPANY_CNPJ_NOT_FAILED', 'errors.company.cnpjNotFailed'),
       );
 
-      await expect(
-        controller.retryValidation('comp-1', 'user-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(controller.retryValidation('comp-1', 'user-1')).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
   });
 
@@ -326,9 +292,7 @@ describe('CompanyController', () => {
         ),
       );
 
-      await expect(controller.dissolve('comp-1')).rejects.toThrow(
-        BusinessRuleException,
-      );
+      await expect(controller.dissolve('comp-1')).rejects.toThrow(BusinessRuleException);
     });
   });
 });

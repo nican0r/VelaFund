@@ -10,10 +10,7 @@ import { UpdateDraftDto } from './dto/update-draft.dto';
 import { ListTemplatesQueryDto } from './dto/list-templates-query.dto';
 import { ListDocumentsQueryDto } from './dto/list-documents-query.dto';
 import { parseSort } from '../common/helpers/sort-parser';
-import {
-  NotFoundException,
-  BusinessRuleException,
-} from '../common/filters/app-exception';
+import { NotFoundException, BusinessRuleException } from '../common/filters/app-exception';
 
 /** Allowed sort fields for templates */
 const TEMPLATE_SORT_FIELDS = ['createdAt', 'name', 'documentType'];
@@ -71,19 +68,13 @@ export class DocumentService {
     private readonly s3Service: S3Service,
     private readonly configService: ConfigService,
   ) {
-    this.s3Bucket = this.configService.get<string>(
-      'AWS_S3_DOCUMENTS_BUCKET',
-      'navia-documents',
-    );
+    this.s3Bucket = this.configService.get<string>('AWS_S3_DOCUMENTS_BUCKET', 'navia-documents');
     registerHandlebarsHelpers();
   }
 
   // ─── TEMPLATE METHODS ──────────────────────────────────────────────
 
-  async findAllTemplates(
-    companyId: string,
-    query: ListTemplatesQueryDto,
-  ) {
+  async findAllTemplates(companyId: string, query: ListTemplatesQueryDto) {
     const { page, limit, type, search, sort } = query;
 
     const where: Prisma.DocumentTemplateWhereInput = {
@@ -137,11 +128,7 @@ export class DocumentService {
 
   // ─── DOCUMENT METHODS ──────────────────────────────────────────────
 
-  async createDraft(
-    companyId: string,
-    userId: string,
-    dto: CreateDocumentDto,
-  ) {
+  async createDraft(companyId: string, userId: string, dto: CreateDocumentDto) {
     const template = await this.prisma.documentTemplate.findFirst({
       where: { id: dto.templateId, companyId },
     });
@@ -151,10 +138,7 @@ export class DocumentService {
     }
 
     if (!template.isActive) {
-      throw new BusinessRuleException(
-        'DOC_TEMPLATE_INACTIVE',
-        'errors.doc.templateInactive',
-      );
+      throw new BusinessRuleException('DOC_TEMPLATE_INACTIVE', 'errors.doc.templateInactive');
     }
 
     return this.prisma.document.create({
@@ -170,11 +154,7 @@ export class DocumentService {
     });
   }
 
-  async createAndGenerate(
-    companyId: string,
-    userId: string,
-    dto: CreateDocumentDto,
-  ) {
+  async createAndGenerate(companyId: string, userId: string, dto: CreateDocumentDto) {
     const template = await this.prisma.documentTemplate.findFirst({
       where: { id: dto.templateId, companyId },
     });
@@ -184,17 +164,11 @@ export class DocumentService {
     }
 
     if (!template.isActive) {
-      throw new BusinessRuleException(
-        'DOC_TEMPLATE_INACTIVE',
-        'errors.doc.templateInactive',
-      );
+      throw new BusinessRuleException('DOC_TEMPLATE_INACTIVE', 'errors.doc.templateInactive');
     }
 
     // Validate required fields
-    this.validateFormData(
-      template.formSchema as FormSchema | null,
-      dto.formData,
-    );
+    this.validateFormData(template.formSchema as FormSchema | null, dto.formData);
 
     // Compile template with form data
     const html = this.compileTemplate(template.content, dto.formData);
@@ -203,9 +177,7 @@ export class DocumentService {
     const pdfBuffer = await this.generatePdf(html);
 
     // Compute content hash
-    const contentHash = createHash('sha256')
-      .update(pdfBuffer)
-      .digest('hex');
+    const contentHash = createHash('sha256').update(pdfBuffer).digest('hex');
 
     // Upload to S3
     const s3Key = `documents/${companyId}/${Date.now()}-${contentHash.slice(0, 8)}.pdf`;
@@ -228,10 +200,7 @@ export class DocumentService {
     });
   }
 
-  async findAllDocuments(
-    companyId: string,
-    query: ListDocumentsQueryDto,
-  ) {
+  async findAllDocuments(companyId: string, query: ListDocumentsQueryDto) {
     const { page, limit, status, type, search, sort } = query;
 
     const where: Prisma.DocumentWhereInput = { companyId };
@@ -304,11 +273,7 @@ export class DocumentService {
     return document;
   }
 
-  async updateDraft(
-    companyId: string,
-    documentId: string,
-    dto: UpdateDraftDto,
-  ) {
+  async updateDraft(companyId: string, documentId: string, dto: UpdateDraftDto) {
     const document = await this.prisma.document.findFirst({
       where: { id: documentId, companyId },
     });
@@ -318,10 +283,7 @@ export class DocumentService {
     }
 
     if (document.status !== 'DRAFT') {
-      throw new BusinessRuleException(
-        'DOC_NOT_DRAFT',
-        'errors.doc.notDraft',
-      );
+      throw new BusinessRuleException('DOC_NOT_DRAFT', 'errors.doc.notDraft');
     }
 
     return this.prisma.document.update({
@@ -346,10 +308,7 @@ export class DocumentService {
     }
 
     if (document.status !== 'DRAFT') {
-      throw new BusinessRuleException(
-        'DOC_NOT_DRAFT',
-        'errors.doc.notDraft',
-      );
+      throw new BusinessRuleException('DOC_NOT_DRAFT', 'errors.doc.notDraft');
     }
 
     if (!document.template) {
@@ -359,18 +318,13 @@ export class DocumentService {
     const formData = (document.formData as Record<string, unknown>) || {};
 
     // Validate required fields
-    this.validateFormData(
-      document.template.formSchema as FormSchema | null,
-      formData,
-    );
+    this.validateFormData(document.template.formSchema as FormSchema | null, formData);
 
     // Compile and generate PDF
     const html = this.compileTemplate(document.template.content, formData);
     const pdfBuffer = await this.generatePdf(html);
 
-    const contentHash = createHash('sha256')
-      .update(pdfBuffer)
-      .digest('hex');
+    const contentHash = createHash('sha256').update(pdfBuffer).digest('hex');
 
     const s3Key = `documents/${companyId}/${Date.now()}-${contentHash.slice(0, 8)}.pdf`;
     await this.uploadToS3(s3Key, pdfBuffer);
@@ -414,16 +368,10 @@ export class DocumentService {
     }
 
     if (!document.s3Key) {
-      throw new BusinessRuleException(
-        'DOC_NOT_GENERATED',
-        'errors.doc.notGenerated',
-      );
+      throw new BusinessRuleException('DOC_NOT_GENERATED', 'errors.doc.notGenerated');
     }
 
-    const downloadUrl = await this.s3Service.generatePresignedUrl(
-      this.s3Bucket,
-      document.s3Key,
-    );
+    const downloadUrl = await this.s3Service.generatePresignedUrl(this.s3Bucket, document.s3Key);
 
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
@@ -448,9 +396,7 @@ export class DocumentService {
     this.validateFileType(file.buffer);
 
     // Compute content hash
-    const contentHash = createHash('sha256')
-      .update(file.buffer)
-      .digest('hex');
+    const contentHash = createHash('sha256').update(file.buffer).digest('hex');
 
     // Upload to S3
     const ext = this.getFileExtension(file.buffer);
@@ -481,20 +427,11 @@ export class DocumentService {
     }
 
     if (document._count.signers > 0) {
-      throw new BusinessRuleException(
-        'DOC_HAS_SIGNATURES',
-        'errors.doc.hasSignatures',
-      );
+      throw new BusinessRuleException('DOC_HAS_SIGNATURES', 'errors.doc.hasSignatures');
     }
 
-    if (
-      document.status !== 'DRAFT' &&
-      document.status !== 'GENERATED'
-    ) {
-      throw new BusinessRuleException(
-        'DOC_HAS_SIGNATURES',
-        'errors.doc.hasSignatures',
-      );
+    if (document.status !== 'DRAFT' && document.status !== 'GENERATED') {
+      throw new BusinessRuleException('DOC_HAS_SIGNATURES', 'errors.doc.hasSignatures');
     }
 
     // Delete S3 object if it exists
@@ -502,9 +439,7 @@ export class DocumentService {
       try {
         await this.s3Service.delete(this.s3Bucket, document.s3Key);
       } catch (err) {
-        this.logger.warn(
-          `Failed to delete S3 object ${document.s3Key}: ${err}`,
-        );
+        this.logger.warn(`Failed to delete S3 object ${document.s3Key}: ${err}`);
       }
     }
 
@@ -519,9 +454,7 @@ export class DocumentService {
     });
 
     if (existing > 0) {
-      this.logger.log(
-        `Templates already exist for company ${companyId}, skipping seed`,
-      );
+      this.logger.log(`Templates already exist for company ${companyId}, skipping seed`);
       return;
     }
 
@@ -540,17 +473,12 @@ export class DocumentService {
       })),
     });
 
-    this.logger.log(
-      `Seeded ${templates.length} document templates for company ${companyId}`,
-    );
+    this.logger.log(`Seeded ${templates.length} document templates for company ${companyId}`);
   }
 
   // ─── PRIVATE HELPERS ───────────────────────────────────────────────
 
-  private compileTemplate(
-    templateContent: string,
-    formData: Record<string, unknown>,
-  ): string {
+  private compileTemplate(templateContent: string, formData: Record<string, unknown>): string {
     const compiled = Handlebars.compile(templateContent);
     return compiled(formData);
   }
@@ -588,10 +516,7 @@ export class DocumentService {
       return Buffer.from(pdfUint8);
     } catch (err) {
       this.logger.error(`PDF generation failed: ${err}`);
-      throw new BusinessRuleException(
-        'DOC_GENERATION_FAILED',
-        'errors.doc.generationFailed',
-      );
+      throw new BusinessRuleException('DOC_GENERATION_FAILED', 'errors.doc.generationFailed');
     } finally {
       if (browser) {
         await browser.close().catch(() => {});
@@ -646,10 +571,7 @@ ${body}
     });
   }
 
-  private validateFormData(
-    schema: FormSchema | null,
-    formData: Record<string, unknown>,
-  ): void {
+  private validateFormData(schema: FormSchema | null, formData: Record<string, unknown>): void {
     if (!schema || !schema.fields) return;
 
     const missingFields: string[] = [];
@@ -659,76 +581,45 @@ ${body}
         const value = formData[field.name];
         if (value === undefined || value === null || value === '') {
           missingFields.push(field.name);
-        } else if (
-          field.type === 'array' &&
-          Array.isArray(value) &&
-          value.length === 0
-        ) {
+        } else if (field.type === 'array' && Array.isArray(value) && value.length === 0) {
           missingFields.push(field.name);
         }
       }
     }
 
     if (missingFields.length > 0) {
-      throw new BusinessRuleException(
-        'DOC_INCOMPLETE_FORM',
-        'errors.doc.incompleteForm',
-        { missingFields },
-      );
+      throw new BusinessRuleException('DOC_INCOMPLETE_FORM', 'errors.doc.incompleteForm', {
+        missingFields,
+      });
     }
   }
 
   private validateFileType(buffer: Buffer): void {
     if (buffer.length < 4) {
-      throw new BusinessRuleException(
-        'DOC_INVALID_FILE_TYPE',
-        'errors.doc.invalidFileType',
-      );
+      throw new BusinessRuleException('DOC_INVALID_FILE_TYPE', 'errors.doc.invalidFileType');
     }
 
     const isPdf =
-      buffer[0] === 0x25 &&
-      buffer[1] === 0x50 &&
-      buffer[2] === 0x44 &&
-      buffer[3] === 0x46; // %PDF
+      buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46; // %PDF
 
-    const isJpeg =
-      buffer[0] === 0xff &&
-      buffer[1] === 0xd8 &&
-      buffer[2] === 0xff;
+    const isJpeg = buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
 
     const isPng =
-      buffer[0] === 0x89 &&
-      buffer[1] === 0x50 &&
-      buffer[2] === 0x4e &&
-      buffer[3] === 0x47; // .PNG
+      buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47; // .PNG
 
     if (!isPdf && !isJpeg && !isPng) {
-      throw new BusinessRuleException(
-        'DOC_INVALID_FILE_TYPE',
-        'errors.doc.invalidFileType',
-      );
+      throw new BusinessRuleException('DOC_INVALID_FILE_TYPE', 'errors.doc.invalidFileType');
     }
   }
 
   private getFileExtension(buffer: Buffer): string {
-    if (
-      buffer[0] === 0x25 &&
-      buffer[1] === 0x50 &&
-      buffer[2] === 0x44 &&
-      buffer[3] === 0x46
-    ) {
+    if (buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46) {
       return 'pdf';
     }
     if (buffer[0] === 0xff && buffer[1] === 0xd8) {
       return 'jpg';
     }
-    if (
-      buffer[0] === 0x89 &&
-      buffer[1] === 0x50 &&
-      buffer[2] === 0x4e &&
-      buffer[3] === 0x47
-    ) {
+    if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) {
       return 'png';
     }
     return 'bin';
@@ -790,8 +681,21 @@ ${body}
               required: true,
               itemSchema: [
                 { name: 'name', type: 'text', label: 'Nome', labelEn: 'Name', required: true },
-                { name: 'cpfCnpj', type: 'text', label: 'CPF/CNPJ', labelEn: 'CPF/CNPJ', required: true },
-                { name: 'shares', type: 'number', label: 'Ações', labelEn: 'Shares', required: true, min: 1 },
+                {
+                  name: 'cpfCnpj',
+                  type: 'text',
+                  label: 'CPF/CNPJ',
+                  labelEn: 'CPF/CNPJ',
+                  required: true,
+                },
+                {
+                  name: 'shares',
+                  type: 'number',
+                  label: 'Ações',
+                  labelEn: 'Shares',
+                  required: true,
+                  min: 1,
+                },
               ],
             },
             {
@@ -859,11 +763,37 @@ ${body}
 </div>`,
         formSchema: {
           fields: [
-            { name: 'companyName', type: 'text', label: 'Nome da Empresa', labelEn: 'Company Name', required: true },
+            {
+              name: 'companyName',
+              type: 'text',
+              label: 'Nome da Empresa',
+              labelEn: 'Company Name',
+              required: true,
+            },
             { name: 'companyCnpj', type: 'text', label: 'CNPJ', labelEn: 'CNPJ', required: true },
-            { name: 'meetingDate', type: 'date', label: 'Data da Assembleia', labelEn: 'Meeting Date', required: true },
-            { name: 'meetingLocation', type: 'text', label: 'Local', labelEn: 'Location', required: true },
-            { name: 'quorumPercentage', type: 'number', label: 'Quórum (%)', labelEn: 'Quorum (%)', required: true, min: 0, max: 100 },
+            {
+              name: 'meetingDate',
+              type: 'date',
+              label: 'Data da Assembleia',
+              labelEn: 'Meeting Date',
+              required: true,
+            },
+            {
+              name: 'meetingLocation',
+              type: 'text',
+              label: 'Local',
+              labelEn: 'Location',
+              required: true,
+            },
+            {
+              name: 'quorumPercentage',
+              type: 'number',
+              label: 'Quórum (%)',
+              labelEn: 'Quorum (%)',
+              required: true,
+              min: 0,
+              max: 100,
+            },
             {
               name: 'attendees',
               type: 'array',
@@ -872,7 +802,13 @@ ${body}
               required: true,
               itemSchema: [
                 { name: 'name', type: 'text', label: 'Nome', labelEn: 'Name', required: true },
-                { name: 'shares', type: 'number', label: 'Ações', labelEn: 'Shares', required: true },
+                {
+                  name: 'shares',
+                  type: 'number',
+                  label: 'Ações',
+                  labelEn: 'Shares',
+                  required: true,
+                },
                 { name: 'percentage', type: 'number', label: '%', labelEn: '%', required: true },
               ],
             },
@@ -886,7 +822,13 @@ ${body}
                 { name: 'item', type: 'text', label: 'Item', labelEn: 'Item', required: true },
               ],
             },
-            { name: 'deliberations', type: 'text', label: 'Deliberações', labelEn: 'Deliberations', required: true },
+            {
+              name: 'deliberations',
+              type: 'text',
+              label: 'Deliberações',
+              labelEn: 'Deliberations',
+              required: true,
+            },
           ],
         },
       },
@@ -924,16 +866,71 @@ ${body}
 </div>`,
         formSchema: {
           fields: [
-            { name: 'certificateNumber', type: 'text', label: 'Número do Certificado', labelEn: 'Certificate Number', required: true },
-            { name: 'companyName', type: 'text', label: 'Nome da Empresa', labelEn: 'Company Name', required: true },
+            {
+              name: 'certificateNumber',
+              type: 'text',
+              label: 'Número do Certificado',
+              labelEn: 'Certificate Number',
+              required: true,
+            },
+            {
+              name: 'companyName',
+              type: 'text',
+              label: 'Nome da Empresa',
+              labelEn: 'Company Name',
+              required: true,
+            },
             { name: 'companyCnpj', type: 'text', label: 'CNPJ', labelEn: 'CNPJ', required: true },
-            { name: 'shareholderName', type: 'text', label: 'Nome do Titular', labelEn: 'Shareholder Name', required: true },
-            { name: 'shareholderCpfCnpj', type: 'text', label: 'CPF/CNPJ do Titular', labelEn: 'Shareholder CPF/CNPJ', required: true },
-            { name: 'shareClassName', type: 'text', label: 'Classe de Ações', labelEn: 'Share Class', required: true },
-            { name: 'shareQuantity', type: 'number', label: 'Quantidade', labelEn: 'Quantity', required: true, min: 1 },
-            { name: 'pricePerShare', type: 'currency', label: 'Valor por Ação', labelEn: 'Price per Share', required: true },
-            { name: 'totalValue', type: 'currency', label: 'Valor Total', labelEn: 'Total Value', required: true },
-            { name: 'issueDate', type: 'date', label: 'Data de Emissão', labelEn: 'Issue Date', required: true },
+            {
+              name: 'shareholderName',
+              type: 'text',
+              label: 'Nome do Titular',
+              labelEn: 'Shareholder Name',
+              required: true,
+            },
+            {
+              name: 'shareholderCpfCnpj',
+              type: 'text',
+              label: 'CPF/CNPJ do Titular',
+              labelEn: 'Shareholder CPF/CNPJ',
+              required: true,
+            },
+            {
+              name: 'shareClassName',
+              type: 'text',
+              label: 'Classe de Ações',
+              labelEn: 'Share Class',
+              required: true,
+            },
+            {
+              name: 'shareQuantity',
+              type: 'number',
+              label: 'Quantidade',
+              labelEn: 'Quantity',
+              required: true,
+              min: 1,
+            },
+            {
+              name: 'pricePerShare',
+              type: 'currency',
+              label: 'Valor por Ação',
+              labelEn: 'Price per Share',
+              required: true,
+            },
+            {
+              name: 'totalValue',
+              type: 'currency',
+              label: 'Valor Total',
+              labelEn: 'Total Value',
+              required: true,
+            },
+            {
+              name: 'issueDate',
+              type: 'date',
+              label: 'Data de Emissão',
+              labelEn: 'Issue Date',
+              required: true,
+            },
           ],
         },
       },
@@ -972,17 +969,80 @@ ${body}
 </div>`,
         formSchema: {
           fields: [
-            { name: 'companyName', type: 'text', label: 'Nome da Empresa', labelEn: 'Company Name', required: true },
+            {
+              name: 'companyName',
+              type: 'text',
+              label: 'Nome da Empresa',
+              labelEn: 'Company Name',
+              required: true,
+            },
             { name: 'companyCnpj', type: 'text', label: 'CNPJ', labelEn: 'CNPJ', required: true },
-            { name: 'granteeName', type: 'text', label: 'Nome do Beneficiário', labelEn: 'Grantee Name', required: true },
-            { name: 'granteeCpf', type: 'text', label: 'CPF do Beneficiário', labelEn: 'Grantee CPF', required: true },
-            { name: 'granteePosition', type: 'text', label: 'Cargo', labelEn: 'Position', required: true },
-            { name: 'optionQuantity', type: 'number', label: 'Quantidade de Opções', labelEn: 'Option Quantity', required: true, min: 1 },
-            { name: 'strikePrice', type: 'currency', label: 'Preço de Exercício', labelEn: 'Strike Price', required: true },
-            { name: 'grantDate', type: 'date', label: 'Data da Outorga', labelEn: 'Grant Date', required: true },
-            { name: 'cliffMonths', type: 'number', label: 'Cliff (meses)', labelEn: 'Cliff (months)', required: true, min: 0 },
-            { name: 'vestingMonths', type: 'number', label: 'Vesting (meses)', labelEn: 'Vesting (months)', required: true, min: 1 },
-            { name: 'expirationDate', type: 'date', label: 'Data de Expiração', labelEn: 'Expiration Date', required: true },
+            {
+              name: 'granteeName',
+              type: 'text',
+              label: 'Nome do Beneficiário',
+              labelEn: 'Grantee Name',
+              required: true,
+            },
+            {
+              name: 'granteeCpf',
+              type: 'text',
+              label: 'CPF do Beneficiário',
+              labelEn: 'Grantee CPF',
+              required: true,
+            },
+            {
+              name: 'granteePosition',
+              type: 'text',
+              label: 'Cargo',
+              labelEn: 'Position',
+              required: true,
+            },
+            {
+              name: 'optionQuantity',
+              type: 'number',
+              label: 'Quantidade de Opções',
+              labelEn: 'Option Quantity',
+              required: true,
+              min: 1,
+            },
+            {
+              name: 'strikePrice',
+              type: 'currency',
+              label: 'Preço de Exercício',
+              labelEn: 'Strike Price',
+              required: true,
+            },
+            {
+              name: 'grantDate',
+              type: 'date',
+              label: 'Data da Outorga',
+              labelEn: 'Grant Date',
+              required: true,
+            },
+            {
+              name: 'cliffMonths',
+              type: 'number',
+              label: 'Cliff (meses)',
+              labelEn: 'Cliff (months)',
+              required: true,
+              min: 0,
+            },
+            {
+              name: 'vestingMonths',
+              type: 'number',
+              label: 'Vesting (meses)',
+              labelEn: 'Vesting (months)',
+              required: true,
+              min: 1,
+            },
+            {
+              name: 'expirationDate',
+              type: 'date',
+              label: 'Data de Expiração',
+              labelEn: 'Expiration Date',
+              required: true,
+            },
           ],
         },
       },
@@ -1030,18 +1090,85 @@ ${body}
 </div>`,
         formSchema: {
           fields: [
-            { name: 'companyName', type: 'text', label: 'Nome da Empresa', labelEn: 'Company Name', required: true },
+            {
+              name: 'companyName',
+              type: 'text',
+              label: 'Nome da Empresa',
+              labelEn: 'Company Name',
+              required: true,
+            },
             { name: 'companyCnpj', type: 'text', label: 'CNPJ', labelEn: 'CNPJ', required: true },
-            { name: 'investorName', type: 'text', label: 'Nome do Investidor', labelEn: 'Investor Name', required: true },
-            { name: 'investorCpfCnpj', type: 'text', label: 'CPF/CNPJ do Investidor', labelEn: 'Investor CPF/CNPJ', required: true },
-            { name: 'investmentAmount', type: 'currency', label: 'Valor do Investimento', labelEn: 'Investment Amount', required: true },
-            { name: 'shareQuantity', type: 'number', label: 'Quantidade de Ações', labelEn: 'Share Quantity', required: true, min: 1 },
-            { name: 'shareClassName', type: 'text', label: 'Classe de Ações', labelEn: 'Share Class', required: true },
-            { name: 'preMoneyValuation', type: 'currency', label: 'Valoração Pré-money', labelEn: 'Pre-money Valuation', required: true },
-            { name: 'postMoneyValuation', type: 'currency', label: 'Valoração Pós-money', labelEn: 'Post-money Valuation', required: true },
-            { name: 'pricePerShare', type: 'currency', label: 'Preço por Ação', labelEn: 'Price per Share', required: true },
-            { name: 'ownershipPercentage', type: 'number', label: 'Participação (%)', labelEn: 'Ownership (%)', required: true },
-            { name: 'paymentDeadline', type: 'date', label: 'Prazo para Aporte', labelEn: 'Payment Deadline', required: true },
+            {
+              name: 'investorName',
+              type: 'text',
+              label: 'Nome do Investidor',
+              labelEn: 'Investor Name',
+              required: true,
+            },
+            {
+              name: 'investorCpfCnpj',
+              type: 'text',
+              label: 'CPF/CNPJ do Investidor',
+              labelEn: 'Investor CPF/CNPJ',
+              required: true,
+            },
+            {
+              name: 'investmentAmount',
+              type: 'currency',
+              label: 'Valor do Investimento',
+              labelEn: 'Investment Amount',
+              required: true,
+            },
+            {
+              name: 'shareQuantity',
+              type: 'number',
+              label: 'Quantidade de Ações',
+              labelEn: 'Share Quantity',
+              required: true,
+              min: 1,
+            },
+            {
+              name: 'shareClassName',
+              type: 'text',
+              label: 'Classe de Ações',
+              labelEn: 'Share Class',
+              required: true,
+            },
+            {
+              name: 'preMoneyValuation',
+              type: 'currency',
+              label: 'Valoração Pré-money',
+              labelEn: 'Pre-money Valuation',
+              required: true,
+            },
+            {
+              name: 'postMoneyValuation',
+              type: 'currency',
+              label: 'Valoração Pós-money',
+              labelEn: 'Post-money Valuation',
+              required: true,
+            },
+            {
+              name: 'pricePerShare',
+              type: 'currency',
+              label: 'Preço por Ação',
+              labelEn: 'Price per Share',
+              required: true,
+            },
+            {
+              name: 'ownershipPercentage',
+              type: 'number',
+              label: 'Participação (%)',
+              labelEn: 'Ownership (%)',
+              required: true,
+            },
+            {
+              name: 'paymentDeadline',
+              type: 'date',
+              label: 'Prazo para Aporte',
+              labelEn: 'Payment Deadline',
+              required: true,
+            },
             {
               name: 'conditions',
               type: 'array',
@@ -1049,7 +1176,13 @@ ${body}
               labelEn: 'Conditions Precedent',
               required: false,
               itemSchema: [
-                { name: 'condition', type: 'text', label: 'Condição', labelEn: 'Condition', required: true },
+                {
+                  name: 'condition',
+                  type: 'text',
+                  label: 'Condição',
+                  labelEn: 'Condition',
+                  required: true,
+                },
               ],
             },
           ],

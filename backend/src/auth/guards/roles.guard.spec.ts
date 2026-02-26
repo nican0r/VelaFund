@@ -8,10 +8,7 @@ import { Reflector } from '@nestjs/core';
 import { ExecutionContext } from '@nestjs/common';
 import { RolesGuard } from './roles.guard';
 import { PrismaService } from '../../prisma/prisma.service';
-import {
-  ForbiddenException,
-  NotFoundException,
-} from '../../common/filters/app-exception';
+import { ForbiddenException, NotFoundException } from '../../common/filters/app-exception';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 
 describe('RolesGuard', () => {
@@ -65,11 +62,7 @@ describe('RolesGuard', () => {
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        RolesGuard,
-        { provide: PrismaService, useValue: prisma },
-        Reflector,
-      ],
+      providers: [RolesGuard, { provide: PrismaService, useValue: prisma }, Reflector],
     }).compile();
 
     guard = module.get<RolesGuard>(RolesGuard);
@@ -170,9 +163,7 @@ describe('RolesGuard', () => {
     const ctx = createMockExecutionContext({
       params: { companyId: 'comp-uuid-1' },
     });
-    jest
-      .spyOn(reflector, 'getAllAndOverride')
-      .mockReturnValue(['ADMIN', 'FINANCE', 'LEGAL']);
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['ADMIN', 'FINANCE', 'LEGAL']);
     prisma.companyMember.findFirst.mockResolvedValue({
       id: 'member-2',
       role: 'FINANCE',
@@ -240,9 +231,7 @@ describe('RolesGuard', () => {
     const ctx = createMockExecutionContext({
       params: { companyId: 'comp-uuid-1' },
     });
-    const spy = jest
-      .spyOn(reflector, 'getAllAndOverride')
-      .mockReturnValue(['ADMIN']);
+    const spy = jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['ADMIN']);
     prisma.companyMember.findFirst.mockResolvedValue({
       id: 'member-1',
       role: 'ADMIN',

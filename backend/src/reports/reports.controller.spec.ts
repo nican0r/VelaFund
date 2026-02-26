@@ -160,9 +160,7 @@ describe('ReportsController', () => {
 
   describe('getOwnershipReport', () => {
     it('should call service.getOwnershipReport and return result', async () => {
-      (service.getOwnershipReport as jest.Mock).mockResolvedValue(
-        mockOwnershipReport,
-      );
+      (service.getOwnershipReport as jest.Mock).mockResolvedValue(mockOwnershipReport);
 
       const result = await controller.getOwnershipReport('comp-1', {});
 
@@ -173,9 +171,7 @@ describe('ReportsController', () => {
     });
 
     it('should pass shareClassId filter to service', async () => {
-      (service.getOwnershipReport as jest.Mock).mockResolvedValue(
-        mockOwnershipReport,
-      );
+      (service.getOwnershipReport as jest.Mock).mockResolvedValue(mockOwnershipReport);
 
       await controller.getOwnershipReport('comp-1', {
         shareClassId: 'sc-1',
@@ -207,9 +203,7 @@ describe('ReportsController', () => {
 
   describe('getDilutionReport', () => {
     it('should call service.getDilutionReport and return result', async () => {
-      (service.getDilutionReport as jest.Mock).mockResolvedValue(
-        mockDilutionReport,
-      );
+      (service.getDilutionReport as jest.Mock).mockResolvedValue(mockDilutionReport);
 
       const result = await controller.getDilutionReport('comp-1', {});
 
@@ -219,9 +213,7 @@ describe('ReportsController', () => {
     });
 
     it('should pass date range and granularity to service', async () => {
-      (service.getDilutionReport as jest.Mock).mockResolvedValue(
-        mockDilutionReport,
-      );
+      (service.getDilutionReport as jest.Mock).mockResolvedValue(mockDilutionReport);
 
       await controller.getDilutionReport('comp-1', {
         dateFrom: '2025-01-01',
@@ -241,42 +233,24 @@ describe('ReportsController', () => {
 
   describe('exportCapTable', () => {
     it('should call service.exportCapTable with default format and return job status', async () => {
-      (service.exportCapTable as jest.Mock).mockResolvedValue(
-        mockExportJobResponse,
-      );
+      (service.exportCapTable as jest.Mock).mockResolvedValue(mockExportJobResponse);
 
-      const result = await controller.exportCapTable(
-        'comp-1',
-        mockUser as any,
-        {},
-      );
+      const result = await controller.exportCapTable('comp-1', mockUser as any, {});
 
-      expect(service.exportCapTable).toHaveBeenCalledWith(
-        'comp-1',
-        'user-1',
-        'pdf',
-        undefined,
-      );
+      expect(service.exportCapTable).toHaveBeenCalledWith('comp-1', 'user-1', 'pdf', undefined);
       expect(result.jobId).toBe('job-1');
       expect(result.status).toBe('QUEUED');
     });
 
     it('should pass specified format and snapshotDate to service', async () => {
-      (service.exportCapTable as jest.Mock).mockResolvedValue(
-        mockExportJobResponse,
-      );
+      (service.exportCapTable as jest.Mock).mockResolvedValue(mockExportJobResponse);
 
       await controller.exportCapTable('comp-1', mockUser as any, {
         format: 'xlsx',
         snapshotDate: '2026-01-15',
       });
 
-      expect(service.exportCapTable).toHaveBeenCalledWith(
-        'comp-1',
-        'user-1',
-        'xlsx',
-        '2026-01-15',
-      );
+      expect(service.exportCapTable).toHaveBeenCalledWith('comp-1', 'user-1', 'xlsx', '2026-01-15');
     });
   });
 
@@ -284,16 +258,11 @@ describe('ReportsController', () => {
 
   describe('getExportStatus', () => {
     it('should call service.getExportJobStatus and return job status', async () => {
-      (service.getExportJobStatus as jest.Mock).mockResolvedValue(
-        mockCompletedExportJob,
-      );
+      (service.getExportJobStatus as jest.Mock).mockResolvedValue(mockCompletedExportJob);
 
       const result = await controller.getExportStatus('comp-1', 'job-2');
 
-      expect(service.getExportJobStatus).toHaveBeenCalledWith(
-        'comp-1',
-        'job-2',
-      );
+      expect(service.getExportJobStatus).toHaveBeenCalledWith('comp-1', 'job-2');
       expect(result.jobId).toBe('job-2');
       expect(result.status).toBe('COMPLETED');
       expect(result.downloadUrl).toBeDefined();
@@ -304,15 +273,9 @@ describe('ReportsController', () => {
 
   describe('generateDueDiligence', () => {
     it('should call service.generateDueDiligence and return job status', async () => {
-      (service.generateDueDiligence as jest.Mock).mockResolvedValue(
-        mockExportJobResponse,
-      );
+      (service.generateDueDiligence as jest.Mock).mockResolvedValue(mockExportJobResponse);
 
-      const result = await controller.generateDueDiligence(
-        'comp-1',
-        mockUser as any,
-        {},
-      );
+      const result = await controller.generateDueDiligence('comp-1', mockUser as any, {});
 
       expect(service.generateDueDiligence).toHaveBeenCalledWith(
         'comp-1',
@@ -325,9 +288,7 @@ describe('ReportsController', () => {
     });
 
     it('should pass date range to service', async () => {
-      (service.generateDueDiligence as jest.Mock).mockResolvedValue(
-        mockExportJobResponse,
-      );
+      (service.generateDueDiligence as jest.Mock).mockResolvedValue(mockExportJobResponse);
 
       await controller.generateDueDiligence('comp-1', mockUser as any, {
         dateFrom: '2025-06-01',
@@ -347,19 +308,11 @@ describe('ReportsController', () => {
 
   describe('getDueDiligenceStatus', () => {
     it('should call service.getExportJobStatus and return result', async () => {
-      (service.getExportJobStatus as jest.Mock).mockResolvedValue(
-        mockCompletedExportJob,
-      );
+      (service.getExportJobStatus as jest.Mock).mockResolvedValue(mockCompletedExportJob);
 
-      const result = await controller.getDueDiligenceStatus(
-        'comp-1',
-        'job-2',
-      );
+      const result = await controller.getDueDiligenceStatus('comp-1', 'job-2');
 
-      expect(service.getExportJobStatus).toHaveBeenCalledWith(
-        'comp-1',
-        'job-2',
-      );
+      expect(service.getExportJobStatus).toHaveBeenCalledWith('comp-1', 'job-2');
       expect(result.status).toBe('COMPLETED');
     });
   });
@@ -371,18 +324,18 @@ describe('ReportsController', () => {
       const error = new Error('Company not found');
       (service.getOwnershipReport as jest.Mock).mockRejectedValue(error);
 
-      await expect(
-        controller.getOwnershipReport('invalid-comp', {}),
-      ).rejects.toThrow('Company not found');
+      await expect(controller.getOwnershipReport('invalid-comp', {})).rejects.toThrow(
+        'Company not found',
+      );
     });
 
     it('should propagate export job not found errors', async () => {
       const error = new Error('Export job not found');
       (service.getExportJobStatus as jest.Mock).mockRejectedValue(error);
 
-      await expect(
-        controller.getExportStatus('comp-1', 'bad-job'),
-      ).rejects.toThrow('Export job not found');
+      await expect(controller.getExportStatus('comp-1', 'bad-job')).rejects.toThrow(
+        'Export job not found',
+      );
     });
   });
 });

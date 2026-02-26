@@ -3,10 +3,7 @@ import { Prisma } from '@prisma/client';
 import { OptionPlanService } from './option-plan.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CapTableService } from '../cap-table/cap-table.service';
-import {
-  NotFoundException,
-  BusinessRuleException,
-} from '../common/filters/app-exception';
+import { NotFoundException, BusinessRuleException } from '../common/filters/app-exception';
 
 // ── Mock Factories ──
 
@@ -187,26 +184,26 @@ describe('OptionPlanService', () => {
     it('should throw NotFoundException if company not found', async () => {
       prisma.company.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.createPlan('company-1', dto, 'user-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.createPlan('company-1', dto, 'user-1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw BusinessRuleException if company not active', async () => {
       prisma.company.findFirst.mockResolvedValue(mockCompany({ status: 'DRAFT' }));
 
-      await expect(
-        service.createPlan('company-1', dto, 'user-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.createPlan('company-1', dto, 'user-1')).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should throw NotFoundException if share class not found', async () => {
       prisma.company.findFirst.mockResolvedValue(mockCompany());
       prisma.shareClass.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.createPlan('company-1', dto, 'user-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.createPlan('company-1', dto, 'user-1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw BusinessRuleException if pool size is zero', async () => {
@@ -246,9 +243,7 @@ describe('OptionPlanService', () => {
 
   describe('findPlanById', () => {
     it('should return plan with grant stats', async () => {
-      prisma.optionPlan.findFirst.mockResolvedValue(
-        mockPlan({ shareClass: mockShareClass() }),
-      );
+      prisma.optionPlan.findFirst.mockResolvedValue(mockPlan({ shareClass: mockShareClass() }));
       prisma.optionGrant.aggregate.mockResolvedValue({
         _sum: { quantity: new Prisma.Decimal('30000'), exercised: new Prisma.Decimal('5000') },
         _count: 3,
@@ -265,18 +260,14 @@ describe('OptionPlanService', () => {
     it('should throw NotFoundException if plan not found', async () => {
       prisma.optionPlan.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.findPlanById('company-1', 'plan-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.findPlanById('company-1', 'plan-1')).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('updatePlan', () => {
     it('should update plan name', async () => {
       prisma.optionPlan.findFirst.mockResolvedValue(mockPlan());
-      prisma.optionPlan.update.mockResolvedValue(
-        mockPlan({ name: 'Updated Plan' }),
-      );
+      prisma.optionPlan.update.mockResolvedValue(mockPlan({ name: 'Updated Plan' }));
 
       const result = await service.updatePlan('company-1', 'plan-1', {
         name: 'Updated Plan',
@@ -288,17 +279,17 @@ describe('OptionPlanService', () => {
     it('should throw NotFoundException if plan not found', async () => {
       prisma.optionPlan.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.updatePlan('company-1', 'plan-1', { name: 'Updated' }),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.updatePlan('company-1', 'plan-1', { name: 'Updated' })).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw BusinessRuleException if plan is closed', async () => {
       prisma.optionPlan.findFirst.mockResolvedValue(mockPlan({ status: 'CLOSED' }));
 
-      await expect(
-        service.updatePlan('company-1', 'plan-1', { name: 'Updated' }),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.updatePlan('company-1', 'plan-1', { name: 'Updated' })).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should allow increasing pool size', async () => {
@@ -343,17 +334,13 @@ describe('OptionPlanService', () => {
     it('should throw NotFoundException if plan not found', async () => {
       prisma.optionPlan.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.closePlan('company-1', 'plan-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.closePlan('company-1', 'plan-1')).rejects.toThrow(NotFoundException);
     });
 
     it('should throw BusinessRuleException if already closed', async () => {
       prisma.optionPlan.findFirst.mockResolvedValue(mockPlan({ status: 'CLOSED' }));
 
-      await expect(
-        service.closePlan('company-1', 'plan-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.closePlan('company-1', 'plan-1')).rejects.toThrow(BusinessRuleException);
     });
   });
 
@@ -400,17 +387,17 @@ describe('OptionPlanService', () => {
     it('should throw NotFoundException if plan not found', async () => {
       prisma.optionPlan.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.createGrant('company-1', dto, 'user-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.createGrant('company-1', dto, 'user-1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw BusinessRuleException if plan is closed', async () => {
       prisma.optionPlan.findFirst.mockResolvedValue(mockPlan({ status: 'CLOSED' }));
 
-      await expect(
-        service.createGrant('company-1', dto, 'user-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.createGrant('company-1', dto, 'user-1')).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should throw BusinessRuleException if pool exhausted', async () => {
@@ -421,9 +408,9 @@ describe('OptionPlanService', () => {
         _sum: { quantity: new Prisma.Decimal('0') },
       });
 
-      await expect(
-        service.createGrant('company-1', dto, 'user-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.createGrant('company-1', dto, 'user-1')).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should throw BusinessRuleException if quantity is zero', async () => {
@@ -473,11 +460,7 @@ describe('OptionPlanService', () => {
       prisma.shareholder.findFirst.mockResolvedValue({ id: 'sh-1' });
 
       await expect(
-        service.createGrant(
-          'company-1',
-          { ...dto, expirationDate: '2025-01-01' },
-          'user-1',
-        ),
+        service.createGrant('company-1', { ...dto, expirationDate: '2025-01-01' }, 'user-1'),
       ).rejects.toThrow(BusinessRuleException);
     });
 
@@ -488,9 +471,9 @@ describe('OptionPlanService', () => {
       });
       prisma.shareholder.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.createGrant('company-1', dto, 'user-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.createGrant('company-1', dto, 'user-1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should allow creating grant without shareholderId', async () => {
@@ -498,12 +481,10 @@ describe('OptionPlanService', () => {
       prisma.optionGrant.aggregate.mockResolvedValue({
         _sum: { quantity: new Prisma.Decimal('0') },
       });
-      prisma.optionGrant.create.mockResolvedValue(
-        mockGrant({ shareholderId: null }),
-      );
+      prisma.optionGrant.create.mockResolvedValue(mockGrant({ shareholderId: null }));
       prisma.optionPlan.update.mockResolvedValue(mockPlan());
 
-      const { shareholderId: _, ...dtoNoShareholder } = dto;
+      const { shareholderId: _shareholderId, ...dtoNoShareholder } = dto;
 
       const result = await service.createGrant('company-1', dtoNoShareholder, 'user-1');
       expect(result).toBeDefined();
@@ -515,7 +496,10 @@ describe('OptionPlanService', () => {
   describe('findAllGrants', () => {
     it('should return paginated grants with vesting info', async () => {
       prisma.optionGrant.findMany.mockResolvedValue([
-        mockGrant({ plan: { id: 'plan-1', name: 'Plan 1' }, shareholder: { id: 'sh-1', name: 'Maria' } }),
+        mockGrant({
+          plan: { id: 'plan-1', name: 'Plan 1' },
+          shareholder: { id: 'sh-1', name: 'Maria' },
+        }),
       ]);
       prisma.optionGrant.count.mockResolvedValue(1);
 
@@ -565,7 +549,12 @@ describe('OptionPlanService', () => {
     it('should return grant with vesting info', async () => {
       prisma.optionGrant.findFirst.mockResolvedValue(
         mockGrant({
-          plan: { id: 'plan-1', name: 'Plan 1', terminationPolicy: 'FORFEITURE', exerciseWindowDays: 90 },
+          plan: {
+            id: 'plan-1',
+            name: 'Plan 1',
+            terminationPolicy: 'FORFEITURE',
+            exerciseWindowDays: 90,
+          },
           shareholder: { id: 'sh-1', name: 'Maria' },
         }),
       );
@@ -579,9 +568,9 @@ describe('OptionPlanService', () => {
     it('should throw NotFoundException if grant not found', async () => {
       prisma.optionGrant.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.findGrantById('company-1', 'grant-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.findGrantById('company-1', 'grant-1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -603,9 +592,9 @@ describe('OptionPlanService', () => {
     it('should throw NotFoundException if grant not found', async () => {
       prisma.optionGrant.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.getGrantVestingSchedule('company-1', 'grant-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getGrantVestingSchedule('company-1', 'grant-1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -614,9 +603,7 @@ describe('OptionPlanService', () => {
       prisma.optionGrant.findFirst.mockResolvedValue(
         mockGrant({ exercised: new Prisma.Decimal('2000') }),
       );
-      prisma.optionGrant.update.mockResolvedValue(
-        mockGrant({ status: 'CANCELLED' }),
-      );
+      prisma.optionGrant.update.mockResolvedValue(mockGrant({ status: 'CANCELLED' }));
       prisma.optionPlan.update.mockResolvedValue(mockPlan());
 
       const result = await service.cancelGrant('company-1', 'grant-1');
@@ -634,29 +621,23 @@ describe('OptionPlanService', () => {
     it('should throw NotFoundException if grant not found', async () => {
       prisma.optionGrant.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.cancelGrant('company-1', 'grant-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.cancelGrant('company-1', 'grant-1')).rejects.toThrow(NotFoundException);
     });
 
     it('should throw BusinessRuleException if already cancelled', async () => {
-      prisma.optionGrant.findFirst.mockResolvedValue(
-        mockGrant({ status: 'CANCELLED' }),
-      );
+      prisma.optionGrant.findFirst.mockResolvedValue(mockGrant({ status: 'CANCELLED' }));
 
-      await expect(
-        service.cancelGrant('company-1', 'grant-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.cancelGrant('company-1', 'grant-1')).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should throw BusinessRuleException if grant is exercised', async () => {
-      prisma.optionGrant.findFirst.mockResolvedValue(
-        mockGrant({ status: 'EXERCISED' }),
-      );
+      prisma.optionGrant.findFirst.mockResolvedValue(mockGrant({ status: 'EXERCISED' }));
 
-      await expect(
-        service.cancelGrant('company-1', 'grant-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.cancelGrant('company-1', 'grant-1')).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
   });
 
@@ -899,9 +880,7 @@ describe('OptionPlanService', () => {
     });
 
     it('should throw BusinessRuleException if grant not active', async () => {
-      prisma.optionGrant.findFirst.mockResolvedValue(
-        fullyVestedGrant({ status: 'CANCELLED' }),
-      );
+      prisma.optionGrant.findFirst.mockResolvedValue(fullyVestedGrant({ status: 'CANCELLED' }));
 
       await expect(
         service.createExerciseRequest('company-1', 'grant-1', dto, 'user-1'),
@@ -1039,9 +1018,9 @@ describe('OptionPlanService', () => {
     it('should throw NotFoundException if exercise not found', async () => {
       prisma.optionExerciseRequest.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.findExerciseById('company-1', 'exercise-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.findExerciseById('company-1', 'exercise-1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -1071,12 +1050,7 @@ describe('OptionPlanService', () => {
       prisma.shareholding.create.mockResolvedValue({ id: 'holding-1' });
       prisma.shareClass.update.mockResolvedValue(mockShareClass());
 
-      const result = await service.confirmExercisePayment(
-        'company-1',
-        'exercise-1',
-        {},
-        'user-1',
-      );
+      const result = await service.confirmExercisePayment('company-1', 'exercise-1', {}, 'user-1');
 
       expect(result.status).toBe('COMPLETED');
       // Exercise request updated
@@ -1118,9 +1092,7 @@ describe('OptionPlanService', () => {
 
     it('should update existing shareholding instead of creating', async () => {
       prisma.optionExerciseRequest.findFirst.mockResolvedValue(pendingExercise());
-      prisma.optionExerciseRequest.update.mockResolvedValue(
-        mockExercise({ status: 'COMPLETED' }),
-      );
+      prisma.optionExerciseRequest.update.mockResolvedValue(mockExercise({ status: 'COMPLETED' }));
       prisma.optionGrant.update.mockResolvedValue(mockGrant());
       prisma.optionPlan.update.mockResolvedValue(mockPlan());
       prisma.shareholding.findFirst.mockResolvedValue({
@@ -1158,9 +1130,7 @@ describe('OptionPlanService', () => {
           },
         }),
       );
-      prisma.optionExerciseRequest.update.mockResolvedValue(
-        mockExercise({ status: 'COMPLETED' }),
-      );
+      prisma.optionExerciseRequest.update.mockResolvedValue(mockExercise({ status: 'COMPLETED' }));
       prisma.optionGrant.update.mockResolvedValue(mockGrant({ status: 'EXERCISED' }));
       prisma.optionPlan.update.mockResolvedValue(mockPlan());
       prisma.shareholding.findFirst.mockResolvedValue(null);
@@ -1236,9 +1206,7 @@ describe('OptionPlanService', () => {
       prisma.optionExerciseRequest.findFirst.mockResolvedValue(
         mockExercise({ grant: { shareholderId: 'sh-1' } }),
       );
-      prisma.optionExerciseRequest.update.mockResolvedValue(
-        mockExercise({ status: 'CANCELLED' }),
-      );
+      prisma.optionExerciseRequest.update.mockResolvedValue(mockExercise({ status: 'CANCELLED' }));
 
       const result = await service.cancelExercise('company-1', 'exercise-1', 'user-1');
 
@@ -1253,9 +1221,9 @@ describe('OptionPlanService', () => {
     it('should throw NotFoundException if exercise not found', async () => {
       prisma.optionExerciseRequest.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.cancelExercise('company-1', 'exercise-1', 'user-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.cancelExercise('company-1', 'exercise-1', 'user-1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw BusinessRuleException if already cancelled', async () => {
@@ -1263,9 +1231,9 @@ describe('OptionPlanService', () => {
         mockExercise({ status: 'CANCELLED', grant: { shareholderId: 'sh-1' } }),
       );
 
-      await expect(
-        service.cancelExercise('company-1', 'exercise-1', 'user-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.cancelExercise('company-1', 'exercise-1', 'user-1')).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should throw BusinessRuleException if not pending', async () => {
@@ -1273,9 +1241,9 @@ describe('OptionPlanService', () => {
         mockExercise({ status: 'COMPLETED', grant: { shareholderId: 'sh-1' } }),
       );
 
-      await expect(
-        service.cancelExercise('company-1', 'exercise-1', 'user-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.cancelExercise('company-1', 'exercise-1', 'user-1')).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should throw BusinessRuleException if user is not grantee or admin', async () => {
@@ -1287,9 +1255,9 @@ describe('OptionPlanService', () => {
       // Not an admin member
       prisma.companyMember.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.cancelExercise('company-1', 'exercise-1', 'user-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.cancelExercise('company-1', 'exercise-1', 'user-1')).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
   });
 });

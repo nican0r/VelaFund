@@ -114,9 +114,7 @@ export class BigDataCorpService {
    */
   async fetchLitigationData(cnpj: string): Promise<BigDataCorpLitigationResponse> {
     if (!this.apiToken) {
-      throw new BigDataCorpUnavailableError(
-        'BigDataCorp API token not configured',
-      );
+      throw new BigDataCorpUnavailableError('BigDataCorp API token not configured');
     }
 
     // Circuit breaker check
@@ -127,29 +125,21 @@ export class BigDataCorpService {
     }
 
     const cleanCnpj = cnpj.replace(/\D/g, '');
-    this.logger.debug(
-      `Fetching litigation data for CNPJ ***${cleanCnpj.slice(-4)}`,
-    );
+    this.logger.debug(`Fetching litigation data for CNPJ ***${cleanCnpj.slice(-4)}`);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(
-      () => controller.abort(),
-      this.REQUEST_TIMEOUT_MS,
-    );
+    const timeoutId = setTimeout(() => controller.abort(), this.REQUEST_TIMEOUT_MS);
 
     try {
-      const response = await fetch(
-        `${this.baseUrl}/empresas/owners_lawsuits`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${this.apiToken}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ cnpj: cleanCnpj }),
-          signal: controller.signal,
+      const response = await fetch(`${this.baseUrl}/empresas/owners_lawsuits`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.apiToken}`,
+          'Content-Type': 'application/json',
         },
-      );
+        body: JSON.stringify({ cnpj: cleanCnpj }),
+        signal: controller.signal,
+      });
 
       if (!response.ok) {
         if (response.status === 400 || response.status === 404) {
@@ -168,9 +158,7 @@ export class BigDataCorpService {
         }
 
         this.recordFailure();
-        throw new BigDataCorpUnavailableError(
-          `BigDataCorp API error: ${response.status}`,
-        );
+        throw new BigDataCorpUnavailableError(`BigDataCorp API error: ${response.status}`);
       }
 
       const data = await response.json();
@@ -189,9 +177,7 @@ export class BigDataCorpService {
       // Network or timeout error
       if (error instanceof Error && error.name === 'AbortError') {
         this.recordFailure();
-        throw new BigDataCorpUnavailableError(
-          'BigDataCorp request timed out after 30 seconds',
-        );
+        throw new BigDataCorpUnavailableError('BigDataCorp request timed out after 30 seconds');
       }
 
       this.recordFailure();

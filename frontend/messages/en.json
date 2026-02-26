@@ -558,7 +558,9 @@
       "unauthorized": "Unauthorized"
     },
     "cap": {
-      "insufficientShares": "Insufficient shares to complete the operation"
+      "immutableAfterIssuance": "This field cannot be changed after shares have been issued",
+      "insufficientShares": "Insufficient shares to complete the operation",
+      "missingCommonShares": "S.A. companies must have at least one common shares class before issuing shares"
     },
     "company": {
       "cnpjDuplicate": "CNPJ already registered",

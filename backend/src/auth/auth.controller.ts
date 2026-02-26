@@ -1,14 +1,4 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Put,
-  Body,
-  Req,
-  Res,
-  HttpCode,
-  HttpStatus,
-} from '@nestjs/common';
+import { Controller, Post, Get, Put, Body, Req, Res, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Request, Response } from 'express';
@@ -18,10 +8,7 @@ import { LoginDto } from './dto/login.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { Public } from './decorators/public.decorator';
 import { RequireAuth } from './decorators/require-auth.decorator';
-import {
-  CurrentUser,
-  AuthenticatedUser,
-} from './decorators/current-user.decorator';
+import { CurrentUser, AuthenticatedUser } from './decorators/current-user.decorator';
 
 @ApiTags('Auth')
 @Controller('api/v1/auth')
@@ -45,10 +32,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const ipAddress = req.ip || req.socket.remoteAddress || 'unknown';
-    const { user, isNewUser } = await this.authService.login(
-      dto.privyAccessToken,
-      ipAddress,
-    );
+    const { user, isNewUser } = await this.authService.login(dto.privyAccessToken, ipAddress);
 
     // BUG-1 fix: Create a Redis-backed session instead of storing the raw Privy token.
     // Privy tokens expire in 1-6 hours, but our session needs to last 7 days.
@@ -85,10 +69,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Logout and invalidate session' })
   @ApiResponse({ status: 200, description: 'Logout successful' })
-  async logout(
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     // Destroy the Redis session if one exists
     const sessionId = req.cookies?.['navia-auth-token'];
     if (sessionId) {
@@ -122,10 +103,7 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Profile updated' })
   @ApiResponse({ status: 401, description: 'Not authenticated' })
   @ApiResponse({ status: 409, description: 'Email already in use' })
-  async updateMe(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: UpdateProfileDto,
-  ) {
+  async updateMe(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateProfileDto) {
     return this.authService.updateProfile(user.id, dto);
   }
 }

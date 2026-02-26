@@ -191,9 +191,7 @@ export class ShareholderService {
         this.logger.debug('CPF encrypted via KMS for new shareholder');
       } catch (error) {
         // Graceful degradation: if encryption fails, store plaintext with warning
-        this.logger.warn(
-          `CPF encryption failed, storing plaintext: ${(error as Error).message}`,
-        );
+        this.logger.warn(`CPF encryption failed, storing plaintext: ${(error as Error).message}`);
       }
     }
 
@@ -224,10 +222,7 @@ export class ShareholderService {
       return shareholder;
     } catch (error) {
       // Handle unique constraint violation on [companyId, cpfCnpjBlindIndex]
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         throw new ConflictException(
           'SHAREHOLDER_CPF_CNPJ_DUPLICATE',
           'errors.shareholder.cpfCnpjDuplicate',
@@ -254,9 +249,7 @@ export class ShareholderService {
       companyId,
       ...(query.status ? { status: query.status } : {}),
       ...(query.type ? { type: query.type } : {}),
-      ...(query.isForeign !== undefined
-        ? { isForeign: query.isForeign === 'true' }
-        : {}),
+      ...(query.isForeign !== undefined ? { isForeign: query.isForeign === 'true' } : {}),
       ...(query.search
         ? {
             OR: [
@@ -335,11 +328,7 @@ export class ShareholderService {
    *
    * BR-4: Changing taxResidency recalculates isForeign.
    */
-  async update(
-    companyId: string,
-    shareholderId: string,
-    dto: UpdateShareholderDto,
-  ) {
+  async update(companyId: string, shareholderId: string, dto: UpdateShareholderDto) {
     const existing = await this.prisma.shareholder.findFirst({
       where: { id: shareholderId, companyId },
     });
@@ -380,9 +369,7 @@ export class ShareholderService {
       data,
     });
 
-    this.logger.log(
-      `Shareholder ${shareholderId} updated for company ${companyId}`,
-    );
+    this.logger.log(`Shareholder ${shareholderId} updated for company ${companyId}`);
 
     return updated;
   }
@@ -411,10 +398,7 @@ export class ShareholderService {
     // Check for transaction history
     const transactionCount = await this.prisma.transaction.count({
       where: {
-        OR: [
-          { fromShareholderId: shareholderId },
-          { toShareholderId: shareholderId },
-        ],
+        OR: [{ fromShareholderId: shareholderId }, { toShareholderId: shareholderId }],
       },
     });
 
@@ -445,9 +429,7 @@ export class ShareholderService {
       where: { id: shareholderId },
     });
 
-    this.logger.log(
-      `Shareholder ${shareholderId} deleted from company ${companyId}`,
-    );
+    this.logger.log(`Shareholder ${shareholderId} deleted from company ${companyId}`);
 
     return { action: 'DELETED' };
   }
@@ -461,11 +443,7 @@ export class ShareholderService {
    * - At least one owner must have >= 25% ownership (AML compliance)
    * - Replaces all existing beneficial owners (upsert pattern)
    */
-  async setBeneficialOwners(
-    companyId: string,
-    shareholderId: string,
-    dto: SetBeneficialOwnersDto,
-  ) {
+  async setBeneficialOwners(companyId: string, shareholderId: string, dto: SetBeneficialOwnersDto) {
     const shareholder = await this.prisma.shareholder.findFirst({
       where: { id: shareholderId, companyId },
     });
@@ -509,32 +487,28 @@ export class ShareholderService {
     }
 
     // Replace all existing beneficial owners atomically
-    const result = await this.prisma.$transaction(
-      async (tx: Prisma.TransactionClient) => {
-        await tx.beneficialOwner.deleteMany({
-          where: { shareholderId },
-        });
+    const result = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      await tx.beneficialOwner.deleteMany({
+        where: { shareholderId },
+      });
 
-        const owners = await Promise.all(
-          dto.beneficialOwners.map((owner) =>
-            tx.beneficialOwner.create({
-              data: {
-                shareholderId,
-                name: owner.name,
-                cpf: owner.cpf ?? null,
-                ownershipPct: new Prisma.Decimal(owner.ownershipPercentage),
-              },
-            }),
-          ),
-        );
+      const owners = await Promise.all(
+        dto.beneficialOwners.map((owner) =>
+          tx.beneficialOwner.create({
+            data: {
+              shareholderId,
+              name: owner.name,
+              cpf: owner.cpf ?? null,
+              ownershipPct: new Prisma.Decimal(owner.ownershipPercentage),
+            },
+          }),
+        ),
+      );
 
-        return owners;
-      },
-    );
+      return owners;
+    });
 
-    this.logger.log(
-      `Set ${result.length} beneficial owners for shareholder ${shareholderId}`,
-    );
+    this.logger.log(`Set ${result.length} beneficial owners for shareholder ${shareholderId}`);
 
     return result;
   }

@@ -25,7 +25,10 @@ export class ListMembersQueryDto extends PaginationQueryDto {
   @IsString()
   search?: string;
 
-  @ApiPropertyOptional({ description: 'Sort field (prefix with - for descending)', example: '-invitedAt' })
+  @ApiPropertyOptional({
+    description: 'Sort field (prefix with - for descending)',
+    example: '-invitedAt',
+  })
   @IsOptional()
   @IsString()
   sort?: string;

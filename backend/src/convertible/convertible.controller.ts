@@ -12,10 +12,7 @@ import {
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { Roles } from '../auth/decorators/roles.decorator';
-import {
-  CurrentUser,
-  AuthenticatedUser,
-} from '../auth/decorators/current-user.decorator';
+import { CurrentUser, AuthenticatedUser } from '../auth/decorators/current-user.decorator';
 import { paginate } from '../common/helpers/paginate';
 import { Auditable } from '../audit-log/decorators/auditable.decorator';
 import { ConvertibleService } from './convertible.service';
@@ -57,12 +54,8 @@ export class ConvertibleController {
   @Throttle({ read: { ttl: 60000, limit: 100 } })
   @ApiOperation({ summary: 'List convertible instruments' })
   @ApiResponse({ status: 200, description: 'Paginated list with summary' })
-  async list(
-    @Param('companyId') companyId: string,
-    @Query() query: ListConvertiblesQueryDto,
-  ) {
-    const { items, total, summary } =
-      await this.convertibleService.findAll(companyId, query);
+  async list(@Param('companyId') companyId: string, @Query() query: ListConvertiblesQueryDto) {
+    const { items, total, summary } = await this.convertibleService.findAll(companyId, query);
     const result = paginate(items, total, query.page, query.limit);
     return { ...result, meta: { ...result.meta, summary } };
   }
@@ -90,10 +83,7 @@ export class ConvertibleController {
     @Param('companyId') companyId: string,
     @Param('convertibleId') convertibleId: string,
   ) {
-    return this.convertibleService.getInterestBreakdown(
-      companyId,
-      convertibleId,
-    );
+    return this.convertibleService.getInterestBreakdown(companyId, convertibleId);
   }
 
   @Get(':convertibleId/scenarios')
@@ -107,11 +97,7 @@ export class ConvertibleController {
     @Param('convertibleId') convertibleId: string,
     @Query('valuations') valuations?: string,
   ) {
-    return this.convertibleService.getConversionScenarios(
-      companyId,
-      convertibleId,
-      valuations,
-    );
+    return this.convertibleService.getConversionScenarios(companyId, convertibleId, valuations);
   }
 
   @Put(':convertibleId')
@@ -199,11 +185,6 @@ export class ConvertibleController {
     @Body() dto: ConvertConvertibleDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    return this.convertibleService.convert(
-      companyId,
-      convertibleId,
-      dto,
-      user.id,
-    );
+    return this.convertibleService.convert(companyId, convertibleId, dto, user.id);
   }
 }

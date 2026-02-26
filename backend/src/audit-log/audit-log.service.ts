@@ -7,11 +7,6 @@ import { AuditEvent } from './audit-log.processor';
 import { ListAuditLogsDto } from './dto/list-audit-logs.dto';
 import { NotFoundException } from '../common/filters/app-exception';
 
-interface SortField {
-  field: string;
-  direction: 'asc' | 'desc';
-}
-
 const ALLOWED_SORT_FIELDS = ['timestamp', 'action', 'actorId', 'resourceType'];
 
 @Injectable()
@@ -108,9 +103,7 @@ export class AuditLogService {
       actorName: item.actor
         ? `${item.actor.firstName || ''} ${item.actor.lastName || ''}`.trim() || null
         : null,
-      actorEmail: item.actor?.email
-        ? this.maskEmail(item.actor.email)
-        : null,
+      actorEmail: item.actor?.email ? this.maskEmail(item.actor.email) : null,
       action: item.action,
       resourceType: item.resourceType,
       resourceId: item.resourceId,
@@ -151,9 +144,7 @@ export class AuditLogService {
       actorName: log.actor
         ? `${log.actor.firstName || ''} ${log.actor.lastName || ''}`.trim() || null
         : null,
-      actorEmail: log.actor?.email
-        ? this.maskEmail(log.actor.email)
-        : null,
+      actorEmail: log.actor?.email ? this.maskEmail(log.actor.email) : null,
       action: log.action,
       resourceType: log.resourceType,
       resourceId: log.resourceId,
@@ -284,10 +275,7 @@ export class AuditLogService {
     previousHash: string,
   ): string {
     const content = logs
-      .map(
-        (l) =>
-          `${l.id}|${l.timestamp.toISOString()}|${l.action}|${l.actorId || 'SYSTEM'}`,
-      )
+      .map((l) => `${l.id}|${l.timestamp.toISOString()}|${l.action}|${l.actorId || 'SYSTEM'}`)
       .join('\n');
 
     return createHash('sha256')

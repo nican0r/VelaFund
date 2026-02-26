@@ -68,9 +68,7 @@ describe('InvitationController', () => {
     it('should propagate NotFoundException for invalid tokens', async () => {
       service.getInvitationDetails.mockRejectedValue(new Error('Not found'));
 
-      await expect(
-        controller.getInvitationDetails('bad-token'),
-      ).rejects.toThrow('Not found');
+      await expect(controller.getInvitationDetails('bad-token')).rejects.toThrow('Not found');
     });
   });
 
@@ -93,9 +91,9 @@ describe('InvitationController', () => {
     it('should propagate service exceptions', async () => {
       service.acceptInvitation.mockRejectedValue(new Error('expired'));
 
-      await expect(
-        controller.acceptInvitation('expired-token', mockUser),
-      ).rejects.toThrow('expired');
+      await expect(controller.acceptInvitation('expired-token', mockUser)).rejects.toThrow(
+        'expired',
+      );
     });
   });
 });

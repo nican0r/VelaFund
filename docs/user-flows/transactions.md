@@ -184,6 +184,9 @@ TRIGGER: User clicks "New Transaction" and selects type ISSUANCE
     -> IF invalid: return 400 with validationErrors
 12. [Backend] Validates company is ACTIVE
     -> IF not ACTIVE: return 422 TXN_COMPANY_NOT_ACTIVE
+12b. [Backend] BR-2: For S.A. companies (SA_CAPITAL_FECHADO/SA_CAPITAL_ABERTO) + ISSUANCE:
+    validates at least one COMMON_SHARES class exists
+    -> IF no COMMON_SHARES class: return 422 CAP_MISSING_COMMON_SHARES
 13. [Backend] Validates quantity > 0
     -> IF invalid: return 422 TXN_INVALID_QUANTITY
 14. [Backend] Validates toShareholderId is present
@@ -764,6 +767,7 @@ SIDE EFFECTS: None
 | 10 | Role check (list/detail) | Not ADMIN/FINANCE/LEGAL | Error | 404 Not Found |
 | 11 | Input validation | Invalid fields | Error | 400 + validationErrors |
 | 12 | Company status | Company not ACTIVE | Error | 422 TXN_COMPANY_NOT_ACTIVE |
+| 12b | S.A. common shares | S.A. ISSUANCE + no COMMON_SHARES class | Error | 422 CAP_MISSING_COMMON_SHARES |
 | 13 | Quantity validation | quantity <= 0 | Error | 422 TXN_INVALID_QUANTITY |
 | 14 | To-shareholder required | ISSUANCE/TRANSFER without toShareholderId | Error | 422 TXN_TO_SHAREHOLDER_REQUIRED |
 | 12 | From-shareholder required | TRANSFER/CANCELLATION/CONVERSION without fromShareholderId | Error | 422 TXN_FROM_SHAREHOLDER_REQUIRED |

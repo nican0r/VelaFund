@@ -2,25 +2,24 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Prisma } from '@prisma/client';
 import { ExitWaterfallService } from './exit-waterfall.service';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  NotFoundException,
-  BusinessRuleException,
-} from '../common/filters/app-exception';
+import { NotFoundException, BusinessRuleException } from '../common/filters/app-exception';
 
 const ZERO = new Prisma.Decimal(0);
 
 // ─── Mock Factories ──────────────────────────────────────────────────────
 
-function mockShareClass(overrides: Partial<{
-  id: string;
-  className: string;
-  type: string;
-  totalIssued: Prisma.Decimal;
-  liquidationPreferenceMultiple: Prisma.Decimal | null;
-  participatingRights: boolean;
-  participationCap: Prisma.Decimal | null;
-  seniority: number;
-}> = {}) {
+function mockShareClass(
+  overrides: Partial<{
+    id: string;
+    className: string;
+    type: string;
+    totalIssued: Prisma.Decimal;
+    liquidationPreferenceMultiple: Prisma.Decimal | null;
+    participatingRights: boolean;
+    participationCap: Prisma.Decimal | null;
+    seniority: number;
+  }> = {},
+) {
   return {
     id: overrides.id ?? 'sc-common',
     className: overrides.className ?? 'ON',
@@ -70,10 +69,7 @@ describe('ExitWaterfallService', () => {
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        ExitWaterfallService,
-        { provide: PrismaService, useValue: prisma },
-      ],
+      providers: [ExitWaterfallService, { provide: PrismaService, useValue: prisma }],
     }).compile();
 
     service = module.get<ExitWaterfallService>(ExitWaterfallService);
@@ -96,9 +92,9 @@ describe('ExitWaterfallService', () => {
       prisma.shareholding.findMany.mockResolvedValue([]);
       prisma.fundingRound.findMany.mockResolvedValue([]);
 
-      await expect(
-        service.runWaterfall('comp-1', { exitAmount: '1000000.00' }),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.runWaterfall('comp-1', { exitAmount: '1000000.00' })).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     // ── EC-1: Zero Exit Amount ──
@@ -108,9 +104,7 @@ describe('ExitWaterfallService', () => {
       prisma.shareClass.findMany.mockResolvedValue([
         mockShareClass({ id: 'sc-common', className: 'ON', seniority: 0 }),
       ]);
-      prisma.shareholding.findMany.mockResolvedValue([
-        mockShareholding('sc-common', '100000'),
-      ]);
+      prisma.shareholding.findMany.mockResolvedValue([mockShareholding('sc-common', '100000')]);
       prisma.fundingRound.findMany.mockResolvedValue([]);
       prisma.optionGrant.findMany.mockResolvedValue([]);
       prisma.convertibleInstrument.findMany.mockResolvedValue([]);
@@ -138,9 +132,7 @@ describe('ExitWaterfallService', () => {
           liquidationPreferenceMultiple: null,
         }),
       ]);
-      prisma.shareholding.findMany.mockResolvedValue([
-        mockShareholding('sc-common', '100000'),
-      ]);
+      prisma.shareholding.findMany.mockResolvedValue([mockShareholding('sc-common', '100000')]);
       prisma.fundingRound.findMany.mockResolvedValue([]);
       prisma.optionGrant.findMany.mockResolvedValue([]);
       prisma.convertibleInstrument.findMany.mockResolvedValue([]);
@@ -184,9 +176,7 @@ describe('ExitWaterfallService', () => {
         mockShareholding('sc-common', '70000'),
       ]);
       // Preferred class funded at R$ 100/share
-      prisma.fundingRound.findMany.mockResolvedValue([
-        mockFundingRound('sc-preferred', '100'),
-      ]);
+      prisma.fundingRound.findMany.mockResolvedValue([mockFundingRound('sc-preferred', '100')]);
       prisma.optionGrant.findMany.mockResolvedValue([]);
       prisma.convertibleInstrument.findMany.mockResolvedValue([]);
 
@@ -199,9 +189,7 @@ describe('ExitWaterfallService', () => {
       expect(result.shareClassResults).toHaveLength(2);
 
       // Preferred gets 1x preference = 30000 * 100 = R$ 3,000,000
-      const preferred = result.shareClassResults.find(
-        (r) => r.shareClassId === 'sc-preferred',
-      )!;
+      const preferred = result.shareClassResults.find((r) => r.shareClassId === 'sc-preferred')!;
       expect(preferred.shareClassName).toBe('PN-A');
 
       // Non-participating preferred: takes max(preference, pro-rata)
@@ -212,9 +200,7 @@ describe('ExitWaterfallService', () => {
       expect(parseFloat(preferred.totalProceeds)).toBeGreaterThan(0);
 
       // Common gets the remainder
-      const common = result.shareClassResults.find(
-        (r) => r.shareClassId === 'sc-common',
-      )!;
+      const common = result.shareClassResults.find((r) => r.shareClassId === 'sc-common')!;
       expect(parseFloat(common.totalProceeds)).toBeGreaterThan(0);
       expect(common.roiMultiple).toBeNull();
 
@@ -250,9 +236,7 @@ describe('ExitWaterfallService', () => {
         mockShareholding('sc-preferred', '30000'),
         mockShareholding('sc-common', '70000'),
       ]);
-      prisma.fundingRound.findMany.mockResolvedValue([
-        mockFundingRound('sc-preferred', '100'),
-      ]);
+      prisma.fundingRound.findMany.mockResolvedValue([mockFundingRound('sc-preferred', '100')]);
       prisma.optionGrant.findMany.mockResolvedValue([]);
       prisma.convertibleInstrument.findMany.mockResolvedValue([]);
 
@@ -262,9 +246,7 @@ describe('ExitWaterfallService', () => {
         includeConvertibles: false,
       });
 
-      const preferred = result.shareClassResults.find(
-        (r) => r.shareClassId === 'sc-preferred',
-      )!;
+      const preferred = result.shareClassResults.find((r) => r.shareClassId === 'sc-preferred')!;
 
       // Participating preferred gets preference + participation
       expect(preferred.isParticipating).toBe(true);
@@ -302,9 +284,7 @@ describe('ExitWaterfallService', () => {
         mockShareholding('sc-common', '90000'),
       ]);
       // Investment: 10000 shares * R$ 100 = R$ 1,000,000
-      prisma.fundingRound.findMany.mockResolvedValue([
-        mockFundingRound('sc-preferred', '100'),
-      ]);
+      prisma.fundingRound.findMany.mockResolvedValue([mockFundingRound('sc-preferred', '100')]);
       prisma.optionGrant.findMany.mockResolvedValue([]);
       prisma.convertibleInstrument.findMany.mockResolvedValue([]);
 
@@ -314,9 +294,7 @@ describe('ExitWaterfallService', () => {
         includeConvertibles: false,
       });
 
-      const preferred = result.shareClassResults.find(
-        (r) => r.shareClassId === 'sc-preferred',
-      )!;
+      const preferred = result.shareClassResults.find((r) => r.shareClassId === 'sc-preferred')!;
 
       // 3x cap on R$ 1M investment = R$ 3M max
       expect(preferred.participationCapped).toBe(true);
@@ -373,21 +351,15 @@ describe('ExitWaterfallService', () => {
       });
 
       // Series B (senior) gets its full 4M preference
-      const seriesB = result.shareClassResults.find(
-        (r) => r.shareClassId === 'sc-series-b',
-      )!;
+      const seriesB = result.shareClassResults.find((r) => r.shareClassId === 'sc-series-b')!;
       expect(parseFloat(seriesB.totalProceeds)).toBeCloseTo(4000000, 0);
 
       // Series A gets the remaining 1M
-      const seriesA = result.shareClassResults.find(
-        (r) => r.shareClassId === 'sc-series-a',
-      )!;
+      const seriesA = result.shareClassResults.find((r) => r.shareClassId === 'sc-series-a')!;
       expect(parseFloat(seriesA.totalProceeds)).toBeCloseTo(1000000, 0);
 
       // Common gets nothing
-      const common = result.shareClassResults.find(
-        (r) => r.shareClassId === 'sc-common',
-      )!;
+      const common = result.shareClassResults.find((r) => r.shareClassId === 'sc-common')!;
       expect(parseFloat(common.totalProceeds)).toBe(0);
     });
 
@@ -440,12 +412,8 @@ describe('ExitWaterfallService', () => {
       });
 
       // Pari passu: PN-1 gets 2/5 * 3M = 1.2M, PN-2 gets 3/5 * 3M = 1.8M
-      const pref1 = result.shareClassResults.find(
-        (r) => r.shareClassId === 'sc-pref-1',
-      )!;
-      const pref2 = result.shareClassResults.find(
-        (r) => r.shareClassId === 'sc-pref-2',
-      )!;
+      const pref1 = result.shareClassResults.find((r) => r.shareClassId === 'sc-pref-1')!;
+      const pref2 = result.shareClassResults.find((r) => r.shareClassId === 'sc-pref-2')!;
 
       expect(parseFloat(pref1.totalProceeds)).toBeCloseTo(1200000, 0);
       expect(parseFloat(pref2.totalProceeds)).toBeCloseTo(1800000, 0);
@@ -455,12 +423,8 @@ describe('ExitWaterfallService', () => {
 
     it('should throw on invalid share class ID in custom order', async () => {
       prisma.company.findUnique.mockResolvedValue({ id: 'comp-1' });
-      prisma.shareClass.findMany.mockResolvedValue([
-        mockShareClass({ id: 'sc-common' }),
-      ]);
-      prisma.shareholding.findMany.mockResolvedValue([
-        mockShareholding('sc-common', '100000'),
-      ]);
+      prisma.shareClass.findMany.mockResolvedValue([mockShareClass({ id: 'sc-common' })]);
+      prisma.shareholding.findMany.mockResolvedValue([mockShareholding('sc-common', '100000')]);
       prisma.fundingRound.findMany.mockResolvedValue([]);
       prisma.optionGrant.findMany.mockResolvedValue([]);
       prisma.convertibleInstrument.findMany.mockResolvedValue([]);
@@ -524,9 +488,7 @@ describe('ExitWaterfallService', () => {
       });
 
       // With custom order, Series A gets full preference first
-      const seriesA = result.shareClassResults.find(
-        (r) => r.shareClassId === 'sc-series-a',
-      )!;
+      const seriesA = result.shareClassResults.find((r) => r.shareClassId === 'sc-series-a')!;
       expect(parseFloat(seriesA.totalProceeds)).toBeGreaterThan(0);
     });
 
@@ -555,9 +517,7 @@ describe('ExitWaterfallService', () => {
         mockShareholding('sc-common', '90000'),
       ]);
       // Investment: 10000 * 100 = R$ 1M
-      prisma.fundingRound.findMany.mockResolvedValue([
-        mockFundingRound('sc-preferred', '100'),
-      ]);
+      prisma.fundingRound.findMany.mockResolvedValue([mockFundingRound('sc-preferred', '100')]);
       prisma.optionGrant.findMany.mockResolvedValue([]);
       prisma.convertibleInstrument.findMany.mockResolvedValue([]);
 
@@ -567,15 +527,11 @@ describe('ExitWaterfallService', () => {
         includeConvertibles: false,
       });
 
-      const preferred = result.shareClassResults.find(
-        (r) => r.shareClassId === 'sc-preferred',
-      )!;
+      const preferred = result.shareClassResults.find((r) => r.shareClassId === 'sc-preferred')!;
       expect(preferred.roiMultiple).not.toBeNull();
       expect(parseFloat(preferred.roiMultiple!)).toBeGreaterThan(1);
 
-      const common = result.shareClassResults.find(
-        (r) => r.shareClassId === 'sc-common',
-      )!;
+      const common = result.shareClassResults.find((r) => r.shareClassId === 'sc-common')!;
       expect(common.roiMultiple).toBeNull();
     });
 
@@ -604,9 +560,7 @@ describe('ExitWaterfallService', () => {
         mockShareholding('sc-common', '50000'),
       ]);
       // Investment: 50000 * 10 = R$ 500K preference
-      prisma.fundingRound.findMany.mockResolvedValue([
-        mockFundingRound('sc-preferred', '10'),
-      ]);
+      prisma.fundingRound.findMany.mockResolvedValue([mockFundingRound('sc-preferred', '10')]);
       prisma.optionGrant.findMany.mockResolvedValue([]);
       prisma.convertibleInstrument.findMany.mockResolvedValue([]);
 
@@ -617,9 +571,7 @@ describe('ExitWaterfallService', () => {
         includeConvertibles: false,
       });
 
-      const preferred = result.shareClassResults.find(
-        (r) => r.shareClassId === 'sc-preferred',
-      )!;
+      const preferred = result.shareClassResults.find((r) => r.shareClassId === 'sc-preferred')!;
 
       // Should convert: pro-rata R$ 5M > preference R$ 500K
       expect(parseFloat(preferred.totalProceeds)).toBeCloseTo(5000000, 0);
@@ -637,9 +589,7 @@ describe('ExitWaterfallService', () => {
           liquidationPreferenceMultiple: null,
         }),
       ]);
-      prisma.shareholding.findMany.mockResolvedValue([
-        mockShareholding('sc-common', '100000'),
-      ]);
+      prisma.shareholding.findMany.mockResolvedValue([mockShareholding('sc-common', '100000')]);
       prisma.fundingRound.findMany.mockResolvedValue([]);
 
       // Grant: 10000 options, all vested (grant date 2 years ago)
@@ -699,9 +649,7 @@ describe('ExitWaterfallService', () => {
         mockShareholding('sc-preferred', '20000'),
         mockShareholding('sc-common', '80000'),
       ]);
-      prisma.fundingRound.findMany.mockResolvedValue([
-        mockFundingRound('sc-preferred', '100'),
-      ]);
+      prisma.fundingRound.findMany.mockResolvedValue([mockFundingRound('sc-preferred', '100')]);
       prisma.fundingRound.findFirst.mockResolvedValue({
         pricePerShare: new Prisma.Decimal('100'),
         preMoneyValuation: new Prisma.Decimal('10000000'),
@@ -732,9 +680,7 @@ describe('ExitWaterfallService', () => {
       });
 
       // Convertible should add shares to the preferred class
-      const preferred = result.shareClassResults.find(
-        (r) => r.shareClassId === 'sc-preferred',
-      )!;
+      const preferred = result.shareClassResults.find((r) => r.shareClassId === 'sc-preferred')!;
       expect(parseInt(preferred.totalShares)).toBeGreaterThan(20000);
     });
 
@@ -745,9 +691,7 @@ describe('ExitWaterfallService', () => {
       prisma.shareClass.findMany.mockResolvedValue([
         mockShareClass({ id: 'sc-common', className: 'ON', seniority: 0 }),
       ]);
-      prisma.shareholding.findMany.mockResolvedValue([
-        mockShareholding('sc-common', '100000'),
-      ]);
+      prisma.shareholding.findMany.mockResolvedValue([mockShareholding('sc-common', '100000')]);
       prisma.fundingRound.findMany.mockResolvedValue([]);
       prisma.fundingRound.findFirst.mockResolvedValue(null);
       prisma.optionGrant.findMany.mockResolvedValue([]);
@@ -773,21 +717,15 @@ describe('ExitWaterfallService', () => {
       });
 
       expect(result.metadata?.excludedConvertibles).toHaveLength(1);
-      expect(result.metadata?.excludedConvertibles?.[0].reason).toBe(
-        'No cap or discount defined',
-      );
+      expect(result.metadata?.excludedConvertibles?.[0].reason).toBe('No cap or discount defined');
     });
 
     // ── generatedAt timestamp ──
 
     it('should include generatedAt timestamp', async () => {
       prisma.company.findUnique.mockResolvedValue({ id: 'comp-1' });
-      prisma.shareClass.findMany.mockResolvedValue([
-        mockShareClass({ id: 'sc-common' }),
-      ]);
-      prisma.shareholding.findMany.mockResolvedValue([
-        mockShareholding('sc-common', '100000'),
-      ]);
+      prisma.shareClass.findMany.mockResolvedValue([mockShareClass({ id: 'sc-common' })]);
+      prisma.shareholding.findMany.mockResolvedValue([mockShareholding('sc-common', '100000')]);
       prisma.fundingRound.findMany.mockResolvedValue([]);
       prisma.optionGrant.findMany.mockResolvedValue([]);
       prisma.convertibleInstrument.findMany.mockResolvedValue([]);
@@ -884,9 +822,7 @@ describe('ExitWaterfallService', () => {
     it('should throw NotFoundException if company not found', async () => {
       prisma.company.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.listScenarios('missing', 1, 20),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.listScenarios('missing', 1, 20)).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -914,9 +850,7 @@ describe('ExitWaterfallService', () => {
     it('should throw NotFoundException if scenario not found', async () => {
       prisma.waterfallScenario.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.getScenario('comp-1', 'missing'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getScenario('comp-1', 'missing')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -937,9 +871,7 @@ describe('ExitWaterfallService', () => {
     it('should throw NotFoundException if scenario not found', async () => {
       prisma.waterfallScenario.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.deleteScenario('comp-1', 'missing'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.deleteScenario('comp-1', 'missing')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -973,10 +905,7 @@ describe('ExitWaterfallService', () => {
       ];
 
       // Exit at R$ 5M — 2x pref = R$ 2M, remaining R$ 3M to common
-      const results = service.executeWaterfall(
-        classes,
-        new Prisma.Decimal('5000000'),
-      );
+      const results = service.executeWaterfall(classes, new Prisma.Decimal('5000000'));
 
       // Non-participating preferred: max(2M preference, 10/100 * 5M = 500K) = 2M
       const preferred = results.find((r) => r.shareClassId === 'sc-preferred')!;
@@ -1013,10 +942,7 @@ describe('ExitWaterfallService', () => {
       ];
 
       // Exit at R$ 1M — less than 5M preference
-      const results = service.executeWaterfall(
-        classes,
-        new Prisma.Decimal('1000000'),
-      );
+      const results = service.executeWaterfall(classes, new Prisma.Decimal('1000000'));
 
       for (const r of results) {
         expect(parseFloat(r.totalProceeds)).toBeGreaterThanOrEqual(0);
@@ -1038,10 +964,7 @@ describe('ExitWaterfallService', () => {
         },
       ];
 
-      const results = service.executeWaterfall(
-        classes,
-        new Prisma.Decimal('1000000'),
-      );
+      const results = service.executeWaterfall(classes, new Prisma.Decimal('1000000'));
 
       expect(results).toHaveLength(1);
       expect(results[0].perShareValue).toBe('0');

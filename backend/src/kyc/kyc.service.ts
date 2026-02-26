@@ -41,7 +41,6 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 /** Ordered list of KYC verification steps. */
 const KYC_STEPS = ['cpf', 'document', 'facial', 'aml'] as const;
-type KycStep = (typeof KYC_STEPS)[number];
 
 // ─── Magic bytes for image format validation ─────────────────────────────────
 
@@ -84,18 +83,12 @@ export class KycService {
 
     // Prevent re-verification if already approved
     if (existing && existing.status === KycStatus.APPROVED) {
-      throw new ConflictException(
-        'KYC_ALREADY_APPROVED',
-        'errors.kyc.alreadyApproved',
-      );
+      throw new ConflictException('KYC_ALREADY_APPROVED', 'errors.kyc.alreadyApproved');
     }
 
     // Prevent new attempt while review is in progress
     if (existing && existing.status === KycStatus.PENDING_REVIEW) {
-      throw new ConflictException(
-        'KYC_UNDER_REVIEW',
-        'errors.kyc.underReview',
-      );
+      throw new ConflictException('KYC_UNDER_REVIEW', 'errors.kyc.underReview');
     }
 
     // Enforce maximum attempt limit
@@ -109,7 +102,7 @@ export class KycService {
 
     const sessionId = randomUUID();
 
-    let kyc: { id: string; status: KycStatus };
+    let _kyc: { id: string; status: KycStatus };
 
     if (
       existing &&
@@ -117,7 +110,7 @@ export class KycService {
         existing.status === KycStatus.RESUBMISSION_REQUIRED)
     ) {
       // Reset for a new attempt — preserve attemptCount
-      kyc = await this.prisma.$transaction(async (tx) => {
+      _kyc = await this.prisma.$transaction(async (tx) => {
         const updated = await tx.kycVerification.update({
           where: { userId },
           data: {
@@ -149,15 +142,12 @@ export class KycService {
 
         return updated;
       });
-    } else if (
-      existing &&
-      existing.status === KycStatus.IN_PROGRESS
-    ) {
+    } else if (existing && existing.status === KycStatus.IN_PROGRESS) {
       // Already in progress — return current session
-      kyc = existing;
+      _kyc = existing;
     } else {
       // Create a new KycVerification record
-      kyc = await this.prisma.$transaction(async (tx) => {
+      _kyc = await this.prisma.$transaction(async (tx) => {
         const created = await tx.kycVerification.create({
           data: {
             userId,
@@ -177,9 +167,7 @@ export class KycService {
       });
     }
 
-    this.logger.log(
-      `[startVerification] KYC started for userId=${userId} sessionId=${sessionId}`,
-    );
+    this.logger.log(`[startVerification] KYC started for userId=${userId} sessionId=${sessionId}`);
 
     return {
       sessionId,
@@ -208,10 +196,7 @@ export class KycService {
 
     // Validate CPF checksum locally before calling Verifik
     if (!this.validateCpfChecksum(dto.cpf)) {
-      throw new BusinessRuleException(
-        'KYC_CPF_INVALID',
-        'errors.kyc.cpfInvalid',
-      );
+      throw new BusinessRuleException('KYC_CPF_INVALID', 'errors.kyc.cpfInvalid');
     }
 
     // Check CPF uniqueness via blind index — no other user should own this CPF
@@ -224,17 +209,11 @@ export class KycService {
     });
 
     if (existingUser) {
-      throw new BusinessRuleException(
-        'KYC_CPF_DUPLICATE',
-        'errors.kyc.cpfDuplicate',
-      );
+      throw new BusinessRuleException('KYC_CPF_DUPLICATE', 'errors.kyc.cpfDuplicate');
     }
 
     // Call Verifik API to verify CPF against Receita Federal
-    const verifikResult = await this.verifikService.verifyCpf(
-      dto.cpf,
-      dto.dateOfBirth,
-    );
+    const verifikResult = await this.verifikService.verifyCpf(dto.cpf, dto.dateOfBirth);
 
     // Encrypt CPF and store on User record
     let cpfEncrypted: Buffer | null = null;
@@ -303,11 +282,10 @@ export class KycService {
 
     // Enforce step order: CPF must be verified first
     if (!kyc.cpfVerified) {
-      throw new BusinessRuleException(
-        'KYC_STEP_ORDER_VIOLATION',
-        'errors.kyc.stepOrderViolation',
-        { requiredStep: 'cpf', currentStep: 'document' },
-      );
+      throw new BusinessRuleException('KYC_STEP_ORDER_VIOLATION', 'errors.kyc.stepOrderViolation', {
+        requiredStep: 'cpf',
+        currentStep: 'document',
+      });
     }
 
     // Validate file size and format
@@ -319,10 +297,7 @@ export class KycService {
     // Upload front of document to S3 with KMS encryption
     const kycBucket = this.s3Service.getKycBucket();
     if (!kycBucket) {
-      throw new BusinessRuleException(
-        'KYC_S3_UNAVAILABLE',
-        'errors.kyc.s3Unavailable',
-      );
+      throw new BusinessRuleException('KYC_S3_UNAVAILABLE', 'errors.kyc.s3Unavailable');
     }
 
     const frontKey = `kyc/${userId}/${documentType}-front-${randomUUID()}`;
@@ -342,10 +317,7 @@ export class KycService {
     }
 
     // Call Verifik to verify the document via OCR
-    const verifikResult = await this.verifikService.verifyDocument(
-      file,
-      documentType,
-    );
+    const verifikResult = await this.verifikService.verifyDocument(file, documentType);
 
     // Compare extracted name with CPF name via fuzzy match
     // Load the user to get CPF-verified name (stored during verifyCpf step)
@@ -372,11 +344,9 @@ export class KycService {
     if (verifikResult.data.expiryDate) {
       const expiry = this.parseDate(verifikResult.data.expiryDate);
       if (expiry && expiry < new Date()) {
-        throw new BusinessRuleException(
-          'KYC_DOCUMENT_EXPIRED',
-          'errors.kyc.documentExpired',
-          { expiryDate: verifikResult.data.expiryDate },
-        );
+        throw new BusinessRuleException('KYC_DOCUMENT_EXPIRED', 'errors.kyc.documentExpired', {
+          expiryDate: verifikResult.data.expiryDate,
+        });
       }
     }
 
@@ -394,9 +364,7 @@ export class KycService {
       },
     });
 
-    this.logger.log(
-      `[uploadDocument] Document verified for userId=${userId} type=${documentType}`,
-    );
+    this.logger.log(`[uploadDocument] Document verified for userId=${userId} type=${documentType}`);
 
     return {
       verified: true,
@@ -424,19 +392,17 @@ export class KycService {
 
     // Enforce step order: CPF + document must be completed
     if (!kyc.cpfVerified) {
-      throw new BusinessRuleException(
-        'KYC_STEP_ORDER_VIOLATION',
-        'errors.kyc.stepOrderViolation',
-        { requiredStep: 'cpf', currentStep: 'facial' },
-      );
+      throw new BusinessRuleException('KYC_STEP_ORDER_VIOLATION', 'errors.kyc.stepOrderViolation', {
+        requiredStep: 'cpf',
+        currentStep: 'facial',
+      });
     }
 
     if (!kyc.documentS3Key) {
-      throw new BusinessRuleException(
-        'KYC_STEP_ORDER_VIOLATION',
-        'errors.kyc.stepOrderViolation',
-        { requiredStep: 'document', currentStep: 'facial' },
-      );
+      throw new BusinessRuleException('KYC_STEP_ORDER_VIOLATION', 'errors.kyc.stepOrderViolation', {
+        requiredStep: 'document',
+        currentStep: 'facial',
+      });
     }
 
     // Validate selfie image
@@ -445,10 +411,7 @@ export class KycService {
     // Upload selfie to S3
     const kycBucket = this.s3Service.getKycBucket();
     if (!kycBucket) {
-      throw new BusinessRuleException(
-        'KYC_S3_UNAVAILABLE',
-        'errors.kyc.s3Unavailable',
-      );
+      throw new BusinessRuleException('KYC_S3_UNAVAILABLE', 'errors.kyc.s3Unavailable');
     }
 
     const selfieKey = `kyc/${userId}/selfie-${randomUUID()}`;
@@ -466,10 +429,7 @@ export class KycService {
     );
 
     // Call Verifik face match
-    const verifikResult = await this.verifikService.matchFace(
-      selfie,
-      documentImageUrl,
-    );
+    const verifikResult = await this.verifikService.matchFace(selfie, documentImageUrl);
 
     const { matchScore, livenessScore } = verifikResult;
 
@@ -483,11 +443,10 @@ export class KycService {
     }
 
     if (matchScore < FACE_MATCH_MIN_SCORE) {
-      throw new BusinessRuleException(
-        'KYC_FACE_MATCH_FAILED',
-        'errors.kyc.faceMatchFailed',
-        { faceMatchScore: matchScore, threshold: FACE_MATCH_MIN_SCORE },
-      );
+      throw new BusinessRuleException('KYC_FACE_MATCH_FAILED', 'errors.kyc.faceMatchFailed', {
+        faceMatchScore: matchScore,
+        threshold: FACE_MATCH_MIN_SCORE,
+      });
     }
 
     // Update KycVerification: mark face as verified, transition to PENDING_REVIEW
@@ -589,16 +548,12 @@ export class KycService {
     });
 
     if (!kyc) {
-      this.logger.error(
-        `[processAmlScreening] KYC verification not found: ${kycVerificationId}`,
-      );
+      this.logger.error(`[processAmlScreening] KYC verification not found: ${kycVerificationId}`);
       return;
     }
 
     if (!kyc.user) {
-      this.logger.error(
-        `[processAmlScreening] User not found for KYC: ${kycVerificationId}`,
-      );
+      this.logger.error(`[processAmlScreening] User not found for KYC: ${kycVerificationId}`);
       return;
     }
 
@@ -606,9 +561,7 @@ export class KycService {
     let cpfForScreening = '';
     if (kyc.user.cpfEncrypted) {
       try {
-        cpfForScreening = await this.encryptionService.decrypt(
-          Buffer.from(kyc.user.cpfEncrypted),
-        );
+        cpfForScreening = await this.encryptionService.decrypt(Buffer.from(kyc.user.cpfEncrypted));
       } catch (err) {
         this.logger.warn(
           `[processAmlScreening] Could not decrypt CPF for userId=${kyc.userId}: ${err instanceof Error ? err.message : String(err)}`,
@@ -616,9 +569,7 @@ export class KycService {
       }
     }
 
-    const fullName = [kyc.user.firstName, kyc.user.lastName]
-      .filter(Boolean)
-      .join(' ');
+    const fullName = [kyc.user.firstName, kyc.user.lastName].filter(Boolean).join(' ');
 
     // Call Verifik AML screening
     const amlResult = await this.verifikService.screenAml(
@@ -637,13 +588,8 @@ export class KycService {
     if (amlResult.sanctionsMatch) {
       newStatus = KycStatus.REJECTED;
       rejectionReason = 'Sanctions list match detected';
-      this.logger.warn(
-        `[processAmlScreening] Sanctions match for userId=${kyc.userId} — REJECTED`,
-      );
-    } else if (
-      amlResult.riskScore === 'HIGH' ||
-      amlResult.isPEP
-    ) {
+      this.logger.warn(`[processAmlScreening] Sanctions match for userId=${kyc.userId} — REJECTED`);
+    } else if (amlResult.riskScore === 'HIGH' || amlResult.isPEP) {
       // Keep in PENDING_REVIEW for manual review
       newStatus = KycStatus.PENDING_REVIEW;
       this.logger.warn(
@@ -652,9 +598,7 @@ export class KycService {
       );
     } else {
       newStatus = KycStatus.APPROVED;
-      this.logger.log(
-        `[processAmlScreening] AML clear for userId=${kyc.userId} — APPROVED`,
-      );
+      this.logger.log(`[processAmlScreening] AML clear for userId=${kyc.userId} — APPROVED`);
     }
 
     await this.prisma.$transaction(async (tx) => {
@@ -708,17 +652,13 @@ export class KycService {
    * Ensures the KYC is in the expected status. Throws a BusinessRuleException
    * if the current status does not match.
    */
-  private ensureStatus(
-    current: KycStatus,
-    expected: KycStatus,
-    operation: string,
-  ): void {
+  private ensureStatus(current: KycStatus, expected: KycStatus, operation: string): void {
     if (current !== expected) {
-      throw new BusinessRuleException(
-        'KYC_INVALID_STATUS',
-        'errors.kyc.invalidStatus',
-        { currentStatus: current, expectedStatus: expected, operation },
-      );
+      throw new BusinessRuleException('KYC_INVALID_STATUS', 'errors.kyc.invalidStatus', {
+        currentStatus: current,
+        expectedStatus: expected,
+        operation,
+      });
     }
   }
 
@@ -827,14 +767,12 @@ export class KycService {
   /**
    * Computes the list of completed KYC steps based on the current record state.
    */
-  private computeCompletedSteps(
-    kyc: {
-      cpfVerified: boolean;
-      documentS3Key: string | null;
-      faceVerified: boolean;
-      amlScreeningDone: boolean;
-    },
-  ): string[] {
+  private computeCompletedSteps(kyc: {
+    cpfVerified: boolean;
+    documentS3Key: string | null;
+    faceVerified: boolean;
+    amlScreeningDone: boolean;
+  }): string[] {
     const completed: string[] = [];
 
     if (kyc.cpfVerified) {
@@ -861,30 +799,25 @@ export class KycService {
    */
   private validateImageBuffer(buffer: Buffer): void {
     if (buffer.length > MAX_FILE_SIZE) {
-      throw new BusinessRuleException(
-        'KYC_FILE_TOO_LARGE',
-        'errors.kyc.fileTooLarge',
-        { maxSizeBytes: MAX_FILE_SIZE, actualSizeBytes: buffer.length },
-      );
+      throw new BusinessRuleException('KYC_FILE_TOO_LARGE', 'errors.kyc.fileTooLarge', {
+        maxSizeBytes: MAX_FILE_SIZE,
+        actualSizeBytes: buffer.length,
+      });
     }
 
     if (buffer.length < 4) {
-      throw new BusinessRuleException(
-        'KYC_FILE_INVALID_FORMAT',
-        'errors.kyc.fileInvalidFormat',
-        { reason: 'File is too small to be a valid image' },
-      );
+      throw new BusinessRuleException('KYC_FILE_INVALID_FORMAT', 'errors.kyc.fileInvalidFormat', {
+        reason: 'File is too small to be a valid image',
+      });
     }
 
     const isJpeg = buffer.subarray(0, 3).equals(JPEG_MAGIC);
     const isPng = buffer.subarray(0, 4).equals(PNG_MAGIC);
 
     if (!isJpeg && !isPng) {
-      throw new BusinessRuleException(
-        'KYC_FILE_INVALID_FORMAT',
-        'errors.kyc.fileInvalidFormat',
-        { reason: 'File must be a JPEG or PNG image' },
-      );
+      throw new BusinessRuleException('KYC_FILE_INVALID_FORMAT', 'errors.kyc.fileInvalidFormat', {
+        reason: 'File must be a JPEG or PNG image',
+      });
     }
   }
 
@@ -949,11 +882,7 @@ export class KycService {
     const brMatch = dateStr.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
     if (brMatch) {
       const [, day, month, year] = brMatch;
-      const date = new Date(
-        parseInt(year, 10),
-        parseInt(month, 10) - 1,
-        parseInt(day, 10),
-      );
+      const date = new Date(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10));
       if (!isNaN(date.getTime())) return date;
     }
 

@@ -22,7 +22,9 @@ export class InviteMemberDto {
   @IsEnum(MemberRoleDto)
   role: MemberRoleDto;
 
-  @ApiPropertyOptional({ description: 'Optional personal message included in the invitation email' })
+  @ApiPropertyOptional({
+    description: 'Optional personal message included in the invitation email',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(500)

@@ -9,12 +9,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiParam,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { OptionPlanService } from './option-plan.service';
 import { CreateOptionPlanDto } from './dto/create-option-plan.dto';
@@ -31,10 +26,7 @@ import {
 import { ListExerciseRequestsQueryDto } from './dto/list-exercise-requests-query.dto';
 import { paginate } from '../common/helpers/paginate';
 import { Roles } from '../auth/decorators/roles.decorator';
-import {
-  CurrentUser,
-  AuthenticatedUser,
-} from '../auth/decorators/current-user.decorator';
+import { CurrentUser, AuthenticatedUser } from '../auth/decorators/current-user.decorator';
 import { Auditable } from '../audit-log/decorators/auditable.decorator';
 
 @ApiTags('Option Plans')
@@ -75,14 +67,8 @@ export class OptionPlanController {
   @ApiOperation({ summary: 'List option plans with pagination and filtering' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiResponse({ status: 200, description: 'Paginated list of option plans' })
-  async listPlans(
-    @Param('companyId') companyId: string,
-    @Query() query: ListOptionPlansQueryDto,
-  ) {
-    const { items, total } = await this.optionPlanService.findAllPlans(
-      companyId,
-      query,
-    );
+  async listPlans(@Param('companyId') companyId: string, @Query() query: ListOptionPlansQueryDto) {
+    const { items, total } = await this.optionPlanService.findAllPlans(companyId, query);
     return paginate(items, total, query.page, query.limit);
   }
 
@@ -94,10 +80,7 @@ export class OptionPlanController {
   @ApiParam({ name: 'planId', description: 'Option plan UUID' })
   @ApiResponse({ status: 200, description: 'Option plan detail' })
   @ApiResponse({ status: 404, description: 'Plan not found' })
-  async getPlan(
-    @Param('companyId') companyId: string,
-    @Param('planId') planId: string,
-  ) {
+  async getPlan(@Param('companyId') companyId: string, @Param('planId') planId: string) {
     return this.optionPlanService.findPlanById(companyId, planId);
   }
 
@@ -140,10 +123,7 @@ export class OptionPlanController {
   @ApiResponse({ status: 200, description: 'Option plan closed' })
   @ApiResponse({ status: 404, description: 'Plan not found' })
   @ApiResponse({ status: 422, description: 'Plan already closed' })
-  async closePlan(
-    @Param('companyId') companyId: string,
-    @Param('planId') planId: string,
-  ) {
+  async closePlan(@Param('companyId') companyId: string, @Param('planId') planId: string) {
     return this.optionPlanService.closePlan(companyId, planId);
   }
 
@@ -184,10 +164,7 @@ export class OptionPlanController {
     @Param('companyId') companyId: string,
     @Query() query: ListOptionGrantsQueryDto,
   ) {
-    const { items, total } = await this.optionPlanService.findAllGrants(
-      companyId,
-      query,
-    );
+    const { items, total } = await this.optionPlanService.findAllGrants(companyId, query);
     return paginate(items, total, query.page, query.limit);
   }
 
@@ -199,10 +176,7 @@ export class OptionPlanController {
   @ApiParam({ name: 'grantId', description: 'Option grant UUID' })
   @ApiResponse({ status: 200, description: 'Option grant detail with vesting' })
   @ApiResponse({ status: 404, description: 'Grant not found' })
-  async getGrant(
-    @Param('companyId') companyId: string,
-    @Param('grantId') grantId: string,
-  ) {
+  async getGrant(@Param('companyId') companyId: string, @Param('grantId') grantId: string) {
     return this.optionPlanService.findGrantById(companyId, grantId);
   }
 
@@ -236,10 +210,7 @@ export class OptionPlanController {
   @ApiResponse({ status: 200, description: 'Grant cancelled' })
   @ApiResponse({ status: 404, description: 'Grant not found' })
   @ApiResponse({ status: 422, description: 'Grant already cancelled or exercised' })
-  async cancelGrant(
-    @Param('companyId') companyId: string,
-    @Param('grantId') grantId: string,
-  ) {
+  async cancelGrant(@Param('companyId') companyId: string, @Param('grantId') grantId: string) {
     return this.optionPlanService.cancelGrant(companyId, grantId);
   }
 
@@ -281,10 +252,7 @@ export class OptionPlanController {
     @Param('companyId') companyId: string,
     @Query() query: ListExerciseRequestsQueryDto,
   ) {
-    const { items, total } = await this.optionPlanService.findAllExercises(
-      companyId,
-      query,
-    );
+    const { items, total } = await this.optionPlanService.findAllExercises(companyId, query);
     return paginate(items, total, query.page, query.limit);
   }
 

@@ -105,9 +105,7 @@ describe('NotificationService', () => {
     };
 
     it('should queue a notification when preferences allow it', async () => {
-      mockPrisma.userNotificationPreferences.findUnique.mockResolvedValue(
-        mockPreferences,
-      );
+      mockPrisma.userNotificationPreferences.findUnique.mockResolvedValue(mockPreferences);
 
       await service.create(payload);
 
@@ -123,11 +121,7 @@ describe('NotificationService', () => {
 
       await service.create(payload);
 
-      expect(queue.add).toHaveBeenCalledWith(
-        'create-notification',
-        payload,
-        expect.any(Object),
-      );
+      expect(queue.add).toHaveBeenCalledWith('create-notification', payload, expect.any(Object));
     });
 
     it('should skip notification when category is disabled', async () => {
@@ -417,9 +411,7 @@ describe('NotificationService', () => {
     it('should throw NotFoundException when notification not found', async () => {
       mockPrisma.notification.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.findById(USER_ID, 'nonexistent'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.findById(USER_ID, 'nonexistent')).rejects.toThrow(NotFoundException);
     });
 
     it('should return read notification with readAt timestamp', async () => {
@@ -494,9 +486,7 @@ describe('NotificationService', () => {
     it('should throw NotFoundException when notification not found', async () => {
       mockPrisma.notification.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.markAsRead(USER_ID, 'nonexistent'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.markAsRead(USER_ID, 'nonexistent')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -532,9 +522,7 @@ describe('NotificationService', () => {
 
   describe('getPreferences', () => {
     it('should return existing preferences', async () => {
-      mockPrisma.userNotificationPreferences.findUnique.mockResolvedValue(
-        mockPreferences,
-      );
+      mockPrisma.userNotificationPreferences.findUnique.mockResolvedValue(mockPreferences);
 
       const result = await service.getPreferences(USER_ID);
 
@@ -552,9 +540,7 @@ describe('NotificationService', () => {
 
     it('should create default preferences when none exist', async () => {
       mockPrisma.userNotificationPreferences.findUnique.mockResolvedValue(null);
-      mockPrisma.userNotificationPreferences.create.mockResolvedValue(
-        mockPreferences,
-      );
+      mockPrisma.userNotificationPreferences.create.mockResolvedValue(mockPreferences);
 
       const result = await service.getPreferences(USER_ID);
 
@@ -575,9 +561,7 @@ describe('NotificationService', () => {
         ...mockPreferences,
         documents: false,
       };
-      mockPrisma.userNotificationPreferences.upsert.mockResolvedValue(
-        updatedPrefs,
-      );
+      mockPrisma.userNotificationPreferences.upsert.mockResolvedValue(updatedPrefs);
 
       const result = await service.updatePreferences(USER_ID, {
         documents: false,
@@ -599,9 +583,7 @@ describe('NotificationService', () => {
     });
 
     it('should ignore security=false in input and enforce true', async () => {
-      mockPrisma.userNotificationPreferences.upsert.mockResolvedValue(
-        mockPreferences,
-      );
+      mockPrisma.userNotificationPreferences.upsert.mockResolvedValue(mockPreferences);
 
       await service.updatePreferences(USER_ID, {
         transactions: false,
@@ -621,9 +603,7 @@ describe('NotificationService', () => {
         options: false,
         fundingRounds: false,
       };
-      mockPrisma.userNotificationPreferences.upsert.mockResolvedValue(
-        updatedPrefs,
-      );
+      mockPrisma.userNotificationPreferences.upsert.mockResolvedValue(updatedPrefs);
 
       const result = await service.updatePreferences(USER_ID, {
         transactions: false,
@@ -638,9 +618,7 @@ describe('NotificationService', () => {
     });
 
     it('should create preferences via upsert when they do not exist', async () => {
-      mockPrisma.userNotificationPreferences.upsert.mockResolvedValue(
-        mockPreferences,
-      );
+      mockPrisma.userNotificationPreferences.upsert.mockResolvedValue(mockPreferences);
 
       await service.updatePreferences(USER_ID, { documents: true });
 
@@ -672,9 +650,7 @@ describe('NotificationService', () => {
     it('should throw NotFoundException when notification not found', async () => {
       mockPrisma.notification.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.delete(USER_ID, 'nonexistent'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.delete(USER_ID, 'nonexistent')).rejects.toThrow(NotFoundException);
     });
   });
 });

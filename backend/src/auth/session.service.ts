@@ -26,9 +26,7 @@ export class SessionService {
   private static readonly SESSION_PREFIX = 'session:';
   private static readonly USER_SESSIONS_PREFIX = 'user-sessions:';
 
-  constructor(
-    @Inject(REDIS_CLIENT) private readonly redis: Redis | null,
-  ) {}
+  constructor(@Inject(REDIS_CLIENT) private readonly redis: Redis | null) {}
 
   /**
    * Create a new session in Redis. Returns the session ID (64-char hex string).
@@ -71,14 +69,9 @@ export class SessionService {
       const userKey = `${SessionService.USER_SESSIONS_PREFIX}${userId}`;
       await this.redis.sadd(userKey, sessionId);
       // User session set TTL = absolute timeout + 1h buffer
-      await this.redis.expire(
-        userKey,
-        SessionService.ABSOLUTE_TIMEOUT_S + 3600,
-      );
+      await this.redis.expire(userKey, SessionService.ABSOLUTE_TIMEOUT_S + 3600);
 
-      this.logger.debug(
-        `Session created for user ${userId}: ${sessionId.slice(0, 8)}...`,
-      );
+      this.logger.debug(`Session created for user ${userId}: ${sessionId.slice(0, 8)}...`);
       return sessionId;
     } catch (error) {
       this.logger.error(
@@ -114,10 +107,7 @@ export class SessionService {
    * Check if session has been inactive longer than the inactivity timeout (2 hours).
    */
   isInactive(session: SessionData): boolean {
-    return (
-      Date.now() - session.lastActivityAt >
-      SessionService.INACTIVITY_TIMEOUT_MS
-    );
+    return Date.now() - session.lastActivityAt > SessionService.INACTIVITY_TIMEOUT_MS;
   }
 
   /**
@@ -125,17 +115,11 @@ export class SessionService {
    * Skips the write if the last update was within the touch threshold (60s)
    * to reduce Redis write load.
    */
-  async touchSession(
-    sessionId: string,
-    session: SessionData,
-  ): Promise<void> {
+  async touchSession(sessionId: string, session: SessionData): Promise<void> {
     if (!this.redis) return;
 
     const now = Date.now();
-    if (
-      now - session.lastActivityAt <
-      SessionService.TOUCH_THRESHOLD_MS
-    ) {
+    if (now - session.lastActivityAt < SessionService.TOUCH_THRESHOLD_MS) {
       return; // Recently touched, skip write
     }
 
@@ -196,13 +180,9 @@ export class SessionService {
       const sessionIds = await this.redis.smembers(userKey);
 
       if (sessionIds.length > 0) {
-        const sessionKeys = sessionIds.map(
-          (id) => `${SessionService.SESSION_PREFIX}${id}`,
-        );
+        const sessionKeys = sessionIds.map((id) => `${SessionService.SESSION_PREFIX}${id}`);
         await this.redis.del(...sessionKeys);
-        this.logger.debug(
-          `Destroyed ${sessionIds.length} sessions for user ${userId}`,
-        );
+        this.logger.debug(`Destroyed ${sessionIds.length} sessions for user ${userId}`);
       }
 
       await this.redis.del(userKey);

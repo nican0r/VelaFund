@@ -1,10 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { OptionPlanController } from './option-plan.controller';
 import { OptionPlanService } from './option-plan.service';
-import {
-  NotFoundException,
-  BusinessRuleException,
-} from '../common/filters/app-exception';
+import { NotFoundException, BusinessRuleException } from '../common/filters/app-exception';
 import { AuthenticatedUser } from '../auth/decorators/current-user.decorator';
 
 const mockUser: AuthenticatedUser = {
@@ -119,9 +116,7 @@ describe('OptionPlanController', () => {
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [OptionPlanController],
-      providers: [
-        { provide: OptionPlanService, useValue: mockService },
-      ],
+      providers: [{ provide: OptionPlanService, useValue: mockService }],
     }).compile();
 
     controller = module.get<OptionPlanController>(OptionPlanController);
@@ -136,11 +131,15 @@ describe('OptionPlanController', () => {
     it('should create and return an option plan', async () => {
       mockService.createPlan.mockResolvedValue(mockPlan);
 
-      const result = await controller.createPlan('comp-1', {
-        name: '2026 Employee Option Plan',
-        shareClassId: 'sc-1',
-        totalPoolSize: '100000',
-      }, mockUser);
+      const result = await controller.createPlan(
+        'comp-1',
+        {
+          name: '2026 Employee Option Plan',
+          shareClassId: 'sc-1',
+          totalPoolSize: '100000',
+        },
+        mockUser,
+      );
 
       expect(result).toEqual(mockPlan);
       expect(mockService.createPlan).toHaveBeenCalledWith(
@@ -151,16 +150,18 @@ describe('OptionPlanController', () => {
     });
 
     it('should propagate NotFoundException', async () => {
-      mockService.createPlan.mockRejectedValue(
-        new NotFoundException('company', 'comp-1'),
-      );
+      mockService.createPlan.mockRejectedValue(new NotFoundException('company', 'comp-1'));
 
       await expect(
-        controller.createPlan('comp-1', {
-          name: 'Plan',
-          shareClassId: 'sc-1',
-          totalPoolSize: '100000',
-        }, mockUser),
+        controller.createPlan(
+          'comp-1',
+          {
+            name: 'Plan',
+            shareClassId: 'sc-1',
+            totalPoolSize: '100000',
+          },
+          mockUser,
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -198,13 +199,9 @@ describe('OptionPlanController', () => {
     });
 
     it('should propagate NotFoundException', async () => {
-      mockService.findPlanById.mockRejectedValue(
-        new NotFoundException('optionPlan', 'plan-1'),
-      );
+      mockService.findPlanById.mockRejectedValue(new NotFoundException('optionPlan', 'plan-1'));
 
-      await expect(
-        controller.getPlan('comp-1', 'plan-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.getPlan('comp-1', 'plan-1')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -227,9 +224,9 @@ describe('OptionPlanController', () => {
         new BusinessRuleException('OPT_PLAN_CLOSED', 'errors.opt.planClosed'),
       );
 
-      await expect(
-        controller.updatePlan('comp-1', 'plan-1', { name: 'Updated' }),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(controller.updatePlan('comp-1', 'plan-1', { name: 'Updated' })).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
   });
 
@@ -250,9 +247,7 @@ describe('OptionPlanController', () => {
         new BusinessRuleException('OPT_PLAN_ALREADY_CLOSED', 'errors.opt.planAlreadyClosed'),
       );
 
-      await expect(
-        controller.closePlan('comp-1', 'plan-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(controller.closePlan('comp-1', 'plan-1')).rejects.toThrow(BusinessRuleException);
     });
   });
 
@@ -264,17 +259,21 @@ describe('OptionPlanController', () => {
     it('should create and return a grant', async () => {
       mockService.createGrant.mockResolvedValue(mockGrant);
 
-      const result = await controller.createGrant('comp-1', {
-        optionPlanId: 'plan-1',
-        employeeName: 'Maria Silva',
-        employeeEmail: 'maria@company.com',
-        quantity: '10000',
-        strikePrice: '5.00',
-        grantDate: '2026-01-15',
-        expirationDate: '2036-01-15',
-        cliffMonths: 12,
-        vestingDurationMonths: 48,
-      }, mockUser);
+      const result = await controller.createGrant(
+        'comp-1',
+        {
+          optionPlanId: 'plan-1',
+          employeeName: 'Maria Silva',
+          employeeEmail: 'maria@company.com',
+          quantity: '10000',
+          strikePrice: '5.00',
+          grantDate: '2026-01-15',
+          expirationDate: '2036-01-15',
+          cliffMonths: 12,
+          vestingDurationMonths: 48,
+        },
+        mockUser,
+      );
 
       expect(result).toEqual(mockGrant);
       expect(mockService.createGrant).toHaveBeenCalledWith(
@@ -293,17 +292,21 @@ describe('OptionPlanController', () => {
       );
 
       await expect(
-        controller.createGrant('comp-1', {
-          optionPlanId: 'plan-1',
-          employeeName: 'Maria',
-          employeeEmail: 'maria@company.com',
-          quantity: '10000',
-          strikePrice: '5.00',
-          grantDate: '2026-01-15',
-          expirationDate: '2036-01-15',
-          cliffMonths: 12,
-          vestingDurationMonths: 48,
-        }, mockUser),
+        controller.createGrant(
+          'comp-1',
+          {
+            optionPlanId: 'plan-1',
+            employeeName: 'Maria',
+            employeeEmail: 'maria@company.com',
+            quantity: '10000',
+            strikePrice: '5.00',
+            grantDate: '2026-01-15',
+            expirationDate: '2036-01-15',
+            cliffMonths: 12,
+            vestingDurationMonths: 48,
+          },
+          mockUser,
+        ),
       ).rejects.toThrow(BusinessRuleException);
     });
   });
@@ -338,13 +341,9 @@ describe('OptionPlanController', () => {
     });
 
     it('should propagate NotFoundException', async () => {
-      mockService.findGrantById.mockRejectedValue(
-        new NotFoundException('optionGrant', 'grant-1'),
-      );
+      mockService.findGrantById.mockRejectedValue(new NotFoundException('optionGrant', 'grant-1'));
 
-      await expect(
-        controller.getGrant('comp-1', 'grant-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.getGrant('comp-1', 'grant-1')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -387,12 +386,15 @@ describe('OptionPlanController', () => {
 
     it('should propagate BusinessRuleException for already cancelled', async () => {
       mockService.cancelGrant.mockRejectedValue(
-        new BusinessRuleException('OPT_GRANT_ALREADY_CANCELLED', 'errors.opt.grantAlreadyCancelled'),
+        new BusinessRuleException(
+          'OPT_GRANT_ALREADY_CANCELLED',
+          'errors.opt.grantAlreadyCancelled',
+        ),
       );
 
-      await expect(
-        controller.cancelGrant('comp-1', 'grant-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(controller.cancelGrant('comp-1', 'grant-1')).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
   });
 
@@ -497,9 +499,9 @@ describe('OptionPlanController', () => {
         new NotFoundException('optionExercise', 'exercise-1'),
       );
 
-      await expect(
-        controller.getExercise('comp-1', 'exercise-1'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.getExercise('comp-1', 'exercise-1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -511,12 +513,7 @@ describe('OptionPlanController', () => {
         confirmedBy: 'user-1',
       });
 
-      const result = await controller.confirmExercise(
-        'comp-1',
-        'exercise-1',
-        {},
-        mockUser,
-      );
+      const result = await controller.confirmExercise('comp-1', 'exercise-1', {}, mockUser);
 
       expect(result.status).toBe('COMPLETED');
       expect(mockService.confirmExercisePayment).toHaveBeenCalledWith(
@@ -529,7 +526,10 @@ describe('OptionPlanController', () => {
 
     it('should propagate BusinessRuleException for already confirmed', async () => {
       mockService.confirmExercisePayment.mockRejectedValue(
-        new BusinessRuleException('OPT_EXERCISE_ALREADY_CONFIRMED', 'errors.opt.exerciseAlreadyConfirmed'),
+        new BusinessRuleException(
+          'OPT_EXERCISE_ALREADY_CONFIRMED',
+          'errors.opt.exerciseAlreadyConfirmed',
+        ),
       );
 
       await expect(
@@ -562,12 +562,15 @@ describe('OptionPlanController', () => {
 
     it('should propagate BusinessRuleException for already cancelled', async () => {
       mockService.cancelExercise.mockRejectedValue(
-        new BusinessRuleException('OPT_EXERCISE_ALREADY_CANCELLED', 'errors.opt.exerciseAlreadyCancelled'),
+        new BusinessRuleException(
+          'OPT_EXERCISE_ALREADY_CANCELLED',
+          'errors.opt.exerciseAlreadyCancelled',
+        ),
       );
 
-      await expect(
-        controller.cancelExercise('comp-1', 'exercise-1', mockUser),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(controller.cancelExercise('comp-1', 'exercise-1', mockUser)).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should propagate BusinessRuleException for non-pending status', async () => {
@@ -575,9 +578,9 @@ describe('OptionPlanController', () => {
         new BusinessRuleException('OPT_EXERCISE_NOT_PENDING', 'errors.opt.exerciseNotPending'),
       );
 
-      await expect(
-        controller.cancelExercise('comp-1', 'exercise-1', mockUser),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(controller.cancelExercise('comp-1', 'exercise-1', mockUser)).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
   });
 });

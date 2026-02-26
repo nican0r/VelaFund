@@ -89,9 +89,7 @@ describe('redact-pii', () => {
 
   describe('maskWallet', () => {
     it('should mask Ethereum wallet address', () => {
-      expect(maskWallet('0xAbCdEf1234567890AbCdEf1234567890AbCdEf12')).toBe(
-        '0xAbCd...Ef12',
-      );
+      expect(maskWallet('0xAbCdEf1234567890AbCdEf1234567890AbCdEf12')).toBe('0xAbCd...Ef12');
     });
 
     it('should handle short addresses (<=10 chars)', () => {
@@ -106,9 +104,7 @@ describe('redact-pii', () => {
     });
 
     it('should handle non-Ethereum addresses', () => {
-      expect(maskWallet('bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq')).toBe(
-        'bc1qar...5mdq',
-      );
+      expect(maskWallet('bc1qar0srrr7xfkvy5l643lydnw9re59gtzzwf5mdq')).toBe('bc1qar...5mdq');
     });
   });
 
@@ -248,15 +244,9 @@ describe('redact-pii', () => {
     });
 
     it('should handle arrays', () => {
-      const input = [
-        { email: 'a@test.com' },
-        { email: 'b@test.com' },
-      ];
+      const input = [{ email: 'a@test.com' }, { email: 'b@test.com' }];
       const result = redactPii(input);
-      expect(result).toEqual([
-        { email: 'a***@test.com' },
-        { email: 'b***@test.com' },
-      ]);
+      expect(result).toEqual([{ email: 'a***@test.com' }, { email: 'b***@test.com' }]);
     });
 
     it('should handle arrays within objects', () => {
@@ -399,16 +389,12 @@ describe('redact-pii', () => {
   describe('redactPiiFromString', () => {
     it('should mask CPF patterns in strings', () => {
       const msg = 'User with CPF 123.456.789-09 logged in';
-      expect(redactPiiFromString(msg)).toBe(
-        'User with CPF ***.***.***-09 logged in',
-      );
+      expect(redactPiiFromString(msg)).toBe('User with CPF ***.***.***-09 logged in');
     });
 
     it('should mask CNPJ patterns in strings', () => {
       const msg = 'Company CNPJ 12.345.678/0001-90 validated';
-      expect(redactPiiFromString(msg)).toBe(
-        'Company CNPJ **.***.****/****-90 validated',
-      );
+      expect(redactPiiFromString(msg)).toBe('Company CNPJ **.***.****/****-90 validated');
     });
 
     it('should mask email patterns in strings', () => {
@@ -417,16 +403,12 @@ describe('redact-pii', () => {
     });
 
     it('should mask Ethereum wallet patterns in strings', () => {
-      const msg =
-        'Wallet 0xAbCdEf1234567890AbCdEf1234567890AbCdEf12 connected';
-      expect(redactPiiFromString(msg)).toBe(
-        'Wallet 0xAbCd...Ef12 connected',
-      );
+      const msg = 'Wallet 0xAbCdEf1234567890AbCdEf1234567890AbCdEf12 connected';
+      expect(redactPiiFromString(msg)).toBe('Wallet 0xAbCd...Ef12 connected');
     });
 
     it('should handle multiple PII values in one string', () => {
-      const msg =
-        'User 123.456.789-09 (joao@example.com) logged in from 192.168.1.42';
+      const msg = 'User 123.456.789-09 (joao@example.com) logged in from 192.168.1.42';
       const result = redactPiiFromString(msg);
       expect(result).toContain('***.***.***-09');
       expect(result).toContain('j***@example.com');
@@ -436,9 +418,7 @@ describe('redact-pii', () => {
     it('should handle null/undefined/empty', () => {
       expect(redactPiiFromString('')).toBe('');
       expect(redactPiiFromString(null as unknown as string)).toBe(null);
-      expect(redactPiiFromString(undefined as unknown as string)).toBe(
-        undefined,
-      );
+      expect(redactPiiFromString(undefined as unknown as string)).toBe(undefined);
     });
 
     it('should not modify strings without PII', () => {

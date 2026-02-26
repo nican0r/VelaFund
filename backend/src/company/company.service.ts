@@ -65,11 +65,9 @@ export class CompanyService {
   async create(dto: CreateCompanyDto, userId: string) {
     // Validate CNPJ checksum
     if (!isValidCnpjChecksum(dto.cnpj)) {
-      throw new BusinessRuleException(
-        'COMPANY_INVALID_CNPJ',
-        'errors.company.invalidCnpj',
-        { cnpj: dto.cnpj },
-      );
+      throw new BusinessRuleException('COMPANY_INVALID_CNPJ', 'errors.company.invalidCnpj', {
+        cnpj: dto.cnpj,
+      });
     }
 
     // Parse foundedDate if provided and validate it's not in the future
@@ -83,10 +81,7 @@ export class CompanyService {
         );
       }
       if (foundedDate > new Date()) {
-        throw new BusinessRuleException(
-          'COMPANY_FUTURE_DATE',
-          'errors.company.futureFoundedDate',
-        );
+        throw new BusinessRuleException('COMPANY_FUTURE_DATE', 'errors.company.futureFoundedDate');
       }
     }
 
@@ -108,51 +103,61 @@ export class CompanyService {
 
     // Atomically create the company and the creator's ADMIN membership
     try {
-      const company = await this.prisma.$transaction(
-        async (tx: Prisma.TransactionClient) => {
-          const created = await tx.company.create({
-            data: {
-              name: dto.name,
-              entityType: dto.entityType,
-              cnpj: dto.cnpj,
-              description: dto.description ?? null,
-              foundedDate: foundedDate ?? null,
-              defaultCurrency: dto.defaultCurrency ?? 'BRL',
-              fiscalYearEnd: dto.fiscalYearEnd ?? '12-31',
-              timezone: dto.timezone ?? 'America/Sao_Paulo',
-              locale: dto.locale ?? 'pt-BR',
-              createdById: userId,
-              cnpjData: {
-                validationStatus: 'PENDING',
-              } as unknown as Prisma.InputJsonValue,
-            },
-          });
+      const company = await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+        const created = await tx.company.create({
+          data: {
+            name: dto.name,
+            entityType: dto.entityType,
+            cnpj: dto.cnpj,
+            description: dto.description ?? null,
+            foundedDate: foundedDate ?? null,
+            defaultCurrency: dto.defaultCurrency ?? 'BRL',
+            fiscalYearEnd: dto.fiscalYearEnd ?? '12-31',
+            timezone: dto.timezone ?? 'America/Sao_Paulo',
+            locale: dto.locale ?? 'pt-BR',
+            createdById: userId,
+            cnpjData: {
+              validationStatus: 'PENDING',
+            } as unknown as Prisma.InputJsonValue,
+          },
+        });
 
-          // BR-4: Auto-assign creator as ADMIN
-          const user = await tx.user.findUniqueOrThrow({
-            where: { id: userId },
-            select: { email: true },
-          });
+        // BR-4: Auto-assign creator as ADMIN
+        const user = await tx.user.findUniqueOrThrow({
+          where: { id: userId },
+          select: { email: true },
+        });
 
-          await tx.companyMember.create({
+        await tx.companyMember.create({
+          data: {
+            companyId: created.id,
+            userId,
+            email: user.email,
+            role: 'ADMIN',
+            status: 'ACTIVE',
+            invitedBy: userId,
+            acceptedAt: new Date(),
+          },
+        });
+
+        // BR-1: Auto-create default QUOTA share class for Ltda. companies
+        if (created.entityType === 'LTDA') {
+          await tx.shareClass.create({
             data: {
               companyId: created.id,
-              userId,
-              email: user.email,
-              role: 'ADMIN',
-              status: 'ACTIVE',
-              invitedBy: userId,
-              acceptedAt: new Date(),
+              className: 'Quotas Ordinárias',
+              type: 'QUOTA',
+              totalAuthorized: new Prisma.Decimal(0),
+              votesPerShare: 1,
+              rightOfFirstRefusal: true,
             },
           });
+        }
 
-          return created;
-        },
-      );
+        return created;
+      });
 
-      this.logger.log(
-        `Company ${company.id} created by user ${userId} (CNPJ: ${dto.cnpj})`,
-      );
+      this.logger.log(`Company ${company.id} created by user ${userId} (CNPJ: ${dto.cnpj})`);
 
       // Dispatch async CNPJ validation job
       await this.dispatchCnpjValidation(company.id, dto.cnpj, userId, dto.name);
@@ -160,17 +165,12 @@ export class CompanyService {
       return company;
     } catch (error) {
       // Handle unique constraint violation on CNPJ
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         const target = (error.meta?.target as string[]) || [];
         if (target.includes('cnpj')) {
-          throw new ConflictException(
-            'COMPANY_CNPJ_DUPLICATE',
-            'errors.company.cnpjDuplicate',
-            { cnpj: dto.cnpj },
-          );
+          throw new ConflictException('COMPANY_CNPJ_DUPLICATE', 'errors.company.cnpjDuplicate', {
+            cnpj: dto.cnpj,
+          });
         }
       }
       throw error;
@@ -187,18 +187,12 @@ export class CompanyService {
     pagination: PaginationQueryDto,
     filters: { status?: string; sort?: string },
   ) {
-    const sortFields = parseSort(filters.sort, [
-      'name',
-      'createdAt',
-      'status',
-    ]);
+    const sortFields = parseSort(filters.sort, ['name', 'createdAt', 'status']);
 
     const where: Prisma.CompanyMemberWhereInput = {
       userId,
       status: 'ACTIVE',
-      ...(filters.status
-        ? { company: { status: filters.status as any } }
-        : {}),
+      ...(filters.status ? { company: { status: filters.status as any } } : {}),
     };
 
     const [memberships, total] = await Promise.all([
@@ -237,9 +231,7 @@ export class CompanyService {
       _count: { id: true },
     });
 
-    const countMap = new Map(
-      memberCounts.map((mc) => [mc.companyId, mc._count.id]),
-    );
+    const countMap = new Map(memberCounts.map((mc) => [mc.companyId, mc._count.id]));
 
     const items = memberships.map((m) => ({
       id: m.company.id,
@@ -296,28 +288,22 @@ export class CompanyService {
     if (dto.name !== undefined) data.name = dto.name;
     if (dto.description !== undefined) data.description = dto.description;
     if (dto.logoUrl !== undefined) data.logoUrl = dto.logoUrl;
-    if (dto.defaultCurrency !== undefined)
-      data.defaultCurrency = dto.defaultCurrency;
-    if (dto.fiscalYearEnd !== undefined)
-      data.fiscalYearEnd = dto.fiscalYearEnd;
+    if (dto.defaultCurrency !== undefined) data.defaultCurrency = dto.defaultCurrency;
+    if (dto.fiscalYearEnd !== undefined) data.fiscalYearEnd = dto.fiscalYearEnd;
     if (dto.timezone !== undefined) data.timezone = dto.timezone;
     if (dto.locale !== undefined) data.locale = dto.locale;
 
     // Allow CNPJ update only while company is in DRAFT
     if (dto.cnpj !== undefined) {
       if (existing.status !== 'DRAFT') {
-        throw new BusinessRuleException(
-          'COMPANY_CNPJ_IMMUTABLE',
-          'errors.company.cnpjImmutable',
-          { companyId },
-        );
+        throw new BusinessRuleException('COMPANY_CNPJ_IMMUTABLE', 'errors.company.cnpjImmutable', {
+          companyId,
+        });
       }
       if (!isValidCnpjChecksum(dto.cnpj)) {
-        throw new BusinessRuleException(
-          'COMPANY_INVALID_CNPJ',
-          'errors.company.invalidCnpj',
-          { cnpj: dto.cnpj },
-        );
+        throw new BusinessRuleException('COMPANY_INVALID_CNPJ', 'errors.company.invalidCnpj', {
+          cnpj: dto.cnpj,
+        });
       }
       data.cnpj = dto.cnpj;
       data.cnpjData = {
@@ -440,9 +426,7 @@ export class CompanyService {
       data: { status: newStatus },
     });
 
-    this.logger.log(
-      `Company ${companyId} status changed: ${existing.status} → ${newStatus}`,
-    );
+    this.logger.log(`Company ${companyId} status changed: ${existing.status} → ${newStatus}`);
 
     return updated;
   }
@@ -470,9 +454,7 @@ export class CompanyService {
       removeOnFail: false,
     });
 
-    this.logger.debug(
-      `Dispatched CNPJ validation job for company ${companyId}`,
-    );
+    this.logger.debug(`Dispatched CNPJ validation job for company ${companyId}`);
   }
 
   /**
@@ -495,8 +477,7 @@ export class CompanyService {
     }
 
     const cnpjData = (company.cnpjData as Record<string, unknown>) ?? {};
-    const validationStatus =
-      (cnpjData.validationStatus as string) ?? 'UNKNOWN';
+    const validationStatus = (cnpjData.validationStatus as string) ?? 'UNKNOWN';
 
     return {
       companyId: company.id,
@@ -506,7 +487,7 @@ export class CompanyService {
         validatedAt: company.cnpjValidatedAt,
         error:
           validationStatus === 'FAILED'
-            ? (cnpjData.error as Record<string, unknown>) ?? null
+            ? ((cnpjData.error as Record<string, unknown>) ?? null)
             : null,
       },
     };
@@ -524,22 +505,20 @@ export class CompanyService {
     const company = await this.findById(companyId);
 
     if (company.status !== 'DRAFT') {
-      throw new BusinessRuleException(
-        'COMPANY_NOT_DRAFT',
-        'errors.company.notDraft',
-        { companyId, status: company.status },
-      );
+      throw new BusinessRuleException('COMPANY_NOT_DRAFT', 'errors.company.notDraft', {
+        companyId,
+        status: company.status,
+      });
     }
 
     const cnpjData = (company.cnpjData as Record<string, unknown>) ?? {};
     const validationStatus = cnpjData.validationStatus as string;
 
     if (validationStatus !== 'FAILED') {
-      throw new BusinessRuleException(
-        'COMPANY_CNPJ_NOT_FAILED',
-        'errors.company.cnpjNotFailed',
-        { companyId, validationStatus },
-      );
+      throw new BusinessRuleException('COMPANY_CNPJ_NOT_FAILED', 'errors.company.cnpjNotFailed', {
+        companyId,
+        validationStatus,
+      });
     }
 
     // Reset cnpjData to PENDING
@@ -553,15 +532,8 @@ export class CompanyService {
     });
 
     // Dispatch a new validation job
-    await this.dispatchCnpjValidation(
-      companyId,
-      company.cnpj,
-      userId,
-      company.name,
-    );
+    await this.dispatchCnpjValidation(companyId, company.cnpj, userId, company.name);
 
-    this.logger.log(
-      `CNPJ validation retry dispatched for company ${companyId} by user ${userId}`,
-    );
+    this.logger.log(`CNPJ validation retry dispatched for company ${companyId} by user ${userId}`);
   }
 }

@@ -1,13 +1,4 @@
-import {
-  IsOptional,
-  IsString,
-  IsEnum,
-  IsInt,
-  IsUrl,
-  MaxLength,
-  Min,
-  Max,
-} from 'class-validator';
+import { IsOptional, IsString, IsEnum, IsInt, IsUrl, MaxLength, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CompanySector, ProfileAccessType } from '@prisma/client';
 

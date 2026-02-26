@@ -1,9 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { Job } from 'bull';
-import {
-  CnpjValidationProcessor,
-  CnpjValidationPayload,
-} from './cnpj-validation.processor';
+import { CnpjValidationProcessor, CnpjValidationPayload } from './cnpj-validation.processor';
 import { PrismaService } from '../../prisma/prisma.service';
 import { VerifikService } from '../../kyc/verifik/verifik.service';
 import { NotificationService } from '../../notification/notification.service';
@@ -324,9 +321,7 @@ describe('CnpjValidationProcessor', () => {
 
   describe('handleCnpjValidation — transient errors', () => {
     it('should re-throw error for Bull retry on non-final attempt', async () => {
-      verifik.validateCnpj.mockRejectedValue(
-        new Error('Verifik service unavailable'),
-      );
+      verifik.validateCnpj.mockRejectedValue(new Error('Verifik service unavailable'));
 
       // attemptsMade=0, attempts=3 → not last attempt
       const job = createMockJob(mockPayload, { attempts: 3 }, 0);
@@ -340,9 +335,7 @@ describe('CnpjValidationProcessor', () => {
     });
 
     it('should mark validation as FAILED on last attempt', async () => {
-      verifik.validateCnpj.mockRejectedValue(
-        new Error('Verifik service unavailable'),
-      );
+      verifik.validateCnpj.mockRejectedValue(new Error('Verifik service unavailable'));
 
       // attemptsMade=2, attempts=3 → last attempt (2+1 >= 3)
       const job = createMockJob(mockPayload, { attempts: 3 }, 2);
@@ -409,9 +402,7 @@ describe('CnpjValidationProcessor', () => {
       verifik.validateCnpj.mockRejectedValue('string error');
 
       const job = createMockJob(mockPayload, { attempts: 3 }, 2);
-      await expect(processor.handleCnpjValidation(job)).rejects.toBe(
-        'string error',
-      );
+      await expect(processor.handleCnpjValidation(job)).rejects.toBe('string error');
 
       expect(prisma.company.update).toHaveBeenCalledWith(
         expect.objectContaining({

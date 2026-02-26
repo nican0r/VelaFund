@@ -7,10 +7,7 @@ import {
   ConflictException,
   BusinessRuleException,
 } from '../common/filters/app-exception';
-import {
-  CreateCompanyDto,
-  CompanyEntityTypeDto,
-} from './dto/create-company.dto';
+import { CreateCompanyDto, CompanyEntityTypeDto } from './dto/create-company.dto';
 import { Prisma } from '@prisma/client';
 
 // Valid CNPJ for tests (passes Módulo 11 checksum)
@@ -70,6 +67,9 @@ describe('CompanyService', () => {
       user: {
         findUniqueOrThrow: jest.fn(),
       },
+      shareClass: {
+        create: jest.fn(),
+      },
       shareholder: {
         count: jest.fn(),
       },
@@ -78,9 +78,7 @@ describe('CompanyService', () => {
       },
       $transaction: jest
         .fn()
-        .mockImplementation((fn: (tx: typeof prisma) => Promise<unknown>) =>
-          fn(prisma),
-        ),
+        .mockImplementation((fn: (tx: typeof prisma) => Promise<unknown>) => fn(prisma)),
     };
 
     mockQueue = {
@@ -184,27 +182,19 @@ describe('CompanyService', () => {
 
     it('should reject invalid CNPJ checksum', async () => {
       const dto = { ...createDto, cnpj: INVALID_CNPJ };
-      await expect(service.create(dto, mockUser.id)).rejects.toThrow(
-        BusinessRuleException,
-      );
-      await expect(service.create(dto, mockUser.id)).rejects.toThrow(
-        'errors.company.invalidCnpj',
-      );
+      await expect(service.create(dto, mockUser.id)).rejects.toThrow(BusinessRuleException);
+      await expect(service.create(dto, mockUser.id)).rejects.toThrow('errors.company.invalidCnpj');
     });
 
     it('should reject all-same-digit CNPJ', async () => {
       const dto = { ...createDto, cnpj: '11.111.111/1111-11' };
-      await expect(service.create(dto, mockUser.id)).rejects.toThrow(
-        BusinessRuleException,
-      );
+      await expect(service.create(dto, mockUser.id)).rejects.toThrow(BusinessRuleException);
     });
 
     it('should reject if user at membership limit (20)', async () => {
       prisma.companyMember.count.mockResolvedValue(20);
 
-      await expect(service.create(createDto, mockUser.id)).rejects.toThrow(
-        BusinessRuleException,
-      );
+      await expect(service.create(createDto, mockUser.id)).rejects.toThrow(BusinessRuleException);
       await expect(service.create(createDto, mockUser.id)).rejects.toThrow(
         'errors.company.membershipLimit',
       );
@@ -213,15 +203,14 @@ describe('CompanyService', () => {
     it('should reject duplicate CNPJ with ConflictException', async () => {
       prisma.companyMember.count.mockResolvedValue(0);
       prisma.user.findUniqueOrThrow.mockResolvedValue(mockUser);
-      const prismaError = new Prisma.PrismaClientKnownRequestError(
-        'Unique constraint failed',
-        { code: 'P2002', clientVersion: '5.0.0', meta: { target: ['cnpj'] } },
-      );
+      const prismaError = new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+        code: 'P2002',
+        clientVersion: '5.0.0',
+        meta: { target: ['cnpj'] },
+      });
       prisma.company.create.mockRejectedValue(prismaError);
 
-      await expect(service.create(createDto, mockUser.id)).rejects.toThrow(
-        ConflictException,
-      );
+      await expect(service.create(createDto, mockUser.id)).rejects.toThrow(ConflictException);
     });
 
     it('should accept optional fields', async () => {
@@ -292,6 +281,46 @@ describe('CompanyService', () => {
 
       expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     });
+
+    it("should auto-create QUOTA share class for Ltda company", async () => {
+      prisma.companyMember.count.mockResolvedValue(0);
+      prisma.user.findUniqueOrThrow.mockResolvedValue(mockUser);
+      prisma.company.create.mockResolvedValue(mockCompany);
+      prisma.companyMember.create.mockResolvedValue({});
+      prisma.shareClass.create.mockResolvedValue({});
+
+      await service.create(createDto, mockUser.id);
+
+      expect(prisma.shareClass.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          companyId: "comp-1",
+          className: "Quotas Ordinárias",
+          type: "QUOTA",
+          totalAuthorized: expect.any(Object),
+          votesPerShare: 1,
+          rightOfFirstRefusal: true,
+        }),
+      });
+    });
+
+    it("should NOT auto-create share class for S.A. company", async () => {
+      const mockCompanySA = {
+        ...mockCompany,
+        id: "comp-sa",
+        name: "Test SA",
+        entityType: "SA_CAPITAL_FECHADO",
+      };
+
+      prisma.companyMember.count.mockResolvedValue(0);
+      prisma.user.findUniqueOrThrow.mockResolvedValue(mockUser);
+      prisma.company.create.mockResolvedValue(mockCompanySA);
+      prisma.companyMember.create.mockResolvedValue({});
+
+      const saDto = { ...createDto, entityType: CompanyEntityTypeDto.SA_CAPITAL_FECHADO };
+      await service.create(saDto, mockUser.id);
+
+      expect(prisma.shareClass.create).not.toHaveBeenCalled();
+    });
   });
 
   // ─── FIND ALL FOR USER ───────────────────────────────────────────
@@ -315,9 +344,7 @@ describe('CompanyService', () => {
 
       prisma.companyMember.findMany.mockResolvedValue([membership]);
       prisma.companyMember.count.mockResolvedValue(1);
-      prisma.companyMember.groupBy.mockResolvedValue([
-        { companyId: 'comp-1', _count: { id: 3 } },
-      ]);
+      prisma.companyMember.groupBy.mockResolvedValue([{ companyId: 'comp-1', _count: { id: 3 } }]);
 
       const result = await service.findAllForUser(mockUser.id, pagination, {});
 
@@ -397,9 +424,7 @@ describe('CompanyService', () => {
     it('should throw NotFoundException when not found', async () => {
       prisma.company.findUnique.mockResolvedValue(null);
 
-      await expect(service.findById('non-existent')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.findById('non-existent')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -428,12 +453,12 @@ describe('CompanyService', () => {
         status: 'DISSOLVED',
       });
 
-      await expect(
-        service.update('comp-1', { name: 'New Name' }),
-      ).rejects.toThrow(BusinessRuleException);
-      await expect(
-        service.update('comp-1', { name: 'New Name' }),
-      ).rejects.toThrow('errors.company.cannotUpdateDissolved');
+      await expect(service.update('comp-1', { name: 'New Name' })).rejects.toThrow(
+        BusinessRuleException,
+      );
+      await expect(service.update('comp-1', { name: 'New Name' })).rejects.toThrow(
+        'errors.company.cannotUpdateDissolved',
+      );
     });
 
     it('should not include undefined fields in update', async () => {
@@ -451,9 +476,9 @@ describe('CompanyService', () => {
     it('should throw NotFoundException for non-existent company', async () => {
       prisma.company.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.update('non-existent', { name: 'Foo' }),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.update('non-existent', { name: 'Foo' })).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should allow CNPJ update when company is in DRAFT', async () => {
@@ -481,23 +506,23 @@ describe('CompanyService', () => {
         status: 'ACTIVE',
       });
 
-      await expect(
-        service.update('comp-1', { cnpj: VALID_CNPJ_2 }),
-      ).rejects.toThrow(BusinessRuleException);
-      await expect(
-        service.update('comp-1', { cnpj: VALID_CNPJ_2 }),
-      ).rejects.toThrow('errors.company.cnpjImmutable');
+      await expect(service.update('comp-1', { cnpj: VALID_CNPJ_2 })).rejects.toThrow(
+        BusinessRuleException,
+      );
+      await expect(service.update('comp-1', { cnpj: VALID_CNPJ_2 })).rejects.toThrow(
+        'errors.company.cnpjImmutable',
+      );
     });
 
     it('should reject CNPJ update with invalid checksum', async () => {
       prisma.company.findUnique.mockResolvedValue(mockCompany); // status: DRAFT
 
-      await expect(
-        service.update('comp-1', { cnpj: INVALID_CNPJ }),
-      ).rejects.toThrow(BusinessRuleException);
-      await expect(
-        service.update('comp-1', { cnpj: INVALID_CNPJ }),
-      ).rejects.toThrow('errors.company.invalidCnpj');
+      await expect(service.update('comp-1', { cnpj: INVALID_CNPJ })).rejects.toThrow(
+        BusinessRuleException,
+      );
+      await expect(service.update('comp-1', { cnpj: INVALID_CNPJ })).rejects.toThrow(
+        'errors.company.invalidCnpj',
+      );
     });
   });
 
@@ -531,12 +556,8 @@ describe('CompanyService', () => {
         status: 'DISSOLVED',
       });
 
-      await expect(service.dissolve('comp-1')).rejects.toThrow(
-        BusinessRuleException,
-      );
-      await expect(service.dissolve('comp-1')).rejects.toThrow(
-        'errors.company.alreadyDissolved',
-      );
+      await expect(service.dissolve('comp-1')).rejects.toThrow(BusinessRuleException);
+      await expect(service.dissolve('comp-1')).rejects.toThrow('errors.company.alreadyDissolved');
     });
 
     it('should reject dissolving with active shareholders', async () => {
@@ -546,9 +567,7 @@ describe('CompanyService', () => {
       });
       prisma.shareholder.count.mockResolvedValue(5);
 
-      await expect(service.dissolve('comp-1')).rejects.toThrow(
-        BusinessRuleException,
-      );
+      await expect(service.dissolve('comp-1')).rejects.toThrow(BusinessRuleException);
       await expect(service.dissolve('comp-1')).rejects.toThrow(
         'errors.company.hasActiveShareholders',
       );
@@ -562,12 +581,8 @@ describe('CompanyService', () => {
       prisma.shareholder.count.mockResolvedValue(0);
       prisma.fundingRound.count.mockResolvedValue(2);
 
-      await expect(service.dissolve('comp-1')).rejects.toThrow(
-        BusinessRuleException,
-      );
-      await expect(service.dissolve('comp-1')).rejects.toThrow(
-        'errors.company.hasActiveRounds',
-      );
+      await expect(service.dissolve('comp-1')).rejects.toThrow(BusinessRuleException);
+      await expect(service.dissolve('comp-1')).rejects.toThrow('errors.company.hasActiveRounds');
     });
 
     it('should allow dissolving INACTIVE company', async () => {
@@ -624,17 +639,13 @@ describe('CompanyService', () => {
         status: 'DISSOLVED',
       });
 
-      await expect(
-        service.updateStatus('comp-1', 'ACTIVE'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.updateStatus('comp-1', 'ACTIVE')).rejects.toThrow(BusinessRuleException);
     });
 
     it('should reject status change on DRAFT company', async () => {
       prisma.company.findUnique.mockResolvedValue(mockCompany); // status: DRAFT
 
-      await expect(
-        service.updateStatus('comp-1', 'ACTIVE'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.updateStatus('comp-1', 'ACTIVE')).rejects.toThrow(BusinessRuleException);
     });
 
     it('should reject ACTIVE → ACTIVE transition', async () => {
@@ -643,9 +654,7 @@ describe('CompanyService', () => {
         status: 'ACTIVE',
       });
 
-      await expect(
-        service.updateStatus('comp-1', 'ACTIVE'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.updateStatus('comp-1', 'ACTIVE')).rejects.toThrow(BusinessRuleException);
     });
   });
 
@@ -735,9 +744,7 @@ describe('CompanyService', () => {
     it('should throw NotFoundException for unknown company', async () => {
       prisma.company.findUnique.mockResolvedValue(null);
 
-      await expect(service.getSetupStatus('non-existent')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.getSetupStatus('non-existent')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -781,12 +788,12 @@ describe('CompanyService', () => {
         cnpjData: { validationStatus: 'FAILED' },
       });
 
-      await expect(
-        service.retryCnpjValidation('comp-1', 'user-1'),
-      ).rejects.toThrow(BusinessRuleException);
-      await expect(
-        service.retryCnpjValidation('comp-1', 'user-1'),
-      ).rejects.toThrow('errors.company.notDraft');
+      await expect(service.retryCnpjValidation('comp-1', 'user-1')).rejects.toThrow(
+        BusinessRuleException,
+      );
+      await expect(service.retryCnpjValidation('comp-1', 'user-1')).rejects.toThrow(
+        'errors.company.notDraft',
+      );
     });
 
     it('should reject retry when validation is not FAILED', async () => {
@@ -795,12 +802,12 @@ describe('CompanyService', () => {
         cnpjData: { validationStatus: 'PENDING' },
       });
 
-      await expect(
-        service.retryCnpjValidation('comp-1', 'user-1'),
-      ).rejects.toThrow(BusinessRuleException);
-      await expect(
-        service.retryCnpjValidation('comp-1', 'user-1'),
-      ).rejects.toThrow('errors.company.cnpjNotFailed');
+      await expect(service.retryCnpjValidation('comp-1', 'user-1')).rejects.toThrow(
+        BusinessRuleException,
+      );
+      await expect(service.retryCnpjValidation('comp-1', 'user-1')).rejects.toThrow(
+        'errors.company.cnpjNotFailed',
+      );
     });
 
     it('should reject retry when validation is COMPLETED', async () => {
@@ -809,9 +816,9 @@ describe('CompanyService', () => {
         cnpjData: { validationStatus: 'COMPLETED' },
       });
 
-      await expect(
-        service.retryCnpjValidation('comp-1', 'user-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.retryCnpjValidation('comp-1', 'user-1')).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should handle null cnpjData as not failed', async () => {
@@ -820,9 +827,9 @@ describe('CompanyService', () => {
         cnpjData: null,
       });
 
-      await expect(
-        service.retryCnpjValidation('comp-1', 'user-1'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.retryCnpjValidation('comp-1', 'user-1')).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
   });
 
@@ -830,12 +837,7 @@ describe('CompanyService', () => {
 
   describe('dispatchCnpjValidation', () => {
     it('should add job to queue with correct payload', async () => {
-      await service.dispatchCnpjValidation(
-        'comp-1',
-        VALID_CNPJ,
-        'user-1',
-        'Acme Ltda.',
-      );
+      await service.dispatchCnpjValidation('comp-1', VALID_CNPJ, 'user-1', 'Acme Ltda.');
 
       expect(mockQueue.add).toHaveBeenCalledWith(
         'validate-cnpj',

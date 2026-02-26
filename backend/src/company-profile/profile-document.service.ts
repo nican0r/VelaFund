@@ -3,10 +3,7 @@ import { DocumentCategory } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../aws/s3.service';
-import {
-  NotFoundException,
-  BusinessRuleException,
-} from '../common/filters/app-exception';
+import { NotFoundException, BusinessRuleException } from '../common/filters/app-exception';
 
 /** Maximum total storage per profile: 500 MB */
 const MAX_STORAGE_BYTES = 500 * 1024 * 1024;
@@ -38,14 +35,6 @@ const ALLOWED_MIME_TYPES: Record<string, { ext: string; magicBytes?: number[] }>
     magicBytes: [0x50, 0x4b, 0x03, 0x04],
   },
 };
-
-/** Sanitize filename: strip special chars, limit length */
-function sanitizeFilename(name: string): string {
-  return name
-    .replace(/[^a-zA-Z0-9._-]/g, '_')
-    .replace(/\.{2,}/g, '.')
-    .slice(0, 255);
-}
 
 /** Redact IP to /24 subnet for privacy */
 function redactIp(ip: string | undefined): string {
@@ -92,11 +81,10 @@ export class ProfileDocumentService {
 
     // Validate file size
     if (file.size > MAX_FILE_SIZE) {
-      throw new BusinessRuleException(
-        'PROFILE_DOC_TOO_LARGE',
-        'errors.profile.docTooLarge',
-        { maxSize: MAX_FILE_SIZE, fileSize: file.size },
-      );
+      throw new BusinessRuleException('PROFILE_DOC_TOO_LARGE', 'errors.profile.docTooLarge', {
+        maxSize: MAX_FILE_SIZE,
+        fileSize: file.size,
+      });
     }
 
     // Check total storage limit
@@ -106,30 +94,20 @@ export class ProfileDocumentService {
     });
     const totalAfterUpload = (currentStorage._sum.fileSize || 0) + file.size;
     if (totalAfterUpload > MAX_STORAGE_BYTES) {
-      throw new BusinessRuleException(
-        'PROFILE_STORAGE_LIMIT',
-        'errors.profile.storageLimit',
-        {
-          currentUsage: currentStorage._sum.fileSize || 0,
-          maxStorage: MAX_STORAGE_BYTES,
-        },
-      );
+      throw new BusinessRuleException('PROFILE_STORAGE_LIMIT', 'errors.profile.storageLimit', {
+        currentUsage: currentStorage._sum.fileSize || 0,
+        maxStorage: MAX_STORAGE_BYTES,
+      });
     }
 
     // Check S3 availability
     if (!this.s3Service.isAvailable()) {
-      throw new BusinessRuleException(
-        'SYS_S3_UNAVAILABLE',
-        'errors.sys.s3Unavailable',
-      );
+      throw new BusinessRuleException('SYS_S3_UNAVAILABLE', 'errors.sys.s3Unavailable');
     }
 
     const bucket = this.s3Service.getDocumentsBucket();
     if (!bucket) {
-      throw new BusinessRuleException(
-        'SYS_S3_UNAVAILABLE',
-        'errors.sys.s3Unavailable',
-      );
+      throw new BusinessRuleException('SYS_S3_UNAVAILABLE', 'errors.sys.s3Unavailable');
     }
 
     // Generate S3 key
@@ -257,10 +235,7 @@ export class ProfileDocumentService {
 
   // ─── REORDER ─────────────────────────────────────────────────────────
 
-  async reorder(
-    companyId: string,
-    documents: Array<{ id: string; order: number }>,
-  ) {
+  async reorder(companyId: string, documents: Array<{ id: string; order: number }>) {
     const profile = await this.prisma.companyProfile.findUnique({
       where: { companyId },
       select: { id: true },
@@ -320,18 +295,12 @@ export class ProfileDocumentService {
     }
 
     if (!this.s3Service.isAvailable()) {
-      throw new BusinessRuleException(
-        'SYS_S3_UNAVAILABLE',
-        'errors.sys.s3Unavailable',
-      );
+      throw new BusinessRuleException('SYS_S3_UNAVAILABLE', 'errors.sys.s3Unavailable');
     }
 
     const bucket = this.s3Service.getDocumentsBucket();
     if (!bucket) {
-      throw new BusinessRuleException(
-        'SYS_S3_UNAVAILABLE',
-        'errors.sys.s3Unavailable',
-      );
+      throw new BusinessRuleException('SYS_S3_UNAVAILABLE', 'errors.sys.s3Unavailable');
     }
 
     const downloadUrl = await this.s3Service.generatePresignedUrl(
@@ -363,35 +332,20 @@ export class ProfileDocumentService {
     }
 
     if (!this.s3Service.isAvailable()) {
-      throw new BusinessRuleException(
-        'SYS_S3_UNAVAILABLE',
-        'errors.sys.s3Unavailable',
-      );
+      throw new BusinessRuleException('SYS_S3_UNAVAILABLE', 'errors.sys.s3Unavailable');
     }
 
     const bucket = this.s3Service.getDocumentsBucket();
     if (!bucket) {
-      throw new BusinessRuleException(
-        'SYS_S3_UNAVAILABLE',
-        'errors.sys.s3Unavailable',
-      );
+      throw new BusinessRuleException('SYS_S3_UNAVAILABLE', 'errors.sys.s3Unavailable');
     }
 
     // Record download event asynchronously
-    this.recordDownload(
-      documentId,
-      document.profile.id,
-      viewerEmail,
-      viewerIp,
-    ).catch((err) =>
+    this.recordDownload(documentId, document.profile.id, viewerEmail, viewerIp).catch((err) =>
       this.logger.warn(`Failed to record document download: ${err.message}`),
     );
 
-    const downloadUrl = await this.s3Service.generatePresignedUrl(
-      bucket,
-      document.fileKey,
-      900,
-    );
+    const downloadUrl = await this.s3Service.generatePresignedUrl(bucket, document.fileKey, 900);
 
     return { downloadUrl, expiresIn: 900 };
   }
@@ -427,19 +381,15 @@ export class ProfileDocumentService {
   private validateFileType(file: Express.Multer.File): void {
     const config = ALLOWED_MIME_TYPES[file.mimetype];
     if (!config) {
-      throw new BusinessRuleException(
-        'PROFILE_DOC_INVALID_TYPE',
-        'errors.profile.docInvalidType',
-        { mimeType: file.mimetype },
-      );
+      throw new BusinessRuleException('PROFILE_DOC_INVALID_TYPE', 'errors.profile.docInvalidType', {
+        mimeType: file.mimetype,
+      });
     }
 
     // Check magic bytes for file type verification
     if (config.magicBytes && file.buffer) {
       const header = Array.from(file.buffer.subarray(0, config.magicBytes.length));
-      const matches = config.magicBytes.every(
-        (byte, i) => header[i] === byte,
-      );
+      const matches = config.magicBytes.every((byte, i) => header[i] === byte);
       if (!matches) {
         throw new BusinessRuleException(
           'PROFILE_DOC_INVALID_TYPE',

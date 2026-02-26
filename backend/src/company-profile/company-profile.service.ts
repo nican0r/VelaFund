@@ -4,7 +4,13 @@ import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { randomBytes } from 'crypto';
 import * as bcrypt from 'bcryptjs';
-import { Prisma, ProfileAccessType, CompanyStatus, ProfileStatus, VerificationStatus } from '@prisma/client';
+import {
+  Prisma,
+  ProfileAccessType,
+  CompanyStatus,
+  ProfileStatus,
+  VerificationStatus,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../aws/s3.service';
 import { CreateProfileDto } from './dto/create-profile.dto';
@@ -47,8 +53,8 @@ function generateSlug(name: string): string {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // remove accents
-    .replace(/[^a-z0-9]+/g, '-')     // non-alphanumeric -> hyphen
-    .replace(/^-|-$/g, '')            // trim leading/trailing hyphens
+    .replace(/[^a-z0-9]+/g, '-') // non-alphanumeric -> hyphen
+    .replace(/^-|-$/g, '') // trim leading/trailing hyphens
     .slice(0, 40);
   const suffix = randomBytes(2).toString('hex');
   return `${base}-${suffix}`;
@@ -80,11 +86,7 @@ export class CompanyProfileService {
 
   // ─── CREATE ──────────────────────────────────────────────────────────
 
-  async create(
-    companyId: string,
-    dto: CreateProfileDto,
-    userId: string,
-  ) {
+  async create(companyId: string, dto: CreateProfileDto, _userId: string) {
     // Verify company exists and is ACTIVE
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },
@@ -109,10 +111,7 @@ export class CompanyProfileService {
     });
 
     if (existing) {
-      throw new ConflictException(
-        'PROFILE_ALREADY_EXISTS',
-        'errors.profile.alreadyExists',
-      );
+      throw new ConflictException('PROFILE_ALREADY_EXISTS', 'errors.profile.alreadyExists');
     }
 
     // Generate a unique slug
@@ -164,16 +163,13 @@ export class CompanyProfileService {
     });
 
     // Dispatch async litigation check via Bull queue (non-blocking)
-    this.dispatchLitigationCheck(profile.id, companyId, company.cnpj).catch(
-      (err) =>
-        this.logger.warn(
-          `Failed to dispatch litigation check for profile ${profile.id}: ${err.message}`,
-        ),
+    this.dispatchLitigationCheck(profile.id, companyId, company.cnpj).catch((err) =>
+      this.logger.warn(
+        `Failed to dispatch litigation check for profile ${profile.id}: ${err.message}`,
+      ),
     );
 
-    this.logger.log(
-      `Profile created for company ${companyId} with slug "${slug}"`,
-    );
+    this.logger.log(`Profile created for company ${companyId} with slug "${slug}"`);
 
     return this.stripSensitiveFields(profile);
   }
@@ -262,18 +258,12 @@ export class CompanyProfileService {
 
     // Validate format
     if (!SLUG_REGEX.test(slug) || slug.length < 3 || slug.length > 50) {
-      throw new BusinessRuleException(
-        'PROFILE_SLUG_INVALID',
-        'errors.profile.slugInvalid',
-      );
+      throw new BusinessRuleException('PROFILE_SLUG_INVALID', 'errors.profile.slugInvalid');
     }
 
     // Check reserved words
     if (RESERVED_SLUGS.includes(slug)) {
-      throw new BusinessRuleException(
-        'PROFILE_SLUG_RESERVED',
-        'errors.profile.slugReserved',
-      );
+      throw new BusinessRuleException('PROFILE_SLUG_RESERVED', 'errors.profile.slugReserved');
     }
 
     // Check uniqueness
@@ -283,10 +273,7 @@ export class CompanyProfileService {
     });
 
     if (existing && existing.id !== profile.id) {
-      throw new ConflictException(
-        'PROFILE_SLUG_TAKEN',
-        'errors.profile.slugTaken',
-      );
+      throw new ConflictException('PROFILE_SLUG_TAKEN', 'errors.profile.slugTaken');
     }
 
     const updated = await this.prisma.companyProfile.update({
@@ -323,10 +310,7 @@ export class CompanyProfileService {
       profile.team.length > 0;
 
     if (!hasContent) {
-      throw new BusinessRuleException(
-        'PROFILE_EMPTY',
-        'errors.profile.empty',
-      );
+      throw new BusinessRuleException('PROFILE_EMPTY', 'errors.profile.empty');
     }
 
     const updated = await this.prisma.companyProfile.update({
@@ -404,10 +388,7 @@ export class CompanyProfileService {
     }
 
     if (dto.metrics.length > 6) {
-      throw new BusinessRuleException(
-        'PROFILE_MAX_METRICS',
-        'errors.profile.maxMetrics',
-      );
+      throw new BusinessRuleException('PROFILE_MAX_METRICS', 'errors.profile.maxMetrics');
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -455,10 +436,7 @@ export class CompanyProfileService {
     }
 
     if (dto.teamMembers.length > 10) {
-      throw new BusinessRuleException(
-        'PROFILE_MAX_TEAM',
-        'errors.profile.maxTeam',
-      );
+      throw new BusinessRuleException('PROFILE_MAX_TEAM', 'errors.profile.maxTeam');
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -495,10 +473,7 @@ export class CompanyProfileService {
 
   // ─── TEAM PHOTO UPLOAD ──────────────────────────────────────────────
 
-  async uploadTeamPhoto(
-    companyId: string,
-    file: Express.Multer.File,
-  ): Promise<{ url: string }> {
+  async uploadTeamPhoto(companyId: string, file: Express.Multer.File): Promise<{ url: string }> {
     const profile = await this.prisma.companyProfile.findUnique({
       where: { companyId },
       select: { id: true },
@@ -509,18 +484,12 @@ export class CompanyProfileService {
     }
 
     if (!this.s3Service.isAvailable()) {
-      throw new BusinessRuleException(
-        'SYS_S3_UNAVAILABLE',
-        'errors.kyc.s3Unavailable',
-      );
+      throw new BusinessRuleException('SYS_S3_UNAVAILABLE', 'errors.kyc.s3Unavailable');
     }
 
     const bucket = this.s3Service.getDocumentsBucket();
     if (!bucket) {
-      throw new BusinessRuleException(
-        'SYS_S3_UNAVAILABLE',
-        'errors.kyc.s3Unavailable',
-      );
+      throw new BusinessRuleException('SYS_S3_UNAVAILABLE', 'errors.kyc.s3Unavailable');
     }
 
     const ext = this.getFileExtension(file.mimetype);
@@ -576,10 +545,7 @@ export class CompanyProfileService {
 
     if (profile.accessType === ProfileAccessType.EMAIL_GATED) {
       if (!email) {
-        throw new BusinessRuleException(
-          'PROFILE_EMAIL_REQUIRED',
-          'errors.profile.emailRequired',
-        );
+        throw new BusinessRuleException('PROFILE_EMAIL_REQUIRED', 'errors.profile.emailRequired');
       }
     }
 
@@ -732,9 +698,7 @@ export class CompanyProfileService {
       },
     );
 
-    this.logger.debug(
-      `Litigation check dispatched for profile ${profileId}`,
-    );
+    this.logger.debug(`Litigation check dispatched for profile ${profileId}`);
   }
 
   /**
@@ -820,7 +784,7 @@ export class CompanyProfileService {
    */
   private stripSensitiveFields(profile: any): any {
     if (!profile) return profile;
-    const { accessPasswordHash, litigationData, _count, ...rest } = profile;
+    const { accessPasswordHash: _accessPasswordHash, litigationData: _litigationData, _count: __count, ...rest } = profile;
     return rest;
   }
 }

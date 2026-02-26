@@ -1,10 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  NotFoundException,
-  BusinessRuleException,
-} from '../common/filters/app-exception';
+import { NotFoundException, BusinessRuleException } from '../common/filters/app-exception';
 import { RunWaterfallDto } from './dto/run-waterfall.dto';
 import { SaveScenarioDto } from './dto/save-scenario.dto';
 
@@ -72,10 +69,7 @@ export class ExitWaterfallService {
 
   // ─── Run Waterfall ─────────────────────────────────────────────────────
 
-  async runWaterfall(
-    companyId: string,
-    dto: RunWaterfallDto,
-  ): Promise<WaterfallAnalysis> {
+  async runWaterfall(companyId: string, dto: RunWaterfallDto): Promise<WaterfallAnalysis> {
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },
       select: { id: true },
@@ -103,9 +97,9 @@ export class ExitWaterfallService {
     }
 
     // 3. Add vested unexercised options as-if exercised
-    let optionShares = ZERO;
+    let _optionShares = ZERO;
     if (includeOptions) {
-      optionShares = await this.getVestedUnexercisedOptions(companyId, shareClasses);
+      _optionShares = await this.getVestedUnexercisedOptions(companyId, shareClasses);
     }
 
     // 4. Add convertible instruments as-if converted
@@ -115,10 +109,7 @@ export class ExitWaterfallService {
     }
 
     // 5. Determine stacking order
-    const orderedClasses = this.determineStackingOrder(
-      shareClasses,
-      dto.shareClassOrder,
-    );
+    const orderedClasses = this.determineStackingOrder(shareClasses, dto.shareClassOrder);
 
     // 6. Run the waterfall algorithm
     const results = this.executeWaterfall(orderedClasses, exitAmount);
@@ -127,10 +118,7 @@ export class ExitWaterfallService {
     const breakeven = this.computeBreakeven(orderedClasses, companyId);
 
     // 8. Calculate unallocated proceeds
-    const totalAllocated = results.reduce(
-      (sum, r) => sum.plus(r.totalProceeds),
-      ZERO,
-    );
+    const totalAllocated = results.reduce((sum, r) => sum.plus(r.totalProceeds), ZERO);
     const unallocated = exitAmount.minus(totalAllocated);
 
     const analysis: WaterfallAnalysis = {
@@ -239,9 +227,9 @@ export class ExitWaterfallService {
       shareClassOrder: item.shareClassOrder,
       createdBy: {
         id: item.createdBy.id,
-        name: [item.createdBy.firstName, item.createdBy.lastName]
-          .filter(Boolean)
-          .join(' ') || 'Unknown',
+        name:
+          [item.createdBy.firstName, item.createdBy.lastName].filter(Boolean).join(' ') ||
+          'Unknown',
       },
       createdAt: item.createdAt.toISOString(),
     }));
@@ -273,9 +261,9 @@ export class ExitWaterfallService {
       resultData: scenario.resultData,
       createdBy: {
         id: scenario.createdBy.id,
-        name: [scenario.createdBy.firstName, scenario.createdBy.lastName]
-          .filter(Boolean)
-          .join(' ') || 'Unknown',
+        name:
+          [scenario.createdBy.firstName, scenario.createdBy.lastName].filter(Boolean).join(' ') ||
+          'Unknown',
       },
       createdAt: scenario.createdAt.toISOString(),
     };
@@ -298,9 +286,7 @@ export class ExitWaterfallService {
 
   // ─── Data Loading ──────────────────────────────────────────────────────
 
-  private async loadShareClassData(
-    companyId: string,
-  ): Promise<ShareClassInput[]> {
+  private async loadShareClassData(companyId: string): Promise<ShareClassInput[]> {
     const shareClasses = await this.prisma.shareClass.findMany({
       where: { companyId },
       select: {
@@ -355,10 +341,7 @@ export class ExitWaterfallService {
       const classShares = sharesPerClass.get(round.shareClassId) ?? ZERO;
       const existing = investmentMap.get(round.shareClassId) ?? ZERO;
       // Total invested = shares * pricePerShare
-      investmentMap.set(
-        round.shareClassId,
-        existing.plus(classShares.mul(round.pricePerShare)),
-      );
+      investmentMap.set(round.shareClassId, existing.plus(classShares.mul(round.pricePerShare)));
     }
 
     return shareClasses.map((sc) => ({
@@ -366,8 +349,7 @@ export class ExitWaterfallService {
       className: sc.className,
       type: sc.type,
       totalShares: sharesPerClass.get(sc.id) ?? ZERO,
-      liquidationPreferenceMultiple:
-        sc.liquidationPreferenceMultiple ?? ZERO,
+      liquidationPreferenceMultiple: sc.liquidationPreferenceMultiple ?? ZERO,
       participatingRights: sc.participatingRights,
       participationCap: sc.participationCap ?? null,
       seniority: sc.seniority,
@@ -375,10 +357,7 @@ export class ExitWaterfallService {
     }));
   }
 
-  private validateShareClassOrder(
-    order: string[],
-    shareClasses: ShareClassInput[],
-  ): void {
+  private validateShareClassOrder(order: string[], shareClasses: ShareClassInput[]): void {
     const classIds = new Set(shareClasses.map((sc) => sc.id));
     for (const id of order) {
       if (!classIds.has(id)) {
@@ -413,9 +392,7 @@ export class ExitWaterfallService {
 
       if (exercisable.greaterThan(0)) {
         // Add these as-if-exercised shares to the target share class
-        const targetClass = shareClasses.find(
-          (sc) => sc.id === grant.plan.shareClassId,
-        );
+        const targetClass = shareClasses.find((sc) => sc.id === grant.plan.shareClassId);
         if (targetClass) {
           targetClass.totalShares = targetClass.totalShares.plus(exercisable);
           totalOptionShares = totalOptionShares.plus(exercisable);
@@ -471,9 +448,7 @@ export class ExitWaterfallService {
         continue;
       }
 
-      const targetClass = shareClasses.find(
-        (sc) => sc.id === conv.targetShareClassId,
-      );
+      const targetClass = shareClasses.find((sc) => sc.id === conv.targetShareClassId);
       if (!targetClass) {
         excluded.push({
           convertibleId: conv.id,
@@ -500,9 +475,7 @@ export class ExitWaterfallService {
         let bestPrice = roundPrice;
 
         if (conv.discountRate) {
-          const discountPrice = roundPrice.mul(
-            new Prisma.Decimal(1).minus(conv.discountRate),
-          );
+          const discountPrice = roundPrice.mul(new Prisma.Decimal(1).minus(conv.discountRate));
           if (discountPrice.lessThan(bestPrice)) {
             bestPrice = discountPrice;
           }
@@ -555,9 +528,7 @@ export class ExitWaterfallService {
 
     const daysDiff = Math.max(
       0,
-      Math.floor(
-        (now.getTime() - issueDate.getTime()) / (1000 * 60 * 60 * 24),
-      ),
+      Math.floor((now.getTime() - issueDate.getTime()) / (1000 * 60 * 60 * 24)),
     );
     const yearFraction = new Prisma.Decimal(daysDiff).div(365);
 
@@ -597,9 +568,7 @@ export class ExitWaterfallService {
       }
 
       // Append remaining classes (not in custom order) sorted by seniority desc
-      const remaining = Array.from(orderedById.values()).sort(
-        (a, b) => b.seniority - a.seniority,
-      );
+      const remaining = Array.from(orderedById.values()).sort((a, b) => b.seniority - a.seniority);
       ordered.push(...remaining);
 
       return ordered;
@@ -636,19 +605,14 @@ export class ExitWaterfallService {
 
       // Calculate total preference for this seniority level
       const totalGroupPreference = group.reduce((sum, wd) => {
-        const pref = wd.input.liquidationPreferenceMultiple.mul(
-          wd.input.originalInvestment,
-        );
+        const pref = wd.input.liquidationPreferenceMultiple.mul(wd.input.originalInvestment);
         return sum.plus(pref);
       }, ZERO);
 
       if (totalGroupPreference.isZero()) continue;
 
       // Allocate preferences pro-rata within the group (pari passu)
-      const availableForGroup = Prisma.Decimal.min(
-        totalGroupPreference,
-        remainingProceeds,
-      );
+      const availableForGroup = Prisma.Decimal.min(totalGroupPreference, remainingProceeds);
 
       for (const wd of group) {
         const classPreference = wd.input.liquidationPreferenceMultiple.mul(
@@ -667,25 +631,18 @@ export class ExitWaterfallService {
 
     if (remainingProceeds.greaterThan(0)) {
       // Identify participating preferred and common classes
-      const commonClasses = workingData.filter(
-        (wd) => wd.input.liquidationPreferenceMultiple.isZero(),
+      const commonClasses = workingData.filter((wd) =>
+        wd.input.liquidationPreferenceMultiple.isZero(),
       );
       const participatingClasses = workingData.filter(
-        (wd) =>
-          wd.input.participatingRights &&
-          !wd.input.liquidationPreferenceMultiple.isZero(),
+        (wd) => wd.input.participatingRights && !wd.input.liquidationPreferenceMultiple.isZero(),
       );
       const nonParticipatingPreferred = workingData.filter(
-        (wd) =>
-          !wd.input.participatingRights &&
-          !wd.input.liquidationPreferenceMultiple.isZero(),
+        (wd) => !wd.input.participatingRights && !wd.input.liquidationPreferenceMultiple.isZero(),
       );
 
       // Total shares eligible for participation = common + participating preferred
-      const participationPool = [
-        ...commonClasses,
-        ...participatingClasses,
-      ];
+      const participationPool = [...commonClasses, ...participatingClasses];
 
       const totalParticipationShares = participationPool.reduce(
         (sum, wd) => sum.plus(wd.input.totalShares),
@@ -706,12 +663,8 @@ export class ExitWaterfallService {
 
       for (const wd of participatingClasses) {
         if (wd.input.participationCap) {
-          const maxTotal = wd.input.participationCap.mul(
-            wd.input.originalInvestment,
-          );
-          const currentTotal = wd.preferenceProceeds.plus(
-            wd.participationProceeds,
-          );
+          const maxTotal = wd.input.participationCap.mul(wd.input.originalInvestment);
+          const currentTotal = wd.preferenceProceeds.plus(wd.participationProceeds);
 
           if (currentTotal.greaterThan(maxTotal)) {
             const excess = currentTotal.minus(maxTotal);
@@ -758,9 +711,7 @@ export class ExitWaterfallService {
 
         let optionB = ZERO;
         if (totalSharesIncludingConverted.greaterThan(0)) {
-          optionB = exitAmount
-            .mul(wd.input.totalShares)
-            .div(totalSharesIncludingConverted);
+          optionB = exitAmount.mul(wd.input.totalShares).div(totalSharesIncludingConverted);
         }
 
         // Choose the better outcome
@@ -777,9 +728,7 @@ export class ExitWaterfallService {
 
     return workingData.map((wd) => {
       const total = wd.preferenceProceeds.plus(wd.participationProceeds);
-      const perShare = wd.input.totalShares.greaterThan(0)
-        ? total.div(wd.input.totalShares)
-        : ZERO;
+      const perShare = wd.input.totalShares.greaterThan(0) ? total.div(wd.input.totalShares) : ZERO;
 
       const isCommon = wd.input.liquidationPreferenceMultiple.isZero();
       let roiMultiple: string | null = null;
@@ -793,21 +742,13 @@ export class ExitWaterfallService {
       return {
         shareClassId: wd.input.id,
         shareClassName: wd.input.className,
-        totalShares: wd.input.totalShares
-          .toDecimalPlaces(0, Prisma.Decimal.ROUND_DOWN)
-          .toString(),
-        liquidationPreference: wd.preferenceProceeds
-          .toDecimalPlaces(2, TWO_DP.rounding)
-          .toString(),
+        totalShares: wd.input.totalShares.toDecimalPlaces(0, Prisma.Decimal.ROUND_DOWN).toString(),
+        liquidationPreference: wd.preferenceProceeds.toDecimalPlaces(2, TWO_DP.rounding).toString(),
         participationProceeds: wd.participationProceeds
           .toDecimalPlaces(2, TWO_DP.rounding)
           .toString(),
-        totalProceeds: total
-          .toDecimalPlaces(2, TWO_DP.rounding)
-          .toString(),
-        perShareValue: perShare
-          .toDecimalPlaces(2, TWO_DP.rounding)
-          .toString(),
+        totalProceeds: total.toDecimalPlaces(2, TWO_DP.rounding).toString(),
+        perShareValue: perShare.toDecimalPlaces(2, TWO_DP.rounding).toString(),
         roiMultiple,
         isParticipating: wd.input.participatingRights,
         participationCapped: wd.capped,
@@ -819,26 +760,20 @@ export class ExitWaterfallService {
 
   private computeBreakeven(
     orderedClasses: ShareClassInput[],
-    companyId: string,
+    _companyId: string,
   ): { exitValue: string; description: string } {
     // Check if there are any preferred classes
-    const hasPreferred = orderedClasses.some(
-      (sc) => !sc.liquidationPreferenceMultiple.isZero(),
-    );
+    const hasPreferred = orderedClasses.some((sc) => !sc.liquidationPreferenceMultiple.isZero());
 
     if (!hasPreferred) {
       return {
         exitValue: '0.00',
-        description:
-          'No preferred classes — common always equals or exceeds preferred',
+        description: 'No preferred classes — common always equals or exceeds preferred',
       };
     }
 
     // Calculate total shares for scaling the search range
-    const totalShares = orderedClasses.reduce(
-      (sum, sc) => sum.plus(sc.totalShares),
-      ZERO,
-    );
+    const totalShares = orderedClasses.reduce((sum, sc) => sum.plus(sc.totalShares), ZERO);
 
     if (totalShares.isZero()) {
       return {
@@ -849,8 +784,7 @@ export class ExitWaterfallService {
 
     // Total liquidation preferences as baseline
     const totalPreferences = orderedClasses.reduce(
-      (sum, sc) =>
-        sum.plus(sc.liquidationPreferenceMultiple.mul(sc.originalInvestment)),
+      (sum, sc) => sum.plus(sc.liquidationPreferenceMultiple.mul(sc.originalInvestment)),
       ZERO,
     );
 
@@ -878,36 +812,26 @@ export class ExitWaterfallService {
       const results = this.executeWaterfall(orderedClasses, mid);
 
       // Find common and preferred per-share values
-      const commonResults = results.filter(
-        (r) => {
-          const sc = orderedClasses.find((c) => c.id === r.shareClassId);
-          return sc?.liquidationPreferenceMultiple.isZero();
-        },
-      );
-      const preferredResults = results.filter(
-        (r) => {
-          const sc = orderedClasses.find((c) => c.id === r.shareClassId);
-          return !sc?.liquidationPreferenceMultiple.isZero();
-        },
-      );
+      const commonResults = results.filter((r) => {
+        const sc = orderedClasses.find((c) => c.id === r.shareClassId);
+        return sc?.liquidationPreferenceMultiple.isZero();
+      });
+      const preferredResults = results.filter((r) => {
+        const sc = orderedClasses.find((c) => c.id === r.shareClassId);
+        return !sc?.liquidationPreferenceMultiple.isZero();
+      });
 
       // Best common per-share
-      const bestCommonPerShare = commonResults.reduce(
-        (best, r) => {
-          const val = new Prisma.Decimal(r.perShareValue);
-          return val.greaterThan(best) ? val : best;
-        },
-        ZERO,
-      );
+      const bestCommonPerShare = commonResults.reduce((best, r) => {
+        const val = new Prisma.Decimal(r.perShareValue);
+        return val.greaterThan(best) ? val : best;
+      }, ZERO);
 
       // Best preferred per-share
-      const bestPreferredPerShare = preferredResults.reduce(
-        (best, r) => {
-          const val = new Prisma.Decimal(r.perShareValue);
-          return val.greaterThan(best) ? val : best;
-        },
-        ZERO,
-      );
+      const bestPreferredPerShare = preferredResults.reduce((best, r) => {
+        const val = new Prisma.Decimal(r.perShareValue);
+        return val.greaterThan(best) ? val : best;
+      }, ZERO);
 
       if (bestCommonPerShare.greaterThanOrEqualTo(bestPreferredPerShare)) {
         high = mid;
@@ -926,9 +850,7 @@ export class ExitWaterfallService {
 
   // ─── Helpers ───────────────────────────────────────────────────────────
 
-  private groupBySeniority(
-    workingData: ClassWorkingData[],
-  ): ClassWorkingData[][] {
+  private groupBySeniority(workingData: ClassWorkingData[]): ClassWorkingData[][] {
     // Group by seniority value, sort groups by seniority descending (most senior first)
     const groups = new Map<number, ClassWorkingData[]>();
 
@@ -964,8 +886,7 @@ export class ExitWaterfallService {
     }
 
     const monthsElapsed =
-      (now.getFullYear() - grantDate.getFullYear()) * 12 +
-      (now.getMonth() - grantDate.getMonth());
+      (now.getFullYear() - grantDate.getFullYear()) * 12 + (now.getMonth() - grantDate.getMonth());
 
     if (grant.cliffMonths && monthsElapsed < grant.cliffMonths) {
       return ZERO;
@@ -982,14 +903,11 @@ export class ExitWaterfallService {
     }
 
     const remainingQuantity = totalQuantity.minus(vested);
-    const remainingMonths =
-      grant.vestingDurationMonths - (grant.cliffMonths ?? 0);
+    const remainingMonths = grant.vestingDurationMonths - (grant.cliffMonths ?? 0);
 
     if (remainingMonths > 0) {
       const monthsPastCliff = monthsElapsed - (grant.cliffMonths ?? 0);
-      const linearVested = remainingQuantity
-        .mul(monthsPastCliff)
-        .div(remainingMonths);
+      const linearVested = remainingQuantity.mul(monthsPastCliff).div(remainingMonths);
       vested = vested.plus(linearVested);
     }
 

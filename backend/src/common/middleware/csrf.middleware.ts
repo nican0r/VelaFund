@@ -35,11 +35,7 @@ export class CsrfMiddleware implements NestMiddleware {
     // Authorization headers which browsers never send automatically,
     // so they are not vulnerable to CSRF attacks.
     const authHeader = req.headers['authorization'];
-    if (
-      authHeader &&
-      typeof authHeader === 'string' &&
-      authHeader.startsWith('Bearer ')
-    ) {
+    if (authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
       next();
       return;
     }
@@ -49,18 +45,13 @@ export class CsrfMiddleware implements NestMiddleware {
     const headerToken = req.headers['x-csrf-token'] as string;
 
     if (!cookieToken || !headerToken || cookieToken !== headerToken) {
-      const lang = this.normalizeLanguage(
-        req.headers['accept-language'] as string,
-      );
+      const lang = this.normalizeLanguage(req.headers['accept-language'] as string);
 
       res.status(403).json({
         success: false,
         error: {
           code: 'AUTH_CSRF_INVALID',
-          message:
-            lang === 'en'
-              ? 'Invalid CSRF token'
-              : 'Token CSRF inválido',
+          message: lang === 'en' ? 'Invalid CSRF token' : 'Token CSRF inválido',
           messageKey: 'errors.auth.csrfInvalid',
         },
       });

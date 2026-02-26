@@ -171,13 +171,9 @@ describe('ShareholderController', () => {
     });
 
     it('should propagate NotFoundException', async () => {
-      service.findById.mockRejectedValue(
-        new NotFoundException('shareholder', 'sh-999'),
-      );
+      service.findById.mockRejectedValue(new NotFoundException('shareholder', 'sh-999'));
 
-      await expect(controller.getOne('comp-1', 'sh-999')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(controller.getOne('comp-1', 'sh-999')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -201,9 +197,7 @@ describe('ShareholderController', () => {
     });
 
     it('should propagate NotFoundException', async () => {
-      service.update.mockRejectedValue(
-        new NotFoundException('shareholder', 'sh-999'),
-      );
+      service.update.mockRejectedValue(new NotFoundException('shareholder', 'sh-999'));
 
       await expect(
         controller.update('comp-1', 'sh-999', { email: 'test@test.com' }),
@@ -231,13 +225,9 @@ describe('ShareholderController', () => {
     });
 
     it('should propagate NotFoundException', async () => {
-      service.remove.mockRejectedValue(
-        new NotFoundException('shareholder', 'sh-999'),
-      );
+      service.remove.mockRejectedValue(new NotFoundException('shareholder', 'sh-999'));
 
-      await expect(controller.remove('comp-1', 'sh-999')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(controller.remove('comp-1', 'sh-999')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -265,14 +255,20 @@ describe('ShareholderController', () => {
   describe('setBeneficialOwners', () => {
     it('should set beneficial owners and return them', async () => {
       const owners = [
-        { id: 'bo-1', shareholderId: 'sh-2', name: 'Maria', cpf: null, ownershipPct: new Prisma.Decimal('60'), createdAt: new Date(), updatedAt: new Date() },
+        {
+          id: 'bo-1',
+          shareholderId: 'sh-2',
+          name: 'Maria',
+          cpf: null,
+          ownershipPct: new Prisma.Decimal('60'),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
       ];
       service.setBeneficialOwners.mockResolvedValue(owners);
 
       const result = await controller.setBeneficialOwners('comp-1', 'sh-2', {
-        beneficialOwners: [
-          { name: 'Maria', ownershipPercentage: '60.00' },
-        ],
+        beneficialOwners: [{ name: 'Maria', ownershipPercentage: '60.00' }],
       });
 
       expect(result).toEqual(owners);
@@ -280,10 +276,7 @@ describe('ShareholderController', () => {
 
     it('should propagate BusinessRuleException for non-corporate', async () => {
       service.setBeneficialOwners.mockRejectedValue(
-        new BusinessRuleException(
-          'SHAREHOLDER_NOT_CORPORATE',
-          'errors.shareholder.notCorporate',
-        ),
+        new BusinessRuleException('SHAREHOLDER_NOT_CORPORATE', 'errors.shareholder.notCorporate'),
       );
 
       await expect(

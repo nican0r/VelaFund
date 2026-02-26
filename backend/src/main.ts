@@ -34,12 +34,16 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       frontendUrl,
-      ...(configService.get<string>('NODE_ENV') === 'development'
-        ? ['http://localhost:3000']
-        : []),
+      ...(configService.get<string>('NODE_ENV') === 'development' ? ['http://localhost:3000'] : []),
     ],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept-Language', 'X-Request-Id', 'X-CSRF-Token'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'Accept-Language',
+      'X-Request-Id',
+      'X-CSRF-Token',
+    ],
     exposedHeaders: [
       'X-Request-Id',
       'X-RateLimit-Limit',

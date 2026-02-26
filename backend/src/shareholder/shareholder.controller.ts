@@ -47,10 +47,7 @@ export class ShareholderController {
   @ApiResponse({ status: 400, description: 'Invalid input' })
   @ApiResponse({ status: 409, description: 'Duplicate CPF/CNPJ' })
   @ApiResponse({ status: 422, description: 'Business rule violation' })
-  async create(
-    @Param('companyId') companyId: string,
-    @Body() dto: CreateShareholderDto,
-  ) {
+  async create(@Param('companyId') companyId: string, @Body() dto: CreateShareholderDto) {
     return this.shareholderService.create(companyId, dto);
   }
 
@@ -66,14 +63,8 @@ export class ShareholderController {
   @ApiOperation({ summary: 'List shareholders' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiResponse({ status: 200, description: 'Paginated list of shareholders' })
-  async list(
-    @Param('companyId') companyId: string,
-    @Query() query: ListShareholdersQueryDto,
-  ) {
-    const { items, total } = await this.shareholderService.findAll(
-      companyId,
-      query,
-    );
+  async list(@Param('companyId') companyId: string, @Query() query: ListShareholdersQueryDto) {
+    const { items, total } = await this.shareholderService.findAll(companyId, query);
     return paginate(items, total, query.page, query.limit);
   }
 
@@ -202,10 +193,6 @@ export class ShareholderController {
     @Param('shareholderId') shareholderId: string,
     @Body() dto: SetBeneficialOwnersDto,
   ) {
-    return this.shareholderService.setBeneficialOwners(
-      companyId,
-      shareholderId,
-      dto,
-    );
+    return this.shareholderService.setBeneficialOwners(companyId, shareholderId, dto);
   }
 }

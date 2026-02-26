@@ -4,10 +4,7 @@ import { Logger } from '@nestjs/common';
 import { Prisma, VerificationStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
-import {
-  BigDataCorpService,
-  BigDataCorpNotFoundError,
-} from './bigdatacorp.service';
+import { BigDataCorpService, BigDataCorpNotFoundError } from './bigdatacorp.service';
 
 /** Payload for the litigation check Bull job. */
 export interface LitigationCheckPayload {
@@ -69,14 +66,10 @@ export class LitigationCheckProcessor {
   ) {}
 
   @Process('fetch-litigation')
-  async handleFetchLitigation(
-    job: Job<LitigationCheckPayload>,
-  ): Promise<void> {
+  async handleFetchLitigation(job: Job<LitigationCheckPayload>): Promise<void> {
     const { profileId, companyId, cnpj } = job.data;
 
-    this.logger.debug(
-      `Processing litigation check job ${job.id}: profileId=${profileId}`,
-    );
+    this.logger.debug(`Processing litigation check job ${job.id}: profileId=${profileId}`);
 
     try {
       const response = await this.bigDataCorpService.fetchLitigationData(cnpj);
@@ -96,17 +89,10 @@ export class LitigationCheckProcessor {
       }));
 
       // Compute summary statistics
-      const activeLawsuits = maskedLawsuits.filter(
-        (l) => l.status?.toUpperCase() === 'ATIVO',
-      );
-      const historicalLawsuits = maskedLawsuits.filter(
-        (l) => l.status?.toUpperCase() !== 'ATIVO',
-      );
+      const activeLawsuits = maskedLawsuits.filter((l) => l.status?.toUpperCase() === 'ATIVO');
+      const historicalLawsuits = maskedLawsuits.filter((l) => l.status?.toUpperCase() !== 'ATIVO');
       const totalValueInDispute = activeLawsuits
-        .reduce(
-          (sum, l) => sum + (parseFloat(l.valueInDispute || '0') || 0),
-          0,
-        )
+        .reduce((sum, l) => sum + (parseFloat(l.valueInDispute || '0') || 0), 0)
         .toFixed(2);
 
       const activeAdmin = (response.administrativeProceedings ?? []).filter(
@@ -124,10 +110,7 @@ export class LitigationCheckProcessor {
           activeAdministrative: activeAdmin,
           protests: activeProtests,
           totalValueInDispute,
-          riskLevel: this.computeRiskLevel(
-            activeLawsuits.length,
-            parseFloat(totalValueInDispute),
-          ),
+          riskLevel: this.computeRiskLevel(activeLawsuits.length, parseFloat(totalValueInDispute)),
         },
         lawsuits: maskedLawsuits,
         protestData: {
@@ -202,10 +185,7 @@ export class LitigationCheckProcessor {
    * Handle CNPJ not found in BigDataCorp — a valid result meaning no litigation history.
    * Sets COMPLETED with zero counts and LOW risk.
    */
-  private async handleCnpjNotFound(
-    profileId: string,
-    companyId: string,
-  ): Promise<void> {
+  private async handleCnpjNotFound(profileId: string, companyId: string): Promise<void> {
     const emptyData: LitigationData = {
       summary: {
         activeLawsuits: 0,
@@ -300,10 +280,7 @@ export class LitigationCheckProcessor {
    * | 1-5            | < R$ 500.000         | MEDIUM     |
    * | >5 or high val | >= R$ 500.000        | HIGH       |
    */
-  computeRiskLevel(
-    activeLawsuits: number,
-    totalValue: number,
-  ): 'LOW' | 'MEDIUM' | 'HIGH' {
+  computeRiskLevel(activeLawsuits: number, totalValue: number): 'LOW' | 'MEDIUM' | 'HIGH' {
     if (activeLawsuits === 0) return 'LOW';
     if (activeLawsuits <= 2 && totalValue < 100_000) return 'LOW';
     if (activeLawsuits <= 5 && totalValue < 500_000) return 'MEDIUM';
@@ -324,11 +301,7 @@ export class LitigationCheckProcessor {
     if (!name) return name;
 
     // Company names are public — do not mask
-    if (
-      /\b(LTDA|S\.?A\.?|EIRELI|MEI|CNPJ|EMPRESA|CIA|COMPANHIA|INC|LLC|CORP)\b/i.test(
-        name,
-      )
-    ) {
+    if (/\b(LTDA|S\.?A\.?|EIRELI|MEI|CNPJ|EMPRESA|CIA|COMPANHIA|INC|LLC|CORP)\b/i.test(name)) {
       return name;
     }
 

@@ -15,5 +15,4 @@ export interface AuditableOptions {
   captureAfterState?: boolean;
 }
 
-export const Auditable = (options: AuditableOptions) =>
-  SetMetadata(AUDITABLE_KEY, options);
+export const Auditable = (options: AuditableOptions) => SetMetadata(AUDITABLE_KEY, options);

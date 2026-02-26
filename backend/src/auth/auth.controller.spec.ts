@@ -160,11 +160,7 @@ describe('AuthController', () => {
       };
       const mockRes = { cookie: jest.fn() };
 
-      await controller.login(
-        { privyAccessToken: 'token' },
-        mockReq as any,
-        mockRes as any,
-      );
+      await controller.login({ privyAccessToken: 'token' }, mockReq as any, mockRes as any);
 
       expect(mockRes.cookie).toHaveBeenCalledWith(
         'navia-auth-token',
@@ -189,11 +185,7 @@ describe('AuthController', () => {
       };
       const mockRes = { cookie: jest.fn() };
 
-      await controller.login(
-        { privyAccessToken: 'token' },
-        mockReq as any,
-        mockRes as any,
-      );
+      await controller.login({ privyAccessToken: 'token' }, mockReq as any, mockRes as any);
 
       expect(authService.login).toHaveBeenCalledWith('token', '172.16.0.1');
     });
@@ -209,9 +201,7 @@ describe('AuthController', () => {
       const result = await controller.logout(mockReq as any, mockRes as any);
 
       expect(result).toEqual({ messageKey: 'errors.auth.loggedOut' });
-      expect(sessionService.destroySession).toHaveBeenCalledWith(
-        'session-to-destroy',
-      );
+      expect(sessionService.destroySession).toHaveBeenCalledWith('session-to-destroy');
       expect(mockRes.clearCookie).toHaveBeenCalledWith(
         'navia-auth-token',
         expect.objectContaining({

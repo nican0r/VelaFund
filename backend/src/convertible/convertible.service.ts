@@ -50,10 +50,7 @@ export class ConvertibleService {
     });
     if (!company) throw new NotFoundException('company', companyId);
     if (company.status !== 'ACTIVE') {
-      throw new BusinessRuleException(
-        'CONV_COMPANY_NOT_ACTIVE',
-        'errors.conv.companyNotActive',
-      );
+      throw new BusinessRuleException('CONV_COMPANY_NOT_ACTIVE', 'errors.conv.companyNotActive');
     }
 
     // Verify shareholder exists in this company
@@ -79,20 +76,15 @@ export class ConvertibleService {
     // Validate principal > 0
     const principal = new Prisma.Decimal(dto.principalAmount);
     if (principal.lte(0)) {
-      throw new BusinessRuleException(
-        'CONV_INVALID_PRINCIPAL',
-        'errors.conv.invalidPrincipal',
-      );
+      throw new BusinessRuleException('CONV_INVALID_PRINCIPAL', 'errors.conv.invalidPrincipal');
     }
 
     // Validate interest rate (warn at > 30%)
     const rate = new Prisma.Decimal(dto.interestRate);
     if (rate.gt(new Prisma.Decimal('0.30'))) {
-      throw new BusinessRuleException(
-        'CONV_HIGH_INTEREST_RATE',
-        'errors.conv.highInterestRate',
-        { interestRate: dto.interestRate },
-      );
+      throw new BusinessRuleException('CONV_HIGH_INTEREST_RATE', 'errors.conv.highInterestRate', {
+        interestRate: dto.interestRate,
+      });
     }
 
     // Validate target share class if provided
@@ -113,12 +105,8 @@ export class ConvertibleService {
       principalAmount: principal,
       interestRate: rate,
       interestType: dto.interestType || 'SIMPLE',
-      discountRate: dto.discountRate
-        ? new Prisma.Decimal(dto.discountRate)
-        : null,
-      valuationCap: dto.valuationCap
-        ? new Prisma.Decimal(dto.valuationCap)
-        : null,
+      discountRate: dto.discountRate ? new Prisma.Decimal(dto.discountRate) : null,
+      valuationCap: dto.valuationCap ? new Prisma.Decimal(dto.valuationCap) : null,
       qualifiedFinancingThreshold: dto.qualifiedFinancingThreshold
         ? new Prisma.Decimal(dto.qualifiedFinancingThreshold)
         : null,
@@ -175,10 +163,8 @@ export class ConvertibleService {
       }),
     ]);
 
-    const totalPrincipal =
-      aggregate._sum.principalAmount ?? new Prisma.Decimal(0);
-    const totalAccruedInterest =
-      aggregate._sum.accruedInterest ?? new Prisma.Decimal(0);
+    const totalPrincipal = aggregate._sum.principalAmount ?? new Prisma.Decimal(0);
+    const totalAccruedInterest = aggregate._sum.accruedInterest ?? new Prisma.Decimal(0);
     const totalValue = totalPrincipal.add(totalAccruedInterest);
 
     const enrichedItems = items.map((item) => ({
@@ -188,8 +174,7 @@ export class ConvertibleService {
       interestRate: item.interestRate.toString(),
       discountRate: item.discountRate?.toString() ?? null,
       valuationCap: item.valuationCap?.toString() ?? null,
-      qualifiedFinancingThreshold:
-        item.qualifiedFinancingThreshold?.toString() ?? null,
+      qualifiedFinancingThreshold: item.qualifiedFinancingThreshold?.toString() ?? null,
       totalValue: item.principalAmount.add(item.accruedInterest).toString(),
       daysToMaturity: this.calculateDaysToMaturity(item.maturityDate),
     }));
@@ -228,8 +213,7 @@ export class ConvertibleService {
       interestRate: convertible.interestRate.toString(),
       discountRate: convertible.discountRate?.toString() ?? null,
       valuationCap: convertible.valuationCap?.toString() ?? null,
-      qualifiedFinancingThreshold:
-        convertible.qualifiedFinancingThreshold?.toString() ?? null,
+      qualifiedFinancingThreshold: convertible.qualifiedFinancingThreshold?.toString() ?? null,
       totalConversionAmount: convertible.principalAmount
         .add(convertible.accruedInterest)
         .toString(),
@@ -254,9 +238,7 @@ export class ConvertibleService {
     const issueDate = new Date(convertible.issueDate);
     const daysElapsed = Math.max(
       0,
-      Math.floor(
-        (now.getTime() - issueDate.getTime()) / (1000 * 60 * 60 * 24),
-      ),
+      Math.floor((now.getTime() - issueDate.getTime()) / (1000 * 60 * 60 * 24)),
     );
 
     const principal = convertible.principalAmount;
@@ -264,21 +246,13 @@ export class ConvertibleService {
 
     if (convertible.interestType === 'SIMPLE') {
       // I = P × r × (days / 365)
-      return principal
-        .mul(rate)
-        .mul(new Prisma.Decimal(daysElapsed))
-        .div(new Prisma.Decimal(365));
+      return principal.mul(rate).mul(new Prisma.Decimal(daysElapsed)).div(new Prisma.Decimal(365));
     } else {
       // A = P × (1 + r/365)^days, interest = A - P
       const dailyRate = rate.div(new Prisma.Decimal(365));
       const onePlusDailyRate = new Prisma.Decimal(1).add(dailyRate);
-      const compoundFactor = Math.pow(
-        onePlusDailyRate.toNumber(),
-        daysElapsed,
-      );
-      return principal
-        .mul(new Prisma.Decimal(compoundFactor))
-        .sub(principal);
+      const compoundFactor = Math.pow(onePlusDailyRate.toNumber(), daysElapsed);
+      return principal.mul(new Prisma.Decimal(compoundFactor)).sub(principal);
     }
   }
 
@@ -295,9 +269,7 @@ export class ConvertibleService {
     const issueDate = new Date(convertible.issueDate);
     const daysElapsed = Math.max(
       0,
-      Math.floor(
-        (now.getTime() - issueDate.getTime()) / (1000 * 60 * 60 * 24),
-      ),
+      Math.floor((now.getTime() - issueDate.getTime()) / (1000 * 60 * 60 * 24)),
     );
 
     const calculatedInterest = this.calculateAccruedInterest(convertible);
@@ -327,11 +299,7 @@ export class ConvertibleService {
 
   // ─── UPDATE ──────────────────────────────────────────────────────────
 
-  async update(
-    companyId: string,
-    convertibleId: string,
-    dto: UpdateConvertibleDto,
-  ) {
+  async update(companyId: string, convertibleId: string, dto: UpdateConvertibleDto) {
     const convertible = await this.prisma.convertibleInstrument.findFirst({
       where: { id: convertibleId, companyId },
     });
@@ -341,15 +309,10 @@ export class ConvertibleService {
     }
 
     // Only OUTSTANDING or MATURED can be updated
-    if (
-      convertible.status !== 'OUTSTANDING' &&
-      convertible.status !== 'MATURED'
-    ) {
-      throw new BusinessRuleException(
-        'CONV_CANNOT_UPDATE',
-        'errors.conv.cannotUpdate',
-        { currentStatus: convertible.status },
-      );
+    if (convertible.status !== 'OUTSTANDING' && convertible.status !== 'MATURED') {
+      throw new BusinessRuleException('CONV_CANNOT_UPDATE', 'errors.conv.cannotUpdate', {
+        currentStatus: convertible.status,
+      });
     }
 
     const data: Prisma.ConvertibleInstrumentUpdateInput = {};
@@ -361,9 +324,7 @@ export class ConvertibleService {
       data.valuationCap = new Prisma.Decimal(dto.valuationCap);
     }
     if (dto.qualifiedFinancingThreshold !== undefined) {
-      data.qualifiedFinancingThreshold = new Prisma.Decimal(
-        dto.qualifiedFinancingThreshold,
-      );
+      data.qualifiedFinancingThreshold = new Prisma.Decimal(dto.qualifiedFinancingThreshold);
     }
     if (dto.maturityDate !== undefined) {
       const newMaturityDate = new Date(dto.maturityDate);
@@ -380,10 +341,7 @@ export class ConvertibleService {
       data.maturityDate = newMaturityDate;
 
       // Maturity extension: MATURED → OUTSTANDING when maturity date is extended
-      if (
-        convertible.status === 'MATURED' &&
-        newMaturityDate > new Date()
-      ) {
+      if (convertible.status === 'MATURED' && newMaturityDate > new Date()) {
         data.status = 'OUTSTANDING';
       }
     }
@@ -417,11 +375,7 @@ export class ConvertibleService {
 
   // ─── REDEEM ──────────────────────────────────────────────────────────
 
-  async redeem(
-    companyId: string,
-    convertibleId: string,
-    dto: RedeemConvertibleDto,
-  ) {
+  async redeem(companyId: string, convertibleId: string, dto: RedeemConvertibleDto) {
     const convertible = await this.prisma.convertibleInstrument.findFirst({
       where: { id: convertibleId, companyId },
     });
@@ -451,11 +405,7 @@ export class ConvertibleService {
 
   // ─── CANCEL ──────────────────────────────────────────────────────────
 
-  async cancel(
-    companyId: string,
-    convertibleId: string,
-    dto: CancelConvertibleDto,
-  ) {
+  async cancel(companyId: string, convertibleId: string, dto: CancelConvertibleDto) {
     const convertible = await this.prisma.convertibleInstrument.findFirst({
       where: { id: convertibleId, companyId },
     });
@@ -478,11 +428,7 @@ export class ConvertibleService {
 
   // ─── CONVERSION SCENARIOS ────────────────────────────────────────────
 
-  async getConversionScenarios(
-    companyId: string,
-    convertibleId: string,
-    valuations?: string,
-  ) {
+  async getConversionScenarios(companyId: string, convertibleId: string, valuations?: string) {
     const convertible = await this.prisma.convertibleInstrument.findFirst({
       where: { id: convertibleId, companyId },
     });
@@ -552,13 +498,9 @@ export class ConvertibleService {
         ownershipPercentage: string;
       } | null = null;
       if (discountRate && discountRate.gt(0)) {
-        const discountPrice = roundPricePerShare.mul(
-          new Prisma.Decimal(1).sub(discountRate),
-        );
+        const discountPrice = roundPricePerShare.mul(new Prisma.Decimal(1).sub(discountRate));
         const discountShares = conversionAmount.div(discountPrice);
-        const discountOwnership = discountShares
-          .div(preMoneyShares.add(discountShares))
-          .mul(100);
+        const discountOwnership = discountShares.div(preMoneyShares.add(discountShares)).mul(100);
         discountMethod = {
           conversionPrice: discountPrice.toString(),
           sharesIssued: discountShares.toFixed(0),
@@ -574,13 +516,9 @@ export class ConvertibleService {
       } | null = null;
       if (valuationCap) {
         const capPrice = valuationCap.div(preMoneyShares);
-        const effectiveCapPrice = capPrice.lt(roundPricePerShare)
-          ? capPrice
-          : roundPricePerShare;
+        const effectiveCapPrice = capPrice.lt(roundPricePerShare) ? capPrice : roundPricePerShare;
         const capShares = conversionAmount.div(effectiveCapPrice);
-        const capOwnership = capShares
-          .div(preMoneyShares.add(capShares))
-          .mul(100);
+        const capOwnership = capShares.div(preMoneyShares.add(capShares)).mul(100);
         capMethod = {
           conversionPrice: effectiveCapPrice.toString(),
           sharesIssued: capShares.toFixed(0),
@@ -606,9 +544,7 @@ export class ConvertibleService {
           bestMethod = 'DISCOUNT';
           finalPrice = new Prisma.Decimal(discountMethod.conversionPrice);
           finalShares = discountShares;
-          finalOwnership = new Prisma.Decimal(
-            discountMethod.ownershipPercentage,
-          );
+          finalOwnership = new Prisma.Decimal(discountMethod.ownershipPercentage);
         }
       }
 
@@ -622,9 +558,7 @@ export class ConvertibleService {
         }
       }
 
-      const dilution = finalShares
-        .div(preMoneyShares.add(finalShares))
-        .mul(100);
+      const dilution = finalShares.div(preMoneyShares.add(finalShares)).mul(100);
 
       return {
         hypotheticalValuation: hypotheticalValuation.toString(),
@@ -672,15 +606,10 @@ export class ConvertibleService {
     }
 
     // Must be OUTSTANDING or MATURED
-    if (
-      convertible.status !== 'OUTSTANDING' &&
-      convertible.status !== 'MATURED'
-    ) {
-      throw new ConflictException(
-        'CONV_ALREADY_CONVERTED',
-        'errors.conv.alreadyConverted',
-        { currentStatus: convertible.status },
-      );
+    if (convertible.status !== 'OUTSTANDING' && convertible.status !== 'MATURED') {
+      throw new ConflictException('CONV_ALREADY_CONVERTED', 'errors.conv.alreadyConverted', {
+        currentStatus: convertible.status,
+      });
     }
 
     // Investimento-Anjo holding period check
@@ -698,20 +627,11 @@ export class ConvertibleService {
 
     // Check qualified financing threshold
     if (convertible.qualifiedFinancingThreshold) {
-      if (
-        fundingRound.targetAmount.lt(
-          convertible.qualifiedFinancingThreshold,
-        )
-      ) {
-        throw new BusinessRuleException(
-          'CONV_TRIGGER_NOT_MET',
-          'errors.conv.triggerNotMet',
-          {
-            threshold:
-              convertible.qualifiedFinancingThreshold.toString(),
-            roundAmount: fundingRound.targetAmount.toString(),
-          },
-        );
+      if (fundingRound.targetAmount.lt(convertible.qualifiedFinancingThreshold)) {
+        throw new BusinessRuleException('CONV_TRIGGER_NOT_MET', 'errors.conv.triggerNotMet', {
+          threshold: convertible.qualifiedFinancingThreshold.toString(),
+          roundAmount: fundingRound.targetAmount.toString(),
+        });
       }
     }
 
@@ -773,19 +693,13 @@ export class ConvertibleService {
     const sharesIssuedInt = parseInt(sharesIssued.toFixed(0), 10);
 
     // Check authorized limit
-    const newTotalIssued = shareClass.totalIssued.add(
-      new Prisma.Decimal(sharesIssuedInt),
-    );
+    const newTotalIssued = shareClass.totalIssued.add(new Prisma.Decimal(sharesIssuedInt));
     if (newTotalIssued.gt(shareClass.totalAuthorized)) {
-      throw new BusinessRuleException(
-        'CONV_EXCEEDS_AUTHORIZED',
-        'errors.conv.exceedsAuthorized',
-        {
-          authorized: shareClass.totalAuthorized.toString(),
-          currentIssued: shareClass.totalIssued.toString(),
-          newShares: sharesIssuedInt.toString(),
-        },
-      );
+      throw new BusinessRuleException('CONV_EXCEEDS_AUTHORIZED', 'errors.conv.exceedsAuthorized', {
+        authorized: shareClass.totalAuthorized.toString(),
+        currentIssued: shareClass.totalIssued.toString(),
+        newShares: sharesIssuedInt.toString(),
+      });
     }
 
     const conversionData = {
@@ -832,9 +746,7 @@ export class ConvertibleService {
         await tx.shareholding.update({
           where: { id: existingHolding.id },
           data: {
-            quantity: existingHolding.quantity.add(
-              new Prisma.Decimal(sharesIssuedInt),
-            ),
+            quantity: existingHolding.quantity.add(new Prisma.Decimal(sharesIssuedInt)),
           },
         });
       } else {
@@ -900,10 +812,7 @@ export class ConvertibleService {
 
   // ─── HELPERS ─────────────────────────────────────────────────────────
 
-  private validateStatusTransition(
-    currentStatus: string,
-    targetStatus: string,
-  ): void {
+  private validateStatusTransition(currentStatus: string, targetStatus: string): void {
     const allowedTransitions = STATUS_TRANSITIONS[currentStatus];
     if (!allowedTransitions || !allowedTransitions.includes(targetStatus)) {
       throw new BusinessRuleException(
@@ -959,17 +868,14 @@ export class ConvertibleService {
           .div(new Prisma.Decimal(365));
       } else {
         const totalDaysFromStart = Math.floor(
-          (actualEnd.getTime() - startDate.getTime()) /
-            (1000 * 60 * 60 * 24),
+          (actualEnd.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
         );
         const dailyRate = rate.div(new Prisma.Decimal(365));
         const factor = Math.pow(
           new Prisma.Decimal(1).add(dailyRate).toNumber(),
           totalDaysFromStart,
         );
-        const totalInterest = principal
-          .mul(new Prisma.Decimal(factor))
-          .sub(principal);
+        const totalInterest = principal.mul(new Prisma.Decimal(factor)).sub(principal);
         periodInterest = totalInterest.sub(cumulativeInterest);
         cumulativeInterest = totalInterest;
       }

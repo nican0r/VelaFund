@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Get,
-  Param,
-  Query,
-  HttpCode,
-  HttpStatus,
-} from '@nestjs/common';
+import { Controller, Get, Param, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ReportsService } from './reports.service';
 import { OwnershipQueryDto } from './dto/ownership-query.dto';
@@ -52,10 +45,7 @@ export class ReportsController {
   @Get('dilution')
   @Roles('ADMIN', 'FINANCE', 'LEGAL')
   @Throttle({ read: { ttl: 60000, limit: 100 } })
-  async getDilutionReport(
-    @Param('companyId') companyId: string,
-    @Query() query: DilutionQueryDto,
-  ) {
+  async getDilutionReport(@Param('companyId') companyId: string, @Query() query: DilutionQueryDto) {
     return this.reportsService.getDilutionReport(companyId, query);
   }
 
@@ -92,10 +82,7 @@ export class ReportsController {
   @Get('cap-table/export/:jobId')
   @Roles('ADMIN', 'FINANCE', 'LEGAL')
   @Throttle({ read: { ttl: 60000, limit: 100 } })
-  async getExportStatus(
-    @Param('companyId') companyId: string,
-    @Param('jobId') jobId: string,
-  ) {
+  async getExportStatus(@Param('companyId') companyId: string, @Param('jobId') jobId: string) {
     return this.reportsService.getExportJobStatus(companyId, jobId);
   }
 

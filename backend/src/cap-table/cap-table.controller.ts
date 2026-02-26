@@ -1,13 +1,4 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Param,
-  Query,
-  Body,
-  HttpCode,
-  HttpStatus,
-} from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { CapTableService } from './cap-table.service';
@@ -60,9 +51,7 @@ export class CapTableController {
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiResponse({ status: 200, description: 'Fully-diluted cap table data' })
   @ApiResponse({ status: 404, description: 'Company not found' })
-  async getFullyDilutedCapTable(
-    @Param('companyId') companyId: string,
-  ) {
+  async getFullyDilutedCapTable(@Param('companyId') companyId: string) {
     return this.capTableService.getFullyDilutedCapTable(companyId);
   }
 
@@ -80,10 +69,7 @@ export class CapTableController {
   @ApiQuery({ name: 'date', required: true, description: 'ISO 8601 date (e.g., 2026-01-31)' })
   @ApiResponse({ status: 200, description: 'Cap table snapshot data' })
   @ApiResponse({ status: 404, description: 'Snapshot not found' })
-  async getSnapshot(
-    @Param('companyId') companyId: string,
-    @Query('date') date: string,
-  ) {
+  async getSnapshot(@Param('companyId') companyId: string, @Query('date') date: string) {
     return this.capTableService.getSnapshot(companyId, date);
   }
 
@@ -99,14 +85,8 @@ export class CapTableController {
   @ApiOperation({ summary: 'Get cap table snapshot history' })
   @ApiParam({ name: 'companyId', description: 'Company UUID' })
   @ApiResponse({ status: 200, description: 'Paginated list of snapshots' })
-  async getHistory(
-    @Param('companyId') companyId: string,
-    @Query() query: SnapshotHistoryQueryDto,
-  ) {
-    const { items, total } = await this.capTableService.getSnapshotHistory(
-      companyId,
-      query,
-    );
+  async getHistory(@Param('companyId') companyId: string, @Query() query: SnapshotHistoryQueryDto) {
+    const { items, total } = await this.capTableService.getSnapshotHistory(companyId, query);
     return paginate(items, total, query.page, query.limit);
   }
 
@@ -151,10 +131,7 @@ export class CapTableController {
   @ApiResponse({ status: 201, description: 'Snapshot created' })
   @ApiResponse({ status: 400, description: 'Invalid input or future date' })
   @ApiResponse({ status: 422, description: 'Company not active' })
-  async createSnapshot(
-    @Param('companyId') companyId: string,
-    @Body() dto: CreateSnapshotDto,
-  ) {
+  async createSnapshot(@Param('companyId') companyId: string, @Body() dto: CreateSnapshotDto) {
     return this.capTableService.createSnapshot(companyId, dto);
   }
 }

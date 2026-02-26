@@ -105,10 +105,7 @@ describe('SesService', () => {
 
         const { SendEmailCommand } = require('@aws-sdk/client-ses');
         const call = SendEmailCommand.mock.calls[0][0];
-        expect(call.Destination.ToAddresses).toEqual([
-          'user1@example.com',
-          'user2@example.com',
-        ]);
+        expect(call.Destination.ToAddresses).toEqual(['user1@example.com', 'user2@example.com']);
       });
 
       it('should include replyTo when provided', async () => {
@@ -190,9 +187,7 @@ describe('SesService', () => {
 
         const { SendEmailCommand } = require('@aws-sdk/client-ses');
         const call = SendEmailCommand.mock.calls[0][0];
-        expect(call.Message.Body.Html.Data).toBe(
-          '<p>Hi João, welcome João!</p>',
-        );
+        expect(call.Message.Body.Html.Data).toBe('<p>Hi João, welcome João!</p>');
       });
 
       it('should leave unmatched placeholders as-is', async () => {
@@ -209,9 +204,7 @@ describe('SesService', () => {
 
         const { SendEmailCommand } = require('@aws-sdk/client-ses');
         const call = SendEmailCommand.mock.calls[0][0];
-        expect(call.Message.Body.Html.Data).toBe(
-          '<p>João and {{unknown}}</p>',
-        );
+        expect(call.Message.Body.Html.Data).toBe('<p>João and {{unknown}}</p>');
       });
     });
   });
@@ -251,14 +244,7 @@ describe('SesService', () => {
 
     it('should throw on sendTemplatedEmail when not configured', async () => {
       await expect(
-        service.sendTemplatedEmail(
-          'user@example.com',
-          'test',
-          'en',
-          {},
-          'Subject',
-          '<p>Body</p>',
-        ),
+        service.sendTemplatedEmail('user@example.com', 'test', 'en', {}, 'Subject', '<p>Body</p>'),
       ).rejects.toThrow('SES client not initialized');
     });
   });

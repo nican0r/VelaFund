@@ -101,9 +101,9 @@ describe('EmailService', () => {
     });
 
     it('should throw when template does not exist', () => {
-      expect(() =>
-        service.compileTemplate('nonexistent-template', 'pt-BR', {}),
-      ).toThrow('Email template not found: nonexistent-template/pt-BR.mjml');
+      expect(() => service.compileTemplate('nonexistent-template', 'pt-BR', {})).toThrow(
+        'Email template not found: nonexistent-template/pt-BR.mjml',
+      );
     });
 
     it('should compile exercise-notification template in pt-BR', () => {
@@ -354,12 +354,7 @@ describe('EmailService', () => {
   // ─── Template file verification ─────────────────────────────────
 
   describe('template files', () => {
-    const templates = [
-      'invitation',
-      'exercise-notification',
-      'export-ready',
-      'password-reset',
-    ];
+    const templates = ['invitation', 'exercise-notification', 'export-ready', 'password-reset'];
     const locales = ['pt-BR', 'en'];
 
     for (const template of templates) {

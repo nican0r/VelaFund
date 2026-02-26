@@ -1,11 +1,4 @@
-import {
-  IsString,
-  IsOptional,
-  MaxLength,
-  MinLength,
-  Matches,
-  IsUrl,
-} from 'class-validator';
+import { IsString, IsOptional, MaxLength, MinLength, Matches, IsUrl } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 // Brazilian CNPJ format: XX.XXX.XXX/XXXX-XX

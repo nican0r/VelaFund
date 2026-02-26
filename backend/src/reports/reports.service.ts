@@ -7,7 +7,6 @@ import { S3Service } from '../aws/s3.service';
 import { ConfigService } from '@nestjs/config';
 import {
   NotFoundException,
-  BusinessRuleException,
   AppException,
 } from '../common/filters/app-exception';
 import { HttpStatus } from '@nestjs/common';
@@ -25,10 +24,7 @@ export class ReportsService {
     private readonly configService: ConfigService,
     @InjectQueue('report-export') private readonly exportQueue: Queue,
   ) {
-    this.exportsBucket = this.configService.get<string>(
-      'AWS_S3_EXPORTS_BUCKET',
-      'navia-exports',
-    );
+    this.exportsBucket = this.configService.get<string>('AWS_S3_EXPORTS_BUCKET', 'navia-exports');
   }
 
   /**
@@ -165,9 +161,7 @@ export class ReportsService {
     });
     if (!company) throw new NotFoundException('company', companyId);
 
-    const dateTo = query.dateTo
-      ? new Date(query.dateTo)
-      : new Date();
+    const dateTo = query.dateTo ? new Date(query.dateTo) : new Date();
     const dateFrom = query.dateFrom
       ? new Date(query.dateFrom)
       : new Date(dateTo.getTime() - 365 * 24 * 60 * 60 * 1000);
@@ -221,8 +215,7 @@ export class ReportsService {
     const giniCoefficient = this.computeGiniCoefficient(currentShareholdings);
 
     // Compute foreign ownership percentage
-    const foreignOwnershipPercentage =
-      await this.computeForeignOwnership(companyId);
+    const foreignOwnershipPercentage = await this.computeForeignOwnership(companyId);
 
     return {
       companyId,
@@ -268,9 +261,7 @@ export class ReportsService {
         pricePerShare: true,
       },
     });
-    const roundPriceMap = new Map(
-      latestRounds.map((r) => [r.companyId, r.pricePerShare]),
-    );
+    const roundPriceMap = new Map(latestRounds.map((r) => [r.companyId, r.pricePerShare]));
 
     // Get total invested from confirmed transactions (ISSUANCE type)
     const investments = await this.prisma.transaction.findMany({
@@ -295,25 +286,21 @@ export class ReportsService {
 
     for (const shareholder of shareholders) {
       for (const holding of shareholder.shareholdings) {
-        const lastRoundPrice =
-          roundPriceMap.get(shareholder.companyId) || new Prisma.Decimal(0);
+        const lastRoundPrice = roundPriceMap.get(shareholder.companyId) || new Prisma.Decimal(0);
         const estimatedValue = holding.quantity.mul(lastRoundPrice);
 
         // Sum invested amounts for this shareholder in this company
         const invested = investments
           .filter(
             (inv) =>
-              inv.companyId === shareholder.companyId &&
-              inv.toShareholderId === shareholder.id,
+              inv.companyId === shareholder.companyId && inv.toShareholderId === shareholder.id,
           )
           .reduce(
             (sum, inv) => sum.plus(inv.totalValue || new Prisma.Decimal(0)),
             new Prisma.Decimal(0),
           );
 
-        const roiMultiple = invested.isZero()
-          ? '0.00'
-          : estimatedValue.div(invested).toFixed(2);
+        const roiMultiple = invested.isZero() ? '0.00' : estimatedValue.div(invested).toFixed(2);
 
         holdings.push({
           companyId: shareholder.company.id,
@@ -351,12 +338,7 @@ export class ReportsService {
   /**
    * Queue a cap table export job.
    */
-  async exportCapTable(
-    companyId: string,
-    userId: string,
-    format: string,
-    snapshotDate?: string,
-  ) {
+  async exportCapTable(companyId: string, userId: string, format: string, snapshotDate?: string) {
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },
       select: { id: true },
@@ -458,9 +440,7 @@ export class ReportsService {
       },
     );
 
-    this.logger.log(
-      `Due diligence package queued: ${exportJob.id} for company ${companyId}`,
-    );
+    this.logger.log(`Due diligence package queued: ${exportJob.id} for company ${companyId}`);
 
     return this.formatExportJobResponse(exportJob);
   }
@@ -508,9 +488,7 @@ export class ReportsService {
     const lines: string[] = [];
 
     // Header
-    lines.push(
-      'Acionista;Classe de Ação;Ações;Porcentagem;Porcentagem Diluída',
-    );
+    lines.push('Acionista;Classe de Ação;Ações;Porcentagem;Porcentagem Diluída');
 
     // Data rows
     for (const sh of report.shareholders) {
@@ -526,9 +504,7 @@ export class ReportsService {
     }
 
     // Summary row
-    lines.push(
-      ['TOTAL', '', report.totalShares, '100.00', '100.00'].join(';'),
-    );
+    lines.push(['TOTAL', '', report.totalShares, '100.00', '100.00'].join(';'));
 
     return Buffer.from(BOM + lines.join('\r\n'), 'utf-8');
   }
@@ -580,9 +556,7 @@ export class ReportsService {
     for (const sh of report.shareholders) {
       const existing = classMap.get(sh.shareClassId);
       if (existing) {
-        existing.totalShares = existing.totalShares.plus(
-          new Prisma.Decimal(sh.shares),
-        );
+        existing.totalShares = existing.totalShares.plus(new Prisma.Decimal(sh.shares));
         existing.count += 1;
       } else {
         classMap.set(sh.shareClassId, {
@@ -744,13 +718,11 @@ export class ReportsService {
       stockClasses: shareClasses.map((sc) => ({
         id: sc.id,
         name: sc.className,
-        classType:
-          sc.type === 'PREFERRED_SHARES' ? 'PREFERRED' : 'COMMON',
+        classType: sc.type === 'PREFERRED_SHARES' ? 'PREFERRED' : 'COMMON',
         authorizedShares: sc.totalAuthorized.toString(),
         issuedShares: sc.totalIssued.toString(),
         votesPerShare: sc.votesPerShare,
-        liquidationPreferenceMultiple:
-          sc.liquidationPreferenceMultiple?.toString() ?? null,
+        liquidationPreferenceMultiple: sc.liquidationPreferenceMultiple?.toString() ?? null,
         participatingPreferred: sc.participatingRights,
         seniority: sc.seniority,
       })),
@@ -779,11 +751,7 @@ export class ReportsService {
   /**
    * Generate due diligence CSV reports for ZIP packaging.
    */
-  async generateDueDiligenceCsvs(
-    companyId: string,
-    dateFrom: string,
-    dateTo: string,
-  ) {
+  async generateDueDiligenceCsvs(companyId: string, dateFrom: string, dateTo: string) {
     const BOM = '\uFEFF';
 
     // Transactions CSV
@@ -816,10 +784,7 @@ export class ReportsService {
         ].join(';'),
       );
     }
-    const transactionsCsv = Buffer.from(
-      BOM + txLines.join('\r\n'),
-      'utf-8',
-    );
+    const transactionsCsv = Buffer.from(BOM + txLines.join('\r\n'), 'utf-8');
 
     // Shareholders CSV (PII masked per LGPD)
     const shareholders = await this.prisma.shareholder.findMany({
@@ -847,10 +812,7 @@ export class ReportsService {
         );
       }
     }
-    const shareholdersCsv = Buffer.from(
-      BOM + shLines.join('\r\n'),
-      'utf-8',
-    );
+    const shareholdersCsv = Buffer.from(BOM + shLines.join('\r\n'), 'utf-8');
 
     // Option grants CSV
     const grants = await this.prisma.optionGrant.findMany({
@@ -878,10 +840,7 @@ export class ReportsService {
         ].join(';'),
       );
     }
-    const optionGrantsCsv = Buffer.from(
-      BOM + grantLines.join('\r\n'),
-      'utf-8',
-    );
+    const optionGrantsCsv = Buffer.from(BOM + grantLines.join('\r\n'), 'utf-8');
 
     // Convertibles CSV
     const convertibles = await this.prisma.convertibleInstrument.findMany({
@@ -911,10 +870,7 @@ export class ReportsService {
         ].join(';'),
       );
     }
-    const convertiblesCsv = Buffer.from(
-      BOM + convLines.join('\r\n'),
-      'utf-8',
-    );
+    const convertiblesCsv = Buffer.from(BOM + convLines.join('\r\n'), 'utf-8');
 
     // Documents inventory CSV
     const documents = await this.prisma.document.findMany({
@@ -935,10 +891,7 @@ export class ReportsService {
         ].join(';'),
       );
     }
-    const documentsCsv = Buffer.from(
-      BOM + docLines.join('\r\n'),
-      'utf-8',
-    );
+    const documentsCsv = Buffer.from(BOM + docLines.join('\r\n'), 'utf-8');
 
     // Cap table history CSV (snapshots)
     const snapshots = await this.prisma.capTableSnapshot.findMany({
@@ -959,10 +912,7 @@ export class ReportsService {
         ].join(';'),
       );
     }
-    const capTableHistoryCsv = Buffer.from(
-      BOM + snapLines.join('\r\n'),
-      'utf-8',
-    );
+    const capTableHistoryCsv = Buffer.from(BOM + snapLines.join('\r\n'), 'utf-8');
 
     return {
       transactionsCsv,
@@ -1119,8 +1069,7 @@ export class ReportsService {
   ): Prisma.Decimal {
     const grantDate = new Date(grant.grantDate);
     const monthsElapsed =
-      (now.getFullYear() - grantDate.getFullYear()) * 12 +
-      (now.getMonth() - grantDate.getMonth());
+      (now.getFullYear() - grantDate.getFullYear()) * 12 + (now.getMonth() - grantDate.getMonth());
 
     if (monthsElapsed < grant.cliffMonths) {
       return new Prisma.Decimal(0);
@@ -1135,24 +1084,17 @@ export class ReportsService {
 
     // Remaining vests linearly
     const remainingAfterCliff = grant.quantity.minus(cliffAmount);
-    const vestingMonthsAfterCliff =
-      grant.vestingDurationMonths - grant.cliffMonths;
+    const vestingMonthsAfterCliff = grant.vestingDurationMonths - grant.cliffMonths;
     const monthsAfterCliff = monthsElapsed - grant.cliffMonths;
 
     if (vestingMonthsAfterCliff <= 0) return grant.quantity;
 
-    const linearVested = remainingAfterCliff
-      .mul(monthsAfterCliff)
-      .div(vestingMonthsAfterCliff);
+    const linearVested = remainingAfterCliff.mul(monthsAfterCliff).div(vestingMonthsAfterCliff);
 
     return cliffAmount.plus(linearVested);
   }
 
-  private generateDatePoints(
-    from: Date,
-    to: Date,
-    granularity: string,
-  ): Date[] {
+  private generateDatePoints(from: Date, to: Date, granularity: string): Date[] {
     const points: Date[] = [];
     const current = new Date(from);
 
@@ -1197,9 +1139,7 @@ export class ReportsService {
     for (const e of entries) {
       const existing = classMap.get(e.shareClassId);
       if (existing) {
-        existing.shares = existing.shares.plus(
-          new Prisma.Decimal(e.shares || '0'),
-        );
+        existing.shares = existing.shares.plus(new Prisma.Decimal(e.shares || '0'));
       } else {
         classMap.set(e.shareClassId, {
           shareClassId: e.shareClassId,
@@ -1212,9 +1152,7 @@ export class ReportsService {
       shareClassId: c.shareClassId,
       name: c.name,
       shares: c.shares.toString(),
-      percentage: totalShares.isZero()
-        ? '0.00'
-        : c.shares.div(totalShares).mul(100).toFixed(2),
+      percentage: totalShares.isZero() ? '0.00' : c.shares.div(totalShares).mul(100).toFixed(2),
     }));
   }
 
@@ -1225,9 +1163,7 @@ export class ReportsService {
     const n = shareholdings.length;
     if (n === 0) return new Prisma.Decimal(0);
 
-    const sorted = shareholdings
-      .map((s) => s.quantity)
-      .sort((a, b) => a.comparedTo(b));
+    const sorted = shareholdings.map((s) => s.quantity).sort((a, b) => a.comparedTo(b));
 
     let numerator = new Prisma.Decimal(0);
     for (let i = 0; i < n; i++) {
@@ -1235,21 +1171,14 @@ export class ReportsService {
     }
 
     const denominator = new Prisma.Decimal(n).mul(
-      sorted.reduce(
-        (sum, q) => sum.plus(q),
-        new Prisma.Decimal(0),
-      ),
+      sorted.reduce((sum, q) => sum.plus(q), new Prisma.Decimal(0)),
     );
 
-    return denominator.isZero()
-      ? new Prisma.Decimal(0)
-      : numerator.div(denominator).abs();
+    return denominator.isZero() ? new Prisma.Decimal(0) : numerator.div(denominator).abs();
   }
 
   /** Compute foreign ownership percentage. */
-  private async computeForeignOwnership(
-    companyId: string,
-  ): Promise<Prisma.Decimal> {
+  private async computeForeignOwnership(companyId: string): Promise<Prisma.Decimal> {
     const shareholdings = await this.prisma.shareholding.findMany({
       where: { companyId },
       include: {

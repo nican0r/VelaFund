@@ -77,10 +77,7 @@ describe('ShareClassController', () => {
 
     it('should propagate ConflictException for duplicate name', async () => {
       service.create.mockRejectedValue(
-        new ConflictException(
-          'CAP_SHARE_CLASS_DUPLICATE',
-          'errors.cap.shareClassDuplicate',
-        ),
+        new ConflictException('CAP_SHARE_CLASS_DUPLICATE', 'errors.cap.shareClassDuplicate'),
       );
 
       await expect(
@@ -95,10 +92,7 @@ describe('ShareClassController', () => {
 
     it('should propagate BusinessRuleException for inactive company', async () => {
       service.create.mockRejectedValue(
-        new BusinessRuleException(
-          'CAP_COMPANY_NOT_ACTIVE',
-          'errors.cap.companyNotActive',
-        ),
+        new BusinessRuleException('CAP_COMPANY_NOT_ACTIVE', 'errors.cap.companyNotActive'),
       );
 
       await expect(
@@ -198,13 +192,9 @@ describe('ShareClassController', () => {
     });
 
     it('should propagate NotFoundException', async () => {
-      service.findById.mockRejectedValue(
-        new NotFoundException('shareClass', 'sc-1'),
-      );
+      service.findById.mockRejectedValue(new NotFoundException('shareClass', 'sc-1'));
 
-      await expect(controller.getOne('comp-1', 'sc-1')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(controller.getOne('comp-1', 'sc-1')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -236,15 +226,13 @@ describe('ShareClassController', () => {
         ),
       );
 
-      await expect(
-        controller.update('comp-1', 'sc-1', { totalAuthorized: '500' }),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(controller.update('comp-1', 'sc-1', { totalAuthorized: '500' })).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should propagate NotFoundException for non-existent share class', async () => {
-      service.update.mockRejectedValue(
-        new NotFoundException('shareClass', 'sc-1'),
-      );
+      service.update.mockRejectedValue(new NotFoundException('shareClass', 'sc-1'));
 
       await expect(
         controller.update('comp-1', 'sc-1', { totalAuthorized: '2000000' }),
@@ -265,25 +253,16 @@ describe('ShareClassController', () => {
 
     it('should propagate BusinessRuleException for share class in use', async () => {
       service.delete.mockRejectedValue(
-        new BusinessRuleException(
-          'CAP_SHARE_CLASS_IN_USE',
-          'errors.cap.shareClassInUse',
-        ),
+        new BusinessRuleException('CAP_SHARE_CLASS_IN_USE', 'errors.cap.shareClassInUse'),
       );
 
-      await expect(controller.delete('comp-1', 'sc-1')).rejects.toThrow(
-        BusinessRuleException,
-      );
+      await expect(controller.delete('comp-1', 'sc-1')).rejects.toThrow(BusinessRuleException);
     });
 
     it('should propagate NotFoundException', async () => {
-      service.delete.mockRejectedValue(
-        new NotFoundException('shareClass', 'sc-1'),
-      );
+      service.delete.mockRejectedValue(new NotFoundException('shareClass', 'sc-1'));
 
-      await expect(controller.delete('comp-1', 'sc-1')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(controller.delete('comp-1', 'sc-1')).rejects.toThrow(NotFoundException);
     });
   });
 });

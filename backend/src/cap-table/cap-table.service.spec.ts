@@ -1,10 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CapTableService } from './cap-table.service';
 import { PrismaService } from '../prisma/prisma.service';
-import {
-  NotFoundException,
-  BusinessRuleException,
-} from '../common/filters/app-exception';
+import { NotFoundException, BusinessRuleException } from '../common/filters/app-exception';
 import { Prisma } from '@prisma/client';
 
 // ─── MOCK DATA ──────────────────────────────────────────────────────
@@ -199,10 +196,7 @@ describe('CapTableService', () => {
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        CapTableService,
-        { provide: PrismaService, useValue: prisma },
-      ],
+      providers: [CapTableService, { provide: PrismaService, useValue: prisma }],
     }).compile();
 
     service = module.get<CapTableService>(CapTableService);
@@ -303,9 +297,9 @@ describe('CapTableService', () => {
     it('should throw NotFoundException when company not found', async () => {
       prisma.company.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.getCurrentCapTable('nonexistent', { view: 'current' }),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getCurrentCapTable('nonexistent', { view: 'current' })).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should return correct lastUpdated based on most recent shareholding', async () => {
@@ -382,9 +376,9 @@ describe('CapTableService', () => {
     it('should throw NotFoundException when company not found', async () => {
       prisma.company.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.getFullyDilutedCapTable('nonexistent'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getFullyDilutedCapTable('nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should sort entries by fully-diluted percentage descending', async () => {
@@ -433,25 +427,23 @@ describe('CapTableService', () => {
       prisma.company.findUnique.mockResolvedValue(mockCompany);
       prisma.capTableSnapshot.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.getSnapshot('comp-1', '2026-01-15'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getSnapshot('comp-1', '2026-01-15')).rejects.toThrow(NotFoundException);
     });
 
     it('should throw BusinessRuleException for date before company creation', async () => {
       prisma.company.findUnique.mockResolvedValue(mockCompany);
 
-      await expect(
-        service.getSnapshot('comp-1', '2024-06-01'),
-      ).rejects.toThrow(BusinessRuleException);
+      await expect(service.getSnapshot('comp-1', '2024-06-01')).rejects.toThrow(
+        BusinessRuleException,
+      );
     });
 
     it('should throw NotFoundException when company not found', async () => {
       prisma.company.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.getSnapshot('nonexistent', '2026-01-15'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getSnapshot('nonexistent', '2026-01-15')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should query with lte for date filtering', async () => {
@@ -809,9 +801,7 @@ describe('CapTableService', () => {
     it('should throw NotFoundException when company not found', async () => {
       prisma.company.findUnique.mockResolvedValue(null);
 
-      await expect(service.exportOct('nonexistent')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.exportOct('nonexistent')).rejects.toThrow(NotFoundException);
     });
 
     it('should include generatedAt timestamp', async () => {

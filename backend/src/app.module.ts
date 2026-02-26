@@ -45,10 +45,7 @@ import { ReportsModule } from './reports/reports.module';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        redis: configService.get<string>(
-          'REDIS_URL',
-          'redis://localhost:6379',
-        ),
+        redis: configService.get<string>('REDIS_URL', 'redis://localhost:6379'),
         defaultJobOptions: {
           attempts: 3,
           backoff: { type: 'exponential' as const, delay: 1000 },

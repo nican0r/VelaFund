@@ -1,17 +1,9 @@
-import {
-  Injectable,
-  CanActivate,
-  ExecutionContext,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, Logger } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import { PrismaService } from '../../prisma/prisma.service';
-import {
-  ForbiddenException,
-  NotFoundException,
-} from '../../common/filters/app-exception';
+import { ForbiddenException, NotFoundException } from '../../common/filters/app-exception';
 import { AuthenticatedUser } from '../decorators/current-user.decorator';
 
 /**
@@ -37,10 +29,10 @@ export class RolesGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     // Get required roles from decorator (handler-level first, then class-level)
-    const requiredRoles = this.reflector.getAllAndOverride<string[]>(
-      ROLES_KEY,
-      [context.getHandler(), context.getClass()],
-    );
+    const requiredRoles = this.reflector.getAllAndOverride<string[]>(ROLES_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
 
     // No @Roles() decorator — no role restriction, allow access
     if (!requiredRoles || requiredRoles.length === 0) {

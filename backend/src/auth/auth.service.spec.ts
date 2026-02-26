@@ -81,8 +81,30 @@ describe('AuthService', () => {
     has_accepted_terms: true,
     is_guest: false,
     linked_accounts: [
-      { type: 'email' as const, address: 'test@example.com', verified_at: Date.now(), first_verified_at: null, latest_verified_at: null },
-      { type: 'wallet' as const, address: '0x1234567890abcdef', chain_type: 'ethereum' as const, wallet_client_type: 'privy', wallet_client: 'privy' as const, connector_type: 'embedded' as const, delegated: false, imported: false, recovery_method: 'privy' as const, verified_at: Date.now(), first_verified_at: null, latest_verified_at: null, wallet_index: 0, chain_id: '1', id: null },
+      {
+        type: 'email' as const,
+        address: 'test@example.com',
+        verified_at: Date.now(),
+        first_verified_at: null,
+        latest_verified_at: null,
+      },
+      {
+        type: 'wallet' as const,
+        address: '0x1234567890abcdef',
+        chain_type: 'ethereum' as const,
+        wallet_client_type: 'privy',
+        wallet_client: 'privy' as const,
+        connector_type: 'embedded' as const,
+        delegated: false,
+        imported: false,
+        recovery_method: 'privy' as const,
+        verified_at: Date.now(),
+        first_verified_at: null,
+        latest_verified_at: null,
+        wallet_index: 0,
+        chain_id: '1',
+        id: null,
+      },
     ],
     mfa_methods: [],
   };
@@ -110,7 +132,9 @@ describe('AuthService', () => {
       },
       $transaction: jest.fn(),
     };
-    prisma.$transaction.mockImplementation((fn: (tx: typeof prisma) => Promise<unknown>) => fn(prisma));
+    prisma.$transaction.mockImplementation((fn: (tx: typeof prisma) => Promise<unknown>) =>
+      fn(prisma),
+    );
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -223,7 +247,13 @@ describe('AuthService', () => {
         ...mockPrivyUser,
         id: 'did:privy:new123',
         linked_accounts: [
-          { type: 'email' as const, address: 'new@example.com', verified_at: Date.now(), first_verified_at: null, latest_verified_at: null },
+          {
+            type: 'email' as const,
+            address: 'new@example.com',
+            verified_at: Date.now(),
+            first_verified_at: null,
+            latest_verified_at: null,
+          },
           {
             type: 'google_oauth' as const,
             email: 'new@example.com',
@@ -302,7 +332,15 @@ describe('AuthService', () => {
         ...mockPrivyUser,
         id: 'did:privy:noemail',
         linked_accounts: [
-          { type: 'wallet' as const, address: '0xabc', chain_type: 'ethereum' as const, wallet_client: 'unknown' as const, verified_at: Date.now(), first_verified_at: null, latest_verified_at: null },
+          {
+            type: 'wallet' as const,
+            address: '0xabc',
+            chain_type: 'ethereum' as const,
+            wallet_client: 'unknown' as const,
+            verified_at: Date.now(),
+            first_verified_at: null,
+            latest_verified_at: null,
+          },
         ],
       });
 
@@ -329,8 +367,30 @@ describe('AuthService', () => {
       mockGetUser.mockResolvedValue({
         ...mockPrivyUser,
         linked_accounts: [
-          { type: 'email' as const, address: 'test@example.com', verified_at: Date.now(), first_verified_at: null, latest_verified_at: null },
-          { type: 'wallet' as const, address: '0xNEWWALLET', chain_type: 'ethereum' as const, wallet_client_type: 'privy', wallet_client: 'privy' as const, connector_type: 'embedded' as const, delegated: false, imported: false, recovery_method: 'privy' as const, verified_at: Date.now(), first_verified_at: null, latest_verified_at: null, wallet_index: 0, chain_id: '1', id: null },
+          {
+            type: 'email' as const,
+            address: 'test@example.com',
+            verified_at: Date.now(),
+            first_verified_at: null,
+            latest_verified_at: null,
+          },
+          {
+            type: 'wallet' as const,
+            address: '0xNEWWALLET',
+            chain_type: 'ethereum' as const,
+            wallet_client_type: 'privy',
+            wallet_client: 'privy' as const,
+            connector_type: 'embedded' as const,
+            delegated: false,
+            imported: false,
+            recovery_method: 'privy' as const,
+            verified_at: Date.now(),
+            first_verified_at: null,
+            latest_verified_at: null,
+            wallet_index: 0,
+            chain_id: '1',
+            id: null,
+          },
         ],
       });
 
@@ -359,7 +419,10 @@ describe('AuthService', () => {
       await expect(service.login('bad-token', ip)).rejects.toThrow(UnauthorizedException);
 
       expect(mockRedis.incr).toHaveBeenCalledWith('lockout:10.0.0.1');
-      expect(mockRedis.expire).toHaveBeenCalledWith('lockout:10.0.0.1', AuthService.LOCKOUT_DURATION_S);
+      expect(mockRedis.expire).toHaveBeenCalledWith(
+        'lockout:10.0.0.1',
+        AuthService.LOCKOUT_DURATION_S,
+      );
     });
 
     it('should set TTL only on first failure and at lockout threshold', async () => {
@@ -456,15 +519,11 @@ describe('AuthService', () => {
 
       // First 5 attempts should throw UnauthorizedException
       for (let i = 0; i < 5; i++) {
-        await expect(fallbackService.login('bad-token', ip)).rejects.toThrow(
-          UnauthorizedException,
-        );
+        await expect(fallbackService.login('bad-token', ip)).rejects.toThrow(UnauthorizedException);
       }
 
       // 6th attempt should throw AccountLockedException
-      await expect(fallbackService.login('any-token', ip)).rejects.toThrow(
-        AccountLockedException,
-      );
+      await expect(fallbackService.login('any-token', ip)).rejects.toThrow(AccountLockedException);
     });
 
     it('should clear failed attempts on successful login in in-memory mode', async () => {
@@ -473,9 +532,7 @@ describe('AuthService', () => {
 
       // Record 3 failed attempts
       for (let i = 0; i < 3; i++) {
-        await expect(fallbackService.login('bad-token', ip)).rejects.toThrow(
-          UnauthorizedException,
-        );
+        await expect(fallbackService.login('bad-token', ip)).rejects.toThrow(UnauthorizedException);
       }
 
       // Successful login clears
@@ -490,24 +547,20 @@ describe('AuthService', () => {
       // After clearing, 5 more failures needed to lock
       mockVerifyAccessToken.mockRejectedValue(new Error('Invalid token'));
       for (let i = 0; i < 4; i++) {
-        await expect(fallbackService.login('bad-token', ip)).rejects.toThrow(
-          UnauthorizedException,
-        );
+        await expect(fallbackService.login('bad-token', ip)).rejects.toThrow(UnauthorizedException);
       }
       // Still not locked (only 4 after clear)
-      await expect(fallbackService.login('bad-token', ip)).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(fallbackService.login('bad-token', ip)).rejects.toThrow(UnauthorizedException);
 
       // Now locked after 5th
-      await expect(fallbackService.login('any-token', ip)).rejects.toThrow(
-        AccountLockedException,
-      );
+      await expect(fallbackService.login('any-token', ip)).rejects.toThrow(AccountLockedException);
     });
 
     it('should not use Redis when REDIS_CLIENT is null', async () => {
       mockVerifyAccessToken.mockRejectedValue(new Error('Invalid token'));
-      await expect(fallbackService.login('bad', '10.0.0.22')).rejects.toThrow(UnauthorizedException);
+      await expect(fallbackService.login('bad', '10.0.0.22')).rejects.toThrow(
+        UnauthorizedException,
+      );
 
       // mockRedis should not have been called (it's a fresh one from beforeEach above,
       // but fallbackService was created with null Redis)
@@ -537,15 +590,11 @@ describe('AuthService', () => {
 
       // Redis fails, but in-memory fallback works
       for (let i = 0; i < 5; i++) {
-        await expect(errorService.login('bad-token', ip)).rejects.toThrow(
-          UnauthorizedException,
-        );
+        await expect(errorService.login('bad-token', ip)).rejects.toThrow(UnauthorizedException);
       }
 
       // 6th attempt locks via in-memory fallback
-      await expect(errorService.login('any-token', ip)).rejects.toThrow(
-        AccountLockedException,
-      );
+      await expect(errorService.login('any-token', ip)).rejects.toThrow(AccountLockedException);
     });
 
     it('should attempt Redis first then fall back on every call', async () => {
@@ -582,9 +631,7 @@ describe('AuthService', () => {
     it('should throw UnauthorizedException when user not found', async () => {
       prisma.user.findUnique.mockResolvedValue(null);
 
-      await expect(service.getUserById('nonexistent')).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(service.getUserById('nonexistent')).rejects.toThrow(UnauthorizedException);
     });
 
     it('should throw UnauthorizedException when user is soft-deleted', async () => {
@@ -593,9 +640,7 @@ describe('AuthService', () => {
         deletedAt: new Date(),
       });
 
-      await expect(service.getUserById('user-uuid-1')).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(service.getUserById('user-uuid-1')).rejects.toThrow(UnauthorizedException);
     });
   });
 
@@ -623,9 +668,7 @@ describe('AuthService', () => {
     it('should throw UnauthorizedException when user not found', async () => {
       prisma.user.findUnique.mockResolvedValue(null);
 
-      await expect(service.getProfile('nonexistent')).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(service.getProfile('nonexistent')).rejects.toThrow(UnauthorizedException);
     });
   });
 

@@ -26,18 +26,9 @@ const STATUS_TRANSITIONS: Record<string, string[]> = {
   CANCELLED: [],
 };
 
-const ROUND_SORTABLE_FIELDS = [
-  'createdAt',
-  'name',
-  'targetAmount',
-  'status',
-];
+const ROUND_SORTABLE_FIELDS = ['createdAt', 'name', 'targetAmount', 'status'];
 
-const COMMITMENT_SORTABLE_FIELDS = [
-  'createdAt',
-  'amount',
-  'paymentStatus',
-];
+const COMMITMENT_SORTABLE_FIELDS = ['createdAt', 'amount', 'paymentStatus'];
 
 @Injectable()
 export class FundingRoundService {
@@ -60,11 +51,7 @@ export class FundingRoundService {
    * - minimumCloseAmount (if set) must be <= targetAmount
    * - hardCap (if set) must be >= targetAmount
    */
-  async create(
-    companyId: string,
-    dto: CreateFundingRoundDto,
-    createdBy: string,
-  ) {
+  async create(companyId: string, dto: CreateFundingRoundDto, createdBy: string) {
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },
       select: { id: true, status: true },
@@ -72,11 +59,10 @@ export class FundingRoundService {
     if (!company) throw new NotFoundException('company', companyId);
 
     if (company.status !== 'ACTIVE') {
-      throw new BusinessRuleException(
-        'ROUND_COMPANY_NOT_ACTIVE',
-        'errors.round.companyNotActive',
-        { companyId, status: company.status },
-      );
+      throw new BusinessRuleException('ROUND_COMPANY_NOT_ACTIVE', 'errors.round.companyNotActive', {
+        companyId,
+        status: company.status,
+      });
     }
 
     // Validate share class belongs to company
@@ -92,27 +78,21 @@ export class FundingRoundService {
     const preMoneyValuation = new Prisma.Decimal(dto.preMoneyValuation);
 
     if (targetAmount.lte(0)) {
-      throw new BusinessRuleException(
-        'ROUND_INVALID_AMOUNT',
-        'errors.round.invalidAmount',
-        { field: 'targetAmount' },
-      );
+      throw new BusinessRuleException('ROUND_INVALID_AMOUNT', 'errors.round.invalidAmount', {
+        field: 'targetAmount',
+      });
     }
 
     if (pricePerShare.lte(0)) {
-      throw new BusinessRuleException(
-        'ROUND_INVALID_AMOUNT',
-        'errors.round.invalidAmount',
-        { field: 'pricePerShare' },
-      );
+      throw new BusinessRuleException('ROUND_INVALID_AMOUNT', 'errors.round.invalidAmount', {
+        field: 'pricePerShare',
+      });
     }
 
     if (preMoneyValuation.lte(0)) {
-      throw new BusinessRuleException(
-        'ROUND_INVALID_AMOUNT',
-        'errors.round.invalidAmount',
-        { field: 'preMoneyValuation' },
-      );
+      throw new BusinessRuleException('ROUND_INVALID_AMOUNT', 'errors.round.invalidAmount', {
+        field: 'preMoneyValuation',
+      });
     }
 
     const minimumCloseAmount = dto.minimumCloseAmount
@@ -154,9 +134,7 @@ export class FundingRoundService {
         hardCap,
         preMoneyValuation,
         pricePerShare,
-        targetCloseDate: dto.targetCloseDate
-          ? new Date(dto.targetCloseDate)
-          : null,
+        targetCloseDate: dto.targetCloseDate ? new Date(dto.targetCloseDate) : null,
         notes: dto.notes,
         createdBy,
       },
@@ -220,9 +198,7 @@ export class FundingRoundService {
     const currentAmount = aggregate._sum.amount ?? new Prisma.Decimal(0);
 
     // Compute post-money valuation
-    const postMoneyValuation = round.preMoneyValuation.add(
-      round.targetAmount,
-    );
+    const postMoneyValuation = round.preMoneyValuation.add(round.targetAmount);
 
     return {
       ...round,
@@ -235,22 +211,16 @@ export class FundingRoundService {
   /**
    * Update a funding round. Only allowed while status is DRAFT or OPEN.
    */
-  async update(
-    companyId: string,
-    roundId: string,
-    dto: UpdateFundingRoundDto,
-  ) {
+  async update(companyId: string, roundId: string, dto: UpdateFundingRoundDto) {
     const round = await this.prisma.fundingRound.findFirst({
       where: { id: roundId, companyId },
     });
     if (!round) throw new NotFoundException('round', roundId);
 
     if (round.status !== 'DRAFT' && round.status !== 'OPEN') {
-      throw new BusinessRuleException(
-        'ROUND_NOT_OPEN',
-        'errors.round.notOpen',
-        { status: round.status },
-      );
+      throw new BusinessRuleException('ROUND_NOT_OPEN', 'errors.round.notOpen', {
+        status: round.status,
+      });
     }
 
     const data: Prisma.FundingRoundUpdateInput = {};
@@ -258,19 +228,15 @@ export class FundingRoundService {
     if (dto.name !== undefined) data.name = dto.name;
     if (dto.notes !== undefined) data.notes = dto.notes;
     if (dto.targetCloseDate !== undefined) {
-      data.targetCloseDate = dto.targetCloseDate
-        ? new Date(dto.targetCloseDate)
-        : null;
+      data.targetCloseDate = dto.targetCloseDate ? new Date(dto.targetCloseDate) : null;
     }
 
     if (dto.targetAmount !== undefined) {
       const val = new Prisma.Decimal(dto.targetAmount);
       if (val.lte(0)) {
-        throw new BusinessRuleException(
-          'ROUND_INVALID_AMOUNT',
-          'errors.round.invalidAmount',
-          { field: 'targetAmount' },
-        );
+        throw new BusinessRuleException('ROUND_INVALID_AMOUNT', 'errors.round.invalidAmount', {
+          field: 'targetAmount',
+        });
       }
       data.targetAmount = val;
     }
@@ -288,11 +254,9 @@ export class FundingRoundService {
     if (dto.preMoneyValuation !== undefined) {
       const val = new Prisma.Decimal(dto.preMoneyValuation);
       if (val.lte(0)) {
-        throw new BusinessRuleException(
-          'ROUND_INVALID_AMOUNT',
-          'errors.round.invalidAmount',
-          { field: 'preMoneyValuation' },
-        );
+        throw new BusinessRuleException('ROUND_INVALID_AMOUNT', 'errors.round.invalidAmount', {
+          field: 'preMoneyValuation',
+        });
       }
       data.preMoneyValuation = val;
     }
@@ -300,11 +264,9 @@ export class FundingRoundService {
     if (dto.pricePerShare !== undefined) {
       const val = new Prisma.Decimal(dto.pricePerShare);
       if (val.lte(0)) {
-        throw new BusinessRuleException(
-          'ROUND_INVALID_AMOUNT',
-          'errors.round.invalidAmount',
-          { field: 'pricePerShare' },
-        );
+        throw new BusinessRuleException('ROUND_INVALID_AMOUNT', 'errors.round.invalidAmount', {
+          field: 'pricePerShare',
+        });
       }
       data.pricePerShare = val;
     }
@@ -352,11 +314,9 @@ export class FundingRoundService {
     if (!round) throw new NotFoundException('round', roundId);
 
     if (!STATUS_TRANSITIONS[round.status]?.includes('CANCELLED')) {
-      throw new BusinessRuleException(
-        'ROUND_ALREADY_CLOSED',
-        'errors.round.alreadyClosed',
-        { status: round.status },
-      );
+      throw new BusinessRuleException('ROUND_ALREADY_CLOSED', 'errors.round.alreadyClosed', {
+        status: round.status,
+      });
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -403,11 +363,9 @@ export class FundingRoundService {
     if (!round) throw new NotFoundException('round', roundId);
 
     if (round.status !== 'OPEN' && round.status !== 'CLOSING') {
-      throw new BusinessRuleException(
-        'ROUND_ALREADY_CLOSED',
-        'errors.round.alreadyClosed',
-        { status: round.status },
-      );
+      throw new BusinessRuleException('ROUND_ALREADY_CLOSED', 'errors.round.alreadyClosed', {
+        status: round.status,
+      });
     }
 
     // Check for unconfirmed payments
@@ -416,15 +374,10 @@ export class FundingRoundService {
     );
 
     if (nonCancelledCommitments.length === 0) {
-      throw new BusinessRuleException(
-        'ROUND_NO_COMMITMENTS',
-        'errors.round.noCommitments',
-      );
+      throw new BusinessRuleException('ROUND_NO_COMMITMENTS', 'errors.round.noCommitments');
     }
 
-    const unconfirmed = nonCancelledCommitments.filter(
-      (c) => c.paymentStatus !== 'CONFIRMED',
-    );
+    const unconfirmed = nonCancelledCommitments.filter((c) => c.paymentStatus !== 'CONFIRMED');
     if (unconfirmed.length > 0) {
       throw new BusinessRuleException(
         'ROUND_UNCONFIRMED_PAYMENTS',
@@ -443,18 +396,11 @@ export class FundingRoundService {
     );
 
     // Check minimum close amount
-    if (
-      round.minimumCloseAmount &&
-      totalCommitted.lt(round.minimumCloseAmount)
-    ) {
-      throw new BusinessRuleException(
-        'ROUND_MINIMUM_NOT_MET',
-        'errors.round.minimumNotMet',
-        {
-          minimumCloseAmount: round.minimumCloseAmount.toString(),
-          currentAmount: totalCommitted.toString(),
-        },
-      );
+    if (round.minimumCloseAmount && totalCommitted.lt(round.minimumCloseAmount)) {
+      throw new BusinessRuleException('ROUND_MINIMUM_NOT_MET', 'errors.round.minimumNotMet', {
+        minimumCloseAmount: round.minimumCloseAmount.toString(),
+        currentAmount: totalCommitted.toString(),
+      });
     }
 
     // Calculate total shares to issue
@@ -462,9 +408,9 @@ export class FundingRoundService {
 
     // Check authorized shares capacity
     if (round.shareClass.totalAuthorized) {
-      const newTotalIssued = (
-        round.shareClass.totalIssued ?? new Prisma.Decimal(0)
-      ).add(totalShares);
+      const newTotalIssued = (round.shareClass.totalIssued ?? new Prisma.Decimal(0)).add(
+        totalShares,
+      );
       if (newTotalIssued.gt(round.shareClass.totalAuthorized)) {
         throw new BusinessRuleException(
           'ROUND_EXCEEDS_AUTHORIZED',
@@ -539,9 +485,7 @@ export class FundingRoundService {
       await tx.shareClass.update({
         where: { id: round.shareClassId },
         data: {
-          totalIssued: (
-            round.shareClass.totalIssued ?? new Prisma.Decimal(0)
-          ).add(totalShares),
+          totalIssued: (round.shareClass.totalIssued ?? new Prisma.Decimal(0)).add(totalShares),
         },
       });
 
@@ -600,22 +544,16 @@ export class FundingRoundService {
    * - Amount must be positive
    * - Total commitments cannot exceed hard cap (if set)
    */
-  async addCommitment(
-    companyId: string,
-    roundId: string,
-    dto: CreateCommitmentDto,
-  ) {
+  async addCommitment(companyId: string, roundId: string, dto: CreateCommitmentDto) {
     const round = await this.prisma.fundingRound.findFirst({
       where: { id: roundId, companyId },
     });
     if (!round) throw new NotFoundException('round', roundId);
 
     if (round.status !== 'OPEN') {
-      throw new BusinessRuleException(
-        'ROUND_NOT_OPEN',
-        'errors.round.notOpen',
-        { status: round.status },
-      );
+      throw new BusinessRuleException('ROUND_NOT_OPEN', 'errors.round.notOpen', {
+        status: round.status,
+      });
     }
 
     // Validate shareholder exists in company
@@ -628,11 +566,9 @@ export class FundingRoundService {
 
     const amount = new Prisma.Decimal(dto.committedAmount);
     if (amount.lte(0)) {
-      throw new BusinessRuleException(
-        'ROUND_INVALID_AMOUNT',
-        'errors.round.invalidAmount',
-        { field: 'committedAmount' },
-      );
+      throw new BusinessRuleException('ROUND_INVALID_AMOUNT', 'errors.round.invalidAmount', {
+        field: 'committedAmount',
+      });
     }
 
     // Check for existing non-cancelled commitment
@@ -644,11 +580,9 @@ export class FundingRoundService {
       },
     });
     if (existing) {
-      throw new ConflictException(
-        'ROUND_COMMITMENT_EXISTS',
-        'errors.round.commitmentExists',
-        { shareholderId: dto.shareholderId },
-      );
+      throw new ConflictException('ROUND_COMMITMENT_EXISTS', 'errors.round.commitmentExists', {
+        shareholderId: dto.shareholderId,
+      });
     }
 
     // Check hard cap
@@ -663,15 +597,11 @@ export class FundingRoundService {
     const currentTotal = aggregate._sum.amount ?? new Prisma.Decimal(0);
 
     if (currentTotal.add(amount).gt(capToCheck)) {
-      throw new BusinessRuleException(
-        'ROUND_HARD_CAP_REACHED',
-        'errors.round.hardCapReached',
-        {
-          hardCap: capToCheck.toString(),
-          currentAmount: currentTotal.toString(),
-          requestedAmount: amount.toString(),
-        },
-      );
+      throw new BusinessRuleException('ROUND_HARD_CAP_REACHED', 'errors.round.hardCapReached', {
+        hardCap: capToCheck.toString(),
+        currentAmount: currentTotal.toString(),
+        requestedAmount: amount.toString(),
+      });
     }
 
     // Calculate shares allocated
@@ -692,11 +622,7 @@ export class FundingRoundService {
   /**
    * List commitments for a funding round.
    */
-  async findCommitments(
-    companyId: string,
-    roundId: string,
-    query: ListCommitmentsQueryDto,
-  ) {
+  async findCommitments(companyId: string, roundId: string, query: ListCommitmentsQueryDto) {
     // Verify round belongs to company
     const round = await this.prisma.fundingRound.findFirst({
       where: { id: roundId, companyId },
@@ -778,9 +704,7 @@ export class FundingRoundService {
       RECEIVED: ['CONFIRMED'],
     };
 
-    if (
-      !validTransitions[commitment.paymentStatus]?.includes(dto.paymentStatus)
-    ) {
+    if (!validTransitions[commitment.paymentStatus]?.includes(dto.paymentStatus)) {
       throw new BusinessRuleException(
         'ROUND_INVALID_PAYMENT_TRANSITION',
         'errors.round.invalidPaymentTransition',
@@ -812,11 +736,7 @@ export class FundingRoundService {
   /**
    * Cancel a specific commitment.
    */
-  async cancelCommitment(
-    companyId: string,
-    roundId: string,
-    commitmentId: string,
-  ) {
+  async cancelCommitment(companyId: string, roundId: string, commitmentId: string) {
     const round = await this.prisma.fundingRound.findFirst({
       where: { id: roundId, companyId },
       select: { id: true, status: true },
@@ -824,11 +744,9 @@ export class FundingRoundService {
     if (!round) throw new NotFoundException('round', roundId);
 
     if (round.status === 'CLOSED') {
-      throw new BusinessRuleException(
-        'ROUND_ALREADY_CLOSED',
-        'errors.round.alreadyClosed',
-        { status: round.status },
-      );
+      throw new BusinessRuleException('ROUND_ALREADY_CLOSED', 'errors.round.alreadyClosed', {
+        status: round.status,
+      });
     }
 
     const commitment = await this.prisma.roundCommitment.findFirst({
@@ -890,19 +808,12 @@ export class FundingRoundService {
       name: s.shareholder.name,
       shares: s.quantity.toString(),
       percentage: currentTotalShares.gt(0)
-        ? s.quantity
-            .mul(100)
-            .div(currentTotalShares)
-            .toDecimalPlaces(4)
-            .toString()
+        ? s.quantity.mul(100).div(currentTotalShares).toDecimalPlaces(4).toString()
         : '0',
     }));
 
     // Calculate new shares from commitments
-    const newSharesByInvestor: Record<
-      string,
-      { name: string; shares: Prisma.Decimal }
-    > = {};
+    const newSharesByInvestor: Record<string, { name: string; shares: Prisma.Decimal }> = {};
 
     for (const commitment of round.commitments) {
       const shares = commitment.amount.div(round.pricePerShare);
@@ -920,17 +831,12 @@ export class FundingRoundService {
     const afterTotalShares = currentTotalShares.add(totalNewShares);
 
     // Build after-round snapshot (merge existing + new)
-    const afterMap = new Map<
-      string,
-      { name: string; shares: Prisma.Decimal }
-    >();
+    const afterMap = new Map<string, { name: string; shares: Prisma.Decimal }>();
 
     for (const s of currentShareholdings) {
       const key = s.shareholderId;
       if (afterMap.has(key)) {
-        afterMap.get(key)!.shares = afterMap
-          .get(key)!
-          .shares.add(s.quantity);
+        afterMap.get(key)!.shares = afterMap.get(key)!.shares.add(s.quantity);
       } else {
         afterMap.set(key, {
           name: s.shareholder.name,
@@ -950,31 +856,20 @@ export class FundingRoundService {
       }
     }
 
-    const afterShareholders = Array.from(afterMap.entries()).map(
-      ([shId, data]) => ({
-        shareholderId: shId,
-        name: data.name,
-        shares: data.shares.toString(),
-        percentage: afterTotalShares.gt(0)
-          ? data.shares
-              .mul(100)
-              .div(afterTotalShares)
-              .toDecimalPlaces(4)
-              .toString()
-          : '0',
-      }),
-    );
+    const afterShareholders = Array.from(afterMap.entries()).map(([shId, data]) => ({
+      shareholderId: shId,
+      name: data.name,
+      shares: data.shares.toString(),
+      percentage: afterTotalShares.gt(0)
+        ? data.shares.mul(100).div(afterTotalShares).toDecimalPlaces(4).toString()
+        : '0',
+    }));
 
     // Compute dilution per existing shareholder
-    const dilution: Record<
-      string,
-      { before: string; after: string; change: string }
-    > = {};
+    const dilution: Record<string, { before: string; after: string; change: string }> = {};
 
     for (const before of beforeShareholders) {
-      const after = afterShareholders.find(
-        (a) => a.shareholderId === before.shareholderId,
-      );
+      const after = afterShareholders.find((a) => a.shareholderId === before.shareholderId);
       if (after) {
         const beforePct = new Prisma.Decimal(before.percentage);
         const afterPct = new Prisma.Decimal(after.percentage);
