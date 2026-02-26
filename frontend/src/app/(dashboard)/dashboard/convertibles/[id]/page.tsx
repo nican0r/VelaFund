@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import {
   ArrowLeft,
+  ArrowRightLeft,
   FileText,
   DollarSign,
   TrendingUp,
@@ -25,7 +26,10 @@ import {
   useConvertibleScenarios,
   useCancelConvertible,
   useRedeemConvertible,
+  useConvertConvertible,
 } from '@/hooks/use-convertibles';
+import { useFundingRounds } from '@/hooks/use-funding-rounds';
+import { useShareClasses } from '@/hooks/use-share-classes';
 import type {
   ConvertibleInstrument,
   InterestBreakdown,
@@ -342,6 +346,208 @@ function RedeemDialog({
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               t('detail.redeemButton')
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConvertDialog({
+  open,
+  onClose,
+  onConfirm,
+  loading,
+  title,
+  description,
+  companyId,
+  instrument,
+  t,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: (data: {
+    fundingRoundId: string;
+    roundValuation: string;
+    shareClassId: string;
+    notes?: string;
+  }) => void;
+  loading: boolean;
+  title: string;
+  description: string;
+  companyId: string;
+  instrument: ConvertibleInstrument;
+  t: (key: string) => string;
+}) {
+  const [fundingRoundId, setFundingRoundId] = useState('');
+  const [roundValuation, setRoundValuation] = useState('');
+  const [shareClassId, setShareClassId] = useState(
+    instrument.targetShareClassId || '',
+  );
+  const [notes, setNotes] = useState('');
+
+  const { data: roundsData, isLoading: roundsLoading } = useFundingRounds(
+    open ? companyId : undefined,
+    { limit: 100 },
+  );
+  const { data: classesData, isLoading: classesLoading } = useShareClasses(
+    open ? companyId : undefined,
+    { limit: 100 },
+  );
+
+  const rounds = roundsData?.data ?? [];
+  const classes = classesData?.data ?? [];
+
+  // Auto-fill valuation when a round is selected
+  const handleRoundChange = (id: string) => {
+    setFundingRoundId(id);
+    const selected = rounds.find((r) => r.id === id);
+    if (selected?.preMoneyValuation) {
+      setRoundValuation(selected.preMoneyValuation);
+    }
+  };
+
+  const canSubmit =
+    fundingRoundId &&
+    roundValuation &&
+    parseFloat(roundValuation) > 0 &&
+    shareClassId;
+
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div
+        className="fixed inset-0 bg-navy-900/50"
+        onClick={onClose}
+        data-testid="convert-dialog-overlay"
+      />
+      <div className="relative z-50 w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
+        <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+        <p className="mt-2 text-sm text-gray-500">{description}</p>
+        <div className="mt-4 space-y-4">
+          {/* Funding Round Dropdown */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              {t('detail.convertFundingRound')}
+            </label>
+            {roundsLoading ? (
+              <div className="mt-1 h-10 animate-pulse rounded-md bg-gray-100" />
+            ) : rounds.length === 0 ? (
+              <p className="mt-1 text-sm text-gray-500">
+                {t('detail.convertNoRounds')}
+              </p>
+            ) : (
+              <select
+                value={fundingRoundId}
+                onChange={(e) => handleRoundChange(e.target.value)}
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-ocean-600 focus:outline-none focus:ring-1 focus:ring-ocean-600"
+                data-testid="convert-funding-round-select"
+              >
+                <option value="">
+                  {t('detail.convertFundingRoundPlaceholder')}
+                </option>
+                {rounds.map((round) => (
+                  <option key={round.id} value={round.id}>
+                    {round.name} ({round.roundType.replace(/_/g, ' ')})
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* Round Valuation */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              {t('detail.convertValuation')}
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={roundValuation}
+              onChange={(e) => setRoundValuation(e.target.value)}
+              placeholder={t('detail.convertValuationPlaceholder')}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-ocean-600 focus:outline-none focus:ring-1 focus:ring-ocean-600"
+              data-testid="convert-valuation-input"
+            />
+          </div>
+
+          {/* Share Class Dropdown */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              {t('detail.convertShareClass')}
+            </label>
+            {classesLoading ? (
+              <div className="mt-1 h-10 animate-pulse rounded-md bg-gray-100" />
+            ) : classes.length === 0 ? (
+              <p className="mt-1 text-sm text-gray-500">
+                {t('detail.convertNoShareClasses')}
+              </p>
+            ) : (
+              <select
+                value={shareClassId}
+                onChange={(e) => setShareClassId(e.target.value)}
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-ocean-600 focus:outline-none focus:ring-1 focus:ring-ocean-600"
+                data-testid="convert-share-class-select"
+              >
+                <option value="">
+                  {t('detail.convertShareClassPlaceholder')}
+                </option>
+                {classes.map((sc) => (
+                  <option key={sc.id} value={sc.id}>
+                    {sc.className} ({sc.type.replace(/_/g, ' ')})
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700">
+              {t('detail.convertNotes')}
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder={t('detail.convertNotesPlaceholder')}
+              rows={2}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-ocean-600 focus:outline-none focus:ring-1 focus:ring-ocean-600"
+              data-testid="convert-notes-input"
+            />
+          </div>
+        </div>
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            disabled={loading}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              onConfirm({
+                fundingRoundId,
+                roundValuation,
+                shareClassId,
+                notes: notes || undefined,
+              })
+            }
+            disabled={loading || !canSubmit}
+            className={cn(
+              'rounded-md bg-ocean-600 px-4 py-2 text-sm font-medium text-white hover:bg-ocean-500',
+              (loading || !canSubmit) && 'opacity-60',
+            )}
+            data-testid="convert-confirm-button"
+          >
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              t('detail.convertButton')
             )}
           </button>
         </div>
@@ -916,15 +1122,19 @@ export default function ConvertibleDetailPage() {
 
   const cancelMutation = useCancelConvertible(companyId);
   const redeemMutation = useRedeemConvertible(companyId);
+  const convertMutation = useConvertConvertible(companyId);
 
   const [activeTab, setActiveTab] = useState<
     'details' | 'interest' | 'scenarios'
   >('details');
   const [dialogType, setDialogType] = useState<
-    'cancel' | 'redeem' | null
+    'cancel' | 'redeem' | 'convert' | null
   >(null);
 
-  const actionLoading = cancelMutation.isPending || redeemMutation.isPending;
+  const actionLoading =
+    cancelMutation.isPending ||
+    redeemMutation.isPending ||
+    convertMutation.isPending;
 
   // ── Guards ─────────────────────────────────────────────────────────
 
@@ -995,6 +1205,7 @@ export default function ConvertibleDetailPage() {
   const canCancel =
     instrument.status === 'OUTSTANDING' || instrument.status === 'MATURED';
   const canRedeem = canCancel;
+  const canConvert = canCancel;
 
   const typeBadge = getTypeBadge(instrument.instrumentType, t);
   const statusBadge = getStatusBadge(instrument.status, t);
@@ -1015,6 +1226,23 @@ export default function ConvertibleDetailPage() {
       await redeemMutation.mutateAsync({
         convertibleId,
         data: { redemptionAmount: amount, paymentReference: ref },
+      });
+      setDialogType(null);
+    } catch (err) {
+      showErrorToast(err);
+    }
+  };
+
+  const handleConvert = async (data: {
+    fundingRoundId: string;
+    roundValuation: string;
+    shareClassId: string;
+    notes?: string;
+  }) => {
+    try {
+      await convertMutation.mutateAsync({
+        convertibleId,
+        data,
       });
       setDialogType(null);
     } catch (err) {
@@ -1072,6 +1300,18 @@ export default function ConvertibleDetailPage() {
           )}
         </div>
         <div className="flex flex-wrap gap-2">
+          {canConvert && (
+            <button
+              type="button"
+              onClick={() => setDialogType('convert')}
+              disabled={actionLoading}
+              className="inline-flex items-center gap-1.5 rounded-md bg-ocean-600 px-3 py-2 text-sm font-medium text-white hover:bg-ocean-500"
+              data-testid="convert-button"
+            >
+              <ArrowRightLeft className="h-4 w-4" />
+              {t('detail.convertButton')}
+            </button>
+          )}
           {canRedeem && (
             <button
               type="button"
@@ -1208,6 +1448,19 @@ export default function ConvertibleDetailPage() {
         description={t('detail.redeemDescription')}
         t={t}
       />
+      {companyId && instrument && (
+        <ConvertDialog
+          open={dialogType === 'convert'}
+          onClose={() => setDialogType(null)}
+          onConfirm={handleConvert}
+          loading={convertMutation.isPending}
+          title={t('detail.convertTitle')}
+          description={t('detail.convertDescription')}
+          companyId={companyId}
+          instrument={instrument}
+          t={t}
+        />
+      )}
     </div>
   );
 }

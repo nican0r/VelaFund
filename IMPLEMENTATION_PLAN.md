@@ -1,6 +1,6 @@
-# Navia MVP — Implementation Plan v60.0
+# Navia MVP — Implementation Plan v61.0
 
-> **Generated**: 2026-02-26 | **Tests**: 2723 passing (1717 backend + 1006 frontend) | **Backend modules**: 22 of 23 built
+> **Generated**: 2026-02-26 | **Tests**: 2734 passing (1717 backend + 1017 frontend) | **Backend modules**: 22 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -632,7 +632,7 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 - [x] Create instrument form (4 Brazilian types) — DONE: 2-step wizard Details→Review, 4 instrument type cards (Mútuo Conversível, Investimento Anjo, Misto, MAIS) with icons/colors, investor dropdown from shareholders, financial details (principal amount, interest rate % with decimal conversion, interest type simple/compound, issue/maturity dates), conversion terms section (discount rate, valuation cap, qualified financing threshold, conversion trigger dropdown, target share class, auto-convert + MFN clause checkboxes), notes textarea, client-side validation (required fields, positive numbers, rate bounds 0-100, maturityDate > issueDate), review step with conditional optional fields + formatted currency/percentage/date, interest/discount rate percentage→decimal conversion in payload, useCreateConvertible mutation hook, convertibles.form.* i18n namespace ~55 keys PT-BR+EN, 42 component tests
 - [x] Instrument detail: interest breakdown, conversion scenarios — DONE: 3-tab layout (Details/Interest/Scenarios), Details tab with summary card (investor, type+status badges, principal, interest rate/type, issue/maturity dates, notes) + conversion terms card (discount rate, valuation cap, qualified financing threshold, conversion trigger, target share class, auto-convert, MFN clause) + conversion data card for CONVERTED status (conversion amount, price, shares issued, method used) + metadata sidebar (createdAt, convertedAt/redeemedAt/cancelledAt), Interest tab with 3 summary stats (days elapsed, accrued interest, total value) + interest breakdown table with period/days/accrued/cumulative columns, Scenarios tab with conversion amount + cap trigger info + scenarios table (valuation, round price, discount method, cap method, best method badge, shares, ownership, dilution), 4 stat cards (Principal active/highlighted, Accrued Interest, Total Value, Days to Maturity), maturity warning banner (cream for ≤30 days, red for expired), Cancel + Redeem action buttons with confirmation dialogs for OUTSTANDING/MATURED statuses, RedeemDialog with amount + payment reference inputs, useConvertible+useConvertibleInterest+useConvertibleScenarios+useCancelConvertible+useRedeemConvertible hooks, convertibles.detail.* i18n namespace ~80 keys PT-BR+EN, 56 component tests
 - [ ] Conversion scenario simulator (slider for valuation → shows resulting shares)
-- [ ] Convert action with confirmation
+- [x] Convert action with confirmation — DONE: ConvertDialog component with funding round dropdown (auto-fetched via useFundingRounds), pre-money valuation input (auto-filled from selected round's preMoneyValuation), share class dropdown (auto-fetched via useShareClasses, pre-selected from instrument's targetShareClassId), notes textarea, form validation (requires funding round + valuation > 0 + share class), useConvertConvertible mutation hook wired, Convert button (primary ocean-600 variant) visible for OUTSTANDING/MATURED statuses, error toast on failure, conditional data fetching (only fetches when dialog opens), convertibles.detail.convert* i18n namespace ~13 keys PT-BR+EN, 11 new component tests (67 total detail page tests)
 
 ### 4.11 Settings Pages
 
@@ -655,7 +655,7 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 - [x] Mark read/unread actions — DONE: Mark as read per notification, mark all as read batch action, toast notifications on success
 - [x] Sidebar navigation updated — DONE: Added Notifications nav item to sidebar.tsx and mobile-sidebar.tsx (with Bell icon). Mobile sidebar synced with desktop sidebar (added Share Classes, Funding Rounds, Convertibles items that were missing).
 
-### 4.14 Frontend Testing (31 test suites, 951 tests)
+### 4.14 Frontend Testing (33 test suites, 1017 tests)
 
 - [x] Configure Jest + React Testing Library (infrastructure is in place: jest.config.ts, jest.setup.ts, dependencies installed)
 - [ ] Tests for all auth flows (login, logout, protected routes)

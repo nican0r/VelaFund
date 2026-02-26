@@ -92,6 +92,19 @@ const convertiblesTranslations: Record<string, string> = {
   'detail.scenariosConversionAmount': 'Valor para Conversão',
   'detail.scenariosCapTrigger': 'Cap é melhor acima de',
   'detail.scenariosEmpty': 'Nenhum cenário disponível.',
+  'detail.convertButton': 'Converter',
+  'detail.convertTitle': 'Converter Instrumento',
+  'detail.convertDescription': 'Converta este instrumento em ações da empresa.',
+  'detail.convertFundingRound': 'Rodada de Investimento',
+  'detail.convertFundingRoundPlaceholder': 'Selecione uma rodada',
+  'detail.convertValuation': 'Valuation Pré-Money (R$)',
+  'detail.convertValuationPlaceholder': '0,00',
+  'detail.convertShareClass': 'Classe de Ações',
+  'detail.convertShareClassPlaceholder': 'Selecione uma classe',
+  'detail.convertNotes': 'Observações',
+  'detail.convertNotesPlaceholder': 'Observações sobre a conversão...',
+  'detail.convertNoRounds': 'Nenhuma rodada disponível.',
+  'detail.convertNoShareClasses': 'Nenhuma classe de ações disponível.',
   'detail.yes': 'Sim',
   'detail.no': 'Não',
   'detail.expired': 'Vencido',
@@ -293,12 +306,88 @@ const mockRedeemMutation = {
   isPending: false,
 };
 
+const mockConvertMutation = {
+  mutateAsync: jest.fn().mockResolvedValue({}),
+  isPending: false,
+};
+
 jest.mock('@/hooks/use-convertibles', () => ({
   useConvertible: (...args: unknown[]) => mockUseConvertible(...args),
   useConvertibleInterest: (...args: unknown[]) => mockUseConvertibleInterest(...args),
   useConvertibleScenarios: (...args: unknown[]) => mockUseConvertibleScenarios(...args),
   useCancelConvertible: () => mockCancelMutation,
   useRedeemConvertible: () => mockRedeemMutation,
+  useConvertConvertible: () => mockConvertMutation,
+}));
+
+// --- Funding rounds & share classes mocks (for ConvertDialog) ---
+
+const mockFundingRounds = [
+  {
+    id: 'round-1',
+    name: 'Seed Round',
+    roundType: 'SEED',
+    status: 'OPEN',
+    preMoneyValuation: '5000000',
+    targetAmount: '1000000',
+    raisedAmount: '500000',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'round-2',
+    name: 'Series A',
+    roundType: 'SERIES_A',
+    status: 'OPEN',
+    preMoneyValuation: '20000000',
+    targetAmount: '5000000',
+    raisedAmount: '0',
+    createdAt: '2026-02-01T00:00:00.000Z',
+    updatedAt: '2026-02-01T00:00:00.000Z',
+  },
+];
+
+const mockShareClasses = [
+  {
+    id: 'sc-1',
+    className: 'Ordinária',
+    type: 'COMMON_SHARES',
+    votesPerShare: 1,
+    totalAuthorized: '1000000',
+    totalIssued: '500000',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  },
+  {
+    id: 'sc-2',
+    className: 'Preferencial A',
+    type: 'PREFERRED_SHARES',
+    votesPerShare: 0,
+    totalAuthorized: '500000',
+    totalIssued: '100000',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  },
+];
+
+let mockUseFundingRounds = jest.fn(() => ({
+  data: { data: mockFundingRounds, meta: { total: 2, page: 1, limit: 100, totalPages: 1 } },
+  isLoading: false,
+  error: null,
+}));
+
+let mockUseShareClasses = jest.fn(() => ({
+  data: { data: mockShareClasses, meta: { total: 2, page: 1, limit: 100, totalPages: 1 } },
+  isLoading: false,
+  error: null,
+}));
+
+jest.mock('@/hooks/use-funding-rounds', () => ({
+  useFundingRounds: (...args: unknown[]) => mockUseFundingRounds(...args),
+}));
+
+jest.mock('@/hooks/use-share-classes', () => ({
+  useShareClasses: (...args: unknown[]) => mockUseShareClasses(...args),
 }));
 
 jest.mock('@/lib/utils', () => ({
@@ -342,6 +431,18 @@ describe('ConvertibleDetailPage', () => {
     mockCancelMutation.isPending = false;
     mockRedeemMutation.mutateAsync.mockResolvedValue({});
     mockRedeemMutation.isPending = false;
+    mockConvertMutation.mutateAsync.mockResolvedValue({});
+    mockConvertMutation.isPending = false;
+    mockUseFundingRounds = jest.fn(() => ({
+      data: { data: mockFundingRounds, meta: { total: 2, page: 1, limit: 100, totalPages: 1 } },
+      isLoading: false,
+      error: null,
+    }));
+    mockUseShareClasses = jest.fn(() => ({
+      data: { data: mockShareClasses, meta: { total: 2, page: 1, limit: 100, totalPages: 1 } },
+      isLoading: false,
+      error: null,
+    }));
   });
 
   // --- State tests ---
@@ -519,13 +620,15 @@ describe('ConvertibleDetailPage', () => {
 
   // --- Action buttons by status ---
 
-  it('shows Cancel and Redeem buttons for OUTSTANDING status', () => {
+  it('shows Cancel, Redeem, and Convert buttons for OUTSTANDING status', () => {
     renderPage();
     expect(screen.getByText('Cancelar Instrumento')).toBeInTheDocument();
     expect(screen.getByText('Resgatar')).toBeInTheDocument();
+    expect(screen.getByTestId('convert-button')).toBeInTheDocument();
+    expect(screen.getByText('Converter')).toBeInTheDocument();
   });
 
-  it('shows Cancel and Redeem buttons for MATURED status', () => {
+  it('shows Cancel, Redeem, and Convert buttons for MATURED status', () => {
     const maturedDate = new Date();
     maturedDate.setFullYear(maturedDate.getFullYear() - 1);
     mockUseConvertible = jest.fn(() => ({
@@ -536,6 +639,7 @@ describe('ConvertibleDetailPage', () => {
     renderPage();
     expect(screen.getByText('Cancelar Instrumento')).toBeInTheDocument();
     expect(screen.getByText('Resgatar')).toBeInTheDocument();
+    expect(screen.getByTestId('convert-button')).toBeInTheDocument();
   });
 
   it('does not show action buttons for CONVERTED status', () => {
@@ -557,6 +661,7 @@ describe('ConvertibleDetailPage', () => {
     renderPage();
     expect(screen.queryByText('Cancelar Instrumento')).not.toBeInTheDocument();
     expect(screen.queryByText('Resgatar')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('convert-button')).not.toBeInTheDocument();
   });
 
   it('does not show action buttons for CANCELLED status', () => {
@@ -572,6 +677,7 @@ describe('ConvertibleDetailPage', () => {
     renderPage();
     expect(screen.queryByText('Cancelar Instrumento')).not.toBeInTheDocument();
     expect(screen.queryByText('Resgatar')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('convert-button')).not.toBeInTheDocument();
   });
 
   it('does not show action buttons for REDEEMED status', () => {
@@ -587,6 +693,7 @@ describe('ConvertibleDetailPage', () => {
     renderPage();
     expect(screen.queryByText('Cancelar Instrumento')).not.toBeInTheDocument();
     expect(screen.queryByText('Resgatar')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('convert-button')).not.toBeInTheDocument();
   });
 
   // --- Cancel action flow ---
@@ -698,6 +805,199 @@ describe('ConvertibleDetailPage', () => {
     await user.click(dialogRedeemButtons[dialogRedeemButtons.length - 1]);
 
     expect(mockShowErrorToast).toHaveBeenCalledWith(mockError);
+  });
+
+  // --- Convert action flow ---
+
+  it('opens convert dialog with form fields', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByTestId('convert-button'));
+
+    expect(screen.getByText('Converter Instrumento')).toBeInTheDocument();
+    expect(screen.getByText('Converta este instrumento em ações da empresa.')).toBeInTheDocument();
+    expect(screen.getByText('Rodada de Investimento')).toBeInTheDocument();
+    expect(screen.getByText('Valuation Pré-Money (R$)')).toBeInTheDocument();
+    expect(screen.getByText('Classe de Ações')).toBeInTheDocument();
+    // "Observações" appears in both Details tab notes section and ConvertDialog
+    expect(screen.getAllByText('Observações').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('renders funding round options in convert dialog', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByTestId('convert-button'));
+
+    const roundSelect = screen.getByTestId('convert-funding-round-select');
+    expect(roundSelect).toBeInTheDocument();
+    // Options include placeholder + 2 rounds
+    const options = roundSelect.querySelectorAll('option');
+    expect(options.length).toBe(3);
+    expect(options[1].textContent).toContain('Seed Round');
+    expect(options[2].textContent).toContain('Series A');
+  });
+
+  it('renders share class options in convert dialog with target pre-selected', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByTestId('convert-button'));
+
+    const classSelect = screen.getByTestId('convert-share-class-select') as HTMLSelectElement;
+    expect(classSelect).toBeInTheDocument();
+    // Target share class (sc-1) should be pre-selected
+    expect(classSelect.value).toBe('sc-1');
+    const options = classSelect.querySelectorAll('option');
+    expect(options.length).toBe(3); // placeholder + 2 classes
+    expect(options[1].textContent).toContain('Ordinária');
+    expect(options[2].textContent).toContain('Preferencial A');
+  });
+
+  it('auto-fills valuation when a funding round is selected', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByTestId('convert-button'));
+
+    const roundSelect = screen.getByTestId('convert-funding-round-select');
+    await user.selectOptions(roundSelect, 'round-1');
+
+    const valuationInput = screen.getByTestId('convert-valuation-input') as HTMLInputElement;
+    expect(valuationInput.value).toBe('5000000');
+  });
+
+  it('disables confirm button when required fields are empty', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByTestId('convert-button'));
+
+    const confirmBtn = screen.getByTestId('convert-confirm-button');
+    // No funding round selected yet, so button should be disabled
+    expect(confirmBtn).toBeDisabled();
+  });
+
+  it('calls convert mutation with correct data on confirm', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByTestId('convert-button'));
+
+    // Select funding round
+    const roundSelect = screen.getByTestId('convert-funding-round-select');
+    await user.selectOptions(roundSelect, 'round-1');
+
+    // Valuation should be auto-filled to 5000000
+    // Share class is pre-selected to sc-1
+
+    // Add notes
+    const notesInput = screen.getByTestId('convert-notes-input');
+    await user.type(notesInput, 'Converting at seed round');
+
+    // Click confirm
+    const confirmBtn = screen.getByTestId('convert-confirm-button');
+    expect(confirmBtn).not.toBeDisabled();
+    await user.click(confirmBtn);
+
+    expect(mockConvertMutation.mutateAsync).toHaveBeenCalledWith({
+      convertibleId: 'conv-123',
+      data: {
+        fundingRoundId: 'round-1',
+        roundValuation: '5000000',
+        shareClassId: 'sc-1',
+        notes: 'Converting at seed round',
+      },
+    });
+  });
+
+  it('calls convert mutation without notes when notes field is empty', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByTestId('convert-button'));
+
+    // Select funding round and manually type valuation
+    const roundSelect = screen.getByTestId('convert-funding-round-select');
+    await user.selectOptions(roundSelect, 'round-2');
+
+    // Valuation auto-filled to 20000000
+    // Share class pre-selected to sc-1
+
+    const confirmBtn = screen.getByTestId('convert-confirm-button');
+    await user.click(confirmBtn);
+
+    expect(mockConvertMutation.mutateAsync).toHaveBeenCalledWith({
+      convertibleId: 'conv-123',
+      data: {
+        fundingRoundId: 'round-2',
+        roundValuation: '20000000',
+        shareClassId: 'sc-1',
+        notes: undefined,
+      },
+    });
+  });
+
+  it('calls showErrorToast when convert mutation fails', async () => {
+    const user = userEvent.setup();
+    const mockError = new Error('Convert failed');
+    mockConvertMutation.mutateAsync.mockRejectedValueOnce(mockError);
+    renderPage();
+
+    await user.click(screen.getByTestId('convert-button'));
+
+    const roundSelect = screen.getByTestId('convert-funding-round-select');
+    await user.selectOptions(roundSelect, 'round-1');
+
+    const confirmBtn = screen.getByTestId('convert-confirm-button');
+    await user.click(confirmBtn);
+
+    expect(mockShowErrorToast).toHaveBeenCalledWith(mockError);
+  });
+
+  it('closes convert dialog when cancel button is clicked', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByTestId('convert-button'));
+    expect(screen.getByText('Converter Instrumento')).toBeInTheDocument();
+
+    // Click the "Cancelar" dismiss button inside the dialog
+    // There are multiple "Cancelar" texts (one is "Cancelar Instrumento" button), get the dialog dismiss one
+    const cancelButtons = screen.getAllByText('Cancelar');
+    // The dismiss button inside ConvertDialog is the last one with text "Cancelar" (not "Cancelar Instrumento")
+    await user.click(cancelButtons[cancelButtons.length - 1]);
+
+    expect(screen.queryByText('Converta este instrumento em ações da empresa.')).not.toBeInTheDocument();
+  });
+
+  it('shows no rounds message when funding rounds are empty', async () => {
+    mockUseFundingRounds = jest.fn(() => ({
+      data: { data: [], meta: { total: 0, page: 1, limit: 100, totalPages: 0 } },
+      isLoading: false,
+      error: null,
+    }));
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByTestId('convert-button'));
+
+    expect(screen.getByText('Nenhuma rodada disponível.')).toBeInTheDocument();
+  });
+
+  it('shows no share classes message when share classes are empty', async () => {
+    mockUseShareClasses = jest.fn(() => ({
+      data: { data: [], meta: { total: 0, page: 1, limit: 100, totalPages: 0 } },
+      isLoading: false,
+      error: null,
+    }));
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByTestId('convert-button'));
+
+    expect(screen.getByText('Nenhuma classe de ações disponível.')).toBeInTheDocument();
   });
 
   // --- CONVERTED status shows conversion data ---

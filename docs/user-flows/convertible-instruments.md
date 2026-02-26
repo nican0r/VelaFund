@@ -140,7 +140,10 @@ PRECONDITION: Convertible is OUTSTANDING or MATURED. Target share class exists w
 ACTOR: ADMIN
 TRIGGER: ADMIN clicks "Convert" and provides funding round details
 
-1. [UI] ADMIN fills in: funding round ID, round valuation (pre-money), target share class, optional notes
+1. [UI] ADMIN clicks "Converter" button (visible for OUTSTANDING/MATURED instruments)
+1a. [UI] ConvertDialog opens with: funding round dropdown (fetched via useFundingRounds), valuation input (auto-filled from selected round's preMoneyValuation), share class dropdown (fetched via useShareClasses, pre-selected from instrument's targetShareClassId), notes textarea
+1b. [UI] ADMIN selects funding round, verifies/adjusts valuation, selects share class, optionally adds notes
+1c. [UI] ADMIN clicks "Converter" confirm button (disabled until funding round + valuation > 0 + share class selected)
 2. [Frontend] Sends POST /api/v1/companies/:companyId/convertibles/:convertibleId/convert
 3. [Backend] Validates authentication and authorization (role: ADMIN)
 4. [Backend] Finds convertible by ID and companyId
