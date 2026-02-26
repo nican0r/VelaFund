@@ -52,6 +52,7 @@ pnpm prisma:studio                 # Open Prisma Studio GUI
 # Scheduled tasks (@nestjs/schedule)
 # ScheduleModule.forRoot() in ScheduledTasksModule (imported by AppModule)
 # Daily audit hash chain at 00:05 UTC
+# DLQ monitoring every 5 minutes (all Bull queues)
 ```
 
 ### Frontend (@navia/frontend)
