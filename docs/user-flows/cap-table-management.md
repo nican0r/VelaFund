@@ -80,6 +80,23 @@ ADMIN/FINANCE clicks "Export OCT"
   │     └─ [company not found] ─→ 404 Not Found
   │
   └─ [LEGAL role] ─→ 404 Not Found (no export permission)
+
+
+Cap-table-mutating event completes (SYSTEM, automatic)
+  │
+  ├─ [transaction confirmed] ─→ recalculateOwnership → auto-snapshot (fire-and-forget)
+  │
+  ├─ [funding round closed] ─→ recalculateOwnership → auto-snapshot (fire-and-forget)
+  │
+  ├─ [option exercise confirmed] ─→ recalculateOwnership → auto-snapshot (fire-and-forget)
+  │
+  ├─ [convertible converted] ─→ recalculateOwnership → auto-snapshot (fire-and-forget)
+  │
+  ├─ [ownership recalculation succeeds] ─→ All ownershipPct + votingPowerPct updated atomically
+  │
+  ├─ [snapshot creation succeeds] ─→ CapTableSnapshot created with trigger type + SHA-256 hash
+  │
+  └─ [snapshot creation fails] ─→ Error logged, original operation NOT affected
 ```
 
 ---
@@ -243,6 +260,43 @@ POSTCONDITION: OCT export file downloaded
 SIDE EFFECTS: None (audit logging CAP_TABLE_EXPORTED will be added later)
 ```
 
+### System Path: Automatic Snapshot After Cap Table Mutation
+
+```
+PRECONDITION: A cap-table-mutating event has just completed successfully
+ACTOR: SYSTEM (triggered automatically, not by user action)
+TRIGGER: One of the following events completes:
+  - Transaction confirmed (ISSUANCE, TRANSFER, CONVERSION, CANCELLATION, SPLIT)
+  - Funding round closed (atomic share issuance for all confirmed commitments)
+  - Option exercise confirmed (shares issued to grantee)
+  - Convertible instrument converted (shares issued to holder)
+
+1. [Backend] Cap table mutation completes within the primary $transaction
+2. [Backend] Calls recalculateOwnership(companyId) to update all Shareholding records:
+   - Recalculates ownershipPct for every Shareholding (quantity / totalShares * 100, 6 decimal places)
+   - Recalculates votingPowerPct for every Shareholding (votingPower / totalVotingPower * 100)
+   - Updates are performed within the same $transaction to ensure atomicity
+3. [Backend] After the $transaction commits, fires auto-snapshot creation (fire-and-forget):
+   - Captures the current cap table state via getCurrentCapTable
+   - Computes SHA-256 state hash from sorted entries
+   - Creates a CapTableSnapshot record with trigger = event type (e.g., 'transaction_confirmed', 'round_closed', 'exercise_confirmed', 'convertible_converted')
+   - If snapshot creation fails, the error is logged but does NOT affect the original operation
+4. [Backend] Returns the response for the original operation (confirm, close, etc.)
+   - The caller is never blocked or impacted by snapshot failures
+
+POSTCONDITION: Ownership percentages are up to date across all Shareholdings; a new CapTableSnapshot record exists (unless snapshot creation failed, in which case the mutation itself still succeeded)
+SIDE EFFECTS: CapTableSnapshot created asynchronously, audit log event for the original operation
+```
+
+**Key design decisions**:
+- **Ownership recalculation is synchronous**: It runs inside the same `$transaction` as the cap table mutation to guarantee consistency. After any mutation, all `ownershipPct` and `votingPowerPct` values reflect the new state.
+- **Snapshot creation is fire-and-forget**: It runs after the transaction commits. If it fails (e.g., database timeout), the original operation still succeeds and the user sees a success response. The failure is logged for investigation.
+- **Triggering events**: The four mutation categories that trigger auto-snapshots are:
+  1. **Transaction confirmed** -- via `TransactionService.confirm()` for all 5 transaction types
+  2. **Funding round closed** -- via `FundingRoundService.closeRound()` which atomically issues shares for all confirmed commitments
+  3. **Option exercise confirmed** -- via `OptionPlanService.confirmExercise()` which issues shares to the grantee
+  4. **Convertible converted** -- via `ConvertibleService.convert()` which issues shares to the instrument holder
+
 ### Error Path: Create Snapshot for Non-Active Company
 
 ```
@@ -293,6 +347,8 @@ SIDE EFFECTS: None
 | S3 | Date before creation | date < company.createdAt | Error | 422 CAP_NO_DATA_FOR_DATE |
 | S4 | No snapshot found | No snapshot on/before date | Error | 404 Not Found |
 | E1 | Export role | Role is LEGAL (no export) | Error | 404 Not Found |
+| A1 | Auto-snapshot trigger | Cap-table-mutating event completes | System | recalculateOwnership + auto-snapshot |
+| A2 | Snapshot creation | Snapshot write fails | System | Error logged, original operation unaffected |
 
 ---
 
@@ -300,9 +356,10 @@ SIDE EFFECTS: None
 
 | Entity | Field | Before | After | Trigger |
 |--------|-------|--------|-------|---------|
-| CapTableSnapshot | — | — | Created (id, data, stateHash) | Manual snapshot creation |
-| Shareholding | ownershipPct | Old value | Recalculated value | recalculateOwnership called |
-| Shareholding | votingPowerPct | Old value | Recalculated value | recalculateOwnership called |
+| CapTableSnapshot | — | — | Created (id, data, stateHash, trigger='manual') | Manual snapshot creation |
+| CapTableSnapshot | — | — | Created (id, data, stateHash, trigger=event type) | Auto-snapshot after transaction confirmed, round closed, exercise confirmed, or convertible converted |
+| Shareholding | ownershipPct | Old value | Recalculated value | recalculateOwnership called (synchronous, inside $transaction) |
+| Shareholding | votingPowerPct | Old value | Recalculated value | recalculateOwnership called (synchronous, inside $transaction) |
 
 ---
 

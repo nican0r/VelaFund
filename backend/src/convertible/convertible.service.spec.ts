@@ -2,12 +2,18 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Prisma } from '@prisma/client';
 import { ConvertibleService } from './convertible.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { CapTableService } from '../cap-table/cap-table.service';
 import {
   NotFoundException,
   BusinessRuleException,
   ConflictException,
 } from '../common/filters/app-exception';
 import { InstrumentTypeDto } from './dto/create-convertible.dto';
+
+const mockCapTableService = {
+  recalculateOwnership: jest.fn(),
+  createAutoSnapshot: jest.fn(),
+};
 
 const mockPrisma = {
   company: { findFirst: jest.fn() },
@@ -70,6 +76,7 @@ describe('ConvertibleService', () => {
       providers: [
         ConvertibleService,
         { provide: PrismaService, useValue: mockPrisma },
+        { provide: CapTableService, useValue: mockCapTableService },
       ],
     }).compile();
 
@@ -741,6 +748,12 @@ describe('ConvertibleService', () => {
         }),
       );
       expect(result.transactionId).toBe('txn-uuid-1');
+      expect(mockCapTableService.recalculateOwnership).toHaveBeenCalledWith(companyId);
+      expect(mockCapTableService.createAutoSnapshot).toHaveBeenCalledWith(
+        companyId,
+        'convertible_converted',
+        expect.stringContaining('converted'),
+      );
     });
 
     it('should throw if convertible not found', async () => {

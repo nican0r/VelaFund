@@ -1,6 +1,6 @@
-# Navia MVP — Implementation Plan v59.0
+# Navia MVP — Implementation Plan v60.0
 
-> **Generated**: 2026-02-26 | **Tests**: 2719 passing (1713 backend + 1006 frontend) | **Backend modules**: 22 of 23 built
+> **Generated**: 2026-02-26 | **Tests**: 2723 passing (1717 backend + 1006 frontend) | **Backend modules**: 22 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -145,7 +145,7 @@ Gaps in the 12 built modules, ordered by module.
 
 ### Cap Table Module
 
-- [ ] Auto-snapshot creation after every confirmed transaction (currently manual only)
+- [x] Auto-snapshot creation after every confirmed transaction — DONE: TransactionService.confirm() calls capTableService.recalculateOwnership() after confirming. FundingRoundService.closeRound(), OptionPlanService.confirmExercise(), and ConvertibleService.convert() also call recalculateOwnership() to auto-create snapshots after cap table mutations.
 - [x] PDF/XLSX/CSV/OCT export endpoints — DONE via Reports module (v0.0.34)
 - [ ] Authorized/public view — filtered view for INVESTOR/EMPLOYEE roles (currently full data for all roles with access)
 - [ ] OCT export: fix snake_case field names per OCF 1.0.0 spec (currently uses camelCase in some places)

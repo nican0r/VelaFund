@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Prisma } from '@prisma/client';
 import { OptionPlanService } from './option-plan.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { CapTableService } from '../cap-table/cap-table.service';
 import {
   NotFoundException,
   BusinessRuleException,
@@ -97,8 +98,14 @@ function mockExercise(overrides: Record<string, unknown> = {}) {
 describe('OptionPlanService', () => {
   let service: OptionPlanService;
   let prisma: any;
+  let capTableService: any;
 
   beforeEach(async () => {
+    capTableService = {
+      recalculateOwnership: jest.fn(),
+      createAutoSnapshot: jest.fn(),
+    };
+
     prisma = {
       company: { findFirst: jest.fn() },
       shareClass: { findFirst: jest.fn(), update: jest.fn() },
@@ -138,6 +145,7 @@ describe('OptionPlanService', () => {
       providers: [
         OptionPlanService,
         { provide: PrismaService, useValue: prisma },
+        { provide: CapTableService, useValue: capTableService },
       ],
     }).compile();
 
@@ -1098,6 +1106,13 @@ describe('OptionPlanService', () => {
             totalIssued: { increment: new Prisma.Decimal('2000') },
           }),
         }),
+      );
+      // Cap table recalculated and snapshot created
+      expect(capTableService.recalculateOwnership).toHaveBeenCalledWith('company-1');
+      expect(capTableService.createAutoSnapshot).toHaveBeenCalledWith(
+        'company-1',
+        'exercise_confirmed',
+        expect.stringContaining('exercise confirmed'),
       );
     });
 

@@ -13,6 +13,7 @@ import { ListConvertiblesQueryDto } from './dto/list-convertibles-query.dto';
 import { RedeemConvertibleDto } from './dto/redeem-convertible.dto';
 import { CancelConvertibleDto } from './dto/cancel-convertible.dto';
 import { ConvertConvertibleDto } from './dto/convert-convertible.dto';
+import { CapTableService } from '../cap-table/cap-table.service';
 
 // Valid status transitions per the state machine
 const STATUS_TRANSITIONS: Record<string, string[]> = {
@@ -34,7 +35,10 @@ const SORTABLE_FIELDS = [
 export class ConvertibleService {
   private readonly logger = new Logger(ConvertibleService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly capTableService: CapTableService,
+  ) {}
 
   // ─── CREATE ──────────────────────────────────────────────────────────
 
@@ -797,7 +801,7 @@ export class ConvertibleService {
     };
 
     // Execute atomically
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // 1. Create ISSUANCE transaction
       const transaction = await tx.transaction.create({
         data: {
@@ -880,6 +884,18 @@ export class ConvertibleService {
         conversionData,
       };
     });
+
+    // Recalculate ownership percentages after cap table mutation
+    await this.capTableService.recalculateOwnership(companyId);
+
+    // Create automatic cap table snapshot (fire-and-forget)
+    await this.capTableService.createAutoSnapshot(
+      companyId,
+      'convertible_converted',
+      `Convertible instrument converted`,
+    );
+
+    return result;
   }
 
   // ─── HELPERS ─────────────────────────────────────────────────────────

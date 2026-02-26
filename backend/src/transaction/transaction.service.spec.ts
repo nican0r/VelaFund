@@ -116,6 +116,7 @@ describe('TransactionService', () => {
 
     capTableService = {
       recalculateOwnership: jest.fn(),
+      createAutoSnapshot: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -667,6 +668,11 @@ describe('TransactionService', () => {
 
       expect(prisma.$transaction).toHaveBeenCalled();
       expect(capTableService.recalculateOwnership).toHaveBeenCalledWith('comp-1');
+      expect(capTableService.createAutoSnapshot).toHaveBeenCalledWith(
+        'comp-1',
+        'transaction_confirmed',
+        expect.stringContaining('ISSUANCE'),
+      );
       expect(result.status).toBe('CONFIRMED');
     });
 

@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { Prisma } from '@prisma/client';
 import { FundingRoundService } from './funding-round.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { CapTableService } from '../cap-table/cap-table.service';
 import {
   NotFoundException,
   BusinessRuleException,
@@ -89,8 +90,14 @@ function mockShareholder(overrides: Record<string, unknown> = {}) {
 describe('FundingRoundService', () => {
   let service: FundingRoundService;
   let prisma: any;
+  let capTableService: any;
 
   beforeEach(async () => {
+    capTableService = {
+      recalculateOwnership: jest.fn(),
+      createAutoSnapshot: jest.fn(),
+    };
+
     prisma = {
       company: {
         findUnique: jest.fn(),
@@ -137,6 +144,7 @@ describe('FundingRoundService', () => {
       providers: [
         FundingRoundService,
         { provide: PrismaService, useValue: prisma },
+        { provide: CapTableService, useValue: capTableService },
       ],
     }).compile();
 
@@ -486,6 +494,12 @@ describe('FundingRoundService', () => {
       expect(result.totalRaised).toBe('3000000');
       expect(result.totalSharesIssued).toBe('300000');
       expect(result.investorCount).toBe(2);
+      expect(capTableService.recalculateOwnership).toHaveBeenCalledWith('company-1');
+      expect(capTableService.createAutoSnapshot).toHaveBeenCalledWith(
+        'company-1',
+        'funding_round_closed',
+        expect.stringContaining('Seed Round'),
+      );
     });
 
     it('should throw if round is DRAFT', async () => {

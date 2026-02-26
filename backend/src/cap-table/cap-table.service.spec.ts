@@ -647,6 +647,86 @@ describe('CapTableService', () => {
     });
   });
 
+  // ─── createAutoSnapshot ────────────────────────────────────────
+
+  describe('createAutoSnapshot', () => {
+    it('should create a snapshot with the given trigger', async () => {
+      prisma.company.findUnique.mockResolvedValue(mockCompany);
+      prisma.shareholding.findMany.mockResolvedValue(allMockShareholdings);
+      prisma.capTableSnapshot.create.mockResolvedValue({
+        id: 'auto-snap-1',
+        companyId: 'comp-1',
+        snapshotDate: new Date(),
+        data: {},
+        notes: 'Transaction ISSUANCE confirmed',
+        stateHash: 'autohash',
+        createdAt: new Date(),
+      });
+
+      await service.createAutoSnapshot(
+        'comp-1',
+        'transaction_confirmed',
+        'Transaction ISSUANCE confirmed',
+      );
+
+      expect(prisma.capTableSnapshot.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            companyId: 'comp-1',
+            data: expect.objectContaining({
+              trigger: 'transaction_confirmed',
+            }),
+            notes: 'Transaction ISSUANCE confirmed',
+            stateHash: expect.any(String),
+          }),
+        }),
+      );
+    });
+
+    it('should not throw when snapshot creation fails (fire-and-forget)', async () => {
+      prisma.company.findUnique.mockResolvedValue(mockCompany);
+      prisma.shareholding.findMany.mockResolvedValue(allMockShareholdings);
+      prisma.capTableSnapshot.create.mockRejectedValue(new Error('DB error'));
+
+      // Should resolve without throwing
+      await expect(
+        service.createAutoSnapshot('comp-1', 'transaction_confirmed'),
+      ).resolves.toBeUndefined();
+    });
+
+    it('should not throw when getCurrentCapTable fails', async () => {
+      prisma.company.findUnique.mockResolvedValue(null); // Will cause NotFoundException inside
+
+      await expect(
+        service.createAutoSnapshot('comp-1', 'funding_round_closed'),
+      ).resolves.toBeUndefined();
+    });
+
+    it('should use null notes when none provided', async () => {
+      prisma.company.findUnique.mockResolvedValue(mockCompany);
+      prisma.shareholding.findMany.mockResolvedValue([]);
+      prisma.capTableSnapshot.create.mockResolvedValue({
+        id: 'auto-snap-2',
+        companyId: 'comp-1',
+        snapshotDate: new Date(),
+        data: {},
+        notes: null,
+        stateHash: 'hash',
+        createdAt: new Date(),
+      });
+
+      await service.createAutoSnapshot('comp-1', 'exercise_confirmed');
+
+      expect(prisma.capTableSnapshot.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            notes: null,
+          }),
+        }),
+      );
+    });
+  });
+
   // ─── exportOct ─────────────────────────────────────────────────
 
   describe('exportOct', () => {

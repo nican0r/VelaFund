@@ -460,6 +460,51 @@ export class CapTableService {
   }
 
   /**
+   * Create an automatic cap table snapshot after a cap-table-mutating event.
+   *
+   * Called internally after transaction confirmation, funding round close,
+   * option exercise confirmation, or convertible conversion.
+   * Unlike manual snapshots, this does not validate company status (the
+   * calling service already validated it) and sets trigger to the event type.
+   *
+   * Fire-and-forget: errors are logged but never propagated to the caller.
+   */
+  async createAutoSnapshot(
+    companyId: string,
+    trigger: string,
+    notes?: string,
+  ): Promise<void> {
+    try {
+      const capTableData = await this.getCurrentCapTable(companyId, {
+        view: 'current',
+      });
+
+      const stateHash = this.computeStateHash(capTableData);
+
+      const snapshot = await this.prisma.capTableSnapshot.create({
+        data: {
+          companyId,
+          snapshotDate: new Date(),
+          data: {
+            ...capTableData,
+            trigger,
+          },
+          notes: notes ?? null,
+          stateHash,
+        },
+      });
+
+      this.logger.log(
+        `Auto-snapshot ${snapshot.id} created for company ${companyId} (trigger: ${trigger})`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to create auto-snapshot for company ${companyId} (trigger: ${trigger}): ${error.message}`,
+      );
+    }
+  }
+
+  /**
    * Export cap table in OCT (Open Cap Table) JSON format.
    *
    * Maps Brazilian share class types to OCT standard stock class types.

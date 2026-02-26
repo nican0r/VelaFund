@@ -131,6 +131,9 @@ ADMIN clicks "Confirm" on SUBMITTED transaction
   |     |     |- [CANCELLATION] -> Deduct from source, decrement ShareClass.totalIssued
   |     |     |- [CONVERSION] -> Cancel from source class, issue to target class
   |     |     └- [SPLIT] -> Multiply all Shareholding quantities and ShareClass totals by ratio
+  |     |     |
+  |     |     └- recalculateOwnership (synchronous, in $transaction)
+  |     |           -> auto-snapshot creation (fire-and-forget, after commit)
   |     |
   |     └- [cap table mutation fails] -> Status: SUBMITTED -> FAILED
   |
@@ -401,15 +404,22 @@ TRIGGER: User clicks "Confirm & Execute" on a SUBMITTED issuance transaction
     - If Shareholding exists: increment quantity
     - If not: create new Shareholding record
 11. [Backend] Increments ShareClass.totalIssued by quantity
-12. [Backend] Sets Transaction status = CONFIRMED
-13. [Backend] Commits database transaction
+12. [Backend] Calls recalculateOwnership(companyId) within the same $transaction:
+    - Recalculates ownershipPct for all Shareholdings (quantity / totalShares * 100)
+    - Recalculates votingPowerPct for all Shareholdings
+13. [Backend] Sets Transaction status = CONFIRMED
+14. [Backend] Commits database transaction
     -> IF mutation fails: set status = FAILED, return error
-14. [Backend] Returns 200 with confirmed transaction
-15. [UI] Shows success toast: "Transaction confirmed. Cap table updated."
-16. [UI] Transaction detail refreshes with CONFIRMED status badge
+15. [Backend] Triggers auto-snapshot creation (fire-and-forget):
+    - Captures current cap table state, computes SHA-256 hash
+    - Creates CapTableSnapshot with trigger = 'transaction_confirmed'
+    - If snapshot creation fails, the error is logged but does NOT block the response
+16. [Backend] Returns 200 with confirmed transaction
+17. [UI] Shows success toast: "Transaction confirmed. Cap table updated."
+18. [UI] Transaction detail refreshes with CONFIRMED status badge
 
-POSTCONDITION: Transaction status = CONFIRMED, Shareholding upserted, ShareClass.totalIssued incremented
-SIDE EFFECTS: Audit log (future: SHARES_ISSUED), cap table snapshot triggered asynchronously
+POSTCONDITION: Transaction status = CONFIRMED, Shareholding upserted, ShareClass.totalIssued incremented, all ownership percentages recalculated, auto-snapshot created
+SIDE EFFECTS: Audit log (SHARES_ISSUED via @Auditable), ownership recalculation (synchronous), cap table auto-snapshot (fire-and-forget)
 ```
 
 ### Happy Path: Confirm and Execute Transfer
@@ -431,14 +441,21 @@ TRIGGER: User clicks "Confirm & Execute" on a SUBMITTED transfer transaction
 8. [Backend] Upserts Shareholding for toShareholder in the share class:
    - If Shareholding exists: increment quantity
    - If not: create new Shareholding record
-9. [Backend] Sets Transaction status = CONFIRMED
-10. [Backend] Commits database transaction
+9. [Backend] Calls recalculateOwnership(companyId) within the same $transaction:
+   - Recalculates ownershipPct for all Shareholdings (quantity / totalShares * 100)
+   - Recalculates votingPowerPct for all Shareholdings
+10. [Backend] Sets Transaction status = CONFIRMED
+11. [Backend] Commits database transaction
     -> IF mutation fails: set status = FAILED, return error
-11. [Backend] Returns 200 with confirmed transaction
-12. [UI] Shows success toast: "Transfer confirmed. Cap table updated."
+12. [Backend] Triggers auto-snapshot creation (fire-and-forget):
+    - Captures current cap table state, computes SHA-256 hash
+    - Creates CapTableSnapshot with trigger = 'transaction_confirmed'
+    - If snapshot creation fails, the error is logged but does NOT block the response
+13. [Backend] Returns 200 with confirmed transaction
+14. [UI] Shows success toast: "Transfer confirmed. Cap table updated."
 
-POSTCONDITION: Transaction status = CONFIRMED, source Shareholding deducted, destination Shareholding upserted
-SIDE EFFECTS: Audit log (future: SHARES_TRANSFERRED), cap table snapshot triggered asynchronously
+POSTCONDITION: Transaction status = CONFIRMED, source Shareholding deducted, destination Shareholding upserted, all ownership percentages recalculated, auto-snapshot created
+SIDE EFFECTS: Audit log (SHARES_TRANSFERRED via @Auditable), ownership recalculation (synchronous), cap table auto-snapshot (fire-and-forget)
 ```
 
 ### Happy Path: Confirm and Execute Cancellation
@@ -458,14 +475,21 @@ TRIGGER: User clicks "Confirm & Execute" on a SUBMITTED cancellation transaction
    - If remaining quantity = 0: deletes the Shareholding record
    - If remaining quantity > 0: updates the Shareholding record
 8. [Backend] Decrements ShareClass.totalIssued by quantity
-9. [Backend] Sets Transaction status = CONFIRMED
-10. [Backend] Commits database transaction
+9. [Backend] Calls recalculateOwnership(companyId) within the same $transaction:
+   - Recalculates ownershipPct for all Shareholdings (quantity / totalShares * 100)
+   - Recalculates votingPowerPct for all Shareholdings
+10. [Backend] Sets Transaction status = CONFIRMED
+11. [Backend] Commits database transaction
     -> IF mutation fails: set status = FAILED, return error
-11. [Backend] Returns 200 with confirmed transaction
-12. [UI] Shows success toast: "Shares cancelled. Cap table updated."
+12. [Backend] Triggers auto-snapshot creation (fire-and-forget):
+    - Captures current cap table state, computes SHA-256 hash
+    - Creates CapTableSnapshot with trigger = 'transaction_confirmed'
+    - If snapshot creation fails, the error is logged but does NOT block the response
+13. [Backend] Returns 200 with confirmed transaction
+14. [UI] Shows success toast: "Shares cancelled. Cap table updated."
 
-POSTCONDITION: Transaction status = CONFIRMED, source Shareholding deducted, ShareClass.totalIssued decremented
-SIDE EFFECTS: Audit log (future: SHARES_CANCELLED), cap table snapshot triggered asynchronously
+POSTCONDITION: Transaction status = CONFIRMED, source Shareholding deducted, ShareClass.totalIssued decremented, all ownership percentages recalculated, auto-snapshot created
+SIDE EFFECTS: Audit log (SHARES_CANCELLED via @Auditable), ownership recalculation (synchronous), cap table auto-snapshot (fire-and-forget)
 ```
 
 ### Happy Path: Confirm and Execute Conversion
@@ -488,14 +512,21 @@ TRIGGER: User clicks "Confirm & Execute" on a SUBMITTED conversion transaction
 8. [Backend] Issues to target class:
    - Upserts Shareholding for shareholder in target share class
    - Increments target ShareClass.totalIssued by quantity
-9. [Backend] Sets Transaction status = CONFIRMED
-10. [Backend] Commits database transaction
+9. [Backend] Calls recalculateOwnership(companyId) within the same $transaction:
+   - Recalculates ownershipPct for all Shareholdings (quantity / totalShares * 100)
+   - Recalculates votingPowerPct for all Shareholdings
+10. [Backend] Sets Transaction status = CONFIRMED
+11. [Backend] Commits database transaction
     -> IF mutation fails: set status = FAILED, return error
-11. [Backend] Returns 200 with confirmed transaction
-12. [UI] Shows success toast: "Conversion confirmed. Cap table updated."
+12. [Backend] Triggers auto-snapshot creation (fire-and-forget):
+    - Captures current cap table state, computes SHA-256 hash
+    - Creates CapTableSnapshot with trigger = 'transaction_confirmed'
+    - If snapshot creation fails, the error is logged but does NOT block the response
+13. [Backend] Returns 200 with confirmed transaction
+14. [UI] Shows success toast: "Conversion confirmed. Cap table updated."
 
-POSTCONDITION: Transaction status = CONFIRMED, source class Shareholding deducted and totalIssued decremented, target class Shareholding upserted and totalIssued incremented
-SIDE EFFECTS: Audit log (future: SHARES_CONVERTED), cap table snapshot triggered asynchronously
+POSTCONDITION: Transaction status = CONFIRMED, source class Shareholding deducted and totalIssued decremented, target class Shareholding upserted and totalIssued incremented, all ownership percentages recalculated, auto-snapshot created
+SIDE EFFECTS: Audit log (SHARES_CONVERTED via @Auditable), ownership recalculation (synchronous), cap table auto-snapshot (fire-and-forget)
 ```
 
 ### Happy Path: Confirm and Execute Split
@@ -515,14 +546,22 @@ TRIGGER: User clicks "Confirm & Execute" on a SUBMITTED split transaction
 8. [Backend] Multiplies each Shareholding.quantity by splitRatio
 9. [Backend] Multiplies ShareClass.totalIssued by splitRatio
 10. [Backend] Multiplies ShareClass.totalAuthorized by splitRatio
-11. [Backend] Sets Transaction status = CONFIRMED
-12. [Backend] Commits database transaction
+11. [Backend] Calls recalculateOwnership(companyId) within the same $transaction:
+    - Recalculates ownershipPct for all Shareholdings (quantity / totalShares * 100)
+    - Recalculates votingPowerPct for all Shareholdings
+    - Note: for a split within a single class, relative ownership % may stay the same, but absolute voting power changes
+12. [Backend] Sets Transaction status = CONFIRMED
+13. [Backend] Commits database transaction
     -> IF mutation fails: set status = FAILED, return error
-13. [Backend] Returns 200 with confirmed transaction
-14. [UI] Shows success toast: "Split applied. Cap table updated."
+14. [Backend] Triggers auto-snapshot creation (fire-and-forget):
+    - Captures current cap table state, computes SHA-256 hash
+    - Creates CapTableSnapshot with trigger = 'transaction_confirmed'
+    - If snapshot creation fails, the error is logged but does NOT block the response
+15. [Backend] Returns 200 with confirmed transaction
+16. [UI] Shows success toast: "Split applied. Cap table updated."
 
-POSTCONDITION: Transaction status = CONFIRMED, all Shareholding quantities and ShareClass totals multiplied by splitRatio
-SIDE EFFECTS: Audit log (future: SHARES_ISSUED for split), cap table snapshot triggered asynchronously
+POSTCONDITION: Transaction status = CONFIRMED, all Shareholding quantities and ShareClass totals multiplied by splitRatio, all ownership percentages recalculated, auto-snapshot created
+SIDE EFFECTS: Audit log (SHARES_ISSUED via @Auditable for split), ownership recalculation (synchronous), cap table auto-snapshot (fire-and-forget)
 ```
 
 ### Happy Path: Cancel Transaction
@@ -806,6 +845,9 @@ SIDE EFFECTS: None
 | Shareholding | quantity | X | X * ratio | SPLIT confirmed (all in class) |
 | ShareClass | totalIssued | X | X * ratio | SPLIT confirmed |
 | ShareClass | totalAuthorized | X | X * ratio | SPLIT confirmed |
+| Shareholding | ownershipPct | Old % | Recalculated % | recalculateOwnership after any confirm |
+| Shareholding | votingPowerPct | Old % | Recalculated % | recalculateOwnership after any confirm |
+| CapTableSnapshot | -- | -- | Created (trigger='transaction_confirmed') | Auto-snapshot after any confirm (fire-and-forget) |
 
 ---
 

@@ -19,6 +19,7 @@ import {
 } from './dto/list-option-plans-query.dto';
 import { ListExerciseRequestsQueryDto } from './dto/list-exercise-requests-query.dto';
 import { randomBytes } from 'crypto';
+import { CapTableService } from '../cap-table/cap-table.service';
 
 const PLAN_SORTABLE_FIELDS = ['createdAt', 'name', 'totalPoolSize', 'status'];
 const GRANT_SORTABLE_FIELDS = ['grantDate', 'createdAt', 'quantity', 'status', 'employeeName'];
@@ -28,7 +29,10 @@ const EXERCISE_SORTABLE_FIELDS = ['createdAt', 'status', 'quantity'];
 export class OptionPlanService {
   private readonly logger = new Logger(OptionPlanService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly capTableService: CapTableService,
+  ) {}
 
   // ========================
   // Option Plan CRUD
@@ -685,7 +689,7 @@ export class OptionPlanService {
     const shareClassId = exercise.grant.plan.shareClassId;
     const shareholderId = exercise.grant.shareholderId;
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // 1. Update exercise request to COMPLETED (no blockchain, so skip SHARES_ISSUED)
       const confirmed = await tx.optionExerciseRequest.update({
         where: { id: exerciseId },
@@ -748,6 +752,18 @@ export class OptionPlanService {
 
       return confirmed;
     });
+
+    // Recalculate ownership percentages after cap table mutation
+    await this.capTableService.recalculateOwnership(companyId);
+
+    // Create automatic cap table snapshot (fire-and-forget)
+    await this.capTableService.createAutoSnapshot(
+      companyId,
+      'exercise_confirmed',
+      `Option exercise confirmed`,
+    );
+
+    return result;
   }
 
   async cancelExercise(companyId: string, exerciseId: string, userId: string) {

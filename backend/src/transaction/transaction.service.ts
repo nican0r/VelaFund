@@ -337,6 +337,13 @@ export class TransactionService {
     // Recalculate ownership percentages after cap table mutation
     await this.capTableService.recalculateOwnership(companyId);
 
+    // Create automatic cap table snapshot (fire-and-forget)
+    await this.capTableService.createAutoSnapshot(
+      companyId,
+      'transaction_confirmed',
+      `Transaction ${transaction.type} confirmed`,
+    );
+
     this.logger.log(
       `Transaction ${transactionId} confirmed in company ${companyId}`,
     );
