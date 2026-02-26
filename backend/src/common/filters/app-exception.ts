@@ -130,6 +130,10 @@ const MESSAGES: Record<string, Record<string, string>> = {
     'pt-BR': 'Proporção de desdobramento é obrigatória para split',
     en: 'Split ratio is required for split transactions',
   },
+  'errors.txn.invalidSplitRatio': {
+    'pt-BR': 'Razão de desdobramento resultaria em ações fracionárias',
+    en: 'Split ratio would result in fractional shares',
+  },
   'errors.txn.lockupActive': {
     'pt-BR': 'Ações estão em período de lock-up e não podem ser transferidas',
     en: 'Shares are in a lock-up period and cannot be transferred',

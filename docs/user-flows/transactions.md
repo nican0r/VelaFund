@@ -549,25 +549,29 @@ TRIGGER: User clicks "Confirm & Execute" on a SUBMITTED split transaction
 5. [Backend] Validates auth (ADMIN), transaction exists, status = SUBMITTED
 6. [Backend] Begins database transaction ($transaction)
 7. [Backend] Finds all Shareholding records for the share class
-8. [Backend] Multiplies each Shareholding.quantity by splitRatio
-9. [Backend] Multiplies ShareClass.totalIssued by splitRatio
-10. [Backend] Multiplies ShareClass.totalAuthorized by splitRatio
-11. [Backend] Calls recalculateOwnership(companyId) within the same $transaction:
-    - Recalculates ownershipPct for all Shareholdings (quantity / totalShares * 100)
-    - Recalculates votingPowerPct for all Shareholdings
-    - Note: for a split within a single class, relative ownership % may stay the same, but absolute voting power changes
+8. [Backend] Validates fractional shares: for each holding, quantity * splitRatio must produce a whole number
+   -> IF any holding would produce fractional shares: return 422 TXN_INVALID_SPLIT_RATIO with details (shareholdingId, currentQuantity, resultingQuantity)
+9. [Backend] Multiplies each Shareholding.quantity by splitRatio
+10. [Backend] Multiplies ShareClass.totalIssued by splitRatio
+11. [Backend] Multiplies ShareClass.totalAuthorized by splitRatio
 12. [Backend] Sets Transaction status = CONFIRMED
 13. [Backend] Commits database transaction
     -> IF mutation fails: set status = FAILED, return error
-14. [Backend] Triggers auto-snapshot creation (fire-and-forget):
+14. [Backend] Calls recalculateOwnership(companyId) (synchronous, outside $transaction)
+    - Recalculates ownershipPct for all Shareholdings (quantity / totalShares * 100)
+    - Recalculates votingPowerPct for all Shareholdings
+    - Note: for a split within a single class, relative ownership % may stay the same, but absolute voting power changes
+15. [Backend] Triggers auto-snapshot creation (fire-and-forget):
     - Captures current cap table state, computes SHA-256 hash
     - Creates CapTableSnapshot with trigger = 'transaction_confirmed'
     - If snapshot creation fails, the error is logged but does NOT block the response
-15. [Backend] Returns 200 with confirmed transaction
-16. [UI] Shows success toast: "Split applied. Cap table updated."
+16. [Backend] Fires type-specific audit log (fire-and-forget): SHARES_SPLIT via programmatic AuditLogService.log()
+17. [Backend] Sends SHARES_SPLIT notification to all ADMIN members (fire-and-forget)
+18. [Backend] Returns 200 with confirmed transaction
+19. [UI] Shows success toast: "Split applied. Cap table updated."
 
 POSTCONDITION: Transaction status = CONFIRMED, all Shareholding quantities and ShareClass totals multiplied by splitRatio, all ownership percentages recalculated, auto-snapshot created
-SIDE EFFECTS: Audit log (SHARES_ISSUED via @Auditable for split), ownership recalculation (synchronous), cap table auto-snapshot (fire-and-forget)
+SIDE EFFECTS: Audit log (SHARES_SPLIT via programmatic AuditLogService.log()), notification (SHARES_SPLIT to ADMINs), ownership recalculation (synchronous), cap table auto-snapshot (fire-and-forget)
 ```
 
 ### Happy Path: Cancel Transaction
@@ -801,6 +805,7 @@ SIDE EFFECTS: None
 | 16 | Sufficient balance | TRANSFER/CANCELLATION/CONVERSION insufficient holdings | Error | 422 TXN_INSUFFICIENT_SHARES |
 | 8 | To-share-class required | CONVERSION without toShareClassId | Error | 422 TXN_TO_SHARE_CLASS_REQUIRED |
 | 7 | Split ratio required | SPLIT without valid splitRatio | Error | 422 TXN_SPLIT_RATIO_REQUIRED |
+| 8 | Fractional shares | SPLIT ratio produces non-integer shares | Error | 422 TXN_INVALID_SPLIT_RATIO |
 | 6 | Submit status | Transaction not DRAFT | Error | 422 TXN_INVALID_STATUS_TRANSITION |
 | 7 | Board approval | requiresBoardApproval = true | Alt | Status -> PENDING_APPROVAL |
 | 7 | Board approval | requiresBoardApproval = false | Happy | Status -> SUBMITTED |

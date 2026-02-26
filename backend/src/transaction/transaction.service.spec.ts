@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { TransactionService } from './transaction.service';
 import { CapTableService } from '../cap-table/cap-table.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditLogService } from '../audit-log/audit-log.service';
 import { NotFoundException, BusinessRuleException } from '../common/filters/app-exception';
 import { CreateTransactionDto, TransactionTypeDto } from './dto/create-transaction.dto';
 import { Prisma } from '@prisma/client';
@@ -98,10 +99,13 @@ describe('TransactionService', () => {
   let service: TransactionService;
   let prisma: any;
   let capTableService: any;
+  let notificationService: any;
+  let auditLogService: any;
 
   beforeEach(async () => {
     prisma = {
       company: { findUnique: jest.fn() },
+      companyMember: { findMany: jest.fn().mockResolvedValue([]) },
       shareClass: { findFirst: jest.fn(), findUnique: jest.fn(), update: jest.fn(), count: jest.fn() },
       shareholder: { findFirst: jest.fn() },
       shareholding: {
@@ -127,12 +131,16 @@ describe('TransactionService', () => {
       createAutoSnapshot: jest.fn(),
     };
 
+    notificationService = { create: jest.fn() };
+    auditLogService = { log: jest.fn().mockResolvedValue(undefined) };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         TransactionService,
         { provide: PrismaService, useValue: prisma },
         { provide: CapTableService, useValue: capTableService },
-        { provide: NotificationService, useValue: { create: jest.fn() } },
+        { provide: NotificationService, useValue: notificationService },
+        { provide: AuditLogService, useValue: auditLogService },
       ],
     }).compile();
 
@@ -1096,6 +1104,444 @@ describe('TransactionService', () => {
       prisma.transaction.findFirst.mockResolvedValue(null);
 
       await expect(service.submit('comp-1', 'txn-999')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  // =========================================================================
+  // SPLIT creation
+  // =========================================================================
+
+  describe('create — SPLIT', () => {
+    it('should create a SPLIT transaction with splitRatio in notes', async () => {
+      const dto: CreateTransactionDto = {
+        type: TransactionTypeDto.SPLIT,
+        shareClassId: 'sc-1',
+        quantity: '1', // placeholder for splits
+        splitRatio: '2',
+      };
+
+      prisma.company.findUnique.mockResolvedValue(mockCompany);
+      prisma.shareClass.findFirst.mockResolvedValue(mockShareClass);
+      prisma.transaction.create.mockResolvedValue(
+        mockTransaction({
+          type: 'SPLIT',
+          notes: JSON.stringify({ splitRatio: '2' }),
+        }),
+      );
+
+      const result = await service.create('comp-1', dto, 'user-1');
+
+      expect(result.type).toBe('SPLIT');
+      expect(prisma.transaction.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            type: 'SPLIT',
+            notes: expect.stringContaining('splitRatio'),
+          }),
+        }),
+      );
+    });
+
+    it('should throw if SPLIT without splitRatio', async () => {
+      const dto: CreateTransactionDto = {
+        type: TransactionTypeDto.SPLIT,
+        shareClassId: 'sc-1',
+        quantity: '1',
+      };
+
+      prisma.company.findUnique.mockResolvedValue(mockCompany);
+      prisma.shareClass.findFirst.mockResolvedValue(mockShareClass);
+
+      await expect(service.create('comp-1', dto, 'user-1')).rejects.toThrow(BusinessRuleException);
+    });
+  });
+
+  // =========================================================================
+  // confirm() — SPLIT execution
+  // =========================================================================
+
+  describe('confirm — SPLIT', () => {
+    const splitTxn = (ratio: string) =>
+      mockTransaction({
+        type: 'SPLIT',
+        status: 'SUBMITTED',
+        notes: JSON.stringify({ splitRatio: ratio }),
+        shareClass: {
+          id: 'sc-1',
+          totalIssued: new Prisma.Decimal('50000'),
+          totalAuthorized: new Prisma.Decimal('100000'),
+        },
+      });
+
+    const confirmedSplitTxn = (ratio: string) => ({
+      ...splitTxn(ratio),
+      status: 'CONFIRMED',
+      confirmedAt: new Date(),
+      blockchainTransactions: [],
+      fromShareholder: null,
+      toShareholder: { id: 'sh-1', name: 'João Silva', type: 'FOUNDER' },
+      shareClass: { id: 'sc-1', className: 'Quotas Ordinárias', type: 'QUOTA' },
+    });
+
+    function setupSplitConfirm(ratio: string, holdings: any[], shareClassOverride?: any) {
+      prisma.transaction.findFirst
+        .mockResolvedValueOnce(splitTxn(ratio))
+        .mockResolvedValueOnce(confirmedSplitTxn(ratio));
+      prisma.$transaction.mockImplementation(async (fn: any) => fn(prisma));
+      prisma.shareholding.findMany.mockResolvedValue(holdings);
+      prisma.shareholding.update.mockResolvedValue({});
+      prisma.shareClass.findUnique.mockResolvedValue(
+        shareClassOverride ?? {
+          id: 'sc-1',
+          totalIssued: new Prisma.Decimal('50000'),
+          totalAuthorized: new Prisma.Decimal('100000'),
+        },
+      );
+      prisma.shareClass.update.mockResolvedValue({});
+      prisma.transaction.update.mockResolvedValue({});
+      capTableService.recalculateOwnership.mockResolvedValue(undefined);
+      capTableService.createAutoSnapshot.mockResolvedValue(undefined);
+    }
+
+    it('should execute a 2:1 stock split — multiply all holdings by 2', async () => {
+      const holdings = [
+        { id: 'shd-1', quantity: new Prisma.Decimal('10000') },
+        { id: 'shd-2', quantity: new Prisma.Decimal('20000') },
+      ];
+      setupSplitConfirm('2', holdings);
+
+      const result = await service.confirm('comp-1', 'txn-1');
+
+      expect(result.status).toBe('CONFIRMED');
+      expect(prisma.shareholding.update).toHaveBeenCalledTimes(2);
+      expect(prisma.shareholding.update).toHaveBeenCalledWith({
+        where: { id: 'shd-1' },
+        data: { quantity: new Prisma.Decimal('20000') },
+      });
+      expect(prisma.shareholding.update).toHaveBeenCalledWith({
+        where: { id: 'shd-2' },
+        data: { quantity: new Prisma.Decimal('40000') },
+      });
+    });
+
+    it('should scale share class totalIssued and totalAuthorized by the split ratio', async () => {
+      setupSplitConfirm('3', [{ id: 'shd-1', quantity: new Prisma.Decimal('10000') }]);
+
+      await service.confirm('comp-1', 'txn-1');
+
+      expect(prisma.shareClass.update).toHaveBeenCalledWith({
+        where: { id: 'sc-1' },
+        data: {
+          totalIssued: new Prisma.Decimal('150000'),
+          totalAuthorized: new Prisma.Decimal('300000'),
+        },
+      });
+    });
+
+    it('should handle reverse split (ratio < 1)', async () => {
+      const holdings = [
+        { id: 'shd-1', quantity: new Prisma.Decimal('10000') },
+      ];
+      setupSplitConfirm('0.5', holdings);
+
+      await service.confirm('comp-1', 'txn-1');
+
+      expect(prisma.shareholding.update).toHaveBeenCalledWith({
+        where: { id: 'shd-1' },
+        data: { quantity: new Prisma.Decimal('5000') },
+      });
+      expect(prisma.shareClass.update).toHaveBeenCalledWith({
+        where: { id: 'sc-1' },
+        data: {
+          totalIssued: new Prisma.Decimal('25000'),
+          totalAuthorized: new Prisma.Decimal('50000'),
+        },
+      });
+    });
+
+    it('should handle split with no existing holdings', async () => {
+      setupSplitConfirm('2', []); // empty holdings
+
+      const result = await service.confirm('comp-1', 'txn-1');
+
+      expect(result.status).toBe('CONFIRMED');
+      expect(prisma.shareholding.update).not.toHaveBeenCalled();
+      // Share class totals still scale
+      expect(prisma.shareClass.update).toHaveBeenCalled();
+    });
+
+    it('should reject split that produces fractional shares', async () => {
+      const holdings = [
+        { id: 'shd-1', quantity: new Prisma.Decimal('10001') }, // 10001 * 0.5 = 5000.5
+      ];
+      setupSplitConfirm('0.5', holdings);
+
+      try {
+        await service.confirm('comp-1', 'txn-1');
+        fail('Should have thrown');
+      } catch (e: any) {
+        expect(e).toBeInstanceOf(BusinessRuleException);
+        expect(e.code).toBe('TXN_INVALID_SPLIT_RATIO');
+        expect(e.messageKey).toBe('errors.txn.invalidSplitRatio');
+        expect(e.details.shareholdingId).toBe('shd-1');
+      }
+    });
+
+    it('should accept split where all holdings produce whole numbers', async () => {
+      const holdings = [
+        { id: 'shd-1', quantity: new Prisma.Decimal('10000') }, // 10000 * 0.5 = 5000
+        { id: 'shd-2', quantity: new Prisma.Decimal('20000') }, // 20000 * 0.5 = 10000
+      ];
+      setupSplitConfirm('0.5', holdings);
+
+      const result = await service.confirm('comp-1', 'txn-1');
+
+      expect(result.status).toBe('CONFIRMED');
+    });
+
+    it('should throw if split ratio is 0 or negative', async () => {
+      setupSplitConfirm('0', [{ id: 'shd-1', quantity: new Prisma.Decimal('10000') }]);
+
+      await expect(service.confirm('comp-1', 'txn-1')).rejects.toThrow(BusinessRuleException);
+    });
+
+    it('should throw if split ratio is missing from notes', async () => {
+      const txn = mockTransaction({
+        type: 'SPLIT',
+        status: 'SUBMITTED',
+        notes: JSON.stringify({ userNotes: 'no ratio here' }),
+        shareClass: {
+          id: 'sc-1',
+          totalIssued: new Prisma.Decimal('50000'),
+          totalAuthorized: new Prisma.Decimal('100000'),
+        },
+      });
+      prisma.transaction.findFirst.mockResolvedValueOnce(txn);
+      prisma.$transaction.mockImplementation(async (fn: any) => fn(prisma));
+      prisma.shareholding.findMany.mockResolvedValue([]);
+
+      await expect(service.confirm('comp-1', 'txn-1')).rejects.toThrow(BusinessRuleException);
+    });
+  });
+
+  // =========================================================================
+  // confirm() — Audit logging
+  // =========================================================================
+
+  describe('confirm — audit logging', () => {
+    function setupConfirmForType(type: string) {
+      const txn = mockTransaction({
+        type,
+        status: 'SUBMITTED',
+        notes: type === 'SPLIT' ? JSON.stringify({ splitRatio: '2' }) : type === 'CONVERSION' ? JSON.stringify({ toShareClassId: 'sc-2' }) : null,
+        shareClass: {
+          id: 'sc-1',
+          totalIssued: new Prisma.Decimal('50000'),
+          totalAuthorized: new Prisma.Decimal('100000'),
+        },
+      });
+      const confirmedTxn = {
+        ...txn,
+        status: 'CONFIRMED',
+        confirmedAt: new Date(),
+        blockchainTransactions: [],
+        fromShareholder: type === 'TRANSFER' || type === 'CANCELLATION' || type === 'CONVERSION'
+          ? { id: 'sh-1', name: 'João Silva', type: 'FOUNDER' }
+          : null,
+        toShareholder: type === 'ISSUANCE' || type === 'TRANSFER'
+          ? { id: 'sh-1', name: 'João Silva', type: 'FOUNDER' }
+          : null,
+        shareClass: { id: 'sc-1', className: 'Quotas Ordinárias', type: 'QUOTA' },
+      };
+      prisma.transaction.findFirst
+        .mockResolvedValueOnce(txn)
+        .mockResolvedValueOnce(confirmedTxn);
+      prisma.$transaction.mockImplementation(async (fn: any) => fn(prisma));
+      prisma.shareholding.findFirst.mockResolvedValue(null);
+      prisma.shareholding.findMany.mockResolvedValue([
+        { id: 'shd-1', quantity: new Prisma.Decimal('10000') },
+      ]);
+      prisma.shareholding.create.mockResolvedValue({});
+      prisma.shareholding.update.mockResolvedValue({});
+      prisma.shareholding.delete.mockResolvedValue({});
+      prisma.shareClass.findUnique.mockResolvedValue({
+        id: 'sc-1',
+        totalIssued: new Prisma.Decimal('50000'),
+        totalAuthorized: new Prisma.Decimal('100000'),
+      });
+      prisma.shareClass.update.mockResolvedValue({});
+      prisma.transaction.update.mockResolvedValue({});
+      capTableService.recalculateOwnership.mockResolvedValue(undefined);
+      capTableService.createAutoSnapshot.mockResolvedValue(undefined);
+    }
+
+    it('should log SHARES_ISSUED audit event for ISSUANCE', async () => {
+      setupConfirmForType('ISSUANCE');
+
+      await service.confirm('comp-1', 'txn-1');
+
+      expect(auditLogService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'SHARES_ISSUED',
+          resourceType: 'Transaction',
+          resourceId: 'txn-1',
+          companyId: 'comp-1',
+        }),
+      );
+    });
+
+    it('should log SHARES_TRANSFERRED audit event for TRANSFER', async () => {
+      setupConfirmForType('TRANSFER');
+      // TRANSFER needs fromHolding to have sufficient shares, and toHolding
+      prisma.shareholding.findFirst
+        .mockResolvedValueOnce({ id: 'shd-from', quantity: new Prisma.Decimal('30000') }) // from holding
+        .mockResolvedValueOnce({ id: 'shd-to', quantity: new Prisma.Decimal('5000') }); // to holding
+
+      await service.confirm('comp-1', 'txn-1');
+
+      expect(auditLogService.log).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'SHARES_TRANSFERRED' }),
+      );
+    });
+
+    it('should log SHARES_CANCELLED audit event for CANCELLATION', async () => {
+      setupConfirmForType('CANCELLATION');
+      // Cancellation needs fromShareholderId holdings
+      prisma.shareholding.findFirst.mockResolvedValue({
+        id: 'shd-1',
+        quantity: new Prisma.Decimal('30000'),
+      });
+
+      await service.confirm('comp-1', 'txn-1');
+
+      expect(auditLogService.log).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'SHARES_CANCELLED' }),
+      );
+    });
+
+    it('should log SHARES_SPLIT audit event for SPLIT', async () => {
+      setupConfirmForType('SPLIT');
+
+      await service.confirm('comp-1', 'txn-1');
+
+      expect(auditLogService.log).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'SHARES_SPLIT' }),
+      );
+    });
+
+    it('should not fail if audit logging throws', async () => {
+      setupConfirmForType('ISSUANCE');
+      auditLogService.log.mockRejectedValue(new Error('Audit queue down'));
+
+      // Should not throw — fire-and-forget
+      const result = await service.confirm('comp-1', 'txn-1');
+      expect(result.status).toBe('CONFIRMED');
+    });
+  });
+
+  // =========================================================================
+  // confirm() — Notifications
+  // =========================================================================
+
+  describe('confirm — notifications', () => {
+    function setupConfirmWithNotifications(type: string) {
+      const txn = mockTransaction({
+        type,
+        status: 'SUBMITTED',
+        notes: type === 'SPLIT' ? JSON.stringify({ splitRatio: '2' }) : type === 'CONVERSION' ? JSON.stringify({ toShareClassId: 'sc-2' }) : null,
+        shareClass: {
+          id: 'sc-1',
+          totalIssued: new Prisma.Decimal('50000'),
+          totalAuthorized: new Prisma.Decimal('100000'),
+        },
+      });
+      const confirmedTxn = {
+        ...txn,
+        status: 'CONFIRMED',
+        confirmedAt: new Date(),
+        blockchainTransactions: [],
+        fromShareholder: type !== 'ISSUANCE' ? { id: 'sh-1', name: 'João Silva', type: 'FOUNDER' } : null,
+        toShareholder: type === 'ISSUANCE' || type === 'TRANSFER' ? { id: 'sh-1', name: 'João Silva', type: 'FOUNDER' } : null,
+        shareClass: { id: 'sc-1', className: 'Quotas Ordinárias', type: 'QUOTA' },
+      };
+      prisma.transaction.findFirst
+        .mockResolvedValueOnce(txn)
+        .mockResolvedValueOnce(confirmedTxn);
+      prisma.$transaction.mockImplementation(async (fn: any) => fn(prisma));
+      prisma.shareholding.findFirst.mockResolvedValue({
+        id: 'shd-1',
+        quantity: new Prisma.Decimal('30000'),
+      });
+      prisma.shareholding.findMany.mockResolvedValue([
+        { id: 'shd-1', quantity: new Prisma.Decimal('10000') },
+      ]);
+      prisma.shareholding.create.mockResolvedValue({});
+      prisma.shareholding.update.mockResolvedValue({});
+      prisma.shareholding.delete.mockResolvedValue({});
+      prisma.shareClass.findUnique.mockResolvedValue({
+        id: 'sc-1',
+        totalIssued: new Prisma.Decimal('50000'),
+        totalAuthorized: new Prisma.Decimal('100000'),
+      });
+      prisma.shareClass.update.mockResolvedValue({});
+      prisma.transaction.update.mockResolvedValue({});
+      capTableService.recalculateOwnership.mockResolvedValue(undefined);
+      capTableService.createAutoSnapshot.mockResolvedValue(undefined);
+      prisma.company.findUnique.mockResolvedValue({ name: 'Test Company' });
+      prisma.companyMember.findMany.mockResolvedValue([
+        { userId: 'admin-1' },
+        { userId: 'admin-2' },
+      ]);
+    }
+
+    it('should send SHARES_ISSUED notification to all admins', async () => {
+      setupConfirmWithNotifications('ISSUANCE');
+
+      await service.confirm('comp-1', 'txn-1');
+
+      expect(notificationService.create).toHaveBeenCalledTimes(2);
+      expect(notificationService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'admin-1',
+          notificationType: 'SHARES_ISSUED',
+          subject: expect.stringContaining('issued'),
+        }),
+      );
+    });
+
+    it('should send SHARES_SPLIT notification to admins', async () => {
+      setupConfirmWithNotifications('SPLIT');
+
+      await service.confirm('comp-1', 'txn-1');
+
+      expect(notificationService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          notificationType: 'SHARES_SPLIT',
+          subject: expect.stringContaining('Stock split'),
+        }),
+      );
+    });
+
+    it('should send SHARES_CANCELLED notification to admins', async () => {
+      setupConfirmWithNotifications('CANCELLATION');
+
+      await service.confirm('comp-1', 'txn-1');
+
+      expect(notificationService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          notificationType: 'SHARES_CANCELLED',
+          subject: expect.stringContaining('cancelled'),
+        }),
+      );
+    });
+
+    it('should not fail if notification throws', async () => {
+      setupConfirmWithNotifications('ISSUANCE');
+      notificationService.create.mockRejectedValue(new Error('Queue down'));
+
+      // Should not throw — fire-and-forget
+      const result = await service.confirm('comp-1', 'txn-1');
+      expect(result.status).toBe('CONFIRMED');
     });
   });
 });

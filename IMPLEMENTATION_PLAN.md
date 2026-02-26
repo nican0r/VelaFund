@@ -1,6 +1,6 @@
-# Navia MVP — Implementation Plan v69.0
+# Navia MVP — Implementation Plan v70.0
 
-> **Generated**: 2026-02-26 | **Tests**: 2842 passing (1823 backend + 1019 frontend) | **Backend modules**: 22 of 23 built
+> **Generated**: 2026-02-26 | **Tests**: 2861 passing (1842 backend + 1019 frontend) | **Backend modules**: 22 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -158,7 +158,7 @@ Gaps in the 12 built modules, ordered by module.
 - [ ] Blockchain transaction submission on confirm (depends on P3 Blockchain module)
 - [ ] Dilution impact preview — show before/after ownership when creating issuance
 - [ ] Transaction batch/bulk operations
-- [ ] SPLIT type implementation — stock split logic that adjusts all holdings proportionally
+- [x] ~~SPLIT type implementation — stock split logic that adjusts all holdings proportionally~~ — DONE in v0.0.75: fractional shares validation, type-specific audit logging (SHARES_SPLIT), notifications for all 5 transaction types, 19 new tests (72 total transaction service tests)
 
 ### Funding Round Module
 

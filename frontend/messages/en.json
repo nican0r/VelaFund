@@ -665,6 +665,7 @@
       "invalidQuantity": "Share quantity must be greater than zero",
       "lockupActive": "Shares are in a lock-up period and cannot be transferred",
       "invalidStatusTransition": "Invalid status transition for this transaction",
+      "invalidSplitRatio": "Split ratio would result in fractional shares",
       "sameShareholder": "Source and destination shareholder cannot be the same",
       "splitRatioRequired": "Split ratio is required for split transactions",
       "toShareClassRequired": "Target share class is required for conversion",

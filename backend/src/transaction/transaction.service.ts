@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CapTableService } from '../cap-table/cap-table.service';
 import { NotificationService } from '../notification/notification.service';
+import { AuditLogService } from '../audit-log/audit-log.service';
 import { parseSort } from '../common/helpers/sort-parser';
 import { NotFoundException, BusinessRuleException } from '../common/filters/app-exception';
 import { CreateTransactionDto, TransactionTypeDto } from './dto/create-transaction.dto';
@@ -26,6 +27,7 @@ export class TransactionService {
     private readonly prisma: PrismaService,
     private readonly capTableService: CapTableService,
     private readonly notificationService: NotificationService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   /**
@@ -341,6 +343,33 @@ export class TransactionService {
     );
 
     this.logger.log(`Transaction ${transactionId} confirmed in company ${companyId}`);
+
+    // Fire-and-forget: programmatic audit logging with type-specific action
+    const auditActionMap: Record<string, string> = {
+      ISSUANCE: 'SHARES_ISSUED',
+      TRANSFER: 'SHARES_TRANSFERRED',
+      CANCELLATION: 'SHARES_CANCELLED',
+      CONVERSION: 'SHARES_CONVERTED',
+      SPLIT: 'SHARES_SPLIT',
+    };
+    const auditAction = auditActionMap[transaction.type];
+    if (auditAction) {
+      this.auditLogService
+        .log({
+          actorType: 'USER',
+          action: auditAction,
+          resourceType: 'Transaction',
+          resourceId: transaction.id,
+          companyId,
+          changes: {
+            before: { status: 'SUBMITTED', type: transaction.type },
+            after: { status: 'CONFIRMED', type: transaction.type },
+          },
+        })
+        .catch((err) =>
+          this.logger.warn(`Failed to log audit event: ${err.message}`),
+        );
+    }
 
     // Fire-and-forget: notify company admins about confirmed transaction
     this.notifyTransactionConfirmed(companyId, transaction).catch((err) =>
@@ -930,6 +959,22 @@ export class TransactionService {
       },
     });
 
+    // Validate no fractional shares result from the split
+    for (const holding of holdings) {
+      const newQuantity = holding.quantity.mul(ratio);
+      if (!newQuantity.eq(newQuantity.floor())) {
+        throw new BusinessRuleException(
+          'TXN_INVALID_SPLIT_RATIO',
+          'errors.txn.invalidSplitRatio',
+          {
+            shareholdingId: holding.id,
+            currentQuantity: holding.quantity.toString(),
+            resultingQuantity: newQuantity.toString(),
+          },
+        );
+      }
+    }
+
     for (const holding of holdings) {
       await tx.shareholding.update({
         where: { id: holding.id },
@@ -1008,10 +1053,13 @@ export class TransactionService {
     const typeMap: Record<string, string> = {
       ISSUANCE: 'SHARES_ISSUED',
       TRANSFER: 'SHARES_TRANSFERRED',
+      CANCELLATION: 'SHARES_CANCELLED',
+      CONVERSION: 'SHARES_CONVERTED',
+      SPLIT: 'SHARES_SPLIT',
     };
 
     const notificationType = typeMap[transaction.type];
-    if (!notificationType) return; // Only notify for ISSUANCE and TRANSFER
+    if (!notificationType) return;
 
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },
@@ -1023,16 +1071,25 @@ export class TransactionService {
       select: { userId: true },
     });
 
+    const companyName = company?.name ?? 'Company';
     const quantity = transaction.quantity.toString();
-    const subject =
-      notificationType === 'SHARES_ISSUED'
-        ? `${quantity} shares issued — ${company?.name ?? 'Company'}`
-        : `${quantity} shares transferred — ${company?.name ?? 'Company'}`;
+    const subjectMap: Record<string, string> = {
+      SHARES_ISSUED: `${quantity} shares issued — ${companyName}`,
+      SHARES_TRANSFERRED: `${quantity} shares transferred — ${companyName}`,
+      SHARES_CANCELLED: `${quantity} shares cancelled — ${companyName}`,
+      SHARES_CONVERTED: `${quantity} shares converted — ${companyName}`,
+      SHARES_SPLIT: `Stock split executed — ${companyName}`,
+    };
+    const bodyMap: Record<string, string> = {
+      SHARES_ISSUED: `${quantity} shares have been issued and confirmed.`,
+      SHARES_TRANSFERRED: `${quantity} shares have been transferred and confirmed.`,
+      SHARES_CANCELLED: `${quantity} shares have been cancelled and confirmed.`,
+      SHARES_CONVERTED: `${quantity} shares have been converted to a new share class.`,
+      SHARES_SPLIT: `A stock split has been executed and all holdings have been adjusted.`,
+    };
 
-    const body =
-      notificationType === 'SHARES_ISSUED'
-        ? `${quantity} shares have been issued and confirmed.`
-        : `${quantity} shares have been transferred and confirmed.`;
+    const subject = subjectMap[notificationType];
+    const body = bodyMap[notificationType];
 
     for (const member of adminMembers) {
       if (!member.userId) continue;

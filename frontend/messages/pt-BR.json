@@ -665,6 +665,7 @@
       "invalidQuantity": "Quantidade de ações deve ser maior que zero",
       "lockupActive": "Ações estão em período de lock-up e não podem ser transferidas",
       "invalidStatusTransition": "Transição de status inválida para esta transação",
+      "invalidSplitRatio": "Razão de desdobramento resultaria em ações fracionárias",
       "sameShareholder": "Acionista de origem e destino não podem ser o mesmo",
       "splitRatioRequired": "Proporção de desdobramento é obrigatória para split",
       "toShareClassRequired": "Classe de ações de destino é obrigatória para conversão",

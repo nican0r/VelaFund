@@ -112,13 +112,6 @@ export class TransactionController {
   @Post(':transactionId/confirm')
   @Roles('ADMIN')
   @Throttle({ write: { ttl: 60000, limit: 30 } })
-  @Auditable({
-    action: 'SHARES_ISSUED',
-    resourceType: 'Transaction',
-    resourceIdParam: 'transactionId',
-    captureBeforeState: true,
-    captureAfterState: true,
-  })
   @ApiOperation({
     summary: 'Confirm a submitted transaction (execute cap table mutation)',
   })
