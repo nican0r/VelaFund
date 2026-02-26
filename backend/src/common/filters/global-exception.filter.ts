@@ -8,6 +8,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Response, Request } from 'express';
+import * as Sentry from '@sentry/nestjs';
 import { AppException } from './app-exception';
 import { ValidationErrorDetail } from '../types/api-response.types';
 import { redactPiiFromString } from '../utils/redact-pii';
@@ -23,6 +24,33 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const lang = this.normalizeLanguage(request.headers['accept-language'] as string);
 
     if (exception instanceof AppException) {
+      // 4xx errors are breadcrumbs only — do not report to Sentry as errors
+      if (exception.statusCode >= 400 && exception.statusCode < 500) {
+        Sentry.addBreadcrumb({
+          category: 'http',
+          message: `${exception.code}: ${exception.messageKey}`,
+          level: 'warning',
+          data: {
+            statusCode: exception.statusCode,
+            code: exception.code,
+            url: request.url,
+            method: request.method,
+          },
+        });
+      } else {
+        // 5xx AppExceptions — capture at error level with errorCode tag
+        Sentry.captureException(exception, {
+          level: 'error',
+          tags: { errorCode: exception.code },
+          extra: {
+            statusCode: exception.statusCode,
+            messageKey: exception.messageKey,
+            url: request.url,
+            method: request.method,
+          },
+        });
+      }
+
       return response.status(exception.statusCode).json({
         success: false,
         error: {
@@ -53,6 +81,18 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           };
         });
 
+        // Validation errors are 4xx — breadcrumb only
+        Sentry.addBreadcrumb({
+          category: 'validation',
+          message: `Validation failed: ${messageArray.length} error(s)`,
+          level: 'info',
+          data: {
+            url: request.url,
+            method: request.method,
+            fieldCount: messageArray.length,
+          },
+        });
+
         return response.status(HttpStatus.BAD_REQUEST).json({
           success: false,
           error: {
@@ -70,6 +110,30 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       const body = exception.getResponse();
       const message = typeof body === 'string' ? body : (body as Record<string, unknown>).message;
 
+      // 4xx → breadcrumb, 5xx → capture as error
+      if (status >= 500) {
+        Sentry.captureException(exception, {
+          level: 'error',
+          tags: { errorCode: 'SYS_HTTP_ERROR' },
+          extra: {
+            statusCode: status,
+            url: request.url,
+            method: request.method,
+          },
+        });
+      } else {
+        Sentry.addBreadcrumb({
+          category: 'http',
+          message: `HTTP ${status}: ${typeof message === 'string' ? message : 'Error'}`,
+          level: 'warning',
+          data: {
+            statusCode: status,
+            url: request.url,
+            method: request.method,
+          },
+        });
+      }
+
       return response.status(status).json({
         success: false,
         error: {
@@ -80,12 +144,23 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       });
     }
 
-    // Unhandled exception — redact PII from error messages before logging
+    // Unhandled exception — capture at fatal level + redact PII from logs
     const rawMessage = exception instanceof Error ? exception.message : 'Unknown error';
     this.logger.error(
       `Unhandled exception: ${redactPiiFromString(rawMessage)}`,
       exception instanceof Error ? exception.stack : undefined,
     );
+
+    // Per error-handling.md: unhandled exceptions → fatal level
+    Sentry.captureException(exception, {
+      level: 'fatal',
+      tags: { errorCode: 'SYS_INTERNAL_ERROR' },
+      extra: {
+        url: request.url,
+        method: request.method,
+        requestId: request.headers['x-request-id'],
+      },
+    });
 
     return response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
       success: false,

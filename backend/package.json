@@ -37,6 +37,8 @@
     "@nestjs/throttler": "^5.1.0",
     "@prisma/client": "^5.10.0",
     "@privy-io/node": "^0.9.0",
+    "@sentry/nestjs": "^10.40.0",
+    "@sentry/node": "^10.40.0",
     "archiver": "^7.0.1",
     "bcryptjs": "^3.0.3",
     "bull": "^4.16.5",

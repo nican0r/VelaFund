@@ -1,4 +1,5 @@
 const createNextIntlPlugin = require('next-intl/plugin');
+const { withSentryConfig } = require('@sentry/nextjs');
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
@@ -20,4 +21,16 @@ const nextConfig = {
   },
 };
 
-module.exports = withNextIntl(nextConfig);
+module.exports = withSentryConfig(withNextIntl(nextConfig), {
+  // Suppress Sentry CLI source map upload warnings when SENTRY_AUTH_TOKEN is not set
+  silent: true,
+
+  // Do not widen the Next.js tracing — use only the Sentry SDK tracing
+  widenClientFileUpload: false,
+
+  // Disable automatic instrumentation of API routes (backend handles its own Sentry)
+  autoInstrumentServerFunctions: false,
+
+  // Disable telemetry
+  telemetry: false,
+});

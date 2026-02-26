@@ -1,5 +1,11 @@
 import { render, screen, fireEvent } from '@testing-library/react';
+import * as Sentry from '@sentry/nextjs';
 import { ErrorBoundary } from './error-boundary';
+
+// Mock Sentry
+jest.mock('@sentry/nextjs', () => ({
+  captureException: jest.fn(),
+}));
 
 // Suppress console.error for expected errors in tests
 const originalConsoleError = console.error;
@@ -17,6 +23,10 @@ beforeAll(() => {
 });
 afterAll(() => {
   console.error = originalConsoleError;
+});
+
+beforeEach(() => {
+  jest.clearAllMocks();
 });
 
 function ThrowingChild() {
@@ -75,5 +85,35 @@ describe('ErrorBoundary', () => {
 
     fireEvent.click(screen.getByText('Recarregar'));
     expect(reloadMock).toHaveBeenCalledTimes(1);
+  });
+
+  // --- Sentry Integration Tests ---
+
+  it('should report error to Sentry via componentDidCatch', () => {
+    render(
+      <ErrorBoundary>
+        <ThrowingChild />
+      </ErrorBoundary>,
+    );
+
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          componentStack: expect.any(String),
+        }),
+      }),
+    );
+  });
+
+  it('should not call Sentry when no error occurs', () => {
+    render(
+      <ErrorBoundary>
+        <WorkingChild />
+      </ErrorBoundary>,
+    );
+
+    expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 });
