@@ -16,6 +16,7 @@ import {
 } from './dto/list-funding-rounds-query.dto';
 import { UpdateCommitmentPaymentDto } from './dto/update-commitment-payment.dto';
 import { CapTableService } from '../cap-table/cap-table.service';
+import { NotificationService } from '../notification/notification.service';
 
 /** Valid status transitions for funding rounds. */
 const STATUS_TRANSITIONS: Record<string, string[]> = {
@@ -37,6 +38,7 @@ export class FundingRoundService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly capTableService: CapTableService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   /**
@@ -527,6 +529,11 @@ export class FundingRoundService {
       `Funding round ${round.name} closed`,
     );
 
+    // Fire-and-forget: notify admins about round closure
+    this.notifyRoundClosed(companyId, round, nonCancelledCommitments).catch((err) =>
+      this.logger.warn(`Failed to send round closed notification: ${err.message}`),
+    );
+
     return result;
   }
 
@@ -892,5 +899,42 @@ export class FundingRoundService {
       },
       dilution,
     };
+  }
+
+  /**
+   * Sends ROUND_CLOSED notifications to company admins after a round is closed.
+   */
+  private async notifyRoundClosed(
+    companyId: string,
+    round: { id: string; name: string },
+    commitments: Array<{ shareholderId: string }>,
+  ): Promise<void> {
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { name: true },
+    });
+
+    const adminMembers = await this.prisma.companyMember.findMany({
+      where: { companyId, role: 'ADMIN', status: 'ACTIVE' },
+      select: { userId: true },
+    });
+
+    const investorCount = commitments.length;
+    const subject = `Funding round closed — ${round.name}`;
+    const body = `Funding round "${round.name}" has been closed with ${investorCount} investor(s). Shares have been issued.`;
+
+    for (const member of adminMembers) {
+      if (!member.userId) continue;
+      await this.notificationService.create({
+        userId: member.userId,
+        notificationType: 'ROUND_CLOSED',
+        subject,
+        body,
+        relatedEntityType: 'FundingRound',
+        relatedEntityId: round.id,
+        companyId,
+        companyName: company?.name ?? undefined,
+      });
+    }
   }
 }

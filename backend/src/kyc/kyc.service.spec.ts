@@ -11,6 +11,7 @@ import {
   ConflictException,
   BusinessRuleException,
 } from '../common/filters/app-exception';
+import { NotificationService } from '../notification/notification.service';
 
 // ─── Test constants ─────────────────────────────────────────────────────────
 
@@ -170,6 +171,7 @@ describe('KycService', () => {
         { provide: EncryptionService, useValue: encryptionService },
         { provide: S3Service, useValue: s3Service },
         { provide: getQueueToken('kyc-aml'), useValue: amlQueue },
+        { provide: NotificationService, useValue: { create: jest.fn() } },
       ],
     }).compile();
 

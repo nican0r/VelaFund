@@ -9,6 +9,7 @@ import {
 } from '../common/filters/app-exception';
 import { CreateShareholderDto, ShareholderTypeDto } from './dto/create-shareholder.dto';
 import { Prisma } from '@prisma/client';
+import { NotificationService } from '../notification/notification.service';
 
 const mockCompany = {
   id: 'comp-1',
@@ -91,6 +92,7 @@ describe('ShareholderService', () => {
         ShareholderService,
         { provide: PrismaService, useValue: prisma },
         { provide: EncryptionService, useValue: encryptionService },
+        { provide: NotificationService, useValue: { create: jest.fn() } },
       ],
     }).compile();
 

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { EncryptionService } from '../encryption/encryption.service';
+import { NotificationService } from '../notification/notification.service';
 import { CreateShareholderDto } from './dto/create-shareholder.dto';
 import { UpdateShareholderDto } from './dto/update-shareholder.dto';
 import { ListShareholdersQueryDto } from './dto/list-shareholders-query.dto';
@@ -86,6 +87,7 @@ export class ShareholderService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly encryptionService: EncryptionService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   /**
@@ -217,6 +219,11 @@ export class ShareholderService {
 
       this.logger.log(
         `Shareholder ${shareholder.id} (${dto.name}) created for company ${companyId}`,
+      );
+
+      // Fire-and-forget: notify company admins about new shareholder
+      this.notifyShareholderEvent(companyId, 'SHAREHOLDER_ADDED', shareholder.id, dto.name).catch(
+        (err) => this.logger.warn(`Failed to send shareholder added notification: ${err.message}`),
       );
 
       return shareholder;
@@ -421,6 +428,11 @@ export class ShareholderService {
         `Shareholder ${shareholderId} set to INACTIVE (has holdings or transactions)`,
       );
 
+      // Fire-and-forget: notify company admins about shareholder removal
+      this.notifyShareholderEvent(companyId, 'SHAREHOLDER_REMOVED', shareholderId, existing.name).catch(
+        (err) => this.logger.warn(`Failed to send shareholder removed notification: ${err.message}`),
+      );
+
       return { action: 'INACTIVATED' };
     }
 
@@ -430,6 +442,11 @@ export class ShareholderService {
     });
 
     this.logger.log(`Shareholder ${shareholderId} deleted from company ${companyId}`);
+
+    // Fire-and-forget: notify company admins about shareholder removal
+    this.notifyShareholderEvent(companyId, 'SHAREHOLDER_REMOVED', shareholderId, existing.name).catch(
+      (err) => this.logger.warn(`Failed to send shareholder removed notification: ${err.message}`),
+    );
 
     return { action: 'DELETED' };
   }
@@ -551,5 +568,47 @@ export class ShareholderService {
         totalForeignOwnershipPercentage: totalForeignOwnershipPct.toString(),
       },
     };
+  }
+
+  /**
+   * Sends SHAREHOLDER_ADDED or SHAREHOLDER_REMOVED notification to company admins.
+   */
+  private async notifyShareholderEvent(
+    companyId: string,
+    notificationType: 'SHAREHOLDER_ADDED' | 'SHAREHOLDER_REMOVED',
+    shareholderId: string,
+    shareholderName: string,
+  ): Promise<void> {
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { name: true },
+    });
+
+    const adminMembers = await this.prisma.companyMember.findMany({
+      where: { companyId, role: 'ADMIN', status: 'ACTIVE' },
+      select: { userId: true },
+    });
+
+    const isAdded = notificationType === 'SHAREHOLDER_ADDED';
+    const subject = isAdded
+      ? `Shareholder added — ${shareholderName}`
+      : `Shareholder removed — ${shareholderName}`;
+    const body = isAdded
+      ? `${shareholderName} has been added as a shareholder.`
+      : `${shareholderName} has been removed from the cap table.`;
+
+    for (const member of adminMembers) {
+      if (!member.userId) continue;
+      await this.notificationService.create({
+        userId: member.userId,
+        notificationType,
+        subject,
+        body,
+        relatedEntityType: 'Shareholder',
+        relatedEntityId: shareholderId,
+        companyId,
+        companyName: company?.name ?? undefined,
+      });
+    }
   }
 }

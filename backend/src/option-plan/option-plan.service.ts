@@ -17,6 +17,7 @@ import {
 import { ListExerciseRequestsQueryDto } from './dto/list-exercise-requests-query.dto';
 import { randomBytes } from 'crypto';
 import { CapTableService } from '../cap-table/cap-table.service';
+import { NotificationService } from '../notification/notification.service';
 
 const PLAN_SORTABLE_FIELDS = ['createdAt', 'name', 'totalPoolSize', 'status'];
 const GRANT_SORTABLE_FIELDS = ['grantDate', 'createdAt', 'quantity', 'status', 'employeeName'];
@@ -29,6 +30,7 @@ export class OptionPlanService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly capTableService: CapTableService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   // ========================
@@ -273,7 +275,7 @@ export class OptionPlanService {
         : new Prisma.Decimal(0);
 
     // Create grant and update plan totalGranted atomically
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const grant = await tx.optionGrant.create({
         data: {
           companyId,
@@ -301,6 +303,45 @@ export class OptionPlanService {
       });
 
       return grant;
+    });
+
+    // Fire-and-forget: notify grantee about new option grant
+    this.notifyOptionGranted(companyId, result).catch((err) =>
+      this.logger.warn(`Failed to send option granted notification: ${err.message}`),
+    );
+
+    return result;
+  }
+
+  /**
+   * Sends OPTION_GRANTED notification to the grantee (if linked to a user).
+   */
+  private async notifyOptionGranted(
+    companyId: string,
+    grant: { id: string; employeeName: string; shareholderId: string | null; quantity: Prisma.Decimal },
+  ): Promise<void> {
+    if (!grant.shareholderId) return; // No linked user to notify
+
+    const shareholder = await this.prisma.shareholder.findFirst({
+      where: { id: grant.shareholderId },
+      select: { userId: true },
+    });
+    if (!shareholder?.userId) return;
+
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { name: true },
+    });
+
+    await this.notificationService.create({
+      userId: shareholder.userId,
+      notificationType: 'OPTION_GRANTED',
+      subject: `Options granted — ${company?.name ?? 'Company'}`,
+      body: `You have been granted ${grant.quantity.toString()} options.`,
+      relatedEntityType: 'OptionGrant',
+      relatedEntityId: grant.id,
+      companyId,
+      companyName: company?.name ?? undefined,
     });
   }
 
@@ -509,7 +550,7 @@ export class OptionPlanService {
     const randomPart = randomBytes(3).toString('hex').toUpperCase();
     const paymentReference = `EX-${year}-${randomPart}`;
 
-    return this.prisma.optionExerciseRequest.create({
+    const exerciseRequest = await this.prisma.optionExerciseRequest.create({
       data: {
         grantId,
         quantity,
@@ -518,6 +559,13 @@ export class OptionPlanService {
         createdBy: userId,
       },
     });
+
+    // Fire-and-forget: notify company admins about exercise request
+    this.notifyExerciseRequested(companyId, grant, exerciseRequest).catch((err) =>
+      this.logger.warn(`Failed to send exercise requested notification: ${err.message}`),
+    );
+
+    return exerciseRequest;
   }
 
   async findAllExercises(companyId: string, query: ListExerciseRequestsQueryDto) {
@@ -714,6 +762,11 @@ export class OptionPlanService {
       companyId,
       'exercise_confirmed',
       `Option exercise confirmed`,
+    );
+
+    // Fire-and-forget: notify grantee about completed exercise
+    this.notifyExerciseCompleted(companyId, exercise).catch((err) =>
+      this.logger.warn(`Failed to send exercise completed notification: ${err.message}`),
     );
 
     return result;
@@ -973,6 +1026,74 @@ export class OptionPlanService {
 
     // Neither grantee nor admin — deny
     throw new BusinessRuleException('OPT_NOT_GRANTEE', 'errors.opt.notGrantee');
+  }
+
+  /**
+   * Sends OPTION_EXERCISE_REQUESTED notification to company admins.
+   */
+  private async notifyExerciseRequested(
+    companyId: string,
+    grant: { employeeName: string },
+    exerciseRequest: { id: string; quantity: Prisma.Decimal },
+  ): Promise<void> {
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { name: true },
+    });
+
+    const adminMembers = await this.prisma.companyMember.findMany({
+      where: { companyId, role: 'ADMIN', status: 'ACTIVE' },
+      select: { userId: true },
+    });
+
+    const subject = `Exercise request — ${grant.employeeName}`;
+    const body = `${grant.employeeName} has requested to exercise ${exerciseRequest.quantity.toString()} options. Payment confirmation required.`;
+
+    for (const member of adminMembers) {
+      if (!member.userId) continue;
+      await this.notificationService.create({
+        userId: member.userId,
+        notificationType: 'OPTION_EXERCISE_REQUESTED',
+        subject,
+        body,
+        relatedEntityType: 'OptionExerciseRequest',
+        relatedEntityId: exerciseRequest.id,
+        companyId,
+        companyName: company?.name ?? undefined,
+      });
+    }
+  }
+
+  /**
+   * Sends OPTION_EXERCISE_COMPLETED notification to the grantee.
+   */
+  private async notifyExerciseCompleted(
+    companyId: string,
+    exercise: { id: string; quantity: Prisma.Decimal; grant: { shareholderId: string | null } },
+  ): Promise<void> {
+    if (!exercise.grant.shareholderId) return;
+
+    const shareholder = await this.prisma.shareholder.findFirst({
+      where: { id: exercise.grant.shareholderId },
+      select: { userId: true },
+    });
+    if (!shareholder?.userId) return;
+
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { name: true },
+    });
+
+    await this.notificationService.create({
+      userId: shareholder.userId,
+      notificationType: 'OPTION_EXERCISE_COMPLETED',
+      subject: `Exercise completed — ${company?.name ?? 'Company'}`,
+      body: `Your exercise of ${exercise.quantity.toString()} options has been confirmed. Shares have been issued.`,
+      relatedEntityType: 'OptionExerciseRequest',
+      relatedEntityId: exercise.id,
+      companyId,
+      companyName: company?.name ?? undefined,
+    });
   }
 
   // ========================

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CapTableService } from '../cap-table/cap-table.service';
+import { NotificationService } from '../notification/notification.service';
 import { parseSort } from '../common/helpers/sort-parser';
 import { NotFoundException, BusinessRuleException } from '../common/filters/app-exception';
 import { CreateTransactionDto, TransactionTypeDto } from './dto/create-transaction.dto';
@@ -24,6 +25,7 @@ export class TransactionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly capTableService: CapTableService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   /**
@@ -339,6 +341,11 @@ export class TransactionService {
     );
 
     this.logger.log(`Transaction ${transactionId} confirmed in company ${companyId}`);
+
+    // Fire-and-forget: notify company admins about confirmed transaction
+    this.notifyTransactionConfirmed(companyId, transaction).catch((err) =>
+      this.logger.warn(`Failed to send transaction notification: ${err.message}`),
+    );
 
     return this.findById(companyId, transactionId);
   }
@@ -990,6 +997,55 @@ export class TransactionService {
       return meta.splitRatio ? new Prisma.Decimal(meta.splitRatio) : null;
     } catch {
       return null;
+    }
+  }
+
+  /**
+   * Sends notifications to company admins when a transaction is confirmed.
+   * Maps transaction type to notification type: ISSUANCE→SHARES_ISSUED, TRANSFER→SHARES_TRANSFERRED.
+   */
+  private async notifyTransactionConfirmed(companyId: string, transaction: any): Promise<void> {
+    const typeMap: Record<string, string> = {
+      ISSUANCE: 'SHARES_ISSUED',
+      TRANSFER: 'SHARES_TRANSFERRED',
+    };
+
+    const notificationType = typeMap[transaction.type];
+    if (!notificationType) return; // Only notify for ISSUANCE and TRANSFER
+
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { name: true },
+    });
+
+    const adminMembers = await this.prisma.companyMember.findMany({
+      where: { companyId, role: 'ADMIN', status: 'ACTIVE' },
+      select: { userId: true },
+    });
+
+    const quantity = transaction.quantity.toString();
+    const subject =
+      notificationType === 'SHARES_ISSUED'
+        ? `${quantity} shares issued — ${company?.name ?? 'Company'}`
+        : `${quantity} shares transferred — ${company?.name ?? 'Company'}`;
+
+    const body =
+      notificationType === 'SHARES_ISSUED'
+        ? `${quantity} shares have been issued and confirmed.`
+        : `${quantity} shares have been transferred and confirmed.`;
+
+    for (const member of adminMembers) {
+      if (!member.userId) continue;
+      await this.notificationService.create({
+        userId: member.userId,
+        notificationType,
+        subject,
+        body,
+        relatedEntityType: 'Transaction',
+        relatedEntityId: transaction.id,
+        companyId,
+        companyName: company?.name ?? undefined,
+      });
     }
   }
 

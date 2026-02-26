@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotFoundException, BusinessRuleException } from '../common/filters/app-exception';
 import { CreateTransactionDto, TransactionTypeDto } from './dto/create-transaction.dto';
 import { Prisma } from '@prisma/client';
+import { NotificationService } from '../notification/notification.service';
 
 // ---------------------------------------------------------------------------
 // Mock data
@@ -131,6 +132,7 @@ describe('TransactionService', () => {
         TransactionService,
         { provide: PrismaService, useValue: prisma },
         { provide: CapTableService, useValue: capTableService },
+        { provide: NotificationService, useValue: { create: jest.fn() } },
       ],
     }).compile();
 

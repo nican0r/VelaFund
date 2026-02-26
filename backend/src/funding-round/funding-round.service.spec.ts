@@ -9,6 +9,7 @@ import {
   ConflictException,
 } from '../common/filters/app-exception';
 import { RoundTypeDto } from './dto/create-funding-round.dto';
+import { NotificationService } from '../notification/notification.service';
 
 // ── Mock Factory ──
 
@@ -145,6 +146,7 @@ describe('FundingRoundService', () => {
         FundingRoundService,
         { provide: PrismaService, useValue: prisma },
         { provide: CapTableService, useValue: capTableService },
+        { provide: NotificationService, useValue: { create: jest.fn() } },
       ],
     }).compile();
 

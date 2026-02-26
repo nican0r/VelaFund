@@ -1,9 +1,10 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { NotificationController } from './notification.controller';
 import { NotificationService } from './notification.service';
 import { NotificationProcessor } from './notification.processor';
 
+@Global()
 @Module({
   imports: [
     BullModule.registerQueue({

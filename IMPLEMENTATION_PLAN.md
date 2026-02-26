@@ -1,4 +1,4 @@
-# Navia MVP — Implementation Plan v63.0
+# Navia MVP — Implementation Plan v64.0
 
 > **Generated**: 2026-02-26 | **Tests**: 2765 passing (1748 backend + 1017 frontend) | **Backend modules**: 22 of 23 built
 >
@@ -204,7 +204,7 @@ Ordered by dependency chain. Modules listed later depend on earlier ones.
 - [x] 22 notification types per spec catalog (mapped to categories in create-notification.dto.ts)
 - [x] Critical notifications: cannot be disabled (KYC_COMPLETED, KYC_REJECTED, KYC_RESUBMISSION)
 - [ ] NotificationGateway: WebSocket for real-time push (optional MVP, can defer)
-- [ ] Integrate with all existing modules: trigger notifications on key events
+- [x] Integrate with all existing modules: trigger notifications on key events — DONE (v0.0.69): NotificationModule made @Global. NotificationService wired into 5 services: TransactionService (SHARES_ISSUED, SHARES_TRANSFERRED on confirm), FundingRoundService (ROUND_CLOSED on close), OptionPlanService (OPTION_GRANTED on createGrant, OPTION_EXERCISE_REQUESTED on createExerciseRequest, OPTION_EXERCISE_COMPLETED on confirmExercisePayment), KycService (KYC_COMPLETED/KYC_REJECTED/KYC_RESUBMISSION on processAmlScreening), ShareholderService (SHAREHOLDER_ADDED on create, SHAREHOLDER_REMOVED on remove). All fire-and-forget pattern. CNPJ validation already wired (v0.0.28).
 - [x] Tests: service + controller + processor specs (51 tests)
 - [x] User flow doc: `docs/user-flows/notifications.md` — DONE (v0.0.59)
 
@@ -764,7 +764,7 @@ P4.1 Frontend Foundation ───→ All P4.x pages
 
 **Sprint 1**: P0 bugs (BUG-1 DONE v0.0.17; BUG-2–6 DONE v0.0.15), P1 Redis+Bull (DONE v0.0.16), P1 AWS SDK (DONE v0.0.18)
 **Sprint 2**: P1 remaining (~~CSRF~~ DONE, ~~redactPii~~ DONE, Sentry, ~~Email~~ DONE, ~~EncryptionService~~ DONE, ~~body limits~~ DONE, ~~helmet gap~~ DONE, test infra deps), P2 Auth gaps (~~Redis lockout~~ DONE)
-**Sprint 3**: P3.1 Notifications (module built, WebSocket + cross-module integration pending), P3.2 Audit Logging (core module built — @Auditable decorator, AuditInterceptor, AuditService, Bull queue processor, controller with list/detail/verify; remaining: ClsModule before-state, daily hash chain job, DLQ monitoring, DB immutability trigger, partitioning, cross-module integration of all 50+ events, export)
+**Sprint 3**: P3.1 Notifications (module built, ~~cross-module integration~~ DONE v0.0.69, WebSocket pending), P3.2 Audit Logging (core module built — @Auditable decorator, AuditInterceptor, AuditService, Bull queue processor, controller with list/detail/verify; remaining: ClsModule before-state, daily hash chain job, DLQ monitoring, DB immutability trigger, partitioning, cross-module integration of all 50+ events, export)
 **Sprint 4**: ~~P3.3 KYC~~ DONE, ~~P3.14 CNPJ Validation~~ DONE, P2 Company gaps
 **Sprint 5**: ~~P3.4 Document Generation~~ DONE (v0.0.29), P3.7 Dataroom
 **Sprint 6**: ~~P3.6 Company Profile~~ DONE, P3.10 Litigation

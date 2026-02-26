@@ -584,6 +584,34 @@ All notification endpoints are user-scoped (`/api/v1/users/me/notifications/*`).
 - `page.test.tsx`: 38 tests (header, tabs, notification list, filters, actions, pagination, preferences)
 - Total: 53 new tests
 
+## Cross-Module Integration (v0.0.69)
+
+NotificationModule is `@Global()` so all backend modules can inject NotificationService without explicit module imports. Notifications are triggered via fire-and-forget pattern (`.catch()` logs warning but never blocks the main operation).
+
+### Trigger Sources
+
+| Module | Method | Notification Type | Recipients |
+|--------|--------|-------------------|------------|
+| TransactionService | `confirm()` | `SHARES_ISSUED` | All company ADMIN members |
+| TransactionService | `confirm()` | `SHARES_TRANSFERRED` | All company ADMIN members |
+| FundingRoundService | `close()` | `ROUND_CLOSED` | All company ADMIN members |
+| OptionPlanService | `createGrant()` | `OPTION_GRANTED` | Grantee (via Shareholder.userId) |
+| OptionPlanService | `createExerciseRequest()` | `OPTION_EXERCISE_REQUESTED` | All company ADMIN members |
+| OptionPlanService | `confirmExercisePayment()` | `OPTION_EXERCISE_COMPLETED` | Grantee (via Shareholder.userId) |
+| KycService | `processAmlScreening()` | `KYC_COMPLETED` | The user who submitted KYC |
+| KycService | `processAmlScreening()` | `KYC_REJECTED` | The user who submitted KYC |
+| KycService | `processAmlScreening()` | `KYC_RESUBMISSION` | The user who submitted KYC |
+| ShareholderService | `create()` | `SHAREHOLDER_ADDED` | All company ADMIN members |
+| ShareholderService | `remove()` | `SHAREHOLDER_REMOVED` | All company ADMIN members |
+| CnpjValidationProcessor | `handle()` | `CNPJ_VALIDATION_SUCCESS` / `CNPJ_VALIDATION_FAILED` | Company ADMIN members (wired in v0.0.28) |
+
+### Design Decisions
+
+- **Admin notifications**: Query `CompanyMember` where `role='ADMIN'` and `status='ACTIVE'`. Skip members with null `userId` (invited but not yet registered).
+- **Grantee notifications**: Look up `Shareholder.userId` for the grant's shareholder. Skip if no linked user account.
+- **KYC notifications**: Sent directly to the user who initiated the KYC flow. These are critical notifications that bypass preference checks.
+- **Preference-based filtering**: NotificationService.create() checks user preferences before queuing. Critical types (KYC_*) always deliver regardless of preferences.
+
 ## MVP Scope
 
 The notification module is **IN_APP only** for the MVP. Email delivery is not implemented. The channel field is always set to `IN_APP`. Future iterations may add email delivery based on user locale and SES integration.

@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { VerifikService } from './verifik/verifik.service';
 import { EncryptionService } from '../encryption/encryption.service';
 import { S3Service } from '../aws/s3.service';
+import { NotificationService } from '../notification/notification.service';
 import { VerifyCpfDto } from './dto/verify-cpf.dto';
 import { KycStatusResponse } from './dto/kyc-status-response.dto';
 import {
@@ -58,6 +59,7 @@ export class KycService {
     private readonly verifikService: VerifikService,
     private readonly encryptionService: EncryptionService,
     private readonly s3Service: S3Service,
+    private readonly notificationService: NotificationService,
     @InjectQueue('kyc-aml') private readonly amlQueue: Queue,
   ) {}
 
@@ -628,6 +630,52 @@ export class KycService {
         where: { id: kyc.userId },
         data: { kycStatus: newStatus },
       });
+    });
+
+    // Fire-and-forget: notify user about KYC outcome (critical — bypasses preferences)
+    this.notifyKycOutcome(kyc.userId, newStatus, rejectionReason).catch((err) =>
+      this.logger.warn(`Failed to send KYC notification: ${err.message}`),
+    );
+  }
+
+  // ─── Notification Helpers ────────────────────────────────────────────────────
+
+  /**
+   * Sends KYC outcome notification to the user.
+   * These are critical notifications and bypass user preference checks.
+   */
+  private async notifyKycOutcome(
+    userId: string,
+    status: KycStatus,
+    rejectionReason: string | null,
+  ): Promise<void> {
+    const typeMap: Partial<Record<KycStatus, string>> = {
+      [KycStatus.APPROVED]: 'KYC_COMPLETED',
+      [KycStatus.REJECTED]: 'KYC_REJECTED',
+      [KycStatus.PENDING_REVIEW]: 'KYC_RESUBMISSION',
+    };
+
+    const notificationType = typeMap[status];
+    if (!notificationType) return;
+
+    const subjectMap: Record<string, string> = {
+      KYC_COMPLETED: 'KYC verification approved',
+      KYC_REJECTED: 'KYC verification rejected',
+      KYC_RESUBMISSION: 'KYC verification under review',
+    };
+
+    const bodyMap: Record<string, string> = {
+      KYC_COMPLETED: 'Your identity verification has been approved. You now have full platform access.',
+      KYC_REJECTED: `Your identity verification was rejected${rejectionReason ? `: ${rejectionReason}` : ''}. Please contact support or resubmit.`,
+      KYC_RESUBMISSION: 'Your identity verification requires additional review. You will be notified of the outcome.',
+    };
+
+    await this.notificationService.create({
+      userId,
+      notificationType,
+      subject: subjectMap[notificationType],
+      body: bodyMap[notificationType],
+      relatedEntityType: 'KYCVerification',
     });
   }
 

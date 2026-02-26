@@ -4,6 +4,7 @@ import { OptionPlanService } from './option-plan.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CapTableService } from '../cap-table/cap-table.service';
 import { NotFoundException, BusinessRuleException } from '../common/filters/app-exception';
+import { NotificationService } from '../notification/notification.service';
 
 // ── Mock Factories ──
 
@@ -143,6 +144,7 @@ describe('OptionPlanService', () => {
         OptionPlanService,
         { provide: PrismaService, useValue: prisma },
         { provide: CapTableService, useValue: capTableService },
+        { provide: NotificationService, useValue: { create: jest.fn() } },
       ],
     }).compile();
 
