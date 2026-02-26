@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { ConvertibleService } from '../convertible/convertible.service';
+import { OptionPlanService } from '../option-plan/option-plan.service';
 
 @Injectable()
 export class ScheduledTasksService {
@@ -10,6 +11,7 @@ export class ScheduledTasksService {
   constructor(
     private readonly auditLogService: AuditLogService,
     private readonly convertibleService: ConvertibleService,
+    private readonly optionPlanService: OptionPlanService,
   ) {}
 
   /**
@@ -64,6 +66,33 @@ export class ScheduledTasksService {
     } catch (error) {
       this.logger.error(
         `Failed to accrue convertible interest: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
+      );
+    }
+  }
+
+  /**
+   * Daily auto-expiration of option grants past their expiration date.
+   * Runs at 02:00 UTC daily per option-plans spec.
+   *
+   * Finds all ACTIVE grants where expirationDate < today, transitions
+   * them to EXPIRED, returns unexercised options to the plan pool,
+   * cancels pending exercise requests, and fires audit + notification events.
+   *
+   * If the job fails, the error is logged but does not crash the application.
+   */
+  @Cron('0 0 2 * * *', { name: 'option-grant-expiration', timeZone: 'UTC' })
+  async expireOptionGrants(): Promise<void> {
+    this.logger.log('Starting daily option grant expiration check');
+
+    try {
+      const expiredCount = await this.optionPlanService.expireStaleGrants();
+      this.logger.log(
+        `Daily option grant expiration completed: ${expiredCount} grants expired`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to expire option grants: ${error instanceof Error ? error.message : String(error)}`,
         error instanceof Error ? error.stack : undefined,
       );
     }

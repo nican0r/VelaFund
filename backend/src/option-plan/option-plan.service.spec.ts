@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CapTableService } from '../cap-table/cap-table.service';
 import { NotFoundException, BusinessRuleException } from '../common/filters/app-exception';
 import { NotificationService } from '../notification/notification.service';
+import { AuditLogService } from '../audit-log/audit-log.service';
 
 // ── Mock Factories ──
 
@@ -105,7 +106,7 @@ describe('OptionPlanService', () => {
     };
 
     prisma = {
-      company: { findFirst: jest.fn() },
+      company: { findFirst: jest.fn(), findUnique: jest.fn() },
       shareClass: { findFirst: jest.fn(), update: jest.fn() },
       optionPlan: {
         create: jest.fn(),
@@ -128,6 +129,7 @@ describe('OptionPlanService', () => {
         findFirst: jest.fn(),
         count: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
       },
       shareholding: {
         findFirst: jest.fn(),
@@ -145,6 +147,7 @@ describe('OptionPlanService', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: CapTableService, useValue: capTableService },
         { provide: NotificationService, useValue: { create: jest.fn() } },
+        { provide: AuditLogService, useValue: { log: jest.fn().mockResolvedValue(undefined) } },
       ],
     }).compile();
 
@@ -1259,6 +1262,242 @@ describe('OptionPlanService', () => {
 
       await expect(service.cancelExercise('company-1', 'exercise-1', 'user-1')).rejects.toThrow(
         BusinessRuleException,
+      );
+    });
+  });
+
+  // ========================
+  // Auto-Expiration
+  // ========================
+
+  describe('expireStaleGrants', () => {
+    const expiredGrant = {
+      id: 'grant-expired-1',
+      companyId: 'company-1',
+      planId: 'plan-1',
+      quantity: new Prisma.Decimal('10000'),
+      exercised: new Prisma.Decimal('2000'),
+      employeeName: 'Maria Silva',
+      shareholderId: 'sh-1',
+      expirationDate: new Date('2025-12-31'),
+    };
+
+    it('should return 0 when no expired grants exist', async () => {
+      prisma.optionGrant.findMany.mockResolvedValue([]);
+
+      const result = await service.expireStaleGrants();
+
+      expect(result).toBe(0);
+      expect(prisma.optionGrant.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { status: 'ACTIVE', expirationDate: { lt: expect.any(Date) } },
+          take: 50,
+        }),
+      );
+    });
+
+    it('should expire a single grant and return count of 1', async () => {
+      prisma.optionGrant.findMany
+        .mockResolvedValueOnce([expiredGrant])
+        .mockResolvedValueOnce([]); // no more in next batch
+      prisma.optionGrant.update.mockResolvedValue({});
+      prisma.optionPlan.update.mockResolvedValue({});
+      prisma.optionExerciseRequest.updateMany.mockResolvedValue({ count: 0 });
+      prisma.shareholder.findFirst.mockResolvedValue({ userId: 'user-1' });
+      prisma.company.findUnique.mockResolvedValue({ name: 'Test Company' });
+
+      const result = await service.expireStaleGrants();
+
+      expect(result).toBe(1);
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('should update grant status to EXPIRED', async () => {
+      prisma.optionGrant.findMany
+        .mockResolvedValueOnce([expiredGrant])
+        .mockResolvedValueOnce([]);
+      prisma.optionGrant.update.mockResolvedValue({});
+      prisma.optionPlan.update.mockResolvedValue({});
+      prisma.optionExerciseRequest.updateMany.mockResolvedValue({ count: 0 });
+      prisma.shareholder.findFirst.mockResolvedValue(null);
+
+      await service.expireStaleGrants();
+
+      expect(prisma.optionGrant.update).toHaveBeenCalledWith({
+        where: { id: 'grant-expired-1' },
+        data: { status: 'EXPIRED', terminatedAt: expect.any(Date) },
+      });
+    });
+
+    it('should return unexercised options to the plan pool', async () => {
+      prisma.optionGrant.findMany
+        .mockResolvedValueOnce([expiredGrant])
+        .mockResolvedValueOnce([]);
+      prisma.optionGrant.update.mockResolvedValue({});
+      prisma.optionPlan.update.mockResolvedValue({});
+      prisma.optionExerciseRequest.updateMany.mockResolvedValue({ count: 0 });
+      prisma.shareholder.findFirst.mockResolvedValue(null);
+
+      await service.expireStaleGrants();
+
+      // unexercised = 10000 - 2000 = 8000
+      expect(prisma.optionPlan.update).toHaveBeenCalledWith({
+        where: { id: 'plan-1' },
+        data: { totalGranted: { decrement: new Prisma.Decimal('8000') } },
+      });
+    });
+
+    it('should not decrement pool when all options were exercised', async () => {
+      const fullyExercised = {
+        ...expiredGrant,
+        exercised: new Prisma.Decimal('10000'),
+      };
+      prisma.optionGrant.findMany
+        .mockResolvedValueOnce([fullyExercised])
+        .mockResolvedValueOnce([]);
+      prisma.optionGrant.update.mockResolvedValue({});
+      prisma.optionExerciseRequest.updateMany.mockResolvedValue({ count: 0 });
+      prisma.shareholder.findFirst.mockResolvedValue(null);
+
+      await service.expireStaleGrants();
+
+      // optionPlan.update should NOT be called since unexercised = 0
+      expect(prisma.optionPlan.update).not.toHaveBeenCalled();
+    });
+
+    it('should cancel pending exercise requests', async () => {
+      prisma.optionGrant.findMany
+        .mockResolvedValueOnce([expiredGrant])
+        .mockResolvedValueOnce([]);
+      prisma.optionGrant.update.mockResolvedValue({});
+      prisma.optionPlan.update.mockResolvedValue({});
+      prisma.optionExerciseRequest.updateMany.mockResolvedValue({ count: 2 });
+      prisma.shareholder.findFirst.mockResolvedValue(null);
+
+      await service.expireStaleGrants();
+
+      expect(prisma.optionExerciseRequest.updateMany).toHaveBeenCalledWith({
+        where: { grantId: 'grant-expired-1', status: 'PENDING_PAYMENT' },
+        data: { status: 'CANCELLED', cancelledAt: expect.any(Date) },
+      });
+    });
+
+    it('should process multiple grants in a batch', async () => {
+      const grant2 = {
+        ...expiredGrant,
+        id: 'grant-expired-2',
+        planId: 'plan-2',
+        quantity: new Prisma.Decimal('5000'),
+        exercised: new Prisma.Decimal('0'),
+      };
+      prisma.optionGrant.findMany
+        .mockResolvedValueOnce([expiredGrant, grant2])
+        .mockResolvedValueOnce([]);
+      prisma.optionGrant.update.mockResolvedValue({});
+      prisma.optionPlan.update.mockResolvedValue({});
+      prisma.optionExerciseRequest.updateMany.mockResolvedValue({ count: 0 });
+      prisma.shareholder.findFirst.mockResolvedValue(null);
+
+      const result = await service.expireStaleGrants();
+
+      expect(result).toBe(2);
+      expect(prisma.$transaction).toHaveBeenCalledTimes(2);
+    });
+
+    it('should continue processing when one grant fails', async () => {
+      const failingGrant = { ...expiredGrant, id: 'grant-fail' };
+      const succeedingGrant = { ...expiredGrant, id: 'grant-ok' };
+
+      prisma.optionGrant.findMany
+        .mockResolvedValueOnce([failingGrant, succeedingGrant])
+        .mockResolvedValueOnce([]);
+
+      // First call to $transaction rejects, second succeeds
+      prisma.$transaction
+        .mockRejectedValueOnce(new Error('DB error'))
+        .mockImplementationOnce((fn: any) => fn(prisma));
+      prisma.optionGrant.update.mockResolvedValue({});
+      prisma.optionPlan.update.mockResolvedValue({});
+      prisma.optionExerciseRequest.updateMany.mockResolvedValue({ count: 0 });
+      prisma.shareholder.findFirst.mockResolvedValue(null);
+
+      const result = await service.expireStaleGrants();
+
+      // Only the successful one counted
+      expect(result).toBe(1);
+    });
+
+    it('should send notification when grantee has a linked userId', async () => {
+      prisma.optionGrant.findMany
+        .mockResolvedValueOnce([expiredGrant])
+        .mockResolvedValueOnce([]);
+      prisma.optionGrant.update.mockResolvedValue({});
+      prisma.optionPlan.update.mockResolvedValue({});
+      prisma.optionExerciseRequest.updateMany.mockResolvedValue({ count: 0 });
+      prisma.shareholder.findFirst.mockResolvedValue({ userId: 'user-42' });
+      prisma.company.findUnique.mockResolvedValue({ name: 'Acme Ltda.' });
+
+      const notificationService = (service as any).notificationService;
+
+      await service.expireStaleGrants();
+
+      // Allow fire-and-forget to resolve
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(notificationService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'user-42',
+          notificationType: 'OPTIONS_EXPIRING',
+          relatedEntityType: 'OptionGrant',
+          relatedEntityId: 'grant-expired-1',
+          companyId: 'company-1',
+        }),
+      );
+    });
+
+    it('should skip notification when grantee has no shareholderId', async () => {
+      const noShareholderGrant = { ...expiredGrant, shareholderId: null };
+      prisma.optionGrant.findMany
+        .mockResolvedValueOnce([noShareholderGrant])
+        .mockResolvedValueOnce([]);
+      prisma.optionGrant.update.mockResolvedValue({});
+      prisma.optionPlan.update.mockResolvedValue({});
+      prisma.optionExerciseRequest.updateMany.mockResolvedValue({ count: 0 });
+
+      const notificationService = (service as any).notificationService;
+
+      await service.expireStaleGrants();
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(notificationService.create).not.toHaveBeenCalled();
+    });
+
+    it('should log audit event via AuditLogService', async () => {
+      prisma.optionGrant.findMany
+        .mockResolvedValueOnce([expiredGrant])
+        .mockResolvedValueOnce([]);
+      prisma.optionGrant.update.mockResolvedValue({});
+      prisma.optionPlan.update.mockResolvedValue({});
+      prisma.optionExerciseRequest.updateMany.mockResolvedValue({ count: 0 });
+      prisma.shareholder.findFirst.mockResolvedValue(null);
+
+      const auditLogService = (service as any).auditLogService;
+
+      await service.expireStaleGrants();
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(auditLogService.log).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actorType: 'SYSTEM',
+          action: 'OPTION_GRANT_EXPIRED',
+          resourceType: 'OptionGrant',
+          resourceId: 'grant-expired-1',
+          companyId: 'company-1',
+          changes: {
+            before: { status: 'ACTIVE' },
+            after: { status: 'EXPIRED', unexercisedReturned: '8000' },
+          },
+        }),
       );
     });
   });

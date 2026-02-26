@@ -18,6 +18,7 @@ import { ListExerciseRequestsQueryDto } from './dto/list-exercise-requests-query
 import { randomBytes } from 'crypto';
 import { CapTableService } from '../cap-table/cap-table.service';
 import { NotificationService } from '../notification/notification.service';
+import { AuditLogService } from '../audit-log/audit-log.service';
 
 const PLAN_SORTABLE_FIELDS = ['createdAt', 'name', 'totalPoolSize', 'status'];
 const GRANT_SORTABLE_FIELDS = ['grantDate', 'createdAt', 'quantity', 'status', 'employeeName'];
@@ -31,6 +32,7 @@ export class OptionPlanService {
     private readonly prisma: PrismaService,
     private readonly capTableService: CapTableService,
     private readonly notificationService: NotificationService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   // ========================
@@ -1092,6 +1094,185 @@ export class OptionPlanService {
       relatedEntityType: 'OptionExerciseRequest',
       relatedEntityId: exercise.id,
       companyId,
+      companyName: company?.name ?? undefined,
+    });
+  }
+
+  // ========================
+  // Auto-Expiration
+  // ========================
+
+  /**
+   * Expires all ACTIVE option grants whose expirationDate has passed.
+   * Called by the daily cron job at 02:00 UTC.
+   *
+   * For each expired grant:
+   * 1. Updates status to EXPIRED
+   * 2. Returns unexercised options to the plan pool (decrements totalGranted)
+   * 3. Cancels any pending exercise requests
+   * 4. Logs a SYSTEM audit event (OPTION_GRANT_EXPIRED)
+   * 5. Sends OPTIONS_EXPIRING notification to the grantee (if linked)
+   *
+   * Processes grants in batches of 50 to avoid memory pressure.
+   * Returns the total number of grants expired.
+   */
+  async expireStaleGrants(): Promise<number> {
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+
+    let totalExpired = 0;
+    const BATCH_SIZE = 50;
+
+    // Process in batches
+    while (true) {
+      const grants = await this.prisma.optionGrant.findMany({
+        where: {
+          status: 'ACTIVE',
+          expirationDate: { lt: today },
+        },
+        select: {
+          id: true,
+          companyId: true,
+          planId: true,
+          quantity: true,
+          exercised: true,
+          employeeName: true,
+          shareholderId: true,
+          expirationDate: true,
+        },
+        take: BATCH_SIZE,
+      });
+
+      if (grants.length === 0) break;
+
+      for (const grant of grants) {
+        try {
+          await this.expireSingleGrant(grant);
+          totalExpired++;
+        } catch (error) {
+          this.logger.error(
+            `Failed to expire grant ${grant.id}: ${error instanceof Error ? error.message : String(error)}`,
+            error instanceof Error ? error.stack : undefined,
+          );
+        }
+      }
+    }
+
+    return totalExpired;
+  }
+
+  /**
+   * Expires a single grant: updates status, returns options to pool,
+   * cancels pending exercises, logs audit event, sends notification.
+   */
+  private async expireSingleGrant(grant: {
+    id: string;
+    companyId: string;
+    planId: string;
+    quantity: Prisma.Decimal;
+    exercised: Prisma.Decimal;
+    employeeName: string;
+    shareholderId: string | null;
+    expirationDate: Date;
+  }): Promise<void> {
+    const unexercised = grant.quantity.sub(grant.exercised);
+
+    await this.prisma.$transaction(async (tx) => {
+      // 1. Update grant status to EXPIRED
+      await tx.optionGrant.update({
+        where: { id: grant.id },
+        data: {
+          status: 'EXPIRED',
+          terminatedAt: new Date(),
+        },
+      });
+
+      // 2. Return unexercised options to the pool
+      if (unexercised.gt(0)) {
+        await tx.optionPlan.update({
+          where: { id: grant.planId },
+          data: {
+            totalGranted: { decrement: unexercised },
+          },
+        });
+      }
+
+      // 3. Cancel any pending exercise requests
+      await tx.optionExerciseRequest.updateMany({
+        where: {
+          grantId: grant.id,
+          status: 'PENDING_PAYMENT',
+        },
+        data: {
+          status: 'CANCELLED',
+          cancelledAt: new Date(),
+        },
+      });
+    });
+
+    // 4. Audit log (fire-and-forget)
+    this.auditLogService
+      .log({
+        actorType: 'SYSTEM',
+        action: 'OPTION_GRANT_EXPIRED',
+        resourceType: 'OptionGrant',
+        resourceId: grant.id,
+        companyId: grant.companyId,
+        changes: {
+          before: { status: 'ACTIVE' },
+          after: {
+            status: 'EXPIRED',
+            unexercisedReturned: unexercised.toString(),
+          },
+        },
+        metadata: { source: 'scheduler' },
+      })
+      .catch((err) =>
+        this.logger.warn(`Failed to log audit event for expired grant ${grant.id}: ${err.message}`),
+      );
+
+    // 5. Notify grantee (fire-and-forget)
+    this.notifyGrantExpired(grant).catch((err) =>
+      this.logger.warn(
+        `Failed to send expiration notification for grant ${grant.id}: ${err.message}`,
+      ),
+    );
+  }
+
+  /**
+   * Sends OPTIONS_EXPIRING notification to the grantee when their grant expires.
+   */
+  private async notifyGrantExpired(grant: {
+    id: string;
+    companyId: string;
+    employeeName: string;
+    shareholderId: string | null;
+    quantity: Prisma.Decimal;
+    exercised: Prisma.Decimal;
+  }): Promise<void> {
+    if (!grant.shareholderId) return;
+
+    const shareholder = await this.prisma.shareholder.findFirst({
+      where: { id: grant.shareholderId },
+      select: { userId: true },
+    });
+    if (!shareholder?.userId) return;
+
+    const company = await this.prisma.company.findUnique({
+      where: { id: grant.companyId },
+      select: { name: true },
+    });
+
+    const unexercised = grant.quantity.sub(grant.exercised);
+
+    await this.notificationService.create({
+      userId: shareholder.userId,
+      notificationType: 'OPTIONS_EXPIRING',
+      subject: `Options expired — ${company?.name ?? 'Company'}`,
+      body: `Your option grant of ${grant.quantity.toString()} options has expired. ${unexercised.toString()} unexercised options have been forfeited.`,
+      relatedEntityType: 'OptionGrant',
+      relatedEntityId: grant.id,
+      companyId: grant.companyId,
       companyName: company?.name ?? undefined,
     });
   }

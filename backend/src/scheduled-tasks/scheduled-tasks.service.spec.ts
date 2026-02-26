@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ScheduledTasksService } from './scheduled-tasks.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
 import { ConvertibleService } from '../convertible/convertible.service';
+import { OptionPlanService } from '../option-plan/option-plan.service';
 
 const mockAuditLogService = {
   computeDailyHash: jest.fn().mockResolvedValue(undefined),
@@ -11,10 +12,15 @@ const mockConvertibleService = {
   updateAccruedInterestForAll: jest.fn().mockResolvedValue(0),
 };
 
+const mockOptionPlanService = {
+  expireStaleGrants: jest.fn().mockResolvedValue(0),
+};
+
 describe('ScheduledTasksService', () => {
   let service: ScheduledTasksService;
   let auditLogService: typeof mockAuditLogService;
   let convertibleService: typeof mockConvertibleService;
+  let optionPlanService: typeof mockOptionPlanService;
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -24,12 +30,14 @@ describe('ScheduledTasksService', () => {
         ScheduledTasksService,
         { provide: AuditLogService, useValue: mockAuditLogService },
         { provide: ConvertibleService, useValue: mockConvertibleService },
+        { provide: OptionPlanService, useValue: mockOptionPlanService },
       ],
     }).compile();
 
     service = module.get<ScheduledTasksService>(ScheduledTasksService);
     auditLogService = module.get(AuditLogService);
     convertibleService = module.get(ConvertibleService);
+    optionPlanService = module.get(OptionPlanService);
   });
 
   describe('getYesterdayDateString', () => {
@@ -150,6 +158,45 @@ describe('ScheduledTasksService', () => {
     });
   });
 
+  describe('expireOptionGrants', () => {
+    it('should call optionPlanService.expireStaleGrants', async () => {
+      mockOptionPlanService.expireStaleGrants.mockResolvedValue(3);
+
+      await service.expireOptionGrants();
+
+      expect(optionPlanService.expireStaleGrants).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not throw when expireStaleGrants succeeds', async () => {
+      mockOptionPlanService.expireStaleGrants.mockResolvedValue(5);
+
+      await expect(service.expireOptionGrants()).resolves.not.toThrow();
+    });
+
+    it('should handle zero expired grants gracefully', async () => {
+      mockOptionPlanService.expireStaleGrants.mockResolvedValue(0);
+
+      await expect(service.expireOptionGrants()).resolves.not.toThrow();
+      expect(optionPlanService.expireStaleGrants).toHaveBeenCalledTimes(1);
+    });
+
+    it('should catch and log errors without rethrowing', async () => {
+      mockOptionPlanService.expireStaleGrants.mockRejectedValue(
+        new Error('Database connection failed'),
+      );
+
+      await expect(service.expireOptionGrants()).resolves.not.toThrow();
+      expect(optionPlanService.expireStaleGrants).toHaveBeenCalledTimes(1);
+    });
+
+    it('should catch non-Error exceptions without rethrowing', async () => {
+      mockOptionPlanService.expireStaleGrants.mockRejectedValue('string error');
+
+      await expect(service.expireOptionGrants()).resolves.not.toThrow();
+      expect(optionPlanService.expireStaleGrants).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('@Cron decorator', () => {
     it('should have computeDailyAuditHashChain as a method', () => {
       expect(typeof service.computeDailyAuditHashChain).toBe('function');
@@ -159,12 +206,17 @@ describe('ScheduledTasksService', () => {
       expect(typeof service.accrueConvertibleInterest).toBe('function');
     });
 
+    it('should have expireOptionGrants as a method', () => {
+      expect(typeof service.expireOptionGrants).toBe('function');
+    });
+
     it('should have the correct cron metadata', () => {
       // Verify the method exists and is decorated — NestJS Schedule module
       // reads the metadata at runtime. We verify the behavior, not the decorator.
       const proto = Object.getPrototypeOf(service);
       expect(proto.computeDailyAuditHashChain).toBeDefined();
       expect(proto.accrueConvertibleInterest).toBeDefined();
+      expect(proto.expireOptionGrants).toBeDefined();
     });
   });
 });

@@ -1,6 +1,6 @@
-# Navia MVP — Implementation Plan v67.0
+# Navia MVP — Implementation Plan v68.0
 
-> **Generated**: 2026-02-26 | **Tests**: 2821 passing (1802 backend + 1019 frontend) | **Backend modules**: 22 of 23 built
+> **Generated**: 2026-02-26 | **Tests**: 2838 passing (1819 backend + 1019 frontend) | **Backend modules**: 22 of 23 built
 >
 > **Purpose**: Prioritized bullet-point list of all remaining work, ordered by dependency and criticality.
 > Items marked with checkboxes. `[x]` = complete, `[ ]` = remaining.
@@ -175,7 +175,7 @@ Gaps in the 12 built modules, ordered by module.
 - [ ] `paymentDate` field on exercise confirmation (spec mentions it, not captured in DTO)
 - [ ] Custom vesting schedules beyond cliff + linear (spec mentions milestone-based vesting)
 - [ ] Terminated grant exercise window: validate 90-day window from termination date (logic exists but needs edge case review)
-- [ ] Auto-expire grants past expiration date (requires scheduled Bull job)
+- [x] Auto-expire grants past expiration date — DONE (v0.0.73): ScheduledTasksService.expireOptionGrants() runs at 02:00 UTC daily via `@Cron('0 0 2 * * *')`. Calls OptionPlanService.expireStaleGrants() which batch-processes (50/batch) all ACTIVE grants where expirationDate < today. Each grant: $transaction to set status=EXPIRED, return unexercised options to plan pool (decrement totalGranted), cancel PENDING_PAYMENT exercise requests. Fire-and-forget audit logging (OPTION_GRANT_EXPIRED, actorType SYSTEM) and OPTIONS_EXPIRING notification to grantee. 17 new tests (11 service + 6 cron).
 - [ ] Vesting milestone notifications (depends on P3 Notification module)
 
 ### Convertible Module

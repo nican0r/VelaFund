@@ -851,7 +851,7 @@ SIDE EFFECTS: None
 +-----+ +----------+ +---------+
 ```
 
-Note: EXERCISED transition is implemented via exercise confirmation ($transaction). EXPIRED transition is not yet automated (requires scheduled job).
+Note: EXERCISED transition is implemented via exercise confirmation ($transaction). EXPIRED transition is automated via daily scheduled job (see [Grant Auto-Expiration](#grant-auto-expiration-system-flow) below).
 
 ### Option Exercise Request Lifecycle
 
@@ -963,3 +963,74 @@ The vesting engine calculates real-time vesting status for each grant:
 | GET | /api/v1/companies/:companyId/option-exercises/:exerciseId | ADMIN, FINANCE, LEGAL | Get exercise detail |
 | POST | /api/v1/companies/:companyId/option-exercises/:exerciseId/confirm | ADMIN | Confirm payment, issue shares |
 | POST | /api/v1/companies/:companyId/option-exercises/:exerciseId/cancel | ADMIN | Cancel pending exercise |
+
+---
+
+## Grant Auto-Expiration (System Flow)
+
+**Feature**: Automatically expire ACTIVE option grants past their expiration date
+**Actors**: SYSTEM (scheduled job)
+**Preconditions**: Grant exists with status ACTIVE and expirationDate < today (UTC midnight)
+**Related Flows**: [Grant Creation](#happy-path-create-option-grant) — sets the expirationDate
+
+### Flow Map
+
+```
+Cron job fires at 02:00 UTC daily
+  │
+  ├─ [no expired grants] ─→ Log "0 grants expired", exit
+  │
+  └─ [expired grants found] ─→ Process in batches of 50
+        │
+        ├─ [per grant: $transaction succeeds]
+        │     │
+        │     ├─ Grant status → EXPIRED, terminatedAt set
+        │     ├─ Unexercised options returned to plan pool (totalGranted decremented)
+        │     ├─ Pending exercise requests → CANCELLED
+        │     ├─ Audit log: OPTION_GRANT_EXPIRED (fire-and-forget)
+        │     └─ Notification: OPTIONS_EXPIRING to grantee (fire-and-forget)
+        │           │
+        │           ├─ [shareholderId is null] ─→ Skip notification
+        │           ├─ [shareholder has no userId] ─→ Skip notification
+        │           └─ [shareholder has userId] ─→ Send notification
+        │
+        └─ [per grant: $transaction fails] ─→ Log error, continue to next grant
+```
+
+### Step-by-Step Flow
+
+```
+PRECONDITION: ScheduleModule is running, OptionPlanModule is imported by ScheduledTasksModule
+ACTOR: SYSTEM (ScheduledTasksService cron)
+TRIGGER: @Cron('0 0 2 * * *') — daily at 02:00 UTC
+
+1. [System] ScheduledTasksService.expireOptionGrants() fires
+2. [System] Calls OptionPlanService.expireStaleGrants()
+3. [Backend] Queries optionGrant.findMany WHERE status=ACTIVE AND expirationDate < today (UTC midnight)
+   → IF empty: return 0, STOP
+4. [Backend] For each grant in batch (up to 50):
+   a. [Backend] Runs $transaction:
+      - Updates grant: status=EXPIRED, terminatedAt=now
+      - If unexercised > 0: decrements optionPlan.totalGranted by unexercised amount
+      - Cancels all PENDING_PAYMENT exercise requests for this grant
+   b. [Backend] Fires audit event OPTION_GRANT_EXPIRED (actorType=SYSTEM, fire-and-forget)
+   c. [Backend] Sends OPTIONS_EXPIRING notification to grantee (fire-and-forget)
+      → IF grant.shareholderId is null: skip notification
+      → IF shareholder has no linked userId: skip notification
+   d. → IF $transaction fails: logs error, continues to next grant
+5. [System] Repeats step 3 until no more expired grants found
+6. [System] Logs total count of expired grants
+
+POSTCONDITION: All ACTIVE grants past expiration are now EXPIRED; unexercised options returned to pool
+SIDE EFFECTS: Audit log (OPTION_GRANT_EXPIRED), notification (OPTIONS_EXPIRING), pending exercises cancelled
+```
+
+### State Transitions
+
+| Entity | Field | Before | After | Trigger |
+|--------|-------|--------|-------|---------|
+| OptionGrant | status | ACTIVE | EXPIRED | expirationDate < today |
+| OptionGrant | terminatedAt | null | now() | Auto-expiration |
+| OptionPlan | totalGranted | N | N - unexercised | Pool return |
+| OptionExerciseRequest | status | PENDING_PAYMENT | CANCELLED | Parent grant expired |
+| OptionExerciseRequest | cancelledAt | null | now() | Parent grant expired |
