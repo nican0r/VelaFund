@@ -30,7 +30,7 @@
     "@aws-sdk/s3-request-presigner": "^3.997.0",
     "@nestjs/bull": "^11.0.4",
     "@nestjs/common": "^10.3.0",
-    "@nestjs/config": "^3.2.0",
+    "@nestjs/config": "^4.0.3",
     "@nestjs/core": "^10.3.0",
     "@nestjs/platform-express": "^10.3.0",
     "@nestjs/schedule": "^6.1.1",
